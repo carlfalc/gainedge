@@ -12,6 +12,7 @@ import DashboardHome from "./pages/dashboard/DashboardHome.tsx";
 import SignalsPage from "./pages/dashboard/SignalsPage.tsx";
 import JournalPage from "./pages/dashboard/JournalPage.tsx";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage.tsx";
+import InsightsPage from "./pages/dashboard/InsightsPage.tsx";
 import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
 import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
