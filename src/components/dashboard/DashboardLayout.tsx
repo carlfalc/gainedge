@@ -23,8 +23,11 @@ export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [userId, setUserId] = useState<string>();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useSeedData(userId);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -32,11 +35,15 @@ export default function DashboardLayout() {
         navigate("/");
       } else {
         setUserEmail(session.user.email || "");
+        setUserId(session.user.id);
       }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) navigate("/");
-      else setUserEmail(session.user.email || "");
+      else {
+        setUserEmail(session.user.email || "");
+        setUserId(session.user.id);
+      }
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
