@@ -356,7 +356,7 @@ export default function Index() {
       <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", background: scrolled ? C.nav : "transparent", backdropFilter: scrolled ? "blur(20px)" : "none", borderBottom: scrolled ? `1px solid ${C.border}` : "none", transition: "all .3s" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Zap size={22} color={C.jade} strokeWidth={2.5} />
-          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: -0.5 }}>TradingAI</span>
+          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: -0.5 }}>GAINEDGE</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {["Features", "How It Works", "Pricing", "FAQ"].map(n => (
