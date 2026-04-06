@@ -34,6 +34,7 @@ const App = () => (
             <Route path="signals" element={<SignalsPage />} />
             <Route path="journal" element={<JournalPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="insights" element={<InsightsPage />} />
             <Route path="backtesting" element={<BacktestingPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />
