@@ -316,6 +316,43 @@ export default function Index() {
   const [yr, setYr] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const [auth, setAuth] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // Check if already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate("/dashboard");
+    });
+  }, [navigate]);
+
+  const handleAuth = async () => {
+    if (!authEmail || !authPassword) { toast.error("Please fill all fields"); return; }
+    setAuthLoading(true);
+    try {
+      if (auth === "signup") {
+        const { error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+          options: { data: { full_name: authName }, emailRedirectTo: window.location.origin },
+        });
+        if (error) throw error;
+        toast.success("Check your email to confirm your account!");
+        setAuth("login");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+        if (error) throw error;
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Authentication failed");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   useEffect(() => {
     const f = () => setScrolled(window.scrollY > 40);
