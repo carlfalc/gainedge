@@ -12,6 +12,7 @@ import DashboardHome from "./pages/dashboard/DashboardHome.tsx";
 import SignalsPage from "./pages/dashboard/SignalsPage.tsx";
 import JournalPage from "./pages/dashboard/JournalPage.tsx";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage.tsx";
+import InsightsPage from "./pages/dashboard/InsightsPage.tsx";
 import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
 import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="signals" element={<SignalsPage />} />
             <Route path="journal" element={<JournalPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="insights" element={<InsightsPage />} />
             <Route path="backtesting" element={<BacktestingPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />

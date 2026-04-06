@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, ChevronLeft, ChevronRight, LogOut, User
+  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { label: "Signals", icon: Zap, path: "/dashboard/signals" },
   { label: "Trade Journal", icon: BookOpen, path: "/dashboard/journal" },
   { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
+  { label: "Insights", icon: Lightbulb, path: "/dashboard/insights" },
   { label: "Backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
   { label: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { label: "Settings", icon: Settings, path: "/dashboard/settings" },
