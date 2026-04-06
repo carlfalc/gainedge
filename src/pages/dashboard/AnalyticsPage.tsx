@@ -1,40 +1,76 @@
+import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell } from "recharts";
-
-const byInstrument = [
-  { name: "NAS100", pnl: 2580, wins: 8, losses: 2 },
-  { name: "US30", pnl: 1100, wins: 5, losses: 2 },
-  { name: "AUDUSD", pnl: 700, wins: 4, losses: 1 },
-  { name: "NZDUSD", pnl: 275, wins: 2, losses: 2 },
-  { name: "XAUUSD", pnl: 505, wins: 3, losses: 3 },
-];
-
-const bySession = [
-  { name: "London", pnl: 2800, winRate: 78 },
-  { name: "New York", pnl: 1600, winRate: 65 },
-  { name: "London/NY", pnl: 560, winRate: 80 },
-  { name: "Asian", pnl: 200, winRate: 50 },
-];
-
-const byDay = [
-  { name: "Mon", pnl: 1200 }, { name: "Tue", pnl: 800 }, { name: "Wed", pnl: -200 },
-  { name: "Thu", pnl: 1400 }, { name: "Fri", pnl: 1960 },
-];
-
-const winRateOverTime = [
-  { week: "W1", rate: 65 }, { week: "W2", rate: 72 }, { week: "W3", rate: 68 },
-  { week: "W4", rate: 75 }, { week: "W5", rate: 70 },
-];
+import { supabase } from "@/integrations/supabase/client";
 
 const tooltipStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, color: C.text };
 
 export default function AnalyticsPage() {
+  const [byInstrument, setByInstrument] = useState<any[]>([]);
+  const [byDay, setByDay] = useState<any[]>([]);
+  const [stats, setStats] = useState<{ label: string; value: string; color: string }[]>([]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, []);
+
+  const loadAnalytics = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data: signals } = await supabase
+      .from("signals")
+      .select("*")
+      .eq("user_id", session.user.id);
+    if (!signals) return;
+
+    const closed = signals.filter((s: any) => s.result !== "pending");
+
+    // By instrument
+    const instMap = new Map<string, { pnl: number; wins: number; losses: number }>();
+    closed.forEach((s: any) => {
+      const cur = instMap.get(s.symbol) || { pnl: 0, wins: 0, losses: 0 };
+      cur.pnl += s.pnl || 0;
+      if (s.result === "win") cur.wins++;
+      else if (s.result === "loss") cur.losses++;
+      instMap.set(s.symbol, cur);
+    });
+    setByInstrument(Array.from(instMap.entries()).map(([name, d]) => ({ name, ...d })));
+
+    // By day of week
+    const dayMap = new Map<string, number>();
+    ["Mon", "Tue", "Wed", "Thu", "Fri"].forEach(d => dayMap.set(d, 0));
+    closed.forEach((s: any) => {
+      if (s.closed_at) {
+        const day = new Date(s.closed_at).toLocaleDateString("en-US", { weekday: "short" });
+        dayMap.set(day, (dayMap.get(day) || 0) + (s.pnl || 0));
+      }
+    });
+    setByDay(Array.from(dayMap.entries()).map(([name, pnl]) => ({ name, pnl })));
+
+    // Stats
+    const wins = closed.filter((s: any) => s.result === "win");
+    const losses = closed.filter((s: any) => s.result === "loss");
+    const totalPnl = closed.reduce((sum: number, s: any) => sum + (s.pnl || 0), 0);
+    const avgWin = wins.length ? wins.reduce((s: number, w: any) => s + (w.pnl || 0), 0) / wins.length : 0;
+    const avgLoss = losses.length ? Math.abs(losses.reduce((s: number, l: any) => s + (l.pnl || 0), 0) / losses.length) : 1;
+
+    setStats([
+      { label: "Total Trades", value: String(closed.length), color: C.purple },
+      { label: "Win Rate", value: `${closed.length ? Math.round((wins.length / closed.length) * 100) : 0}%`, color: C.jade },
+      { label: "Profit Factor", value: avgLoss > 0 ? (avgWin / avgLoss).toFixed(2) : "—", color: C.blue },
+      { label: "Net P&L", value: `$${totalPnl.toLocaleString()}`, color: totalPnl >= 0 ? C.green : C.red },
+      { label: "Avg Win", value: `$${Math.round(avgWin).toLocaleString()}`, color: C.green },
+      { label: "Avg Loss", value: `-$${Math.round(avgLoss).toLocaleString()}`, color: C.red },
+      { label: "Max Win Streak", value: String(getMaxStreak(closed, "win")), color: C.green },
+      { label: "Expectancy", value: `$${closed.length ? Math.round(totalPnl / closed.length) : 0}/trade`, color: C.jade },
+    ]);
+  };
+
   return (
     <div style={{ maxWidth: 1200 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 20 }}>Analytics</h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-        {/* By Instrument */}
         <ChartCard title="P&L by Instrument">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={byInstrument}>
@@ -51,20 +87,6 @@ export default function AnalyticsPage() {
           </ResponsiveContainer>
         </ChartCard>
 
-        {/* By Session */}
-        <ChartCard title="P&L by Session">
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={bySession}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-              <XAxis dataKey="name" tick={{ fill: C.sec, fontSize: 11 }} axisLine={false} />
-              <YAxis tick={{ fill: C.sec, fontSize: 11 }} axisLine={false} />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Bar dataKey="pnl" fill={C.blue} radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-
-        {/* By Day */}
         <ChartCard title="P&L by Day of Week">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={byDay}>
@@ -80,34 +102,25 @@ export default function AnalyticsPage() {
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
-
-        {/* Win Rate Over Time */}
-        <ChartCard title="Win Rate Over Time">
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={winRateOverTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-              <XAxis dataKey="week" tick={{ fill: C.sec, fontSize: 11 }} axisLine={false} />
-              <YAxis tick={{ fill: C.sec, fontSize: 11 }} axisLine={false} domain={[50, 100]} />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Line type="monotone" dataKey="rate" stroke={C.jade} strokeWidth={2} dot={{ fill: C.jade, r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartCard>
       </div>
 
-      {/* Stats Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-        <StatBox label="Best Setup" value="EMA Cross + London" color={C.jade} />
-        <StatBox label="Worst Setup" value="Counter-trend Asian" color={C.red} />
-        <StatBox label="Avg Hold Time" value="47 min" color={C.blue} />
-        <StatBox label="Max Win Streak" value="5 trades" color={C.green} />
-        <StatBox label="Max Loss Streak" value="2 trades" color={C.red} />
-        <StatBox label="Total Trades" value="30" color={C.purple} />
-        <StatBox label="Avg R-Multiple" value="1.6R" color={C.orange} />
-        <StatBox label="Expectancy" value="$172/trade" color={C.jade} />
+        {stats.map(s => (
+          <StatBox key={s.label} label={s.label} value={s.value} color={s.color} />
+        ))}
       </div>
     </div>
   );
+}
+
+function getMaxStreak(signals: any[], type: string): number {
+  let max = 0, cur = 0;
+  const sorted = [...signals].sort((a, b) => new Date(a.closed_at || a.created_at).getTime() - new Date(b.closed_at || b.created_at).getTime());
+  sorted.forEach(s => {
+    if (s.result === type) { cur++; max = Math.max(max, cur); }
+    else cur = 0;
+  });
+  return max;
 }
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {

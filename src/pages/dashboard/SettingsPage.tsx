@@ -1,26 +1,73 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { User, Bell, Sliders, CreditCard, AlertTriangle } from "lucide-react";
+import { useProfile } from "@/hooks/use-profile";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const [name, setName] = useState("Demo Trader");
-  const [email] = useState("trader@example.com");
-  const [timeframe, setTimeframe] = useState("15m");
-  const [candle, setCandle] = useState("heiken-ashi");
+  const { profile, loading, updateProfile, userId } = useProfile();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [timeframe, setTimeframe] = useState("15");
+  const [candle, setCandle] = useState("heiken_ashi");
   const [emaFast, setEmaFast] = useState("4");
   const [emaSlow, setEmaSlow] = useState("17");
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [pushAlerts, setPushAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [broker, setBroker] = useState("eightcap");
+  const [instruments, setInstruments] = useState<string[]>([]);
 
-  const instruments = ["NAS100", "US30", "AUDUSD", "NZDUSD", "XAUUSD"];
+  useEffect(() => {
+    if (profile) {
+      setName(profile.full_name || "");
+      setTimeframe(profile.default_timeframe);
+      setCandle(profile.default_candle_type);
+      setEmaFast(String(profile.ema_fast));
+      setEmaSlow(String(profile.ema_slow));
+      setEmailAlerts(profile.email_alerts);
+      setPushAlerts(profile.push_notifications);
+      setSmsAlerts(profile.sms_alerts);
+      setBroker(profile.broker);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setEmail(session.user.email || "");
+    });
+    if (userId) {
+      supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
+        if (data) setInstruments(data.map(d => d.symbol));
+      });
+    }
+  }, [userId]);
+
+  const handleSave = async () => {
+    await updateProfile({
+      full_name: name,
+      default_timeframe: timeframe,
+      default_candle_type: candle,
+      ema_fast: parseInt(emaFast),
+      ema_slow: parseInt(emaSlow),
+      email_alerts: emailAlerts,
+      push_notifications: pushAlerts,
+      sms_alerts: smsAlerts,
+      broker,
+    });
+    toast.success("Settings saved");
+  };
+
+  if (loading) return <div style={{ color: C.sec }}>Loading...</div>;
+
+  const tierLabel = profile?.subscription_tier === "elite" ? "Elite" : profile?.subscription_tier === "trader" ? "Trader" : "Scout";
+  const statusLabel = profile?.subscription_status === "active" ? "ACTIVE" : profile?.subscription_status === "trial" ? "TRIAL" : profile?.subscription_status?.toUpperCase();
 
   return (
     <div style={{ maxWidth: 700 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 24 }}>Settings</h1>
 
-      {/* Profile */}
       <Section icon={<User size={16} color={C.jade} />} title="Profile">
         <Field label="Full Name">
           <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
@@ -30,9 +77,8 @@ export default function SettingsPage() {
         </Field>
       </Section>
 
-      {/* Instruments */}
       <Section icon={<Sliders size={16} color={C.blue} />} title="Instruments">
-        <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>Current watchlist ({instruments.length}/10 — Trader tier):</div>
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>Current watchlist ({instruments.length}/10 — {tierLabel} tier):</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
           {instruments.map(i => (
             <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: C.jade + "18", color: C.jade }}>{i}</span>
@@ -41,17 +87,16 @@ export default function SettingsPage() {
         <button style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>+ Add Instrument</button>
       </Section>
 
-      {/* Preferences */}
       <Section icon={<Sliders size={16} color={C.purple} />} title="Preferences">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Default Timeframe">
             <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={inputStyle}>
-              {["1m", "5m", "15m", "30m", "1h", "4h", "1D"].map(t => <option key={t} value={t}>{t}</option>)}
+              {["1", "5", "15", "30", "60", "240", "1440"].map(t => <option key={t} value={t}>{t === "60" ? "1h" : t === "240" ? "4h" : t === "1440" ? "1D" : t + "m"}</option>)}
             </select>
           </Field>
           <Field label="Candle Type">
             <select value={candle} onChange={e => setCandle(e.target.value)} style={inputStyle}>
-              <option value="heiken-ashi">Heiken Ashi</option>
+              <option value="heiken_ashi">Heiken Ashi</option>
               <option value="standard">Standard</option>
               <option value="renko">Renko</option>
             </select>
@@ -65,14 +110,12 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      {/* Notifications */}
       <Section icon={<Bell size={16} color={C.amber} />} title="Notifications">
         <Toggle label="Email Alerts" checked={emailAlerts} onChange={setEmailAlerts} />
         <Toggle label="Push Notifications" checked={pushAlerts} onChange={setPushAlerts} />
         <Toggle label="SMS Alerts" checked={smsAlerts} onChange={setSmsAlerts} />
       </Section>
 
-      {/* Broker */}
       <Section icon={<Sliders size={16} color={C.orange} />} title="Broker">
         <Field label="Select Broker">
           <select value={broker} onChange={e => setBroker(e.target.value)} style={inputStyle}>
@@ -85,20 +128,24 @@ export default function SettingsPage() {
         <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Used for correct symbol mapping.</div>
       </Section>
 
-      {/* Subscription */}
       <Section icon={<CreditCard size={16} color={C.jade} />} title="Subscription">
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Trader Plan</span>
-          <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: C.jade + "20", color: C.jade }}>ACTIVE</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{tierLabel} Plan</span>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: C.jade + "20", color: C.jade }}>{statusLabel}</span>
         </div>
-        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>$59/mo • 10 instruments • Real-time signals</div>
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>
+          {profile?.subscription_tier === "trader" ? "$59/mo • 10 instruments • Real-time signals" : profile?.subscription_tier === "elite" ? "$129/mo • Unlimited instruments • Priority AI" : "Free • 3 instruments • Daily signals"}
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`, color: C.bg }}>Upgrade to Elite</button>
           <button style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>Downgrade</button>
         </div>
       </Section>
 
-      {/* Danger */}
+      <button onClick={handleSave} style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`, color: C.bg, padding: "12px 32px", fontSize: 14, marginBottom: 16 }}>
+        Save All Settings
+      </button>
+
       <Section icon={<AlertTriangle size={16} color={C.red} />} title="Danger Zone">
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>This action cannot be undone. All data will be permanently deleted.</div>
         <button style={{ ...btnStyle, background: C.red + "20", color: C.red, border: `1px solid ${C.red}30` }}>Delete Account</button>
