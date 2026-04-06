@@ -6,6 +6,7 @@ import {
   Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
+import { useSeedData } from "@/hooks/use-seed-data";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
