@@ -1,42 +1,211 @@
-#root {
-  max-width: 1280px;
+/* Global utility styles for TradingAI landing page */
+
+.sec {
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 0 24px;
+}
+
+.lbl {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--jade);
+  margin-bottom: 10px;
+}
+
+.ttl {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.5px;
+}
+
+.sub {
+  font-size: 16px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-top: 10px;
+  max-width: 600px;
+}
+
+/* Primary button */
+.bp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bg-deep);
+  background: linear-gradient(135deg, var(--jade), var(--teal));
+  transition: all 0.25s;
+  box-shadow: 0 4px 20px rgba(0, 207, 165, 0.19);
+}
+.bp:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 207, 165, 0.25);
+}
+
+/* Ghost button */
+.bg2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1.5px solid var(--border-subtle);
+  transition: all 0.25s;
+}
+.bg2:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+  background: var(--card-bg);
+}
+
+/* Nav item */
+.ni {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: none;
+  font-family: 'DM Sans', sans-serif;
+}
+.ni:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Card */
+.cd {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  transition: all 0.3s;
+}
+.cd:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* Check item */
+.ci {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding: 5px 0;
+}
+
+/* Tab button */
+.tb {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.tb:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+.tb.ac {
+  color: var(--jade);
+  background: rgba(0, 207, 165, 0.07);
+  border-color: rgba(0, 207, 165, 0.19);
+}
+
+/* FAQ */
+.fq {
+  border-bottom: 1px solid var(--border-subtle);
+}
+.fqq {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+.fqq:hover {
+  color: var(--jade);
+}
+.fqa {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  padding-bottom: 20px;
+}
+
+/* Hover-reveal cards */
+.hc {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
+  cursor: pointer;
+  transition: all 0.4s;
+  min-height: 170px;
+  justify-content: center;
 }
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+.hc:hover {
+  border-color: rgba(0, 207, 165, 0.19);
+  background: linear-gradient(180deg, var(--card-bg), rgba(0, 207, 165, 0.02));
+  transform: translateY(-4px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
+.hc .hcd {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all 0.4s;
+  margin-top: 0;
 }
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.hc:hover .hcd {
+  max-height: 80px;
+  opacity: 1;
+  margin-top: 8px;
 }
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.hc .hci {
+  margin-bottom: 12px;
+  transition: transform 0.3s;
 }
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+.hc:hover .hci {
+  transform: scale(1.1);
 }
