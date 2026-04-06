@@ -604,7 +604,7 @@ export default function Index() {
             <div style={{ maxWidth: 260 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <Zap size={20} color={C.jade} strokeWidth={2.5} />
-                <span style={{ fontWeight: 800, fontSize: 17 }}>TradingAI</span>
+                <span style={{ fontWeight: 800, fontSize: 17 }}>GAINEDGE</span>
               </div>
               <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>Artificial intelligence powered trading platform.</p>
             </div>
