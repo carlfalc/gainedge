@@ -14,7 +14,418 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      backtest_results: {
+        Row: {
+          avg_rr: number
+          candle_type: string
+          created_at: string
+          ema_fast: number
+          ema_slow: number
+          equity_curve: Json | null
+          expectancy: number
+          id: string
+          max_drawdown: number
+          net_pnl: number
+          period_months: number
+          profit_factor: number
+          sharpe_ratio: number | null
+          symbol: string
+          timeframe: string
+          total_trades: number
+          user_id: string
+          win_rate: number
+        }
+        Insert: {
+          avg_rr: number
+          candle_type: string
+          created_at?: string
+          ema_fast: number
+          ema_slow: number
+          equity_curve?: Json | null
+          expectancy: number
+          id?: string
+          max_drawdown: number
+          net_pnl: number
+          period_months: number
+          profit_factor: number
+          sharpe_ratio?: number | null
+          symbol: string
+          timeframe: string
+          total_trades: number
+          user_id: string
+          win_rate: number
+        }
+        Update: {
+          avg_rr?: number
+          candle_type?: string
+          created_at?: string
+          ema_fast?: number
+          ema_slow?: number
+          equity_curve?: Json | null
+          expectancy?: number
+          id?: string
+          max_drawdown?: number
+          net_pnl?: number
+          period_months?: number
+          profit_factor?: number
+          sharpe_ratio?: number | null
+          symbol?: string
+          timeframe?: string
+          total_trades?: number
+          user_id?: string
+          win_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backtest_results_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insights: {
+        Row: {
+          created_at: string
+          data: Json | null
+          description: string
+          estimated_impact: number | null
+          id: string
+          insight_type: string
+          severity: string | null
+          symbol: string | null
+          title: string
+          user_id: string
+          week_start: string | null
+        }
+        Insert: {
+          created_at?: string
+          data?: Json | null
+          description: string
+          estimated_impact?: number | null
+          id?: string
+          insight_type: string
+          severity?: string | null
+          symbol?: string | null
+          title: string
+          user_id: string
+          week_start?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json | null
+          description?: string
+          estimated_impact?: number | null
+          id?: string
+          insight_type?: string
+          severity?: string | null
+          symbol?: string | null
+          title?: string
+          user_id?: string
+          week_start?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_entries: {
+        Row: {
+          created_at: string
+          entry_date: string
+          id: string
+          mood: string | null
+          notes: string | null
+          session_summary: string | null
+          tags: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entry_date: string
+          id?: string
+          mood?: string | null
+          notes?: string | null
+          session_summary?: string | null
+          tags?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entry_date?: string
+          id?: string
+          mood?: string | null
+          notes?: string | null
+          session_summary?: string | null
+          tags?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          broker: string
+          created_at: string
+          default_candle_type: string
+          default_timeframe: string
+          ema_fast: number
+          ema_slow: number
+          email_alerts: boolean
+          full_name: string | null
+          id: string
+          push_notifications: boolean
+          sms_alerts: boolean
+          subscription_status: string
+          subscription_tier: string
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          broker?: string
+          created_at?: string
+          default_candle_type?: string
+          default_timeframe?: string
+          ema_fast?: number
+          ema_slow?: number
+          email_alerts?: boolean
+          full_name?: string | null
+          id: string
+          push_notifications?: boolean
+          sms_alerts?: boolean
+          subscription_status?: string
+          subscription_tier?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          broker?: string
+          created_at?: string
+          default_candle_type?: string
+          default_timeframe?: string
+          ema_fast?: number
+          ema_slow?: number
+          email_alerts?: boolean
+          full_name?: string | null
+          id?: string
+          push_notifications?: boolean
+          sms_alerts?: boolean
+          subscription_status?: string
+          subscription_tier?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      scan_results: {
+        Row: {
+          adx: number | null
+          candle_type: string
+          confidence: number
+          direction: string
+          ema_crossover_direction: string | null
+          ema_crossover_status: string
+          ema_fast_value: number | null
+          ema_slow_value: number | null
+          entry_price: number | null
+          id: string
+          macd_status: string | null
+          reasoning: string
+          risk_reward: string | null
+          rsi: number | null
+          scanned_at: string
+          session: string
+          stoch_rsi: number | null
+          stop_loss: number | null
+          supertrend_status: string | null
+          symbol: string
+          take_profit: number | null
+          timeframe: string
+          user_id: string
+          verdict: string
+        }
+        Insert: {
+          adx?: number | null
+          candle_type: string
+          confidence: number
+          direction: string
+          ema_crossover_direction?: string | null
+          ema_crossover_status?: string
+          ema_fast_value?: number | null
+          ema_slow_value?: number | null
+          entry_price?: number | null
+          id?: string
+          macd_status?: string | null
+          reasoning: string
+          risk_reward?: string | null
+          rsi?: number | null
+          scanned_at?: string
+          session: string
+          stoch_rsi?: number | null
+          stop_loss?: number | null
+          supertrend_status?: string | null
+          symbol: string
+          take_profit?: number | null
+          timeframe: string
+          user_id: string
+          verdict: string
+        }
+        Update: {
+          adx?: number | null
+          candle_type?: string
+          confidence?: number
+          direction?: string
+          ema_crossover_direction?: string | null
+          ema_crossover_status?: string
+          ema_fast_value?: number | null
+          ema_slow_value?: number | null
+          entry_price?: number | null
+          id?: string
+          macd_status?: string | null
+          reasoning?: string
+          risk_reward?: string | null
+          rsi?: number | null
+          scanned_at?: string
+          session?: string
+          stoch_rsi?: number | null
+          stop_loss?: number | null
+          supertrend_status?: string | null
+          symbol?: string
+          take_profit?: number | null
+          timeframe?: string
+          user_id?: string
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_results_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signals: {
+        Row: {
+          closed_at: string | null
+          confidence: number
+          created_at: string
+          direction: string
+          entry_price: number
+          id: string
+          notes: string | null
+          pnl: number | null
+          result: string
+          risk_reward: string
+          scan_result_id: string | null
+          stop_loss: number
+          symbol: string
+          take_profit: number
+          user_id: string
+        }
+        Insert: {
+          closed_at?: string | null
+          confidence: number
+          created_at?: string
+          direction: string
+          entry_price: number
+          id?: string
+          notes?: string | null
+          pnl?: number | null
+          result?: string
+          risk_reward: string
+          scan_result_id?: string | null
+          stop_loss: number
+          symbol: string
+          take_profit: number
+          user_id: string
+        }
+        Update: {
+          closed_at?: string | null
+          confidence?: number
+          created_at?: string
+          direction?: string
+          entry_price?: number
+          id?: string
+          notes?: string | null
+          pnl?: number | null
+          result?: string
+          risk_reward?: string
+          scan_result_id?: string | null
+          stop_loss?: number
+          symbol?: string
+          take_profit?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signals_scan_result_id_fkey"
+            columns: ["scan_result_id"]
+            isOneToOne: false
+            referencedRelation: "scan_results"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_instruments: {
+        Row: {
+          added_at: string
+          broker_symbol: string | null
+          id: string
+          symbol: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          broker_symbol?: string | null
+          id?: string
+          symbol: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          broker_symbol?: string | null
+          id?: string
+          symbol?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_instruments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
