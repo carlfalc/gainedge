@@ -626,7 +626,7 @@ export default function Index() {
             ))}
           </div>
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <span style={{ fontSize: 12, color: C.muted }}>© 2026 TradingAI. All rights reserved.</span>
+            <span style={{ fontSize: 12, color: C.muted }}>© 2026 GAINEDGE. All rights reserved.</span>
             <span style={{ fontSize: 11, color: C.muted }}>Not financial advice. Past performance is not indicative of future results.</span>
           </div>
         </div>
