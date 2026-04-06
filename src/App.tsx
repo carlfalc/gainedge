@@ -5,6 +5,14 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import DashboardLayout from "./components/dashboard/DashboardLayout.tsx";
+import DashboardHome from "./pages/dashboard/DashboardHome.tsx";
+import SignalsPage from "./pages/dashboard/SignalsPage.tsx";
+import JournalPage from "./pages/dashboard/JournalPage.tsx";
+import AnalyticsPage from "./pages/dashboard/AnalyticsPage.tsx";
+import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
+import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
+import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +24,15 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route index element={<DashboardHome />} />
+            <Route path="signals" element={<SignalsPage />} />
+            <Route path="journal" element={<JournalPage />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="backtesting" element={<BacktestingPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   Zap, Shield, BarChart3, Bell, Brain, Target, Calendar, Filter,
   TrendingUp, RefreshCw, Layers, BookOpen, Save, Clock, Maximize2,
@@ -313,6 +316,43 @@ export default function Index() {
   const [yr, setYr] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const [auth, setAuth] = useState<string | null>(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // Check if already logged in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) navigate("/dashboard");
+    });
+  }, [navigate]);
+
+  const handleAuth = async () => {
+    if (!authEmail || !authPassword) { toast.error("Please fill all fields"); return; }
+    setAuthLoading(true);
+    try {
+      if (auth === "signup") {
+        const { error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+          options: { data: { full_name: authName }, emailRedirectTo: window.location.origin },
+        });
+        if (error) throw error;
+        toast.success("Check your email to confirm your account!");
+        setAuth("login");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+        if (error) throw error;
+        navigate("/dashboard");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Authentication failed");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   useEffect(() => {
     const f = () => setScrolled(window.scrollY > 40);
@@ -331,19 +371,30 @@ export default function Index() {
             <button onClick={() => setAuth(null)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: C.muted }}><X size={18} /></button>
             <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{auth === "login" ? "Welcome back" : "Get started free"}</h2>
             <p style={{ fontSize: 13, color: C.sec, marginBottom: 24 }}>{auth === "login" ? "Log in to your dashboard" : "14-day free trial. No card required."}</p>
-            {["Email", auth === "signup" ? "Full Name" : null, "Password"].filter(Boolean).map(f => (
-              <div key={f} style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>{f}</label>
-                <input
-                  type={f === "Password" ? "password" : f === "Email" ? "email" : "text"}
-                  placeholder={f === "Email" ? "you@example.com" : f === "Password" ? "••••••••" : "Your name"}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Email</label>
+              <input type="email" placeholder="you@example.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+                onFocus={e => (e.target.style.borderColor = C.jade + "60")} onBlur={e => (e.target.style.borderColor = C.border)} />
+            </div>
+            {auth === "signup" && (
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Full Name</label>
+                <input type="text" placeholder="Your name" value={authName} onChange={e => setAuthName(e.target.value)}
                   style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
-                  onFocus={e => (e.target.style.borderColor = C.jade + "60")}
-                  onBlur={e => (e.target.style.borderColor = C.border)}
-                />
+                  onFocus={e => (e.target.style.borderColor = C.jade + "60")} onBlur={e => (e.target.style.borderColor = C.border)} />
               </div>
-            ))}
-            <button className="bp" style={{ width: "100%", justifyContent: "center", marginTop: 8 }}>{auth === "login" ? "Log In" : "Start Free Trial →"}</button>
+            )}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Password</label>
+              <input type="password" placeholder="••••••••" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+                onFocus={e => (e.target.style.borderColor = C.jade + "60")} onBlur={e => (e.target.style.borderColor = C.border)}
+                onKeyDown={e => e.key === "Enter" && handleAuth()} />
+            </div>
+            <button className="bp" onClick={handleAuth} disabled={authLoading} style={{ width: "100%", justifyContent: "center", marginTop: 8, opacity: authLoading ? 0.7 : 1 }}>
+              {authLoading ? "Please wait..." : auth === "login" ? "Log In" : "Start Free Trial →"}
+            </button>
             <p style={{ textAlign: "center", fontSize: 13, color: C.sec, marginTop: 16 }}>
               {auth === "login" ? "New here? " : "Already have an account? "}
               <span onClick={() => setAuth(auth === "login" ? "signup" : "login")} style={{ color: C.jade, cursor: "pointer", fontWeight: 600 }}>{auth === "login" ? "Create account" : "Log in"}</span>
