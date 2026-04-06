@@ -356,7 +356,7 @@ export default function Index() {
       <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", background: scrolled ? C.nav : "transparent", backdropFilter: scrolled ? "blur(20px)" : "none", borderBottom: scrolled ? `1px solid ${C.border}` : "none", transition: "all .3s" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <Zap size={22} color={C.jade} strokeWidth={2.5} />
-          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: -0.5 }}>TradingAI</span>
+          <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: -0.5 }}>GAINEDGE</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {["Features", "How It Works", "Pricing", "FAQ"].map(n => (
@@ -604,7 +604,7 @@ export default function Index() {
             <div style={{ maxWidth: 260 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <Zap size={20} color={C.jade} strokeWidth={2.5} />
-                <span style={{ fontWeight: 800, fontSize: 17 }}>TradingAI</span>
+                <span style={{ fontWeight: 800, fontSize: 17 }}>GAINEDGE</span>
               </div>
               <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>Artificial intelligence powered trading platform.</p>
             </div>
@@ -626,7 +626,7 @@ export default function Index() {
             ))}
           </div>
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <span style={{ fontSize: 12, color: C.muted }}>© 2026 TradingAI. All rights reserved.</span>
+            <span style={{ fontSize: 12, color: C.muted }}>© 2026 GAINEDGE. All rights reserved.</span>
             <span style={{ fontSize: 11, color: C.muted }}>Not financial advice. Past performance is not indicative of future results.</span>
           </div>
         </div>
