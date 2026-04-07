@@ -138,6 +138,50 @@ export default function SettingsPage() {
         <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Used for correct symbol mapping.</div>
       </Section>
 
+      <Section icon={<Key size={16} color={C.cyan} />} title="API Access">
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>Use this key to connect your Claude Code analysis engine to GAINEDGE.</div>
+        {apiKey ? (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <input
+                readOnly
+                value={apiKeyVisible ? apiKey : "•".repeat(32)}
+                style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, flex: 1 }}
+              />
+              <button onClick={() => setApiKeyVisible(!apiKeyVisible)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, padding: "9px 10px" }}>
+                {apiKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+              <button onClick={() => { navigator.clipboard.writeText(apiKey); toast.success("API key copied"); }} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, padding: "9px 10px" }}>
+                <Copy size={14} />
+              </button>
+            </div>
+            {apiLastUsed && <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Last used: {new Date(apiLastUsed).toLocaleString()}</div>}
+          </>
+        ) : (
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>No API key generated yet.</div>
+        )}
+        <button
+          disabled={generatingKey}
+          onClick={async () => {
+            if (!userId) return;
+            setGeneratingKey(true);
+            const newKey = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
+            if (apiKey) {
+              await supabase.from("api_keys").delete().eq("user_id", userId);
+            }
+            await supabase.from("api_keys").insert({ user_id: userId, key: newKey });
+            setApiKey(newKey);
+            setApiKeyVisible(true);
+            setApiLastUsed(null);
+            setGeneratingKey(false);
+            toast.success("New API key generated");
+          }}
+          style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <RefreshCw size={12} /> {apiKey ? "Regenerate Key" : "Generate API Key"}
+        </button>
+      </Section>
+
       <Section icon={<CreditCard size={16} color={C.jade} />} title="Subscription">
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{tierLabel} Plan</span>
