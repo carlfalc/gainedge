@@ -45,6 +45,12 @@ export default function SettingsPage() {
       supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
         if (data) setInstruments(data.map(d => d.symbol));
       });
+      supabase.from("api_keys").select("key, last_used_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).then(({ data }) => {
+        if (data && data.length > 0) {
+          setApiKey(data[0].key);
+          setApiLastUsed(data[0].last_used_at);
+        }
+      });
     }
   }, [userId]);
 
