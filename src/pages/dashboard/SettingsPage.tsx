@@ -18,6 +18,10 @@ export default function SettingsPage() {
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [broker, setBroker] = useState("eightcap");
   const [instruments, setInstruments] = useState<string[]>([]);
+  const [apiKey, setApiKey] = useState("");
+  const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [apiLastUsed, setApiLastUsed] = useState<string | null>(null);
+  const [generatingKey, setGeneratingKey] = useState(false);
 
   useEffect(() => {
     if (profile) {
