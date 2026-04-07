@@ -5,6 +5,8 @@ import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
 import { AlertTriangle, Play, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
+import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 
 interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
@@ -92,6 +94,8 @@ export default function DashboardHome() {
 
   return (
     <div style={{ maxWidth: 1200 }}>
+      <LiveTradeAlert />
+      <BreakingNewsTicker />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         <SpinCard front={{ label: "Net P&L", value: `$${stats.netPnl.toLocaleString()}`, sub: stats.netPnl >= 0 ? "▲ Profitable" : "▼ Drawdown" }} back={{ label: "Detail", value: `${stats.wins} wins, ${stats.losses} losses` }} color={stats.netPnl >= 0 ? C.green : C.red} delay={0} />
         <SpinCard front={{ label: "Win Rate", value: `${winRate}%`, sub: `${stats.wins}/${totalTrades} trades` }} back={{ label: "Detail", value: "Based on closed signals" }} color={C.jade} delay={500} />

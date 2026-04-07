@@ -214,6 +214,36 @@ export type Database = {
           },
         ]
       }
+      news_items: {
+        Row: {
+          created_at: string
+          headline: string
+          id: string
+          impact: string | null
+          instruments_affected: string[] | null
+          published_at: string
+          source: string | null
+        }
+        Insert: {
+          created_at?: string
+          headline: string
+          id?: string
+          impact?: string | null
+          instruments_affected?: string[] | null
+          published_at?: string
+          source?: string | null
+        }
+        Update: {
+          created_at?: string
+          headline?: string
+          id?: string
+          impact?: string | null
+          instruments_affected?: string[] | null
+          published_at?: string
+          source?: string | null
+        }
+        Relationships: []
+      }
       platform_config: {
         Row: {
           created_at: string
