@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
-import { User, Bell, Sliders, CreditCard, AlertTriangle } from "lucide-react";
+import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
