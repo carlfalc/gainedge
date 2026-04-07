@@ -25,6 +25,12 @@ export default function SignalsPage() {
 
   useEffect(() => {
     loadSignals();
+
+    const channel = supabase.channel('signals-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, () => loadSignals())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const loadSignals = async () => {
