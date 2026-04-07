@@ -30,6 +30,15 @@ export default function DashboardHome() {
 
   useEffect(() => {
     loadData();
+
+    // Realtime subscription for scan_results
+    const channel = supabase.channel('dashboard-scans')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scan_results' }, () => loadData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'signals' }, () => loadData())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'signals' }, () => loadData())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const loadData = async () => {
