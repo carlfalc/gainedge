@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
-import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const ADMIN_EMAIL = "falconercarlandrew@gmail.com";
 
 export default function SettingsPage() {
   const { profile, loading, updateProfile, userId } = useProfile();
@@ -18,10 +20,7 @@ export default function SettingsPage() {
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [broker, setBroker] = useState("eightcap");
   const [instruments, setInstruments] = useState<string[]>([]);
-  const [apiKey, setApiKey] = useState("");
-  const [apiKeyVisible, setApiKeyVisible] = useState(false);
-  const [apiLastUsed, setApiLastUsed] = useState<string | null>(null);
-  const [generatingKey, setGeneratingKey] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -39,17 +38,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setEmail(session.user.email || "");
+      if (session) {
+        setEmail(session.user.email || "");
+        setIsAdmin(session.user.email === ADMIN_EMAIL);
+      }
     });
     if (userId) {
       supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
         if (data) setInstruments(data.map(d => d.symbol));
-      });
-      supabase.from("api_keys").select("key, last_used_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(1).then(({ data }) => {
-        if (data && data.length > 0) {
-          setApiKey(data[0].key);
-          setApiLastUsed(data[0].last_used_at);
-        }
       });
     }
   }, [userId]);
@@ -138,50 +134,6 @@ export default function SettingsPage() {
         <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Used for correct symbol mapping.</div>
       </Section>
 
-      <Section icon={<Key size={16} color={C.cyan} />} title="API Access">
-        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>Use this key to connect your Claude Code analysis engine to GAINEDGE.</div>
-        {apiKey ? (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <input
-                readOnly
-                value={apiKeyVisible ? apiKey : "•".repeat(32)}
-                style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, flex: 1 }}
-              />
-              <button onClick={() => setApiKeyVisible(!apiKeyVisible)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, padding: "9px 10px" }}>
-                {apiKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-              <button onClick={() => { navigator.clipboard.writeText(apiKey); toast.success("API key copied"); }} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, padding: "9px 10px" }}>
-                <Copy size={14} />
-              </button>
-            </div>
-            {apiLastUsed && <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>Last used: {new Date(apiLastUsed).toLocaleString()}</div>}
-          </>
-        ) : (
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>No API key generated yet.</div>
-        )}
-        <button
-          disabled={generatingKey}
-          onClick={async () => {
-            if (!userId) return;
-            setGeneratingKey(true);
-            const newKey = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
-            if (apiKey) {
-              await supabase.from("api_keys").delete().eq("user_id", userId);
-            }
-            await supabase.from("api_keys").insert({ user_id: userId, key: newKey });
-            setApiKey(newKey);
-            setApiKeyVisible(true);
-            setApiLastUsed(null);
-            setGeneratingKey(false);
-            toast.success("New API key generated");
-          }}
-          style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, display: "flex", alignItems: "center", gap: 6 }}
-        >
-          <RefreshCw size={12} /> {apiKey ? "Regenerate Key" : "Generate API Key"}
-        </button>
-      </Section>
-
       <Section icon={<CreditCard size={16} color={C.jade} />} title="Subscription">
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{tierLabel} Plan</span>
@@ -200,11 +152,132 @@ export default function SettingsPage() {
         Save All Settings
       </button>
 
+      {isAdmin && <AdminPanel />}
+
       <Section icon={<AlertTriangle size={16} color={C.red} />} title="Danger Zone">
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>This action cannot be undone. All data will be permanently deleted.</div>
         <button style={{ ...btnStyle, background: C.red + "20", color: C.red, border: `1px solid ${C.red}30` }}>Delete Account</button>
       </Section>
     </div>
+  );
+}
+
+function AdminPanel() {
+  const [serviceKey, setServiceKey] = useState("");
+  const [keyVisible, setKeyVisible] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [scansToday, setScansToday] = useState(0);
+  const [pushing, setPushing] = useState(false);
+
+  useEffect(() => {
+    loadAdminData();
+  }, []);
+
+  const loadAdminData = async () => {
+    // We can't query platform_config via anon key (no RLS policy), so we use the edge function approach
+    // For display purposes, fetch stats via regular queries the admin user has access to
+    const today = new Date().toISOString().split("T")[0];
+
+    const [profilesRes, scansRes] = await Promise.all([
+      supabase.from("profiles").select("id", { count: "exact", head: true }),
+      supabase.from("scan_results").select("id", { count: "exact", head: true }).gte("scanned_at", today + "T00:00:00Z"),
+    ]);
+
+    setTotalUsers(profilesRes.count || 0);
+    setScansToday(scansRes.count || 0);
+  };
+
+  const handleTestScan = async () => {
+    if (!serviceKey) {
+      toast.error("Enter the platform service key first");
+      return;
+    }
+    setPushing(true);
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/push-scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+        body: JSON.stringify({
+          service_key: serviceKey,
+          target: "all",
+          scans: [{
+            symbol: "NAS100",
+            timeframe: "15",
+            candle_type: "heiken_ashi",
+            direction: "BUY",
+            confidence: 7,
+            entry_price: 21500,
+            take_profit: 21700,
+            stop_loss: 21400,
+            risk_reward: "2:1",
+            adx: 28.5,
+            rsi: 55.3,
+            macd_status: "Bullish",
+            stoch_rsi: 62.1,
+            ema_fast_value: 21510,
+            ema_slow_value: 21480,
+            ema_crossover_status: "CONFIRMED",
+            ema_crossover_direction: "BULLISH",
+            supertrend_status: "BULL",
+            verdict: "HIGH",
+            reasoning: "Admin test scan — all indicators aligned bullish.",
+            session: "new_york",
+          }],
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Test scan pushed: ${data.scans_inserted} scans, ${data.signals_created} signals`);
+        loadAdminData();
+      } else {
+        toast.error(data.error || "Failed to push test scan");
+      }
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+    setPushing(false);
+  };
+
+  return (
+    <Section icon={<Shield size={16} color={C.pink} />} title="Platform Admin">
+      <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>Platform-level service key for the AI analysis engine. This key broadcasts scans to all subscribers.</div>
+
+      <Field label="Platform Service Key">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            value={keyVisible ? serviceKey : serviceKey ? "•".repeat(32) : ""}
+            onChange={e => setServiceKey(e.target.value)}
+            placeholder="Paste service key here..."
+            style={{ ...inputStyle, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, flex: 1 }}
+          />
+          <button onClick={() => setKeyVisible(!keyVisible)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, padding: "9px 10px" }}>
+            {keyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+          <button onClick={() => { navigator.clipboard.writeText(serviceKey); toast.success("Key copied"); }} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, padding: "9px 10px" }}>
+            <Copy size={14} />
+          </button>
+        </div>
+      </Field>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <div style={{ background: C.bg, borderRadius: 10, padding: 14, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.sec, marginBottom: 4 }}>Total Users</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.jade, fontFamily: "'JetBrains Mono', monospace" }}>{totalUsers}</div>
+        </div>
+        <div style={{ background: C.bg, borderRadius: 10, padding: 14, border: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.sec, marginBottom: 4 }}>Scans Today</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.blue, fontFamily: "'JetBrains Mono', monospace" }}>{scansToday}</div>
+        </div>
+      </div>
+
+      <button
+        disabled={pushing}
+        onClick={handleTestScan}
+        style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.pink}, ${C.purple})`, color: "#fff", display: "flex", alignItems: "center", gap: 6 }}
+      >
+        <Activity size={12} /> {pushing ? "Pushing..." : "Push Test Scan (All Users)"}
+      </button>
+    </Section>
   );
 }
 

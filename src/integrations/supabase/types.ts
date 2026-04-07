@@ -214,6 +214,24 @@ export type Database = {
           },
         ]
       }
+      platform_config: {
+        Row: {
+          created_at: string
+          id: string
+          service_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          service_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          service_key?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
