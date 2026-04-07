@@ -23,21 +23,17 @@ const sparkMap: Record<string, number[]> = {
 
 export default function DashboardHome() {
   const [scanning, setScanning] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0 });
   const [equityCurve, setEquityCurve] = useState<number[]>([]);
 
   useEffect(() => {
     loadData();
-
-    // Realtime subscription for scan_results
     const channel = supabase.channel('dashboard-scans')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scan_results' }, () => loadData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'signals' }, () => loadData())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'signals' }, () => loadData())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
@@ -46,7 +42,6 @@ export default function DashboardHome() {
     if (!session) return;
     const uid = session.user.id;
 
-    // Latest scan per symbol
     const { data: scanData } = await supabase
       .from("scan_results")
       .select("*")
@@ -59,7 +54,6 @@ export default function DashboardHome() {
       setScans(Array.from(latest.values()));
     }
 
-    // Signals stats
     const { data: signals } = await supabase.from("signals").select("*").eq("user_id", uid);
     if (signals) {
       const closed = signals.filter((s: any) => s.result !== "pending");
@@ -80,7 +74,6 @@ export default function DashboardHome() {
         }, 0) / closed.length).toFixed(1)) : 0,
       });
 
-      // Build equity curve
       const sorted = [...closed].sort((a: any, b: any) => new Date(a.closed_at).getTime() - new Date(b.closed_at).getTime());
       let cumulative = 0;
       const curve = [0, ...sorted.map((s: any) => { cumulative += (s.pnl || 0); return cumulative; })];
@@ -116,7 +109,7 @@ export default function DashboardHome() {
           <div>
             <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>HIGHEST CONVICTION</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
-              {best.symbol} {best.direction} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> Entry {best.entry_price ?? "—"} → TP {best.take_profit ?? "—"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> R:R {best.risk_reward ?? "—"}
+              {best.symbol} {best.direction} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> Entry {best.entry_price ?? "N/A"} → TP {best.take_profit ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> SL {best.stop_loss ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> R:R {best.risk_reward ?? "N/A"}
             </div>
           </div>
           <div style={{
@@ -129,15 +122,15 @@ export default function DashboardHome() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 12, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {scans.map(inst => {
           const color = colorMap[inst.symbol] || C.jade;
           return (
-            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${expanded === inst.symbol ? C.jade + "40" : C.border}`, borderRadius: 14, padding: 16, cursor: "pointer", transition: "all 0.3s" }} onClick={() => setExpanded(expanded === inst.symbol ? null : inst.symbol)}>
+            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{inst.symbol}</div>
-                  <div style={{ fontSize: 10, color: C.muted }}>15m HA</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</div>
+                  <div style={{ fontSize: 10, color: C.muted }}>15m Heiken Ashi</div>
                 </div>
                 <div style={{
                   fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
@@ -147,31 +140,28 @@ export default function DashboardHome() {
                   {inst.direction}
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                <Gauge value={inst.confidence} color={color} size={40} />
-                <Sparkline data={sparkMap[inst.symbol] || [1,2,3]} color={color} w={100} h={28} />
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <Gauge value={inst.confidence} color={color} size={44} />
+                <Sparkline data={sparkMap[inst.symbol] || [1,2,3]} color={color} w={120} h={32} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 10, color: C.sec }}>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
                 <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.adx ?? "—"}</span></span>
                 <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.rsi ?? "—"}</span></span>
                 <span>MACD <span style={{ color: inst.macd_status === "Bullish" ? C.green : inst.macd_status === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{inst.macd_status ?? "—"}</span></span>
                 <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.stoch_rsi ?? "—"}</span></span>
               </div>
-              {expanded === inst.symbol && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 8 }}>
-                    <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.entry_price ?? "—"}</span></div>
-                    <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: C.green, fontFamily: "'JetBrains Mono', monospace" }}>{inst.take_profit ?? "—"}</span></div>
-                    <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: C.red, fontFamily: "'JetBrains Mono', monospace" }}>{inst.stop_loss ?? "—"}</span></div>
-                    <div><span style={{ color: C.sec }}>R:R:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
-                  </div>
-                  <div style={{ fontSize: 11, color: C.sec, lineHeight: 1.6 }}>
-                    <span style={{ color: C.jade, fontWeight: 600 }}>AI Reasoning: </span>{inst.reasoning}
-                  </div>
-                </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-                {expanded === inst.symbol ? <ChevronUp size={14} color={C.muted} /> : <ChevronDown size={14} color={C.muted} />}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.entry_price ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: C.green, fontFamily: "'JetBrains Mono', monospace" }}>{inst.take_profit ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: C.red, fontFamily: "'JetBrains Mono', monospace" }}>{inst.stop_loss ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>R:R:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
+              </div>
+
+              <div style={{ fontSize: 11, color: C.sec, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                <span style={{ color: C.jade, fontWeight: 600 }}>AI Reasoning: </span>{inst.reasoning || "No reasoning available."}
               </div>
             </div>
           );
