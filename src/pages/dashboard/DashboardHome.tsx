@@ -5,6 +5,8 @@ import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
 import { AlertTriangle, Play, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
+import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 
 interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
