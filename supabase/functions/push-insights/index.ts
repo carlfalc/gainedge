@@ -7,9 +7,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { api_key, insights } = await req.json();
-    if (!api_key || !Array.isArray(insights) || insights.length === 0) {
-      return new Response(JSON.stringify({ error: "Missing api_key or insights array" }), {
+    const { service_key, target, insights } = await req.json();
+    if (!service_key || !Array.isArray(insights) || insights.length === 0) {
+      return new Response(JSON.stringify({ error: "Missing service_key or insights array" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -19,44 +19,57 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const { data: keyRow, error: keyErr } = await supabase
-      .from("api_keys")
-      .select("user_id")
-      .eq("key", api_key)
+    const { data: config, error: configErr } = await supabase
+      .from("platform_config")
+      .select("service_key")
+      .eq("service_key", service_key)
       .single();
 
-    if (keyErr || !keyRow) {
-      return new Response(JSON.stringify({ error: "Invalid API key" }), {
+    if (configErr || !config) {
+      return new Response(JSON.stringify({ error: "Invalid service key" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("key", api_key);
+    let totalInserted = 0;
 
-    const rows = insights.map((i: any) => ({
-      user_id: keyRow.user_id,
-      insight_type: i.insight_type,
-      symbol: i.symbol ?? null,
-      title: i.title,
-      description: i.description,
-      data: i.data ?? null,
-      severity: i.severity ?? "info",
-      estimated_impact: i.estimated_impact ?? null,
-      week_start: i.week_start ?? null,
-    }));
+    for (const insight of insights) {
+      let userIds: string[] = [];
 
-    const { data: inserted, error } = await supabase.from("insights").insert(rows).select("id");
+      if (!target || target === "all") {
+        if (insight.symbol) {
+          const { data: instruments } = await supabase
+            .from("user_instruments")
+            .select("user_id")
+            .eq("symbol", insight.symbol);
+          userIds = (instruments || []).map((i: any) => i.user_id);
+        } else {
+          const { data: profiles } = await supabase.from("profiles").select("id");
+          userIds = (profiles || []).map((p: any) => p.id);
+        }
+      } else {
+        userIds = [target];
+      }
 
-    if (error) {
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (userIds.length === 0) continue;
+
+      const rows = userIds.map((uid) => ({
+        user_id: uid,
+        insight_type: insight.insight_type,
+        symbol: insight.symbol || null,
+        title: insight.title,
+        description: insight.description,
+        data: insight.data || null,
+        severity: insight.severity || "info",
+        estimated_impact: insight.estimated_impact || null,
+        week_start: insight.week_start || null,
+      }));
+
+      const { data: inserted, error } = await supabase.from("insights").insert(rows).select("id");
+      if (!error) totalInserted += inserted?.length || 0;
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      insights_inserted: inserted?.length || 0,
-    }), {
+    return new Response(JSON.stringify({ success: true, insights_inserted: totalInserted }), {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
