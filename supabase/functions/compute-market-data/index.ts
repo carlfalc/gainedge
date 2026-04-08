@@ -325,11 +325,7 @@ const SESSION_DEFS = [
   { key: "new_york", startUtc: 16, endUtc: 21 },
 ];
 
-const BROKER_SYMBOL_VARIANTS: Record<string, string[]> = {
-  US30: ["US30", "DJ30", "DJI30"],
-  NAS100: ["NAS100", "USTEC", "NDX100"],
-  XAUUSD: ["XAUUSD", "GOLD"],
-};
+// Reuse the global BROKER_SYMBOL_MAP for hourly candle fetching too
 
 function getCompletedSessions(utcHour: number): typeof SESSION_DEFS {
   return SESSION_DEFS.filter(s => utcHour >= s.endUtc);
