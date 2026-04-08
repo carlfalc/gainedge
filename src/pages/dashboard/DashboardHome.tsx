@@ -45,6 +45,7 @@ function generateSparkData(direction: string, confidence: number): number[] {
 export default function DashboardHome() {
   const [scanning, setScanning] = useState(false);
   const [scans, setScans] = useState<ScanResult[]>([]);
+  const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(new Map());
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0 });
   const [equityCurve, setEquityCurve] = useState<number[]>([]);
   const [userId, setUserId] = useState<string>();
