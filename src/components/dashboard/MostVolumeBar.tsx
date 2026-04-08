@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { BarChart3, Clock, TrendingUp } from "lucide-react";
+import { BarChart3, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
-import { SESSIONS, SESSION_COLORS, getActiveSessions, getCompletedSessions, getCurrentSession, formatLocalHour, type SessionDef } from "@/lib/session-colors";
+import { SESSIONS, getActiveSessions, getCurrentSession, formatLocalHour, type SessionDef } from "@/lib/session-colors";
 import { VolumeHistoryModal } from "./VolumeHistoryModal";
 
 interface SessionRow {
@@ -10,7 +10,7 @@ interface SessionRow {
   topSymbol: string | null;
   peakHourLabel: string | null;
   volume: number;
-  inProgress: boolean;
+  status: "completed" | "active" | "upcoming";
 }
 
 function peakHourFromSparkline(sparkline: number[] | null): { peakUtcHour: number } | null {
@@ -26,6 +26,13 @@ function peakHourFromSparkline(sparkline: number[] | null): { peakUtcHour: numbe
   const candlesFromEnd = sparkline.length - peak.idx;
   const hoursAgo = Math.floor(candlesFromEnd / 4);
   return { peakUtcHour: (new Date().getUTCHours() - hoursAgo + 24) % 24 };
+}
+
+function getSessionStatus(sess: SessionDef): "completed" | "active" | "upcoming" {
+  const h = new Date().getUTCHours();
+  if (h >= sess.endUtcHour) return "completed";
+  if (h >= sess.startUtcHour && h < sess.endUtcHour) return "active";
+  return "upcoming";
 }
 
 export function MostVolumeBar() {
@@ -47,67 +54,48 @@ export function MostVolumeBar() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     const uid = session.user.id;
-
-    const completed = getCompletedSessions();
-    const active = getActiveSessions();
     const today = new Date().toISOString().split("T")[0];
 
-    const { data: summaries } = await supabase
-      .from("session_volume_summary")
-      .select("*")
-      .eq("date", today)
-      .order("total_volume", { ascending: false });
-
-    const { data: liveRows } = await supabase
-      .from("live_market_data")
-      .select("symbol, volume_today, sparkline_data")
-      .eq("user_id", uid);
+    const [{ data: summaries }, { data: liveRows }] = await Promise.all([
+      supabase.from("session_volume_summary").select("*").eq("date", today).order("total_volume", { ascending: false }),
+      supabase.from("live_market_data").select("symbol, volume_today, sparkline_data").eq("user_id", uid),
+    ]);
 
     const result: SessionRow[] = [];
 
-    // Completed sessions from stored summaries
-    for (const sess of completed) {
-      const sessSum = (summaries || []).filter((s: any) => s.session === sess.key);
-      if (sessSum.length > 0) {
-        const top = sessSum[0];
-        let peakLabel: string | null = null;
-        if (top.peak_hour_start) {
-          const peakDate = new Date(top.peak_hour_start);
-          const startH = peakDate.getUTCHours();
-          const startLocal = formatLocalHour(startH);
-          const endLocal = formatLocalHour((startH + 1) % 24);
-          peakLabel = `${startLocal} – ${endLocal}`;
-        }
-        result.push({ session: sess, topSymbol: top.symbol, peakHourLabel: peakLabel, volume: Number(top.total_volume) || 0, inProgress: false });
-      } else {
-        result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: false });
-      }
-    }
-
-    // Active/in-progress sessions from live data
-    for (const sess of active) {
-      if (completed.some(c => c.key === sess.key)) continue;
-      if (liveRows && liveRows.length > 0) {
-        const sorted = [...liveRows]
-          .map(r => ({ symbol: r.symbol, volume: Number(r.volume_today) || 0, sparkline: Array.isArray(r.sparkline_data) ? (r.sparkline_data as number[]) : null }))
-          .sort((a, b) => b.volume - a.volume);
-        const top = sorted[0];
-        let peakLabel: string | null = null;
-        const peak = peakHourFromSparkline(top.sparkline);
-        if (peak) {
-          peakLabel = `${formatLocalHour(peak.peakUtcHour)} – ${formatLocalHour((peak.peakUtcHour + 1) % 24)}`;
-        }
-        result.push({ session: sess, topSymbol: top.symbol, peakHourLabel: peakLabel, volume: top.volume, inProgress: true });
-      } else {
-        result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: true });
-      }
-    }
-
-    // Future sessions
-    const allShown = new Set(result.map(r => r.session.key));
     for (const sess of SESSIONS) {
-      if (!allShown.has(sess.key)) {
-        result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: false });
+      const status = getSessionStatus(sess);
+
+      if (status === "completed") {
+        const sessSum = (summaries || []).filter((s: any) => s.session === sess.key);
+        if (sessSum.length > 0) {
+          const top = sessSum[0];
+          let peakLabel: string | null = null;
+          if (top.peak_hour_start) {
+            const startH = new Date(top.peak_hour_start).getUTCHours();
+            peakLabel = `${formatLocalHour(startH)} – ${formatLocalHour((startH + 1) % 24)}`;
+          }
+          result.push({ session: sess, topSymbol: top.symbol, peakHourLabel: peakLabel, volume: Number(top.total_volume) || 0, status });
+        } else {
+          result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, status });
+        }
+      } else if (status === "active") {
+        if (liveRows && liveRows.length > 0) {
+          const sorted = [...liveRows]
+            .map(r => ({ symbol: r.symbol, volume: Number(r.volume_today) || 0, sparkline: Array.isArray(r.sparkline_data) ? (r.sparkline_data as number[]) : null }))
+            .sort((a, b) => b.volume - a.volume);
+          const top = sorted[0];
+          let peakLabel: string | null = null;
+          const peak = peakHourFromSparkline(top.sparkline);
+          if (peak) {
+            peakLabel = `${formatLocalHour(peak.peakUtcHour)} – ${formatLocalHour((peak.peakUtcHour + 1) % 24)}`;
+          }
+          result.push({ session: sess, topSymbol: top.symbol, peakHourLabel: peakLabel, volume: top.volume, status });
+        } else {
+          result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, status });
+        }
+      } else {
+        result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, status });
       }
     }
 
@@ -122,7 +110,6 @@ export function MostVolumeBar() {
   return (
     <>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
-        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <BarChart3 size={16} color={C.text} />
@@ -148,13 +135,10 @@ export function MostVolumeBar() {
           </button>
         </div>
 
-        {/* Session rows */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {rows.map((row) => {
             const color = row.session.color;
             const hasData = row.topSymbol != null;
-            const isActive = row.inProgress;
-            const isFuture = !hasData && !isActive && !getCompletedSessions().some(c => c.key === row.session.key);
 
             return (
               <div
@@ -162,20 +146,20 @@ export function MostVolumeBar() {
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "6px 10px", borderRadius: 8,
-                  background: isActive ? color + "10" : "transparent",
-                  borderLeft: `3px solid ${color}${hasData || isActive ? "" : "40"}`,
-                  opacity: isFuture ? 0.4 : 1,
+                  background: row.status === "active" ? color + "10" : "transparent",
+                  borderLeft: `3px solid ${color}${hasData || row.status === "active" ? "" : "40"}`,
+                  opacity: row.status === "upcoming" ? 0.4 : 1,
                 }}
               >
                 <span style={{ fontSize: 11, fontWeight: 700, color, minWidth: 70, whiteSpace: "nowrap" }}>
                   {row.session.label}
                 </span>
 
-                {isActive && !hasData ? (
+                {row.status === "active" && !hasData ? (
                   <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>In progress...</span>
-                ) : !isActive && !hasData && getCompletedSessions().some(c => c.key === row.session.key) ? (
+                ) : row.status === "completed" && !hasData ? (
                   <span style={{ fontSize: 11, color: "#F59E0B", fontStyle: "italic" }}>No data recorded</span>
-                ) : isActive && hasData ? (
+                ) : row.status === "active" && hasData ? (
                   <>
                     <span style={{ padding: "2px 10px", borderRadius: 14, border: `1.5px solid ${color}`, color: C.text, fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
                       {row.topSymbol}

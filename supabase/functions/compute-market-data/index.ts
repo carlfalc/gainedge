@@ -293,12 +293,39 @@ function runAnalysis(candles: any[]): AnalysisResult {
 const SESSION_DEFS = [
   { key: "asian", startUtc: 0, endUtc: 8 },
   { key: "london", startUtc: 8, endUtc: 16 },
-  { key: "new_york", startUtc: 13, endUtc: 21 },
-  { key: "new_york", startUtc: 13, endUtc: 22 },
+  { key: "new_york", startUtc: 16, endUtc: 21 },
 ];
 
-function getEndingSessions(utcHour: number): string[] {
-  return SESSION_DEFS.filter(s => utcHour === s.endUtc - 1).map(s => s.key);
+const BROKER_SYMBOL_VARIANTS: Record<string, string[]> = {
+  US30: ["US30", "DJ30", "DJI30"],
+  NAS100: ["NAS100", "USTEC", "NDX100"],
+  XAUUSD: ["XAUUSD", "GOLD"],
+};
+
+function getCompletedSessions(utcHour: number): typeof SESSION_DEFS {
+  return SESSION_DEFS.filter(s => utcHour >= s.endUtc);
+}
+
+async function fetchHourlyCandles(token: string, accountId: string, symbol: string, startISO: string, endISO: string) {
+  const variants = BROKER_SYMBOL_VARIANTS[symbol] || [symbol];
+  for (const variant of variants) {
+    try {
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
+      const res = await fetch(url, { headers: { "auth-token": token } });
+      if (!res.ok) continue;
+      const candles = await res.json();
+      if (Array.isArray(candles) && candles.length > 0) {
+        // Filter to session window
+        const startTs = new Date(startISO).getTime();
+        const endTs = new Date(endISO).getTime();
+        return candles.filter((c: any) => {
+          const t = new Date(c.time).getTime();
+          return t >= startTs && t < endTs;
+        });
+      }
+    } catch { /* try next */ }
+  }
+  return [];
 }
 
 serve(async (req) => {
@@ -541,38 +568,51 @@ serve(async (req) => {
       }
     }
 
-    // ─── Session volume summaries ───
+    // ─── Retroactive session volume backfill ───
     const utcHour = new Date().getUTCHours();
-    const utcMinute = new Date().getUTCMinutes();
-    const endingSessions = getEndingSessions(utcHour);
+    const today = new Date().toISOString().split("T")[0];
+    const completedSessions = getCompletedSessions(utcHour);
 
-    if (endingSessions.length > 0 && utcMinute >= 55) {
-      const today = new Date().toISOString().split("T")[0];
-      for (const sessionKey of endingSessions) {
+    if (completedSessions.length > 0 && METAAPI_TOKEN && accountId) {
+      // Check which session+symbol combos already exist
+      const { data: existingSummaries } = await supabase
+        .from("session_volume_summary")
+        .select("session, symbol")
+        .eq("date", today);
+
+      const existingKeys = new Set(
+        (existingSummaries || []).map((s: any) => `${s.session}:${s.symbol}`)
+      );
+
+      for (const sessDef of completedSessions) {
         for (const [symbol] of symbolTfSet) {
-          const data = symbolData.get(symbol);
-          if (!data) continue;
-          let peakHourStart: string | null = null;
-          const spark = data.sparkline_data as number[];
-          if (spark && spark.length >= 4) {
-            const bucketSize = 4;
-            let maxRange = 0, peakIdx = 0;
-            for (let i = 0; i <= spark.length - bucketSize; i += bucketSize) {
-              const slice = spark.slice(i, i + bucketSize);
-              const range = Math.max(...slice) - Math.min(...slice);
-              if (range > maxRange) { maxRange = range; peakIdx = i; }
+          if (existingKeys.has(`${sessDef.key}:${symbol}`)) continue;
+
+          // Build session time window for today
+          const startISO = `${today}T${String(sessDef.startUtc).padStart(2, "0")}:00:00.000Z`;
+          const endISO = `${today}T${String(sessDef.endUtc).padStart(2, "0")}:00:00.000Z`;
+
+          try {
+            const sessionCandles = await fetchHourlyCandles(METAAPI_TOKEN!, accountId!, symbol, startISO, endISO);
+            if (sessionCandles.length === 0) continue;
+
+            const totalVol = sessionCandles.reduce((s: number, c: any) => s + (c.tickVolume || 0), 0);
+
+            // Find peak hour
+            let peakHourStart: string | null = null;
+            let peakVol = 0;
+            for (const c of sessionCandles) {
+              const v = c.tickVolume || 0;
+              if (v > peakVol) { peakVol = v; peakHourStart = c.time; }
             }
-            const candlesFromEnd = spark.length - peakIdx;
-            const hoursAgo = Math.floor(candlesFromEnd / 4);
-            const peakUtcHour = (utcHour - hoursAgo + 24) % 24;
-            const d = new Date();
-            d.setUTCHours(peakUtcHour, 0, 0, 0);
-            peakHourStart = d.toISOString();
+
+            await supabase.from("session_volume_summary").upsert({
+              session: sessDef.key, symbol, date: today,
+              total_volume: totalVol, peak_hour_start: peakHourStart,
+            }, { onConflict: "session,symbol,date" });
+          } catch (e) {
+            console.warn(`Backfill failed for ${sessDef.key}/${symbol}:`, e);
           }
-          await supabase.from("session_volume_summary").upsert({
-            session: sessionKey, symbol, date: today,
-            total_volume: data.volume_today || 0, peak_hour_start: peakHourStart,
-          }, { onConflict: "session,symbol,date" });
         }
       }
     }
