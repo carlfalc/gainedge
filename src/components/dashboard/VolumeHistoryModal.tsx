@@ -177,7 +177,7 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
         </div>
 
         {loading ? (
-          <LoadingIndicator period={period} />
+          <LoadingState period={period} />
         ) : error ? (
           <div style={{ textAlign: "center", padding: 40, color: "#EF4444" }}>
             {error}
