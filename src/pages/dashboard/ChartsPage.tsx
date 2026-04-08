@@ -368,9 +368,12 @@ export default function ChartsPage() {
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      chart.remove();
-      rsiChartRef.current?.remove();
-      macdChartRef.current?.remove();
+      try { chart.remove(); } catch {}
+      try { rsiChartRef.current?.remove(); } catch {}
+      try { macdChartRef.current?.remove(); } catch {}
+      chartRef.current = null;
+      rsiChartRef.current = null;
+      macdChartRef.current = null;
     };
   }, [displayCandles, activeIndicators, scanResult]);
 
