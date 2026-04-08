@@ -18,7 +18,7 @@ interface BrokerModalProps {
   onBrokerChange?: (brokerKey: string, brokerLabel: string) => void;
 }
 
-export default function BrokerModal({ open, onClose, userId }: BrokerModalProps) {
+export default function BrokerModal({ open, onClose, userId, onBrokerChange }: BrokerModalProps) {
   const [selected, setSelected] = useState("eightcap");
 
   useEffect(() => {
