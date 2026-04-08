@@ -257,6 +257,9 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
                 <div style={{ fontSize: 9, color: C.muted, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
                   <Clock size={8} /> Based on {inst.totalDays} day{inst.totalDays !== 1 ? "s" : ""} of data — patterns improve with more history
                 </div>
+                <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
+                  30-day backtest data will accumulate automatically as the platform collects more session data
+                </div>
               </div>
             ))}
           </div>

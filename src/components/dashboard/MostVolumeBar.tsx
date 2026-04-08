@@ -173,6 +173,8 @@ export function MostVolumeBar() {
 
                 {isActive && !hasData ? (
                   <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>In progress...</span>
+                ) : !isActive && !hasData && getCompletedSessions().some(c => c.key === row.session.key) ? (
+                  <span style={{ fontSize: 11, color: "#F59E0B", fontStyle: "italic" }}>No data recorded</span>
                 ) : isActive && hasData ? (
                   <>
                     <span style={{ padding: "2px 10px", borderRadius: 14, border: `1.5px solid ${color}`, color: C.text, fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
