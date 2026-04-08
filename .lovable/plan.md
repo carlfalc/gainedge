@@ -1,32 +1,36 @@
-## GAINEDGE Dashboard Implementation Plan
 
-### Phase 1: Infrastructure
-1. **Enable Lovable Cloud** for authentication
-2. **Set up routing** — add all dashboard routes under `/dashboard/*`
-3. **Create dashboard layout** — collapsible sidebar + top bar wrapper component
+# Unified Broker Data Pipeline — Background Job Approach
 
-### Phase 2: Shared Components
-4. **Dashboard layout component** — sidebar nav with GAINEDGE logo, collapsible, links with icons
-5. **Top bar** — session indicator, scan status, user avatar dropdown with logout
-6. **Reuse SpinCard/Sparkline** from landing page (extract to shared components)
-7. **Mock data file** — centralized mock data for all pages
+## Phase 1: Database & Edge Function
+1. **Create `live_market_data` table** — stores pre-computed prices + indicators per instrument per user
+   - Columns: user_id, symbol, bid, ask, last_price, rsi, adx, macd_status, stoch_rsi, volume_today, market_open, sparkline_data (jsonb), updated_at
+   - RLS: users can only read their own rows
+   - Updated every 30s by a background job
 
-### Phase 3: Pages (6 pages)
-8. **Dashboard Home** — stat cards, best signal banner, instrument cards with expand, correlation warnings, equity curve, run scan button
-9. **Signals** — sortable/filterable table with expandable rows
-10. **Trade Journal** — date picker, daily view, notes, strategy tags
-11. **Analytics** — multiple charts (bar, line) for performance breakdowns using Recharts
-12. **Calendar** — P&L heatmap monthly grid, day click to view trades
-13. **Settings** — profile, instruments, preferences, notifications, broker, subscription, danger zone
+2. **Create `compute-market-data` edge function** — the background job
+   - Fetches all active users' instruments from `user_instruments`
+   - For each unique symbol, calls MetaApi once (candles + current price)
+   - Calculates RSI, ADX, MACD, StochRSI from candle data server-side
+   - Upserts results into `live_market_data`
+   - Runs via pg_cron every 30 seconds
 
-### Phase 4: Auth Flow
-14. **Auth guard** — redirect to landing if not logged in
-15. **Wire login/signup modal** on landing to actual Supabase auth
-16. **Protected routes** wrapper
+3. **Enable Realtime** on `live_market_data` so dashboard auto-updates
 
-### Technical Notes
-- All data is mock/placeholder for now
-- Same dark theme, jade accents, DM Sans + JetBrains Mono
-- Use Recharts (already installed) for charts
-- Use shadcn components where possible (sidebar, tabs, select, calendar, etc.)
-- Collapsible sidebar using shadcn Sidebar component
+## Phase 2: Shared Client Service
+4. **Create `src/services/broker-data.ts`** — reads from `live_market_data` table
+   - `getLiveData(userId)` — returns all instrument data in one query
+   - Subscribes to Realtime updates on the table
+   - Falls back to mock/calculated data if table is empty
+
+## Phase 3: Dashboard Integration
+5. **Update Dashboard instrument cards** — live price, real sparkline, real indicators
+6. **Update Live Trade bar** — show live P&L against current MetaApi price
+7. **Update Most Volume Today** — use real volume from `live_market_data`
+8. **Add market status indicator** — green/grey dot per instrument
+
+## Demo Fallback
+- If MetaApi connection fails, the edge function writes mock/simulated data
+- Dashboard always reads from the same table regardless
+- Connection status shown on dashboard
+
+This approach means: 1 edge function call every 30s serves ALL dashboard components for ALL users, with zero client-side MetaApi calls from the dashboard.
