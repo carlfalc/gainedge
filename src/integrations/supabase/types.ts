@@ -523,6 +523,8 @@ export type Database = {
           id: string
           notes: string | null
           pnl: number | null
+          pnl_pips: number | null
+          resolved_at: string | null
           result: string
           risk_reward: string
           scan_result_id: string | null
@@ -540,6 +542,8 @@ export type Database = {
           id?: string
           notes?: string | null
           pnl?: number | null
+          pnl_pips?: number | null
+          resolved_at?: string | null
           result?: string
           risk_reward: string
           scan_result_id?: string | null
@@ -557,6 +561,8 @@ export type Database = {
           id?: string
           notes?: string | null
           pnl?: number | null
+          pnl_pips?: number | null
+          resolved_at?: string | null
           result?: string
           risk_reward?: string
           scan_result_id?: string | null
@@ -616,6 +622,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_signal_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          instrument_filters: Json
+          min_confidence: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instrument_filters?: Json
+          min_confidence?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instrument_filters?: Json
+          min_confidence?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
