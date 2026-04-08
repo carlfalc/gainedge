@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { label: "Backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
   { label: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { label: "Settings", icon: Settings, path: "/dashboard/settings" },
+  { label: "Clock Settings", icon: Clock, path: "/dashboard/clock-settings" },
 ];
 
 export default function DashboardLayout() {
