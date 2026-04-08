@@ -11,6 +11,7 @@ import {
   CrosshairMode,
 } from "lightweight-charts";
 import { supabase } from "@/integrations/supabase/client";
+import { signalFreshness, formatAge } from "@/lib/expiry";
 import { useProfile } from "@/hooks/use-profile";
 import { generateMockCandles } from "@/lib/mock-candles";
 import {
