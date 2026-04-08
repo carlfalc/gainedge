@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
+import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
