@@ -55,6 +55,7 @@ export default function ChartsPage() {
   const widgetRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptLoaded = useRef(false);
+  const fallbackIndexRef = useRef(0);
 
   // Fetch user instruments
   useEffect(() => {
