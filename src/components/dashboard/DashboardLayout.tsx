@@ -32,6 +32,10 @@ export default function DashboardLayout() {
 
   useSeedData(userId);
 
+  const handleSessionChange = useCallback((label: string) => {
+    setSessionLabel(label);
+  }, []);
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
@@ -50,6 +54,16 @@ export default function DashboardLayout() {
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Load clock preferences from profile
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("profiles").select("clock_timezones").eq("id", userId).single().then(({ data }) => {
+      if (data?.clock_timezones && Array.isArray(data.clock_timezones) && data.clock_timezones.length > 0) {
+        setClockConfigs(data.clock_timezones as unknown as ClockConfig[]);
+      }
+    });
+  }, [userId]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
