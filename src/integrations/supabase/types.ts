@@ -220,6 +220,7 @@ export type Database = {
           ask: number | null
           bid: number | null
           id: string
+          last_candle_time: string | null
           last_price: number | null
           macd_status: string | null
           market_open: boolean | null
@@ -237,6 +238,7 @@ export type Database = {
           ask?: number | null
           bid?: number | null
           id?: string
+          last_candle_time?: string | null
           last_price?: number | null
           macd_status?: string | null
           market_open?: boolean | null
@@ -254,6 +256,7 @@ export type Database = {
           ask?: number | null
           bid?: number | null
           id?: string
+          last_candle_time?: string | null
           last_price?: number | null
           macd_status?: string | null
           market_open?: boolean | null
@@ -585,6 +588,7 @@ export type Database = {
           broker_symbol: string | null
           id: string
           symbol: string
+          timeframe: string
           user_id: string
         }
         Insert: {
@@ -592,6 +596,7 @@ export type Database = {
           broker_symbol?: string | null
           id?: string
           symbol: string
+          timeframe?: string
           user_id: string
         }
         Update: {
@@ -599,6 +604,7 @@ export type Database = {
           broker_symbol?: string | null
           id?: string
           symbol?: string
+          timeframe?: string
           user_id?: string
         }
         Relationships: [
