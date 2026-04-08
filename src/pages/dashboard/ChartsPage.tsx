@@ -1,195 +1,407 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  createChart,
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
+  type IChartApi,
+  type ISeriesApi,
+  type CandlestickData,
+  type Time,
+  CrosshairMode,
+} from "lightweight-charts";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-profile";
-import { Activity, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { generateMockCandles } from "@/lib/mock-candles";
+import {
+  calculateEMA,
+  calculateSMA,
+  calculateBollingerBands,
+  calculateRSI,
+  calculateMACD,
+  toHeikenAshi,
+  type OHLCData,
+} from "@/lib/chart-indicators";
+import {
+  Activity,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Maximize2,
+  Minimize2,
+  ZoomIn,
+  Search,
+  X,
+  MinusIcon,
+} from "lucide-react";
 
-declare global {
-  interface Window {
-    TradingView: any;
-  }
-}
-
+/* ───── types ───── */
 interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; reasoning: string; scanned_at: string;
 }
 
-const TV_SYMBOL_MAP: Record<string, string> = {
-  "XAUUSD": "OANDA:XAUUSD",
-  "US30": "BLACKBULL:US30",
-  "NAS100": "PEPPERSTONE:NAS100",
-  "NZDUSD": "FX:NZDUSD",
-  "AUDUSD": "FX:AUDUSD",
-  "EURUSD": "FX:EURUSD",
-  "GBPUSD": "FX:GBPUSD",
-  "USDJPY": "FX:USDJPY",
-  "USDCAD": "FX:USDCAD",
-  "USDCHF": "FX:USDCHF",
-  "GBPJPY": "FX:GBPJPY",
-  "EURJPY": "FX:EURJPY",
-  "EURGBP": "FX:EURGBP",
-  "XAGUSD": "OANDA:XAGUSD",
-  "BTCUSD": "COINBASE:BTCUSD",
-  "ETHUSD": "COINBASE:ETHUSD",
-  "US500": "FOREXCOM:SPX500",
-  "SPX500": "FOREXCOM:SPX500",
-};
+interface CrosshairData {
+  open: number; high: number; low: number; close: number; volume: number; time: number;
+}
 
-const TV_SYMBOL_FALLBACKS: Record<string, string[]> = {
-  "XAUUSD": ["OANDA:XAUUSD", "FX:XAUUSD", "TVC:GOLD", "FOREXCOM:XAUUSD"],
-  "US30": ["BLACKBULL:US30", "PEPPERSTONE:US30", "FOREXCOM:DJI", "TVC:DJI"],
-  "NAS100": ["PEPPERSTONE:NAS100", "FOREXCOM:NSXUSD", "TVC:NDX", "CAPITALCOM:NAS100"],
-  "NZDUSD": ["FX:NZDUSD", "OANDA:NZDUSD", "FOREXCOM:NZDUSD"],
-  "AUDUSD": ["FX:AUDUSD", "OANDA:AUDUSD", "FOREXCOM:AUDUSD"],
-  "XAGUSD": ["OANDA:XAGUSD", "FX:XAGUSD", "TVC:SILVER"],
-  "US500": ["FOREXCOM:SPX500", "TVC:SPX", "OANDA:SPX500USD"],
-  "SPX500": ["FOREXCOM:SPX500", "TVC:SPX", "OANDA:SPX500USD"],
-};
+const TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"];
+const CHART_TYPES = ["Candlestick", "Heiken Ashi"] as const;
+
+/* ───── indicator config ───── */
+interface IndicatorConfig {
+  id: string;
+  label: string;
+  enabled: boolean;
+  params?: Record<string, number>;
+}
+
+const DEFAULT_INDICATORS: IndicatorConfig[] = [
+  { id: "ema_fast", label: "EMA 4", enabled: true, params: { period: 4 } },
+  { id: "ema_slow", label: "EMA 17", enabled: true, params: { period: 17 } },
+  { id: "bollinger", label: "Bollinger Bands", enabled: false, params: { period: 20, stdDev: 2 } },
+  { id: "sma_50", label: "SMA 50", enabled: false, params: { period: 50 } },
+  { id: "sma_200", label: "SMA 200", enabled: false, params: { period: 200 } },
+  { id: "rsi", label: "RSI 14", enabled: false, params: { period: 14 } },
+  { id: "macd", label: "MACD", enabled: false },
+];
 
 export default function ChartsPage() {
   const { profile, userId } = useProfile();
   const [instruments, setInstruments] = useState<string[]>([]);
   const [selected, setSelected] = useState("");
+  const [timeframe, setTimeframe] = useState("15m");
+  const [chartType, setChartType] = useState<typeof CHART_TYPES[number]>("Candlestick");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
-  const widgetRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scriptLoaded = useRef(false);
-  const fallbackIndexRef = useRef(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [crosshair, setCrosshair] = useState<CrosshairData | null>(null);
+  const [countdown, setCountdown] = useState("");
+  const [indicators, setIndicators] = useState<IndicatorConfig[]>(DEFAULT_INDICATORS);
+  const [showIndicatorModal, setShowIndicatorModal] = useState(false);
+  const [indicatorSearch, setIndicatorSearch] = useState("");
+  const [hLineMode, setHLineMode] = useState(false);
 
-  // Fetch user instruments
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const overlaySeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
+  const rawDataRef = useRef<OHLCData[]>([]);
+  const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
+
+  /* ─── fetch instruments ─── */
   useEffect(() => {
     if (!userId) return;
     supabase.from("user_instruments").select("symbol").eq("user_id", userId)
       .then(({ data }) => {
         const syms = data?.map(d => d.symbol) ?? [];
-        if (syms.length === 0) {
-          const defaults = ["NAS100", "US30", "XAUUSD", "AUDUSD", "NZDUSD"];
-          setInstruments(defaults);
-          setSelected(defaults[0]);
-        } else {
-          setInstruments(syms);
-          setSelected(syms[0]);
-        }
+        const list = syms.length > 0 ? syms : ["NAS100", "US30", "XAUUSD", "AUDUSD", "NZDUSD"];
+        setInstruments(list);
+        if (!selected) setSelected(list[0]);
       });
   }, [userId]);
 
-  // Fetch latest scan result for selected instrument
+  /* ─── fetch scan result ─── */
   useEffect(() => {
     if (!userId || !selected) return;
     supabase.from("scan_results").select("*")
       .eq("user_id", userId).eq("symbol", selected)
       .order("scanned_at", { ascending: false }).limit(1)
-      .then(({ data }) => {
-        setScanResult(data?.[0] as ScanResult ?? null);
-      });
+      .then(({ data }) => setScanResult(data?.[0] as ScanResult ?? null));
   }, [userId, selected]);
 
-  // Load TradingView script once
+  /* ─── countdown timer ─── */
   useEffect(() => {
-    if (scriptLoaded.current || document.getElementById("tv-script")) return;
-    const script = document.createElement("script");
-    script.id = "tv-script";
-    script.src = "https://s3.tradingview.com/tv.js";
-    script.async = true;
-    script.onload = () => { scriptLoaded.current = true; };
-    document.head.appendChild(script);
-    return () => {};
-  }, []);
-
-  const getSymbolAtIndex = useCallback((sym: string, index: number) => {
-    const fallbacks = TV_SYMBOL_FALLBACKS[sym];
-    if (fallbacks && index < fallbacks.length) return fallbacks[index];
-    return TV_SYMBOL_MAP[sym] || sym;
-  }, []);
-
-  const createWidget = useCallback((symbol: string) => {
-    if (!window.TradingView || !containerRef.current) return;
-    const container = document.getElementById("tradingview_chart");
-    if (container) container.innerHTML = "";
-
-    try {
-      widgetRef.current = new window.TradingView.widget({
-        autosize: true,
-        symbol,
-        interval: "15",
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        theme: "dark",
-        style: "1",
-        locale: "en",
-        enable_publishing: false,
-        allow_symbol_change: true,
-        hide_top_toolbar: false,
-        hide_side_toolbar: false,
-        hide_legend: false,
-        save_image: true,
-        toolbar_bg: "#111724",
-        withdateranges: true,
-        details: true,
-        hotlist: true,
-        calendar: true,
-        show_popup_button: true,
-        popup_width: "1200",
-        popup_height: "800",
-        backgroundColor: "rgba(17, 23, 36, 1)",
-        gridColor: "rgba(255, 255, 255, 0.04)",
-        studies: ["MAExp@tv-basicstudies"],
-        container_id: "tradingview_chart",
-      });
-    } catch (e) {
-      console.error("TradingView widget error:", e);
-    }
-  }, []);
-
-  // Create/recreate widget when symbol changes
-  useEffect(() => {
-    if (!selected) return;
-    fallbackIndexRef.current = 0;
-
-    const initWidget = () => {
-      const sym = getSymbolAtIndex(selected, 0);
-      createWidget(sym);
-
-      // Fallback: if iframe shows error after 5s, try next symbol
-      const fallbacks = TV_SYMBOL_FALLBACKS[selected];
-      if (!fallbacks || fallbacks.length <= 1) return;
-
-      const fallbackTimer = setTimeout(() => {
-        const iframe = containerRef.current?.querySelector("iframe");
-        if (!iframe || iframe.offsetHeight < 50) {
-          fallbackIndexRef.current = 1;
-          const nextSym = getSymbolAtIndex(selected, 1);
-          console.log(`Trying fallback symbol: ${nextSym}`);
-          createWidget(nextSym);
-        }
-      }, 5000);
-      return fallbackTimer;
+    const tfMinutes: Record<string, number> = { "1m": 1, "5m": 5, "15m": 15, "1H": 60, "4H": 240, "1D": 1440 };
+    const mins = tfMinutes[timeframe] ?? 15;
+    const update = () => {
+      const now = Date.now();
+      const intervalMs = mins * 60000;
+      const nextClose = Math.ceil(now / intervalMs) * intervalMs;
+      const diff = nextClose - now;
+      const m = Math.floor(diff / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setCountdown(`${m}:${s.toString().padStart(2, "0")}`);
     };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [timeframe]);
 
-    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
-    if (scriptLoaded.current && window.TradingView) {
-      fallbackTimer = initWidget();
-    } else {
-      const check = setInterval(() => {
-        if (window.TradingView) {
-          clearInterval(check);
-          fallbackTimer = initWidget();
-        }
-      }, 200);
-      return () => { clearInterval(check); if (fallbackTimer) clearTimeout(fallbackTimer); };
+  /* ─── create chart ─── */
+  const buildChart = useCallback(() => {
+    if (!containerRef.current || !selected) return;
+    // Cleanup
+    if (chartRef.current) {
+      chartRef.current.remove();
+      chartRef.current = null;
     }
-    return () => { if (fallbackTimer) clearTimeout(fallbackTimer); };
-  }, [selected, getSymbolAtIndex, createWidget]);
+    overlaySeriesRefs.current = [];
 
+    const chart = createChart(containerRef.current, {
+      autoSize: true,
+      layout: {
+        background: { color: "#080B12" },
+        textColor: "#9CA3AF",
+        fontFamily: "'DM Sans', sans-serif",
+      },
+      grid: {
+        vertLines: { color: "rgba(255,255,255,0.04)" },
+        horzLines: { color: "rgba(255,255,255,0.04)" },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: "#00CFA5", labelBackgroundColor: "#00CFA5" },
+        horzLine: { color: "#00CFA5", labelBackgroundColor: "#00CFA5" },
+      },
+      rightPriceScale: {
+        visible: true,
+        borderColor: "rgba(255,255,255,0.1)",
+        scaleMargins: { top: 0.1, bottom: 0.2 },
+      },
+      timeScale: {
+        visible: true,
+        borderColor: "rgba(255,255,255,0.1)",
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 5,
+      },
+      watermark: {
+        visible: true,
+        text: "GAINEDGE",
+        color: "rgba(0, 207, 165, 0.07)",
+        fontSize: 48,
+      },
+    });
+    chartRef.current = chart;
+
+    // Candle series
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "#22C55E",
+      downColor: "#EF4444",
+      borderUpColor: "#22C55E",
+      borderDownColor: "#EF4444",
+      wickUpColor: "#22C55E",
+      wickDownColor: "#EF4444",
+    });
+    candleSeriesRef.current = candleSeries;
+
+    // Volume series
+    const volSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: "volume" },
+      priceScaleId: "volume",
+    });
+    chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    volumeSeriesRef.current = volSeries;
+
+    // Generate data
+    const rawData = generateMockCandles(selected, timeframe, 500);
+    rawDataRef.current = rawData;
+    const displayData = chartType === "Heiken Ashi" ? toHeikenAshi(rawData) : rawData;
+
+    candleSeries.setData(displayData.map(d => ({
+      time: d.time as Time,
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close,
+    })));
+
+    volSeries.setData(displayData.map(d => ({
+      time: d.time as Time,
+      value: d.volume ?? 0,
+      color: d.close >= d.open ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+    })));
+
+    // Current price line
+    const lastCandle = displayData[displayData.length - 1];
+    if (lastCandle) {
+      candleSeries.createPriceLine({
+        price: lastCandle.close,
+        color: lastCandle.close >= lastCandle.open ? "#22C55E" : "#EF4444",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: "Price",
+      });
+    }
+
+    // Scan result lines (TP/SL/Entry)
+    if (scanResult) {
+      if (scanResult.entry_price) {
+        candleSeries.createPriceLine({
+          price: scanResult.entry_price, color: "#3B82F6", lineWidth: 1, lineStyle: 2,
+          axisLabelVisible: true, title: "Entry",
+        });
+      }
+      if (scanResult.take_profit) {
+        candleSeries.createPriceLine({
+          price: scanResult.take_profit, color: "#22C55E", lineWidth: 1, lineStyle: 2,
+          axisLabelVisible: true, title: "TP",
+        });
+      }
+      if (scanResult.stop_loss) {
+        candleSeries.createPriceLine({
+          price: scanResult.stop_loss, color: "#EF4444", lineWidth: 1, lineStyle: 2,
+          axisLabelVisible: true, title: "SL",
+        });
+      }
+    }
+
+    // Overlay indicators
+    applyIndicators(chart, rawData, displayData);
+
+    // Crosshair move handler
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.seriesData) {
+        setCrosshair(null);
+        return;
+      }
+      const candle = param.seriesData.get(candleSeries) as CandlestickData | undefined;
+      const vol = param.seriesData.get(volSeries) as any;
+      if (candle) {
+        setCrosshair({
+          open: candle.open, high: candle.high, low: candle.low, close: candle.close,
+          volume: vol?.value ?? 0, time: param.time as number,
+        });
+      }
+    });
+
+    // Click for horizontal line
+    if (hLineMode) {
+      chart.subscribeClick((param) => {
+        if (!param.point) return;
+        const price = candleSeries.coordinateToPrice(param.point.y);
+        if (price !== null) {
+          candleSeries.createPriceLine({
+            price, color: "#F59E0B", lineWidth: 1, lineStyle: 0,
+            axisLabelVisible: true, title: "",
+          });
+        }
+        setHLineMode(false);
+      });
+    }
+
+    chart.timeScale().fitContent();
+
+    // Simulate live ticks
+    if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+    tickIntervalRef.current = setInterval(() => {
+      const last = rawDataRef.current[rawDataRef.current.length - 1];
+      if (!last) return;
+      const vol = (VOLATILITY_MAP[selected] ?? last.close * 0.0003);
+      const change = (Math.random() - 0.5) * vol;
+      const newClose = +(last.close + change).toFixed(5);
+      const updated = {
+        ...last,
+        close: newClose,
+        high: Math.max(last.high, newClose),
+        low: Math.min(last.low, newClose),
+      };
+      rawDataRef.current[rawDataRef.current.length - 1] = updated;
+      const display = chartType === "Heiken Ashi"
+        ? toHeikenAshi(rawDataRef.current).pop()!
+        : updated;
+      candleSeriesRef.current?.update({
+        time: display.time as Time,
+        open: display.open, high: display.high, low: display.low, close: display.close,
+      });
+    }, 1500);
+
+    return () => {
+      if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
+    };
+  }, [selected, timeframe, chartType, scanResult, hLineMode, indicators]);
+
+  const applyIndicators = (chart: IChartApi, rawData: OHLCData[], displayData: OHLCData[]) => {
+    // Remove old overlays
+    overlaySeriesRefs.current.forEach(s => {
+      try { chart.removeSeries(s); } catch {}
+    });
+    overlaySeriesRefs.current = [];
+
+    for (const ind of indicators) {
+      if (!ind.enabled) continue;
+      if (ind.id === "ema_fast" || ind.id === "ema_slow") {
+        const period = ind.params?.period ?? 17;
+        const emaData = calculateEMA(rawData, period);
+        const s = chart.addSeries(LineSeries, {
+          color: ind.id === "ema_fast" ? "#00CFA5" : "#8B5CF6",
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+        s.setData(emaData.map(d => ({ time: d.time as Time, value: d.value })));
+        overlaySeriesRefs.current.push(s);
+      }
+      if (ind.id === "sma_50" || ind.id === "sma_200") {
+        const period = ind.params?.period ?? 50;
+        const smaData = calculateSMA(rawData, period);
+        const s = chart.addSeries(LineSeries, {
+          color: ind.id === "sma_50" ? "#F59E0B" : "#EC4899",
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+        });
+        s.setData(smaData.map(d => ({ time: d.time as Time, value: d.value })));
+        overlaySeriesRefs.current.push(s);
+      }
+      if (ind.id === "bollinger") {
+        const { upper, middle, lower } = calculateBollingerBands(rawData, ind.params?.period ?? 20, ind.params?.stdDev ?? 2);
+        const colors = ["#3B82F6", "#6B7280", "#3B82F6"];
+        [upper, middle, lower].forEach((band, idx) => {
+          const s = chart.addSeries(LineSeries, {
+            color: colors[idx],
+            lineWidth: 1,
+            priceLineVisible: false,
+            lastValueVisible: false,
+          });
+          s.setData(band.map(d => ({ time: d.time as Time, value: d.value })));
+          overlaySeriesRefs.current.push(s);
+        });
+      }
+    }
+  };
+
+  /* rebuild chart on deps change */
+  useEffect(() => {
+    const cleanup = buildChart();
+    return () => {
+      cleanup?.();
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, [buildChart]);
+
+  /* ─── fullscreen ─── */
+  const toggleFullscreen = () => setIsFullscreen(f => !f);
+
+  /* ─── helpers ─── */
   const dirColor = (d: string) =>
     d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
   const dirIcon = (d: string) =>
-    d === "BUY" ? <ArrowUpRight className="w-4 h-4" /> : d === "SELL" ? <ArrowDownRight className="w-4 h-4" /> : <Minus className="w-4 h-4" />;
+    d === "BUY" ? <ArrowUpRight className="w-4 h-4" /> :
+    d === "SELL" ? <ArrowDownRight className="w-4 h-4" /> :
+    <Minus className="w-4 h-4" />;
+
+  const lastCandle = rawDataRef.current[rawDataRef.current.length - 1];
+  const currentPrice = crosshair ?? (lastCandle ? {
+    open: lastCandle.open, high: lastCandle.high, low: lastCandle.low,
+    close: lastCandle.close, volume: lastCandle.volume ?? 0, time: lastCandle.time,
+  } : null);
+
+  const filteredIndicators = indicators.filter(i =>
+    i.label.toLowerCase().includes(indicatorSearch.toLowerCase())
+  );
 
   return (
-    <div className="flex flex-col h-full w-full gap-2 p-2 sm:p-4">
-      {/* Instrument pills */}
-      <div className="flex flex-wrap gap-2">
+    <div className={`flex flex-col w-full gap-2 ${isFullscreen ? "fixed inset-0 z-50 bg-[#080B12] p-2" : "h-full p-2 sm:p-4"}`}>
+      {/* Top controls */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Instrument pills */}
         {instruments.map(sym => (
           <button
             key={sym}
@@ -203,18 +415,100 @@ export default function ChartsPage() {
             {sym}
           </button>
         ))}
+        <div className="w-px h-6 bg-white/10 mx-1" />
+        {/* Timeframes */}
+        {TIMEFRAMES.map(tf => (
+          <button
+            key={tf}
+            onClick={() => setTimeframe(tf)}
+            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border ${
+              timeframe === tf
+                ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
+                : "bg-[#111724] border-white/10 text-[#8892A4] hover:text-white"
+            }`}
+          >
+            {tf}
+          </button>
+        ))}
+        <div className="w-px h-6 bg-white/10 mx-1" />
+        {/* Chart type */}
+        {CHART_TYPES.map(ct => (
+          <button
+            key={ct}
+            onClick={() => setChartType(ct)}
+            className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border ${
+              chartType === ct
+                ? "bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#8B5CF6]"
+                : "bg-[#111724] border-white/10 text-[#8892A4] hover:text-white"
+            }`}
+          >
+            {ct}
+          </button>
+        ))}
+        <div className="w-px h-6 bg-white/10 mx-1" />
+        {/* Indicators */}
+        <button
+          onClick={() => setShowIndicatorModal(true)}
+          className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1"
+        >
+          <Search className="w-3 h-3" /> Indicators
+        </button>
+        {/* H-Line tool */}
+        <button
+          onClick={() => setHLineMode(m => !m)}
+          className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border flex items-center gap-1 ${
+            hLineMode
+              ? "bg-[#F59E0B]/15 border-[#F59E0B]/40 text-[#F59E0B]"
+              : "bg-[#111724] border-white/10 text-[#8892A4] hover:text-white"
+          }`}
+        >
+          <MinusIcon className="w-3 h-3" /> H-Line
+        </button>
+        {/* Fit all */}
+        <button
+          onClick={() => chartRef.current?.timeScale().fitContent()}
+          className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1"
+        >
+          <ZoomIn className="w-3 h-3" /> Fit
+        </button>
+        {/* Fullscreen */}
+        <button
+          onClick={toggleFullscreen}
+          className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all ml-auto"
+        >
+          {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+        </button>
       </div>
 
-      {/* TradingView Chart */}
+      {/* OHLCV overlay + countdown */}
+      <div className="flex items-center justify-between text-[11px] px-1">
+        <div className="flex items-center gap-3 font-mono">
+          <span className="text-white/40">{selected}</span>
+          {currentPrice && (
+            <>
+              <span className="text-white/60">O: <span className="text-white">{currentPrice.open}</span></span>
+              <span className="text-white/60">H: <span className="text-green-400">{currentPrice.high}</span></span>
+              <span className="text-white/60">L: <span className="text-red-400">{currentPrice.low}</span></span>
+              <span className="text-white/60">C: <span className={currentPrice.close >= currentPrice.open ? "text-green-400" : "text-red-400"}>{currentPrice.close}</span></span>
+              <span className="text-white/60">V: <span className="text-white">{currentPrice.volume?.toLocaleString()}</span></span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white/40">Next close:</span>
+          <span className="text-[#00CFA5] font-bold font-mono">{countdown}</span>
+        </div>
+      </div>
+
+      {/* Chart container */}
       <div
         ref={containerRef}
-        className="flex-1 min-h-[60vh] rounded-lg overflow-hidden border border-white/[0.06]"
-      >
-        <div id="tradingview_chart" style={{ width: "100%", height: "100%" }} />
-      </div>
+        className={`rounded-lg overflow-hidden border border-white/[0.06] ${isFullscreen ? "flex-1" : "min-h-[55vh]"}`}
+        style={{ cursor: hLineMode ? "crosshair" : undefined }}
+      />
 
       {/* AI Analysis Panel */}
-      {scanResult && (
+      {!isFullscreen && scanResult && (
         <div className="rounded-lg border border-white/[0.06] bg-[#111724] p-4">
           <div className="flex items-center gap-2 mb-2">
             <Activity className="w-4 h-4 text-[#00CFA5]" />
@@ -224,41 +518,74 @@ export default function ChartsPage() {
             <span className={`font-bold flex items-center gap-1 ${dirColor(scanResult.direction)}`}>
               {dirIcon(scanResult.direction)} {scanResult.direction}
             </span>
-            <span className="text-white/60">
-              Confidence: <span className="text-white font-bold">{scanResult.confidence}/10</span>
-            </span>
-            {scanResult.entry_price && (
-              <span className="text-white/60">
-                Entry: <span className="text-white font-bold">{scanResult.entry_price}</span>
-              </span>
-            )}
-            {scanResult.take_profit && (
-              <span className="text-white/60">
-                TP: <span className="text-green-400 font-bold">{scanResult.take_profit}</span>
-              </span>
-            )}
-            {scanResult.stop_loss && (
-              <span className="text-white/60">
-                SL: <span className="text-red-400 font-bold">{scanResult.stop_loss}</span>
-              </span>
-            )}
-            {scanResult.risk_reward && (
-              <span className="text-white/60">
-                R:R: <span className="text-amber-400 font-bold">{scanResult.risk_reward}</span>
-              </span>
-            )}
+            <span className="text-white/60">Confidence: <span className="text-white font-bold">{scanResult.confidence}/10</span></span>
+            {scanResult.entry_price && <span className="text-white/60">Entry: <span className="text-white font-bold">{scanResult.entry_price}</span></span>}
+            {scanResult.take_profit && <span className="text-white/60">TP: <span className="text-green-400 font-bold">{scanResult.take_profit}</span></span>}
+            {scanResult.stop_loss && <span className="text-white/60">SL: <span className="text-red-400 font-bold">{scanResult.stop_loss}</span></span>}
+            {scanResult.risk_reward && <span className="text-white/60">R:R: <span className="text-amber-400 font-bold">{scanResult.risk_reward}</span></span>}
           </div>
           <p className="text-xs text-white/50 leading-relaxed">{scanResult.reasoning}</p>
-          <p className="text-[10px] text-white/20 mt-2">
-            Scanned: {new Date(scanResult.scanned_at).toLocaleString()}
-          </p>
+          <p className="text-[10px] text-white/20 mt-2">Scanned: {new Date(scanResult.scanned_at).toLocaleString()}</p>
         </div>
       )}
 
       {/* Attribution */}
-      <p className="text-[10px] text-white/20 text-center">
-        Charts powered by TradingView
-      </p>
+      {!isFullscreen && (
+        <p className="text-[10px] text-white/20 text-center">
+          Charts powered by{" "}
+          <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener noreferrer" className="underline">
+            Lightweight Charts™
+          </a>{" "}
+          • tradingview.com
+        </p>
+      )}
+
+      {/* Indicator modal */}
+      {showIndicatorModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60" onClick={() => setShowIndicatorModal(false)}>
+          <div className="bg-[#111724] border border-white/10 rounded-xl p-5 w-[360px] max-h-[70vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-bold text-white">Indicators</span>
+              <button onClick={() => setShowIndicatorModal(false)} className="text-white/40 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <input
+              value={indicatorSearch}
+              onChange={e => setIndicatorSearch(e.target.value)}
+              placeholder="Search indicators..."
+              className="w-full bg-[#080B12] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 mb-3 outline-none focus:border-[#00CFA5]/40"
+            />
+            <div className="flex flex-col gap-1">
+              {filteredIndicators.map(ind => (
+                <button
+                  key={ind.id}
+                  onClick={() => {
+                    setIndicators(prev => prev.map(i => i.id === ind.id ? { ...i, enabled: !i.enabled } : i));
+                  }}
+                  className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs transition-all ${
+                    ind.enabled
+                      ? "bg-[#00CFA5]/10 text-[#00CFA5] border border-[#00CFA5]/30"
+                      : "text-white/60 hover:bg-white/5 border border-transparent"
+                  }`}
+                >
+                  <span className="font-medium">{ind.label}</span>
+                  <span className="text-[10px]">{ind.enabled ? "ON" : "OFF"}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-white/30 mt-3 text-center">More indicators coming in Phase 2</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+/* Volatility map for live tick simulation */
+const VOLATILITY_MAP: Record<string, number> = {
+  XAUUSD: 0.5, US30: 5, NAS100: 3, NZDUSD: 0.0002, AUDUSD: 0.0002,
+  EURUSD: 0.0002, GBPUSD: 0.0003, USDJPY: 0.03, USDCAD: 0.0002,
+  USDCHF: 0.0002, GBPJPY: 0.04, EURJPY: 0.03, XAGUSD: 0.02,
+  BTCUSD: 30, ETHUSD: 3, US500: 1, SPX500: 1,
+};
