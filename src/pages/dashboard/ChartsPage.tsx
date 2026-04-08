@@ -233,10 +233,13 @@ export default function ChartsPage() {
   useEffect(() => {
     if (!chartContainerRef.current || displayCandles.length === 0) return;
 
-    // Cleanup
-    chartRef.current?.remove();
-    rsiChartRef.current?.remove();
-    macdChartRef.current?.remove();
+    // Cleanup previous charts safely
+    try { chartRef.current?.remove(); } catch {}
+    try { rsiChartRef.current?.remove(); } catch {}
+    try { macdChartRef.current?.remove(); } catch {}
+    chartRef.current = null;
+    rsiChartRef.current = null;
+    macdChartRef.current = null;
     seriesRefs.current.clear();
 
     const container = chartContainerRef.current;
@@ -365,9 +368,12 @@ export default function ChartsPage() {
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      chart.remove();
-      rsiChartRef.current?.remove();
-      macdChartRef.current?.remove();
+      try { chart.remove(); } catch {}
+      try { rsiChartRef.current?.remove(); } catch {}
+      try { macdChartRef.current?.remove(); } catch {}
+      chartRef.current = null;
+      rsiChartRef.current = null;
+      macdChartRef.current = null;
     };
   }, [displayCandles, activeIndicators, scanResult]);
 
