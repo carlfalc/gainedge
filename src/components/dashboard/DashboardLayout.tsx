@@ -218,6 +218,7 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+      <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
     </div>
   );
 }
