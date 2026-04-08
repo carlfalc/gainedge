@@ -1,93 +1,44 @@
-import { useState, useEffect, useMemo } from "react";
-import { BarChart3, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { BarChart3, Clock, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
+import { SESSIONS, SESSION_COLORS, getActiveSessions, getCompletedSessions, formatLocalHour, type SessionDef } from "@/lib/session-colors";
 
-interface TopInstrument {
-  symbol: string;
-  score: number;
+interface SessionRow {
+  session: SessionDef;
+  topSymbol: string | null;
   peakHourLabel: string | null;
+  volume: number;
+  inProgress: boolean;
 }
 
-type TradingSession = "asian" | "london" | "new_york" | "closed";
-
-interface SessionInfo {
-  name: string;
-  key: TradingSession;
-  startUtcHour: number;
-  endUtcHour: number;
-}
-
-const SESSIONS: SessionInfo[] = [
-  { name: "Asian Session", key: "asian", startUtcHour: 0, endUtcHour: 9 },
-  { name: "London Session", key: "london", startUtcHour: 7, endUtcHour: 16 },
-  { name: "New York Session", key: "new_york", startUtcHour: 13, endUtcHour: 22 },
-];
-
-function detectCurrentSession(): { session: SessionInfo; overlap: boolean } | null {
-  const utcHour = new Date().getUTCHours();
-  const active = SESSIONS.filter(s => {
-    if (s.startUtcHour < s.endUtcHour) return utcHour >= s.startUtcHour && utcHour < s.endUtcHour;
-    return utcHour >= s.startUtcHour || utcHour < s.endUtcHour;
-  });
-  if (active.length === 0) return null;
-  // If multiple sessions overlap, pick the one that started most recently
-  const primary = active.length > 1
-    ? active.reduce((a, b) => {
-        const aDist = (utcHour - a.startUtcHour + 24) % 24;
-        const bDist = (utcHour - b.startUtcHour + 24) % 24;
-        return aDist < bDist ? a : b;
-      })
-    : active[0];
-  return { session: primary, overlap: active.length > 1 };
-}
-
-function formatLocalHour(utcHour: number): string {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour, 0));
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
-}
-
-function peakHourFromSparkline(sparkline: number[] | null | undefined): { peakUtcHour: number } | null {
+function peakHourFromSparkline(sparkline: number[] | null): { peakUtcHour: number } | null {
   if (!sparkline || sparkline.length < 4) return null;
-  // Sparkline has ~20 data points representing recent candles (15m each = ~5 hours)
-  // Group into ~1-hour buckets (4 candles per hour) and find highest activity bucket
   const bucketSize = 4;
-  const buckets: { sum: number; idx: number }[] = [];
+  const buckets: { range: number; idx: number }[] = [];
   for (let i = 0; i <= sparkline.length - bucketSize; i += bucketSize) {
     const slice = sparkline.slice(i, i + bucketSize);
-    // Use range (max-min) as a proxy for volume/activity
-    const range = Math.max(...slice) - Math.min(...slice);
-    buckets.push({ sum: range, idx: i });
+    buckets.push({ range: Math.max(...slice) - Math.min(...slice), idx: i });
   }
   if (buckets.length === 0) return null;
-  const peak = buckets.reduce((a, b) => a.sum > b.sum ? a : b);
-  // Map bucket index back to approximate UTC hour
+  const peak = buckets.reduce((a, b) => a.range > b.range ? a : b);
   const candlesFromEnd = sparkline.length - peak.idx;
   const hoursAgo = Math.floor(candlesFromEnd / 4);
-  const peakUtcHour = (new Date().getUTCHours() - hoursAgo + 24) % 24;
-  return { peakUtcHour };
+  return { peakUtcHour: (new Date().getUTCHours() - hoursAgo + 24) % 24 };
 }
 
 export function MostVolumeBar() {
-  const [top, setTop] = useState<TopInstrument[]>([]);
-  const [metric, setMetric] = useState<"volume" | "confidence">("confidence");
-  const [sessionInfo, setSessionInfo] = useState(detectCurrentSession());
-
-  // Update session every minute
-  useEffect(() => {
-    const interval = setInterval(() => setSessionInfo(detectCurrentSession()), 60_000);
-    return () => clearInterval(interval);
-  }, []);
+  const [rows, setRows] = useState<SessionRow[]>([]);
 
   useEffect(() => {
     load();
     const channel = supabase
-      .channel("most-volume")
+      .channel("most-volume-v2")
       .on("postgres_changes", { event: "*", schema: "public", table: "live_market_data" }, () => load())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "scan_results" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "session_volume_summary" }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(load, 60_000);
+    return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, []);
 
   const load = async () => {
@@ -95,96 +46,98 @@ export function MostVolumeBar() {
     if (!session) return;
     const uid = session.user.id;
 
-    const { data: instruments } = await supabase
-      .from("user_instruments")
-      .select("symbol")
-      .eq("user_id", uid);
+    const completed = getCompletedSessions();
+    const active = getActiveSessions();
+    const today = new Date().toISOString().split("T")[0];
 
-    if (!instruments || instruments.length === 0) return;
-    const symbols = instruments.map((i) => i.symbol);
+    // Load stored summaries for completed sessions
+    const { data: summaries } = await supabase
+      .from("session_volume_summary")
+      .select("*")
+      .eq("date", today)
+      .order("total_volume", { ascending: false });
 
-    // Try live_market_data first for real volume + sparkline
+    // Load live data for in-progress sessions
     const { data: liveRows } = await supabase
       .from("live_market_data")
       .select("symbol, volume_today, sparkline_data")
-      .eq("user_id", uid)
-      .in("symbol", symbols);
+      .eq("user_id", uid);
 
-    const hasLiveVolume = liveRows && liveRows.some(r => r.volume_today != null && Number(r.volume_today) > 0);
+    const result: SessionRow[] = [];
 
-    if (hasLiveVolume && liveRows) {
-      setMetric("volume");
-      const sorted = [...liveRows]
-        .map(r => {
-          const spark = Array.isArray(r.sparkline_data) ? (r.sparkline_data as number[]) : null;
-          const peak = peakHourFromSparkline(spark);
-          let peakLabel: string | null = null;
-          if (peak) {
-            const start = formatLocalHour(peak.peakUtcHour);
-            const end = formatLocalHour((peak.peakUtcHour + 1) % 24);
-            peakLabel = `${start} – ${end}`;
-          }
-          return { symbol: r.symbol, score: Number(r.volume_today) || 0, peakHourLabel: peakLabel };
-        })
-        .sort((a, b) => b.score - a.score);
-      const result = [sorted[0]];
-      if (sorted.length > 1 && sorted[1].score >= sorted[0].score * 0.85) {
-        result.push(sorted[1]);
-      }
-      setTop(result);
-      return;
-    }
-
-    // Fallback to scan_results confidence
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-
-    let { data: scans } = await supabase
-      .from("scan_results")
-      .select("symbol, volume, confidence, scanned_at")
-      .eq("user_id", uid)
-      .in("symbol", symbols)
-      .gte("scanned_at", todayStart.toISOString())
-      .order("scanned_at", { ascending: false })
-      .limit(100);
-
-    if (!scans || scans.length === 0) {
-      const { data: recentScans } = await supabase
-        .from("scan_results")
-        .select("symbol, volume, confidence, scanned_at")
-        .eq("user_id", uid)
-        .in("symbol", symbols)
-        .order("scanned_at", { ascending: false })
-        .limit(100);
-      scans = recentScans;
-    }
-
-    if (!scans || scans.length === 0) return;
-
-    const hasVolume = scans.some(s => s.volume != null && Number(s.volume) > 0);
-    const latest = new Map<string, TopInstrument>();
-    for (const s of scans) {
-      if (!latest.has(s.symbol)) {
-        latest.set(s.symbol, {
-          symbol: s.symbol,
-          score: hasVolume ? (Number(s.volume) || 0) : (s.confidence ?? 0),
-          peakHourLabel: null,
+    // Add completed sessions from stored summaries
+    for (const sess of completed) {
+      const sessSum = (summaries || []).filter((s: any) => s.session === sess.key);
+      if (sessSum.length > 0) {
+        const top = sessSum[0]; // already sorted by volume desc
+        let peakLabel: string | null = null;
+        if (top.peak_hour_start) {
+          const peakDate = new Date(top.peak_hour_start);
+          const startH = peakDate.getUTCHours();
+          const startLocal = formatLocalHour(startH);
+          const endLocal = formatLocalHour((startH + 1) % 24);
+          peakLabel = `${startLocal} – ${endLocal}`;
+        }
+        result.push({
+          session: sess,
+          topSymbol: top.symbol,
+          peakHourLabel: peakLabel,
+          volume: Number(top.total_volume) || 0,
+          inProgress: false,
         });
+      } else {
+        result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: false });
       }
     }
 
-    setMetric(hasVolume ? "volume" : "confidence");
-    const sorted = Array.from(latest.values()).sort((a, b) => b.score - a.score);
-    const result = [sorted[0]];
-    if (sorted.length > 1 && sorted[1].score >= sorted[0].score * 0.85) {
-      result.push(sorted[1]);
+    // Add active/in-progress sessions from live data
+    for (const sess of active) {
+      if (completed.some(c => c.key === sess.key)) continue; // already shown as completed
+      
+      if (liveRows && liveRows.length > 0) {
+        const sorted = [...liveRows]
+          .map(r => ({
+            symbol: r.symbol,
+            volume: Number(r.volume_today) || 0,
+            sparkline: Array.isArray(r.sparkline_data) ? (r.sparkline_data as number[]) : null,
+          }))
+          .sort((a, b) => b.volume - a.volume);
+        
+        const top = sorted[0];
+        let peakLabel: string | null = null;
+        const peak = peakHourFromSparkline(top.sparkline);
+        if (peak) {
+          const startLocal = formatLocalHour(peak.peakUtcHour);
+          const endLocal = formatLocalHour((peak.peakUtcHour + 1) % 24);
+          peakLabel = `${startLocal} – ${endLocal}`;
+        }
+
+        result.push({
+          session: sess,
+          topSymbol: top.symbol,
+          peakHourLabel: peakLabel,
+          volume: top.volume,
+          inProgress: true,
+        });
+      } else {
+        result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: true });
+      }
     }
-    setTop(result);
+
+    // Add future sessions not yet started
+    const allShown = new Set(result.map(r => r.session.key));
+    for (const sess of SESSIONS) {
+      if (!allShown.has(sess.key)) {
+        result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: false });
+      }
+    }
+
+    // Sort by session order
+    const order = SESSIONS.map(s => s.key);
+    result.sort((a, b) => order.indexOf(a.session.key) - order.indexOf(b.session.key));
+
+    setRows(result);
   };
-
-  if (top.length === 0) return null;
-
-  const sessionLabel = sessionInfo ? sessionInfo.session.name : "Markets Closed";
 
   return (
     <div
@@ -192,53 +145,125 @@ export function MostVolumeBar() {
         background: C.card,
         border: `1px solid ${C.border}`,
         borderRadius: 12,
-        padding: "10px 18px",
+        padding: "14px 18px",
         marginBottom: 16,
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        flexWrap: "wrap",
       }}
     >
-      <BarChart3 size={16} color={C.text} />
-      <span style={{ fontSize: 12, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>
-        Most Volume Today
-      </span>
-      <span style={{ fontSize: 10, color: C.jade, fontWeight: 600, whiteSpace: "nowrap" }}>
-        — {sessionLabel}
-      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <BarChart3 size={16} color={C.text} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+          Most Volume Today
+        </span>
+      </div>
 
-      <div style={{ width: 1, height: 16, background: C.border, flexShrink: 0 }} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {rows.map((row) => {
+          const color = row.session.color;
+          const hasData = row.topSymbol != null;
+          const isActive = row.inProgress;
+          const isFuture = !hasData && !isActive && !getCompletedSessions().some(c => c.key === row.session.key);
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        {top.map((t) => (
-          <div key={t.symbol} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span
+          return (
+            <div
+              key={row.session.key}
               style={{
-                padding: "4px 14px",
-                borderRadius: 20,
-                border: "1.5px solid #EAB308",
-                color: C.text,
-                fontSize: 12,
-                fontWeight: 800,
-                fontFamily: "'JetBrains Mono', monospace",
-                letterSpacing: 0.5,
-                transition: "all 0.4s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "6px 10px",
+                borderRadius: 8,
+                background: isActive ? color + "10" : "transparent",
+                borderLeft: `3px solid ${color}${hasData || isActive ? "" : "40"}`,
+                opacity: isFuture ? 0.4 : 1,
               }}
             >
-              {t.symbol}
-            </span>
-            {t.peakHourLabel && (
-              <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
-                <Clock size={9} />
-                {t.peakHourLabel}
+              {/* Session label */}
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color,
+                  minWidth: 70,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.session.label}
               </span>
-            )}
-          </div>
-        ))}
-        <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>
-          by {metric}
-        </span>
+
+              {isActive && !hasData ? (
+                <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>
+                  In progress...
+                </span>
+              ) : isActive && hasData ? (
+                <>
+                  <span
+                    style={{
+                      padding: "2px 10px",
+                      borderRadius: 14,
+                      border: `1.5px solid ${color}`,
+                      color: C.text,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {row.topSymbol}
+                  </span>
+                  {row.peakHourLabel && (
+                    <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <Clock size={9} />
+                      {row.peakHourLabel}
+                    </span>
+                  )}
+                  {row.volume > 0 && (
+                    <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {row.volume.toLocaleString()} vol
+                    </span>
+                  )}
+                  <span style={{
+                    fontSize: 8, fontWeight: 700, color, background: color + "20",
+                    padding: "1px 6px", borderRadius: 4, textTransform: "uppercase", letterSpacing: 1,
+                  }}>
+                    LIVE
+                  </span>
+                </>
+              ) : hasData ? (
+                <>
+                  <span
+                    style={{
+                      padding: "2px 10px",
+                      borderRadius: 14,
+                      border: `1.5px solid ${color}50`,
+                      color: C.sec,
+                      fontSize: 11,
+                      fontWeight: 800,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {row.topSymbol}
+                  </span>
+                  {row.peakHourLabel && (
+                    <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <Clock size={9} />
+                      {row.peakHourLabel}
+                    </span>
+                  )}
+                  {row.volume > 0 && (
+                    <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {row.volume.toLocaleString()} vol
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>
+                  Upcoming
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
