@@ -134,6 +134,18 @@ function generateMockData(symbol: string) {
   };
 }
 
+/* ─── Session detection for volume summaries ─── */
+const SESSION_DEFS = [
+  { key: "asian", startUtc: 0, endUtc: 9 },
+  { key: "london", startUtc: 7, endUtc: 16 },
+  { key: "new_york", startUtc: 13, endUtc: 22 },
+];
+
+function getEndingSessions(utcHour: number): string[] {
+  // A session is "ending" in its last hour
+  return SESSION_DEFS.filter(s => utcHour === s.endUtc - 1).map(s => s.key);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -242,6 +254,53 @@ serve(async (req) => {
         .from("live_market_data")
         .upsert(upserts, { onConflict: "user_id,symbol" });
       if (error) console.error("Upsert error:", error);
+    }
+
+    // ─── Session volume summaries ───
+    // Check if any session is ending (within its last hour)
+    const utcHour = new Date().getUTCHours();
+    const utcMinute = new Date().getUTCMinutes();
+    const endingSessions = getEndingSessions(utcHour);
+
+    // Only write summary once near the end of the hour (minute 55-59)
+    if (endingSessions.length > 0 && utcMinute >= 55) {
+      const today = new Date().toISOString().split("T")[0];
+      for (const sessionKey of endingSessions) {
+        const sessionDef = SESSION_DEFS.find(s => s.key === sessionKey)!;
+        for (const symbol of allSymbols) {
+          const data = symbolData.get(symbol);
+          if (!data) continue;
+
+          // Estimate peak hour from sparkline
+          let peakHourStart: string | null = null;
+          const spark = data.sparkline_data as number[];
+          if (spark && spark.length >= 4) {
+            const bucketSize = 4;
+            let maxRange = 0, peakIdx = 0;
+            for (let i = 0; i <= spark.length - bucketSize; i += bucketSize) {
+              const slice = spark.slice(i, i + bucketSize);
+              const range = Math.max(...slice) - Math.min(...slice);
+              if (range > maxRange) { maxRange = range; peakIdx = i; }
+            }
+            const candlesFromEnd = spark.length - peakIdx;
+            const hoursAgo = Math.floor(candlesFromEnd / 4);
+            const peakUtcHour = (utcHour - hoursAgo + 24) % 24;
+            const d = new Date();
+            d.setUTCHours(peakUtcHour, 0, 0, 0);
+            peakHourStart = d.toISOString();
+          }
+
+          await supabase
+            .from("session_volume_summary")
+            .upsert({
+              session: sessionKey,
+              symbol,
+              date: today,
+              total_volume: data.volume_today || 0,
+              peak_hour_start: peakHourStart,
+            }, { onConflict: "session,symbol,date" });
+        }
+      }
     }
 
     return new Response(JSON.stringify({
