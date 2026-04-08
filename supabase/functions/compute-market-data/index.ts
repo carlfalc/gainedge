@@ -81,16 +81,24 @@ function calcMACDStatus(closes: number[]): string {
   return "Neutral";
 }
 
+function calcATR(highs: number[], lows: number[], closes: number[], period = 14): number | null {
+  if (closes.length < period + 1) return null;
+  let sum = 0;
+  for (let i = closes.length - period; i < closes.length; i++) {
+    const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
+    sum += tr;
+  }
+  return sum / period;
+}
+
 /* ─── MetaApi helpers ─── */
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
 
-// Map timeframe string to minutes for candle start time calculation
 const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
 };
 
-// Eightcap-Demo symbol mapping: forex pairs use ".i" suffix, indices have special names
 const BROKER_SYMBOL_MAP: Record<string, string[]> = {
   NAS100: ["NDX100", "NAS100", "USTEC"],
   US30: ["US30", "DJ30"],
@@ -168,7 +176,7 @@ function generateMockData(symbol: string) {
   };
 }
 
-/* ─── Auto-scan analysis on candle close ─── */
+/* ─── Falconer AI: Improved analysis with NO-TRADE filters ─── */
 function detectSession(): string {
   const h = new Date().getUTCHours();
   if (h >= 13 && h < 22) return "new_york";
@@ -194,18 +202,38 @@ interface AnalysisResult {
   stoch_rsi: number | null;
 }
 
+function findSwingLow(lows: number[], endIdx: number, lookback = 20): number {
+  const start = Math.max(0, endIdx - lookback);
+  let minVal = lows[start];
+  for (let i = start + 1; i <= endIdx; i++) {
+    if (lows[i] < minVal) minVal = lows[i];
+  }
+  return minVal;
+}
+
+function findSwingHigh(highs: number[], endIdx: number, lookback = 20): number {
+  const start = Math.max(0, endIdx - lookback);
+  let maxVal = highs[start];
+  for (let i = start + 1; i <= endIdx; i++) {
+    if (highs[i] > maxVal) maxVal = highs[i];
+  }
+  return maxVal;
+}
+
 function runAnalysis(candles: any[]): AnalysisResult {
   const closes = candles.map((c: any) => c.close);
   const highs = candles.map((c: any) => c.high);
   const lows = candles.map((c: any) => c.low);
+  const volumes = candles.map((c: any) => c.tickVolume || 0);
 
-  // EMA 4/17 crossover
+  // EMA 4/17 crossover — use CLOSED candle (second-to-last vs third-to-last)
   const ema4 = calcEMA(closes, 4);
   const ema17 = calcEMA(closes, 17);
-  const currFast = ema4[ema4.length - 1];
-  const currSlow = ema17[ema17.length - 1];
-  const prevFast = ema4[ema4.length - 2];
-  const prevSlow = ema17[ema17.length - 2];
+  const lastIdx = ema4.length - 1;
+  const currFast = ema4[lastIdx];
+  const currSlow = ema17[lastIdx];
+  const prevFast = ema4[lastIdx - 1];
+  const prevSlow = ema17[lastIdx - 1];
 
   let crossoverStatus = "NONE";
   let crossoverDir: string | null = null;
@@ -213,7 +241,7 @@ function runAnalysis(candles: any[]): AnalysisResult {
     crossoverStatus = "CONFIRMED"; crossoverDir = "BULLISH";
   } else if (prevFast >= prevSlow && currFast < currSlow) {
     crossoverStatus = "CONFIRMED"; crossoverDir = "BEARISH";
-  } else if (Math.abs(currFast - currSlow) / currSlow < 0.0005) {
+  } else if (Math.abs(currFast - currSlow) / currSlow < 0.0003) {
     crossoverStatus = "FORMING";
     crossoverDir = currFast > currSlow ? "BULLISH" : "BEARISH";
   }
@@ -223,70 +251,118 @@ function runAnalysis(candles: any[]): AnalysisResult {
   const adx = calcADX(highs, lows, closes);
   const macd = calcMACDStatus(closes);
   const stochRsi = calcStochRSI(closes);
+  const atr = calcATR(highs, lows, closes);
 
-  // Confidence scoring
-  let bullishPoints = 0, bearishPoints = 0;
+  // Calculate average ATR for comparison
+  const avgVolume = volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : 0;
+  const lastVolume = volumes[volumes.length - 1] || 0;
+
+  // ─── NO-TRADE FILTERS ───
   const reasons: string[] = [];
+  let noTrade = false;
 
-  // EMA crossover (weight: 2)
+  // ADX < 20: no trend
+  if (adx !== null && adx < 20) {
+    noTrade = true;
+    reasons.push(`ADX at ${adx} — no clear trend, staying flat`);
+  }
+
+  // ATR below average: tight range
+  if (atr !== null) {
+    const avgAtr = calcATR(highs.slice(0, -14), lows.slice(0, -14), closes.slice(0, -14));
+    if (avgAtr && atr < avgAtr * 0.6) {
+      noTrade = true;
+      reasons.push("Price in tight range — ATR well below average");
+    }
+  }
+
+  // EMA flat/parallel: no crossover forming
+  if (crossoverStatus === "NONE") {
+    const emaDiff = Math.abs(currFast - currSlow) / currSlow;
+    const prevDiff = Math.abs(prevFast - prevSlow) / prevSlow;
+    if (emaDiff < 0.001 && prevDiff < 0.001) {
+      noTrade = true;
+      reasons.push("EMAs flat and parallel — no crossover forming");
+    }
+  }
+
+  if (noTrade) {
+    return {
+      direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
+      stop_loss: null, risk_reward: null, ema_crossover_status: crossoverStatus,
+      ema_crossover_direction: crossoverDir,
+      reasoning: `Falconer AI: ${reasons.join(". ")}. No trade conditions met.`,
+      verdict: "NO_TRADE", rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+    };
+  }
+
+  // ─── CONFIDENCE SCORING (start at 0, add points) ───
+  let confidence = 0;
+  const tradeReasons: string[] = [];
+
+  // +3: Confirmed EMA crossover on closed candle
   if (crossoverStatus === "CONFIRMED" && crossoverDir === "BULLISH") {
-    bullishPoints += 2; reasons.push("EMA 4/17 bullish crossover confirmed");
+    confidence += 3;
+    tradeReasons.push("Confirmed bullish EMA crossover on closed candle");
   } else if (crossoverStatus === "CONFIRMED" && crossoverDir === "BEARISH") {
-    bearishPoints += 2; reasons.push("EMA 4/17 bearish crossover confirmed");
+    confidence += 3;
+    tradeReasons.push("Confirmed bearish EMA crossover on closed candle");
   } else if (crossoverStatus === "FORMING") {
-    const pts = crossoverDir === "BULLISH" ? 1 : 0;
-    bullishPoints += pts; bearishPoints += (1 - pts);
-    reasons.push(`EMA 4/17 crossover forming (${crossoverDir})`);
+    confidence += 1;
+    tradeReasons.push(`EMA crossover forming (${crossoverDir})`);
   }
 
-  // RSI
+  // +1: RSI confirming direction
+  const isBullish = crossoverDir === "BULLISH" || (crossoverStatus === "NONE" && currFast > currSlow);
+  const isBearish = crossoverDir === "BEARISH" || (crossoverStatus === "NONE" && currFast < currSlow);
   if (rsi !== null) {
-    if (rsi < 30) { bullishPoints += 1; reasons.push(`RSI oversold at ${rsi}`); }
-    else if (rsi > 70) { bearishPoints += 1; reasons.push(`RSI overbought at ${rsi}`); }
-    else if (rsi > 50) { bullishPoints += 0.5; reasons.push(`RSI bullish at ${rsi}`); }
-    else { bearishPoints += 0.5; reasons.push(`RSI bearish at ${rsi}`); }
+    if (isBullish && rsi > 55) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bullish momentum`); }
+    else if (isBearish && rsi < 45) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bearish momentum`); }
+    // RSI neutral zone penalty
+    if (rsi >= 45 && rsi <= 55) { confidence -= 2; tradeReasons.push(`RSI ${rsi} in neutral zone — reduced conviction`); }
   }
 
-  // ADX (trend strength)
-  if (adx !== null) {
-    if (adx > 25) { reasons.push(`Strong trend (ADX ${adx})`); bullishPoints += 0.5; bearishPoints += 0.5; }
-    else { reasons.push(`Weak trend (ADX ${adx})`); }
-  }
+  // +1: MACD aligned
+  if (macd === "Bullish" && isBullish) { confidence += 1; tradeReasons.push("MACD bullish momentum aligned"); }
+  else if (macd === "Bearish" && isBearish) { confidence += 1; tradeReasons.push("MACD bearish momentum aligned"); }
 
-  // MACD
-  if (macd === "Bullish") { bullishPoints += 1.5; reasons.push("MACD bullish momentum"); }
-  else if (macd === "Bearish") { bearishPoints += 1.5; reasons.push("MACD bearish momentum"); }
+  // +1: ADX > 25
+  if (adx !== null && adx > 25) { confidence += 1; tradeReasons.push(`ADX at ${adx} confirms trend strength`); }
 
-  // StochRSI
+  // +1: StochRSI confirming
   if (stochRsi !== null) {
-    if (stochRsi < 20) { bullishPoints += 1; reasons.push(`StochRSI oversold at ${stochRsi}`); }
-    else if (stochRsi > 80) { bearishPoints += 1; reasons.push(`StochRSI overbought at ${stochRsi}`); }
+    if (isBullish && stochRsi > 60) { confidence += 1; tradeReasons.push(`StochRSI ${stochRsi} confirms bullish`); }
+    else if (isBearish && stochRsi < 40) { confidence += 1; tradeReasons.push(`StochRSI ${stochRsi} confirms bearish`); }
   }
 
-  // Determine direction and confidence
-  const totalPoints = bullishPoints + bearishPoints;
-  const maxSide = Math.max(bullishPoints, bearishPoints);
-  const alignment = totalPoints > 0 ? maxSide / totalPoints : 0;
-  let confidence = Math.min(10, Math.max(1, Math.round(alignment * maxSide * 2)));
+  // +1: Volume above average on crossover candle
+  if (lastVolume > avgVolume * 1.2 && crossoverStatus === "CONFIRMED") {
+    confidence += 1;
+    tradeReasons.push("Volume spike on crossover candle");
+  }
+
+  // Clamp confidence
+  confidence = Math.max(1, Math.min(10, confidence));
+
+  // Determine direction
   let direction: string;
   let verdict: string;
 
-  if (bullishPoints > bearishPoints && alignment > 0.6) {
-    direction = "BUY"; verdict = "BUY";
-  } else if (bearishPoints > bullishPoints && alignment > 0.6) {
-    direction = "SELL"; verdict = "SELL";
-  } else if (totalPoints > 2) {
-    direction = "WAIT"; verdict = "WAIT"; confidence = Math.min(confidence, 4);
+  if (confidence >= 5 && crossoverStatus === "CONFIRMED") {
+    direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
+    verdict = direction;
+  } else if (confidence >= 3 && crossoverStatus !== "NONE") {
+    direction = isBullish ? "BUY" : "SELL";
+    verdict = "WAIT";
+    confidence = Math.min(confidence, 4);
   } else {
-    direction = "NO TRADE"; verdict = "NO_TRADE"; confidence = 1;
+    direction = "WAIT";
+    verdict = "WAIT";
+    confidence = Math.min(confidence, 3);
   }
 
-  // Entry/TP/SL from recent price structure
+  // ─── ENTRY / TP / SL with swing structure ───
   const lastClose = closes[closes.length - 1];
-  const recentHigh = Math.max(...highs.slice(-10));
-  const recentLow = Math.min(...lows.slice(-10));
-  const range = recentHigh - recentLow;
-
   let entry: number | null = null;
   let tp: number | null = null;
   let sl: number | null = null;
@@ -295,25 +371,30 @@ function runAnalysis(candles: any[]): AnalysisResult {
   if (direction === "BUY" || direction === "SELL") {
     entry = +lastClose.toFixed(5);
     if (direction === "BUY") {
-      sl = +(recentLow - range * 0.1).toFixed(5);
-      tp = +(lastClose + (lastClose - sl) * 2).toFixed(5);
+      const swingLow = findSwingLow(lows, lows.length - 1, 20);
+      sl = +(swingLow - (lastClose - swingLow) * 0.05).toFixed(5);
+      const risk = Math.abs(entry - sl);
+      tp = +(entry + risk * 2).toFixed(5);
     } else {
-      sl = +(recentHigh + range * 0.1).toFixed(5);
-      tp = +(lastClose - (sl - lastClose) * 2).toFixed(5);
+      const swingHigh = findSwingHigh(highs, highs.length - 1, 20);
+      sl = +(swingHigh + (swingHigh - lastClose) * 0.05).toFixed(5);
+      const risk = Math.abs(sl - entry);
+      tp = +(entry - risk * 2).toFixed(5);
     }
     const risk = Math.abs(entry - sl);
     const reward = Math.abs(tp - entry);
-    rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2:1";
+    rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
   }
 
-  const reasoning = reasons.length > 0
-    ? reasons.join(". ") + `. Overall ${direction} with ${confidence}/10 confidence.`
-    : `No clear setup. ${direction}.`;
+  // Build Falconer AI reasoning — expert trader style
+  const reasoningText = tradeReasons.length > 0
+    ? `Falconer AI: ${tradeReasons.join(". ")}. ${entry ? `Entry at ${entry.toLocaleString()} with SL ${direction === "BUY" ? "below swing low" : "above swing high"} at ${sl}. R:R ${rr}.` : ""} ${confidence >= 7 ? "High conviction setup." : confidence >= 5 ? "Moderate conviction." : "Low conviction — monitoring."}`
+    : `Falconer AI: No clear setup forming. Monitoring price action.`;
 
   return {
     direction, confidence, entry_price: entry, take_profit: tp, stop_loss: sl,
     risk_reward: rr, ema_crossover_status: crossoverStatus,
-    ema_crossover_direction: crossoverDir, reasoning, verdict,
+    ema_crossover_direction: crossoverDir, reasoning: reasoningText, verdict,
     rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
   };
 }
@@ -324,8 +405,6 @@ const SESSION_DEFS = [
   { key: "london", startUtc: 8, endUtc: 16 },
   { key: "new_york", startUtc: 16, endUtc: 21 },
 ];
-
-// Reuse the global BROKER_SYMBOL_MAP for hourly candle fetching too
 
 function getCompletedSessions(utcHour: number): typeof SESSION_DEFS {
   return SESSION_DEFS.filter(s => utcHour >= s.endUtc);
@@ -340,7 +419,6 @@ async function fetchHourlyCandles(token: string, accountId: string, symbol: stri
       if (!res.ok) continue;
       const candles = await res.json();
       if (Array.isArray(candles) && candles.length > 0) {
-        // Filter to session window
         const startTs = new Date(startISO).getTime();
         const endTs = new Date(endISO).getTime();
         return candles.filter((c: any) => {
@@ -386,7 +464,7 @@ serve(async (req) => {
     }
 
     // Unique symbol+timeframe combos to fetch
-    const symbolTfSet = new Map<string, string>(); // symbol -> timeframe (use first user's)
+    const symbolTfSet = new Map<string, string>();
     for (const list of userInstruments.values()) {
       for (const inst of list) {
         if (!symbolTfSet.has(inst.symbol)) symbolTfSet.set(inst.symbol, inst.timeframe);
@@ -417,7 +495,7 @@ serve(async (req) => {
 
     // Fetch data for each unique symbol
     const symbolData = new Map<string, any>();
-    const symbolCandles = new Map<string, any[]>(); // for auto-scan analysis
+    const symbolCandles = new Map<string, any[]>();
     let usedLive = false;
 
     for (const [symbol, timeframe] of symbolTfSet) {
@@ -436,7 +514,6 @@ serve(async (req) => {
             const first = sparkline[0], last = sparkline[sparkline.length - 1];
             const direction = last > first * 1.001 ? "up" : last < first * 0.999 ? "down" : "flat";
             const todayVolume = candles.slice(-96).reduce((s: number, c: any) => s + (c.tickVolume || 0), 0);
-            // Last candle time for close detection
             const lastCandleTime = candles[candles.length - 1]?.time || null;
 
             symbolData.set(symbol, {
@@ -461,7 +538,6 @@ serve(async (req) => {
           console.warn(`MetaApi failed for ${symbol}: ${e.message}`);
         }
       }
-      // Fallback to mock — also generate a mock candle time that changes per timeframe period
       const mock = generateMockData(symbol);
       const tfMin = TF_MINUTES[timeframe] || 15;
       const now = Date.now();
@@ -492,12 +568,12 @@ serve(async (req) => {
       if (error) console.error("Upsert error:", error);
     }
 
-    // ─── AUTO-SCAN: detect candle closes and insert scan_results ───
+    // ─── FALCONER AI AUTO-SCAN: detect candle closes with STRICT DEDUP ───
     let autoScans = 0;
+    let signalsCreated = 0;
     const session = detectSession();
 
     for (const [userId, instList] of userInstruments) {
-      // Get user's profile for EMA settings
       const { data: profile } = await supabase
         .from("profiles")
         .select("default_candle_type, ema_fast, ema_slow")
@@ -514,98 +590,122 @@ serve(async (req) => {
 
         // Candle close detected: new candle time differs from previous
         if (prevTime && newTime && prevTime !== newTime) {
-          console.log(`Candle close detected: ${inst.symbol} (${inst.timeframe}) for user ${userId.slice(0, 8)}`);
+          console.log(`Candle close: ${inst.symbol} (${inst.timeframe}) user ${userId.slice(0, 8)}`);
 
-          // Run analysis on available candles
           const candles = symbolCandles.get(inst.symbol);
           let analysis: AnalysisResult;
 
           if (candles && candles.length > 20) {
             analysis = runAnalysis(candles);
           } else {
-            // Mock analysis from mock data
+            // Mock analysis — still apply Falconer AI logic
             const mockRsi = data.rsi;
             const mockAdx = data.adx;
             const mockMacd = data.macd_status;
             const mockStoch = data.stoch_rsi;
-            const bullish = (mockRsi < 50 ? 0 : 1) + (mockMacd === "Bullish" ? 1.5 : 0) + (mockStoch < 30 ? 1 : 0);
-            const bearish = (mockRsi > 50 ? 0 : 1) + (mockMacd === "Bearish" ? 1.5 : 0) + (mockStoch > 70 ? 1 : 0);
-            const dir = bullish > bearish + 1 ? "BUY" : bearish > bullish + 1 ? "SELL" : "WAIT";
-            const conf = Math.min(10, Math.max(1, Math.round(Math.max(bullish, bearish) * 2)));
-            const lastPrice = data.last_price || 100;
-            const range = lastPrice * 0.005;
+            
+            // Apply NO-TRADE filter for mock too
+            if (mockAdx !== null && mockAdx < 20) {
+              analysis = {
+                direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
+                stop_loss: null, risk_reward: null, ema_crossover_status: "NONE",
+                ema_crossover_direction: null,
+                reasoning: `Falconer AI: ADX at ${mockAdx} — no clear trend. Staying flat until momentum develops.`,
+                verdict: "NO_TRADE", rsi: mockRsi, adx: mockAdx, macd_status: mockMacd, stoch_rsi: mockStoch,
+              };
+            } else {
+              const bullish = (mockRsi > 55 ? 1 : 0) + (mockMacd === "Bullish" ? 1 : 0) + (mockStoch > 60 ? 1 : 0) + (mockAdx > 25 ? 1 : 0);
+              const bearish = (mockRsi < 45 ? 1 : 0) + (mockMacd === "Bearish" ? 1 : 0) + (mockStoch < 40 ? 1 : 0) + (mockAdx > 25 ? 1 : 0);
+              const dir = bullish >= 3 ? "BUY" : bearish >= 3 ? "SELL" : "WAIT";
+              const conf = Math.max(1, Math.min(10, Math.max(bullish, bearish) + 1));
+              const lastPrice = data.last_price || 100;
+              const range = lastPrice * 0.005;
 
-            analysis = {
-              direction: dir,
-              confidence: conf,
-              entry_price: dir !== "WAIT" && dir !== "NO TRADE" ? lastPrice : null,
-              take_profit: dir === "BUY" ? +(lastPrice + range * 2).toFixed(5) : dir === "SELL" ? +(lastPrice - range * 2).toFixed(5) : null,
-              stop_loss: dir === "BUY" ? +(lastPrice - range).toFixed(5) : dir === "SELL" ? +(lastPrice + range).toFixed(5) : null,
-              risk_reward: dir !== "WAIT" && dir !== "NO TRADE" ? "2:1" : null,
-              ema_crossover_status: "NONE",
-              ema_crossover_direction: null,
-              reasoning: `Auto-scan on ${inst.timeframe} candle close. RSI ${mockRsi}, ADX ${mockAdx}, MACD ${mockMacd}, StochRSI ${mockStoch}. ${dir} signal generated.`,
-              verdict: dir === "NO TRADE" ? "NO_TRADE" : dir,
-              rsi: mockRsi, adx: mockAdx, macd_status: mockMacd, stoch_rsi: mockStoch,
-            };
+              analysis = {
+                direction: dir, confidence: conf,
+                entry_price: dir !== "WAIT" ? lastPrice : null,
+                take_profit: dir === "BUY" ? +(lastPrice + range * 2).toFixed(5) : dir === "SELL" ? +(lastPrice - range * 2).toFixed(5) : null,
+                stop_loss: dir === "BUY" ? +(lastPrice - range).toFixed(5) : dir === "SELL" ? +(lastPrice + range).toFixed(5) : null,
+                risk_reward: dir !== "WAIT" ? "2.0:1" : null,
+                ema_crossover_status: "NONE", ema_crossover_direction: null,
+                reasoning: `Falconer AI: Auto-scan on ${inst.timeframe}. RSI ${mockRsi}, ADX ${mockAdx}, MACD ${mockMacd}, StochRSI ${mockStoch}. ${dir === "WAIT" ? "No clear setup — monitoring." : `${dir} signal with ${conf}/10 confidence.`}`,
+                verdict: dir === "WAIT" ? "WAIT" : dir, rsi: mockRsi, adx: mockAdx, macd_status: mockMacd, stoch_rsi: mockStoch,
+              };
+            }
           }
 
-          // Insert scan_result
-          const { error: scanErr } = await supabase.from("scan_results").insert({
-            user_id: userId,
-            symbol: inst.symbol,
-            direction: analysis.direction,
-            confidence: analysis.confidence,
-            entry_price: analysis.entry_price,
-            take_profit: analysis.take_profit,
-            stop_loss: analysis.stop_loss,
-            risk_reward: analysis.risk_reward,
-            rsi: analysis.rsi,
-            adx: analysis.adx,
-            macd_status: analysis.macd_status,
-            stoch_rsi: analysis.stoch_rsi,
-            ema_crossover_status: analysis.ema_crossover_status,
-            ema_crossover_direction: analysis.ema_crossover_direction,
-            reasoning: analysis.reasoning,
-            verdict: analysis.verdict,
-            timeframe: inst.timeframe,
-            candle_type: profile?.default_candle_type || "heiken_ashi",
-            session,
-            scanned_at: new Date().toISOString(),
-          });
-          if (scanErr) console.error(`Scan insert error for ${inst.symbol}:`, scanErr);
-          else autoScans++;
+          // ─── STRICT SCAN DEDUPLICATION ───
+          // Check most recent scan for this user+symbol
+          const { data: lastScan } = await supabase
+            .from("scan_results")
+            .select("id, direction, entry_price")
+            .eq("user_id", userId)
+            .eq("symbol", inst.symbol)
+            .order("scanned_at", { ascending: false })
+            .limit(1);
 
-          // Auto-create signal if confidence >= 5 and direction is BUY or SELL
-          // WITH DEDUPLICATION: skip if recent pending signal has same direction & entry within 0.1%
-          if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
-            const { data: recentPending } = await supabase
-              .from("signals")
-              .select("entry_price")
-              .eq("user_id", userId)
-              .eq("symbol", inst.symbol)
-              .eq("direction", analysis.direction)
-              .eq("result", "pending")
-              .order("created_at", { ascending: false })
-              .limit(1);
-
-            let isDuplicate = false;
-            if (recentPending && recentPending.length > 0) {
-              const priceDiff = Math.abs(recentPending[0].entry_price - analysis.entry_price) / analysis.entry_price;
-              if (priceDiff < 0.001) isDuplicate = true; // within 0.1%
+          let shouldInsertScan = true;
+          if (lastScan && lastScan.length > 0) {
+            const prev = lastScan[0];
+            const dirChanged = prev.direction !== analysis.direction;
+            const entryChanged = analysis.entry_price && prev.entry_price
+              ? Math.abs(prev.entry_price - analysis.entry_price) / analysis.entry_price > 0.005
+              : false;
+            // Only insert if direction changed OR entry changed by >0.5%
+            if (!dirChanged && !entryChanged) {
+              shouldInsertScan = false;
+              // Just update the timestamp on existing scan
+              await supabase.from("scan_results")
+                .update({ scanned_at: new Date().toISOString() })
+                .eq("id", prev.id);
             }
+          }
 
-            if (!isDuplicate) {
-              await supabase.from("signals").insert({
-                user_id: userId,
-                symbol: inst.symbol,
-                direction: analysis.direction,
-                confidence: analysis.confidence,
-                entry_price: analysis.entry_price,
-                take_profit: analysis.take_profit,
-                stop_loss: analysis.stop_loss,
-                risk_reward: analysis.risk_reward || "2:1",
-              });
+          if (shouldInsertScan) {
+            const { error: scanErr } = await supabase.from("scan_results").insert({
+              user_id: userId, symbol: inst.symbol, direction: analysis.direction,
+              confidence: analysis.confidence, entry_price: analysis.entry_price,
+              take_profit: analysis.take_profit, stop_loss: analysis.stop_loss,
+              risk_reward: analysis.risk_reward, rsi: analysis.rsi, adx: analysis.adx,
+              macd_status: analysis.macd_status, stoch_rsi: analysis.stoch_rsi,
+              ema_crossover_status: analysis.ema_crossover_status,
+              ema_crossover_direction: analysis.ema_crossover_direction,
+              reasoning: analysis.reasoning, verdict: analysis.verdict,
+              timeframe: inst.timeframe, candle_type: profile?.default_candle_type || "heiken_ashi",
+              session, scanned_at: new Date().toISOString(),
+            });
+            if (scanErr) console.error(`Scan insert error for ${inst.symbol}:`, scanErr);
+            else autoScans++;
+
+            // ─── SIGNAL CREATION: only on meaningful new signals with conf >= 5 ───
+            if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
+              // Check for duplicate pending signal: same direction & entry within 0.5%
+              const { data: recentPending } = await supabase
+                .from("signals")
+                .select("entry_price, direction")
+                .eq("user_id", userId)
+                .eq("symbol", inst.symbol)
+                .eq("result", "pending")
+                .order("created_at", { ascending: false })
+                .limit(1);
+
+              let isDuplicate = false;
+              if (recentPending && recentPending.length > 0) {
+                const prev = recentPending[0];
+                const sameDir = prev.direction === analysis.direction;
+                const priceDiff = Math.abs(prev.entry_price - analysis.entry_price!) / analysis.entry_price!;
+                if (sameDir && priceDiff < 0.005) isDuplicate = true;
+              }
+
+              if (!isDuplicate) {
+                await supabase.from("signals").insert({
+                  user_id: userId, symbol: inst.symbol, direction: analysis.direction,
+                  confidence: analysis.confidence, entry_price: analysis.entry_price,
+                  take_profit: analysis.take_profit, stop_loss: analysis.stop_loss,
+                  risk_reward: analysis.risk_reward || "2.0:1",
+                });
+                signalsCreated++;
+              }
             }
           }
         }
@@ -627,7 +727,6 @@ serve(async (req) => {
           await supabase.from("signals").update({
             result: "expired", pnl: 0, pnl_pips: 0, resolved_at: new Date().toISOString(),
           }).eq("id", sig.id);
-          // Store outcome insight
           await supabase.from("insights").insert({
             user_id: sig.user_id, insight_type: "signal_outcome",
             title: `${sig.symbol} ${sig.direction} — Expired`,
@@ -638,7 +737,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Get live price for this user+symbol
+        // Get live price
         const liveData = symbolData.get(sig.symbol);
         if (!liveData || !liveData.last_price) continue;
 
@@ -674,11 +773,10 @@ serve(async (req) => {
             result, pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1),
             resolved_at: new Date().toISOString(),
           }).eq("id", sig.id);
-          // Store outcome insight for AI brain
           await supabase.from("insights").insert({
             user_id: sig.user_id, insight_type: "signal_outcome",
             title: `${sig.symbol} ${sig.direction} — ${result.toUpperCase()}`,
-            description: `Signal resolved as ${result}. Entry: ${sig.entry_price}, P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
+            description: `Falconer AI signal resolved as ${result}. Entry: ${sig.entry_price}, P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
             symbol: sig.symbol, severity: result === "win" ? "positive" : "negative",
             data: { entry_price: sig.entry_price, take_profit: sig.take_profit, stop_loss: sig.stop_loss, pnl, pnl_pips: pnlPips },
           });
@@ -693,7 +791,6 @@ serve(async (req) => {
     const completedSessions = getCompletedSessions(utcHour);
 
     if (completedSessions.length > 0 && METAAPI_TOKEN && accountId) {
-      // Check which session+symbol combos already exist
       const { data: existingSummaries } = await supabase
         .from("session_volume_summary")
         .select("session, symbol")
@@ -706,25 +803,18 @@ serve(async (req) => {
       for (const sessDef of completedSessions) {
         for (const [symbol] of symbolTfSet) {
           if (existingKeys.has(`${sessDef.key}:${symbol}`)) continue;
-
-          // Build session time window for today
           const startISO = `${today}T${String(sessDef.startUtc).padStart(2, "0")}:00:00.000Z`;
           const endISO = `${today}T${String(sessDef.endUtc).padStart(2, "0")}:00:00.000Z`;
-
           try {
             const sessionCandles = await fetchHourlyCandles(METAAPI_TOKEN!, accountId!, symbol, startISO, endISO);
             if (sessionCandles.length === 0) continue;
-
             const totalVol = sessionCandles.reduce((s: number, c: any) => s + (c.tickVolume || 0), 0);
-
-            // Find peak hour
             let peakHourStart: string | null = null;
             let peakVol = 0;
             for (const c of sessionCandles) {
               const v = c.tickVolume || 0;
               if (v > peakVol) { peakVol = v; peakHourStart = c.time; }
             }
-
             await supabase.from("session_volume_summary").upsert({
               session: sessDef.key, symbol, date: today,
               total_volume: totalVol, peak_hour_start: peakHourStart,
@@ -737,21 +827,16 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      success: true,
-      symbols: symbolTfSet.size,
-      users: userInstruments.size,
-      rows: upserts.length,
-      auto_scans: autoScans,
-      signals_resolved: resolvedCount,
-      live: usedLive,
+      success: true, symbols: symbolTfSet.size, users: userInstruments.size,
+      rows: upserts.length, auto_scans: autoScans, signals_created: signalsCreated,
+      signals_resolved: resolvedCount, live: usedLive,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("compute-market-data error:", e);
     return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
