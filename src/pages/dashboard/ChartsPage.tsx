@@ -488,12 +488,17 @@ export default function ChartsPage() {
 
   /* rebuild chart on deps change */
   useEffect(() => {
-    buildChart();
+    let cancelled = false;
+    const run = async () => {
+      await buildChart();
+    };
+    run();
     return () => {
+      cancelled = true;
       if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
       if (pricePollingRef.current) clearInterval(pricePollingRef.current);
       if (chartRef.current) {
-        chartRef.current.remove();
+        try { chartRef.current.remove(); } catch {}
         chartRef.current = null;
       }
     };
