@@ -36,6 +36,7 @@ export default function BrokerModal({ open, onClose, userId, onBrokerChange }: B
     if (userId) {
       await supabase.from("profiles").update({ broker: key }).eq("id", userId);
       toast.success(`Broker set to ${broker}`);
+      onBrokerChange?.(key, broker);
     }
   };
 
