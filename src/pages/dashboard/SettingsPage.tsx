@@ -22,6 +22,7 @@ export default function SettingsPage() {
   const [broker, setBroker] = useState("eightcap");
   const [instruments, setInstruments] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
 
   useEffect(() => {
     if (profile) {
