@@ -293,12 +293,39 @@ function runAnalysis(candles: any[]): AnalysisResult {
 const SESSION_DEFS = [
   { key: "asian", startUtc: 0, endUtc: 8 },
   { key: "london", startUtc: 8, endUtc: 16 },
-  { key: "new_york", startUtc: 13, endUtc: 21 },
-  { key: "new_york", startUtc: 13, endUtc: 22 },
+  { key: "new_york", startUtc: 16, endUtc: 21 },
 ];
 
-function getEndingSessions(utcHour: number): string[] {
-  return SESSION_DEFS.filter(s => utcHour === s.endUtc - 1).map(s => s.key);
+const BROKER_SYMBOL_VARIANTS: Record<string, string[]> = {
+  US30: ["US30", "DJ30", "DJI30"],
+  NAS100: ["NAS100", "USTEC", "NDX100"],
+  XAUUSD: ["XAUUSD", "GOLD"],
+};
+
+function getCompletedSessions(utcHour: number): typeof SESSION_DEFS {
+  return SESSION_DEFS.filter(s => utcHour >= s.endUtc);
+}
+
+async function fetchHourlyCandles(token: string, accountId: string, symbol: string, startISO: string, endISO: string) {
+  const variants = BROKER_SYMBOL_VARIANTS[symbol] || [symbol];
+  for (const variant of variants) {
+    try {
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
+      const res = await fetch(url, { headers: { "auth-token": token } });
+      if (!res.ok) continue;
+      const candles = await res.json();
+      if (Array.isArray(candles) && candles.length > 0) {
+        // Filter to session window
+        const startTs = new Date(startISO).getTime();
+        const endTs = new Date(endISO).getTime();
+        return candles.filter((c: any) => {
+          const t = new Date(c.time).getTime();
+          return t >= startTs && t < endTs;
+        });
+      }
+    } catch { /* try next */ }
+  }
+  return [];
 }
 
 serve(async (req) => {
