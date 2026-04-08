@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { BarChart3, Clock, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
-import { SESSIONS, SESSION_COLORS, getActiveSessions, getCompletedSessions, formatLocalHour, type SessionDef } from "@/lib/session-colors";
+import { SESSIONS, SESSION_COLORS, getActiveSessions, getCompletedSessions, getCurrentSession, formatLocalHour, type SessionDef } from "@/lib/session-colors";
+import { VolumeHistoryModal } from "./VolumeHistoryModal";
 
 interface SessionRow {
   session: SessionDef;
@@ -29,6 +30,7 @@ function peakHourFromSparkline(sparkline: number[] | null): { peakUtcHour: numbe
 
 export function MostVolumeBar() {
   const [rows, setRows] = useState<SessionRow[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     load();
@@ -50,14 +52,12 @@ export function MostVolumeBar() {
     const active = getActiveSessions();
     const today = new Date().toISOString().split("T")[0];
 
-    // Load stored summaries for completed sessions
     const { data: summaries } = await supabase
       .from("session_volume_summary")
       .select("*")
       .eq("date", today)
       .order("total_volume", { ascending: false });
 
-    // Load live data for in-progress sessions
     const { data: liveRows } = await supabase
       .from("live_market_data")
       .select("symbol, volume_today, sparkline_data")
@@ -65,11 +65,11 @@ export function MostVolumeBar() {
 
     const result: SessionRow[] = [];
 
-    // Add completed sessions from stored summaries
+    // Completed sessions from stored summaries
     for (const sess of completed) {
       const sessSum = (summaries || []).filter((s: any) => s.session === sess.key);
       if (sessSum.length > 0) {
-        const top = sessSum[0]; // already sorted by volume desc
+        const top = sessSum[0];
         let peakLabel: string | null = null;
         if (top.peak_hour_start) {
           const peakDate = new Date(top.peak_hour_start);
@@ -78,53 +78,32 @@ export function MostVolumeBar() {
           const endLocal = formatLocalHour((startH + 1) % 24);
           peakLabel = `${startLocal} – ${endLocal}`;
         }
-        result.push({
-          session: sess,
-          topSymbol: top.symbol,
-          peakHourLabel: peakLabel,
-          volume: Number(top.total_volume) || 0,
-          inProgress: false,
-        });
+        result.push({ session: sess, topSymbol: top.symbol, peakHourLabel: peakLabel, volume: Number(top.total_volume) || 0, inProgress: false });
       } else {
         result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: false });
       }
     }
 
-    // Add active/in-progress sessions from live data
+    // Active/in-progress sessions from live data
     for (const sess of active) {
-      if (completed.some(c => c.key === sess.key)) continue; // already shown as completed
-      
+      if (completed.some(c => c.key === sess.key)) continue;
       if (liveRows && liveRows.length > 0) {
         const sorted = [...liveRows]
-          .map(r => ({
-            symbol: r.symbol,
-            volume: Number(r.volume_today) || 0,
-            sparkline: Array.isArray(r.sparkline_data) ? (r.sparkline_data as number[]) : null,
-          }))
+          .map(r => ({ symbol: r.symbol, volume: Number(r.volume_today) || 0, sparkline: Array.isArray(r.sparkline_data) ? (r.sparkline_data as number[]) : null }))
           .sort((a, b) => b.volume - a.volume);
-        
         const top = sorted[0];
         let peakLabel: string | null = null;
         const peak = peakHourFromSparkline(top.sparkline);
         if (peak) {
-          const startLocal = formatLocalHour(peak.peakUtcHour);
-          const endLocal = formatLocalHour((peak.peakUtcHour + 1) % 24);
-          peakLabel = `${startLocal} – ${endLocal}`;
+          peakLabel = `${formatLocalHour(peak.peakUtcHour)} – ${formatLocalHour((peak.peakUtcHour + 1) % 24)}`;
         }
-
-        result.push({
-          session: sess,
-          topSymbol: top.symbol,
-          peakHourLabel: peakLabel,
-          volume: top.volume,
-          inProgress: true,
-        });
+        result.push({ session: sess, topSymbol: top.symbol, peakHourLabel: peakLabel, volume: top.volume, inProgress: true });
       } else {
         result.push({ session: sess, topSymbol: null, peakHourLabel: null, volume: 0, inProgress: true });
       }
     }
 
-    // Add future sessions not yet started
+    // Future sessions
     const allShown = new Set(result.map(r => r.session.key));
     for (const sess of SESSIONS) {
       if (!allShown.has(sess.key)) {
@@ -135,136 +114,110 @@ export function MostVolumeBar() {
     // Sort by session order
     const order = SESSIONS.map(s => s.key);
     result.sort((a, b) => order.indexOf(a.session.key) - order.indexOf(b.session.key));
-
     setRows(result);
   };
 
+  const currentSession = getCurrentSession();
+
   return (
-    <div
-      style={{
-        background: C.card,
-        border: `1px solid ${C.border}`,
-        borderRadius: 12,
-        padding: "14px 18px",
-        marginBottom: 16,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <BarChart3 size={16} color={C.text} />
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
-          Most Volume Today
-        </span>
-      </div>
+    <>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <BarChart3 size={16} color={C.text} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+              Most Volume Today
+              {currentSession && (
+                <span style={{ color: currentSession.color, marginLeft: 6 }}>— {currentSession.label} Session</span>
+              )}
+            </span>
+          </div>
+          <button
+            onClick={() => setHistoryOpen(true)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: 11, fontWeight: 700, color: "#34D399",
+              padding: "2px 8px", borderRadius: 6,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#34D39920")}
+            onMouseLeave={e => (e.currentTarget.style.background = "none")}
+          >
+            History
+          </button>
+        </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {rows.map((row) => {
-          const color = row.session.color;
-          const hasData = row.topSymbol != null;
-          const isActive = row.inProgress;
-          const isFuture = !hasData && !isActive && !getCompletedSessions().some(c => c.key === row.session.key);
+        {/* Session rows */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {rows.map((row) => {
+            const color = row.session.color;
+            const hasData = row.topSymbol != null;
+            const isActive = row.inProgress;
+            const isFuture = !hasData && !isActive && !getCompletedSessions().some(c => c.key === row.session.key);
 
-          return (
-            <div
-              key={row.session.key}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "6px 10px",
-                borderRadius: 8,
-                background: isActive ? color + "10" : "transparent",
-                borderLeft: `3px solid ${color}${hasData || isActive ? "" : "40"}`,
-                opacity: isFuture ? 0.4 : 1,
-              }}
-            >
-              {/* Session label */}
-              <span
+            return (
+              <div
+                key={row.session.key}
                 style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color,
-                  minWidth: 70,
-                  whiteSpace: "nowrap",
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "6px 10px", borderRadius: 8,
+                  background: isActive ? color + "10" : "transparent",
+                  borderLeft: `3px solid ${color}${hasData || isActive ? "" : "40"}`,
+                  opacity: isFuture ? 0.4 : 1,
                 }}
               >
-                {row.session.label}
-              </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color, minWidth: 70, whiteSpace: "nowrap" }}>
+                  {row.session.label}
+                </span>
 
-              {isActive && !hasData ? (
-                <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>
-                  In progress...
-                </span>
-              ) : isActive && hasData ? (
-                <>
-                  <span
-                    style={{
-                      padding: "2px 10px",
-                      borderRadius: 14,
-                      border: `1.5px solid ${color}`,
-                      color: C.text,
-                      fontSize: 11,
-                      fontWeight: 800,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {row.topSymbol}
-                  </span>
-                  {row.peakHourLabel && (
-                    <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
-                      <Clock size={9} />
-                      {row.peakHourLabel}
+                {isActive && !hasData ? (
+                  <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>In progress...</span>
+                ) : isActive && hasData ? (
+                  <>
+                    <span style={{ padding: "2px 10px", borderRadius: 14, border: `1.5px solid ${color}`, color: C.text, fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
+                      {row.topSymbol}
                     </span>
-                  )}
-                  {row.volume > 0 && (
-                    <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {row.volume.toLocaleString()} vol
+                    {row.peakHourLabel && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+                        <Clock size={9} />{row.peakHourLabel}
+                      </span>
+                    )}
+                    {row.volume > 0 && (
+                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                        {row.volume.toLocaleString()} vol
+                      </span>
+                    )}
+                    <span style={{ fontSize: 8, fontWeight: 700, color, background: color + "20", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase", letterSpacing: 1 }}>
+                      LIVE
                     </span>
-                  )}
-                  <span style={{
-                    fontSize: 8, fontWeight: 700, color, background: color + "20",
-                    padding: "1px 6px", borderRadius: 4, textTransform: "uppercase", letterSpacing: 1,
-                  }}>
-                    LIVE
-                  </span>
-                </>
-              ) : hasData ? (
-                <>
-                  <span
-                    style={{
-                      padding: "2px 10px",
-                      borderRadius: 14,
-                      border: `1.5px solid ${color}50`,
-                      color: C.sec,
-                      fontSize: 11,
-                      fontWeight: 800,
-                      fontFamily: "'JetBrains Mono', monospace",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {row.topSymbol}
-                  </span>
-                  {row.peakHourLabel && (
-                    <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
-                      <Clock size={9} />
-                      {row.peakHourLabel}
+                  </>
+                ) : hasData ? (
+                  <>
+                    <span style={{ padding: "2px 10px", borderRadius: 14, border: `1.5px solid ${color}50`, color: C.sec, fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
+                      {row.topSymbol}
                     </span>
-                  )}
-                  {row.volume > 0 && (
-                    <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {row.volume.toLocaleString()} vol
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>
-                  Upcoming
-                </span>
-              )}
-            </div>
-          );
-        })}
+                    {row.peakHourLabel && (
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                        <Clock size={9} />{row.peakHourLabel}
+                      </span>
+                    )}
+                    {row.volume > 0 && (
+                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                        {row.volume.toLocaleString()} vol
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>Upcoming</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+
+      <VolumeHistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} />
+    </>
   );
 }
