@@ -156,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
       const candleLimit = limit || 500;
       const start = startTime || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const url = `${CLIENT_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
 
       const res = await fetch(url, {
         headers: { "auth-token": METAAPI_TOKEN },
