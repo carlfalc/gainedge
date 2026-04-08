@@ -1,37 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { C } from "@/lib/mock-data";
 
 interface SpinCardProps {
   front: { label: string; value: string; sub?: string };
   back: { label: string; value: string };
   color: string;
-  delay?: number;
 }
 
-export function SpinCard({ front, back, color, delay = 0 }: SpinCardProps) {
+export function SpinCard({ front, back, color }: SpinCardProps) {
   const [flipped, setFlipped] = useState(false);
-  const [autoSpin, setAutoSpin] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAutoSpin(true), delay);
-    return () => clearTimeout(timer);
-  }, [delay]);
-
-  useEffect(() => {
-    if (!autoSpin) return;
-    const interval = setInterval(() => setFlipped(f => !f), 4000 + delay);
-    return () => clearInterval(interval);
-  }, [autoSpin, delay]);
 
   return (
     <div
-      onClick={() => { setAutoSpin(false); setFlipped(f => !f); }}
+      onMouseEnter={() => setFlipped(true)}
+      onMouseLeave={() => setFlipped(false)}
+      onTouchStart={() => setFlipped(f => !f)}
       style={{ perspective: 800, cursor: "pointer", flex: 1, minWidth: 0 }}
     >
       <div style={{
         position: "relative", width: "100%", height: 100,
         transformStyle: "preserve-3d",
-        transition: "transform 0.6s cubic-bezier(0.4,0,0.2,1)",
+        transition: "transform 0.6s ease",
         transform: flipped ? "rotateX(180deg)" : "rotateX(0deg)",
       }}>
         <div style={{
