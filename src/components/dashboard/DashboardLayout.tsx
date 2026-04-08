@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
+import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -24,10 +25,16 @@ export default function DashboardLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [userId, setUserId] = useState<string>();
+  const [sessionLabel, setSessionLabel] = useState("London Session");
+  const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const navigate = useNavigate();
   const location = useLocation();
 
   useSeedData(userId);
+
+  const handleSessionChange = useCallback((label: string) => {
+    setSessionLabel(label);
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -47,6 +54,16 @@ export default function DashboardLayout() {
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Load clock preferences from profile
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("profiles").select("clock_timezones").eq("id", userId).single().then(({ data }) => {
+      if (data?.clock_timezones && Array.isArray(data.clock_timezones) && data.clock_timezones.length > 0) {
+        setClockConfigs(data.clock_timezones as unknown as ClockConfig[]);
+      }
+    });
+  }, [userId]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -130,12 +147,13 @@ export default function DashboardLayout() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, animation: "pulse-dot 2s infinite" }} />
-            <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>London Session</span>
+            <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>{sessionLabel}</span>
             <span style={{ color: C.muted, fontSize: 12 }}>•</span>
             <span style={{ color: C.muted, fontSize: 12 }}>Last scan: 2 min ago</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
+            <WorldClocks clocks={clockConfigs} onSessionChange={handleSessionChange} />
             <button
               onClick={() => setUserMenuOpen(o => !o)}
               style={{

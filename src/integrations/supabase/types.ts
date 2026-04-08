@@ -266,6 +266,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           broker: string
+          clock_timezones: Json | null
           created_at: string
           default_candle_type: string
           default_timeframe: string
@@ -284,6 +285,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           broker?: string
+          clock_timezones?: Json | null
           created_at?: string
           default_candle_type?: string
           default_timeframe?: string
@@ -302,6 +304,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           broker?: string
+          clock_timezones?: Json | null
           created_at?: string
           default_candle_type?: string
           default_timeframe?: string

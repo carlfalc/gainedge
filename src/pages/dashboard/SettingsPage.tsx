@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
-import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity } from "lucide-react";
+import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { DEFAULT_CLOCKS, AVAILABLE_CITIES, type ClockConfig } from "@/components/dashboard/WorldClocks";
 
 const ADMIN_EMAIL = "falconercarlandrew@gmail.com";
 
@@ -21,6 +22,7 @@ export default function SettingsPage() {
   const [broker, setBroker] = useState("eightcap");
   const [instruments, setInstruments] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
 
   useEffect(() => {
     if (profile) {
@@ -33,6 +35,10 @@ export default function SettingsPage() {
       setPushAlerts(profile.push_notifications);
       setSmsAlerts(profile.sms_alerts);
       setBroker(profile.broker);
+      // Load clock preferences
+      if ((profile as any).clock_timezones && Array.isArray((profile as any).clock_timezones) && (profile as any).clock_timezones.length > 0) {
+        setClockSlots((profile as any).clock_timezones as ClockConfig[]);
+      }
     }
   }, [profile]);
 
@@ -51,6 +57,8 @@ export default function SettingsPage() {
   }, [userId]);
 
   const handleSave = async () => {
+    if (!userId) return;
+    // Save standard profile fields
     await updateProfile({
       full_name: name,
       default_timeframe: timeframe,
@@ -62,7 +70,15 @@ export default function SettingsPage() {
       sms_alerts: smsAlerts,
       broker,
     });
+    // Save clock preferences separately (column not in typed Profile)
+    await supabase.from("profiles").update({ clock_timezones: clockSlots as any }).eq("id", userId);
     toast.success("Settings saved");
+  };
+
+  const updateClockSlot = (index: number, timezone: string) => {
+    const city = AVAILABLE_CITIES.find(c => c.timezone === timezone);
+    if (!city) return;
+    setClockSlots(prev => prev.map((s, i) => i === index ? { ...city } : s));
   };
 
   if (loading) return <div style={{ color: C.sec }}>Loading...</div>;
@@ -113,6 +129,25 @@ export default function SettingsPage() {
           <Field label="EMA Slow Period">
             <input value={emaSlow} onChange={e => setEmaSlow(e.target.value)} style={inputStyle} type="number" />
           </Field>
+        </div>
+      </Section>
+
+      <Section icon={<Clock size={16} color={C.cyan} />} title="Clock Settings">
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>Customize the 6 world market clocks shown in your dashboard header.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {clockSlots.map((slot, i) => (
+            <Field key={i} label={`Clock ${i + 1}`}>
+              <select
+                value={slot.timezone}
+                onChange={e => updateClockSlot(i, e.target.value)}
+                style={inputStyle}
+              >
+                {AVAILABLE_CITIES.map(c => (
+                  <option key={c.timezone} value={c.timezone}>{c.abbr} — {c.city}</option>
+                ))}
+              </select>
+            </Field>
+          ))}
         </div>
       </Section>
 
