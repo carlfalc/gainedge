@@ -1,181 +1,126 @@
-import { useState, useEffect } from "react";
-import { X, BarChart3, TrendingUp, TrendingDown, Clock, Info } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, BarChart3, Clock, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
-import { SESSIONS, SESSION_COLORS, formatLocalHour, type SessionDef } from "@/lib/session-colors";
+import { SESSIONS, formatLocalHour } from "@/lib/session-colors";
+import { provisionAccount, fetchCandles } from "@/services/metaapi-client";
+import {
+  HISTORY_PERIOD_OPTIONS,
+  buildInstrumentAnalytics,
+  type InstrumentAnalytics,
+} from "@/lib/session-volume-analytics";
 
 interface Props {
   open: boolean;
   onClose: () => void;
 }
 
-interface SessionPattern {
-  session: SessionDef;
-  peakHourUtc: number | null;
-  peakAvgVolume: number;
-  lowestHourUtc: number | null;
-  lowestAvgVolume: number;
-  buyPct: number;
-  sellPct: number;
-  tip: string;
-  dataPoints: number;
-}
-
-interface InstrumentAnalytics {
-  symbol: string;
-  sessions: SessionPattern[];
-  overallNote: string;
-  totalDays: number;
-}
+const SYMBOL_VARIANTS: Record<string, string[]> = {
+  US30: ["US30", "DJ30", "DJI30"],
+  NAS100: ["NAS100", "USTEC", "NDX100"],
+  XAUUSD: ["XAUUSD", "GOLD"],
+  NZDUSD: ["NZDUSD"],
+  AUDUSD: ["AUDUSD"],
+};
 
 export function VolumeHistoryModal({ open, onClose }: Props) {
   const [analytics, setAnalytics] = useState<InstrumentAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [period, setPeriod] = useState<number>(7);
+  const cancelRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
+    cancelRef.current = false;
     loadAnalytics();
-  }, [open]);
+    return () => { cancelRef.current = true; };
+  }, [open, period]);
 
   const loadAnalytics = async () => {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    const uid = session.user.id;
+    setError(null);
 
-    const [{ data: instruments }, { data: summaries }, { data: scanResults }] = await Promise.all([
-      supabase.from("user_instruments").select("symbol").eq("user_id", uid),
-      supabase.from("session_volume_summary").select("*").order("date", { ascending: false }).limit(500),
-      supabase.from("scan_results").select("symbol, direction, session, scanned_at").eq("user_id", uid).order("scanned_at", { ascending: false }).limit(1000),
-    ]);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setLoading(false); return; }
+      const uid = session.user.id;
 
-    const symbols = (instruments || []).map(i => i.symbol);
-    const allDates = new Set((summaries || []).map((s: any) => s.date));
-    const totalDays = allDates.size || 1;
+      const { data: instruments } = await supabase
+        .from("user_instruments")
+        .select("symbol")
+        .eq("user_id", uid);
 
-    const results: InstrumentAnalytics[] = symbols.map(symbol => {
-      const symSummaries = (summaries || []).filter((s: any) => s.symbol === symbol);
-      const symScans = (scanResults || []).filter((s: any) => s.symbol === symbol);
+      const symbols = (instruments || []).map(i => i.symbol);
+      if (symbols.length === 0) { setAnalytics([]); setLoading(false); return; }
 
-      const sessionPatterns: SessionPattern[] = SESSIONS.map(sess => {
-        const sessSums = symSummaries.filter((s: any) => s.session === sess.key);
-        const sessScans = symScans.filter((s: any) => s.session === sess.key);
+      // Provision MetaApi account
+      let accountId: string | null = null;
+      try {
+        const acc = await provisionAccount();
+        accountId = acc.accountId;
+      } catch { /* will fallback to empty */ }
 
-        // Find peak hour from summaries
-        let peakHourUtc: number | null = null;
-        let peakAvgVolume = 0;
-        let lowestHourUtc: number | null = null;
-        let lowestAvgVolume = 0;
+      const results: InstrumentAnalytics[] = [];
 
-        if (sessSums.length > 0) {
-          // Group by peak_hour_start to find most common peak hour
-          const hourCounts = new Map<number, { count: number; totalVol: number }>();
-          for (const s of sessSums) {
-            if (s.peak_hour_start) {
-              const h = new Date(s.peak_hour_start).getUTCHours();
-              const existing = hourCounts.get(h) || { count: 0, totalVol: 0 };
-              hourCounts.set(h, { count: existing.count + 1, totalVol: existing.totalVol + (Number(s.total_volume) || 0) });
-            }
+      for (const symbol of symbols) {
+        if (cancelRef.current) return;
+
+        let candles: Awaited<ReturnType<typeof fetchCandles>> = [];
+        if (accountId) {
+          const variants = SYMBOL_VARIANTS[symbol] || [symbol];
+          for (const variant of variants) {
+            try {
+              candles = await fetchCandles(accountId, variant, "1H", 500, period);
+              if (candles.length > 0) break;
+            } catch { /* try next variant */ }
           }
-          
-          let maxCount = 0;
-          for (const [h, data] of hourCounts) {
-            if (data.count > maxCount) {
-              maxCount = data.count;
-              peakHourUtc = h;
-              peakAvgVolume = Math.round(data.totalVol / data.count);
-            }
-          }
-
-          // Lowest = first/last hour of session typically
-          const lowestH = sess.startUtcHour === 0 ? 6 : sess.endUtcHour - 2;
-          lowestHourUtc = lowestH;
-          const lowestData = hourCounts.get(lowestH);
-          lowestAvgVolume = lowestData ? Math.round(lowestData.totalVol / lowestData.count) : 0;
         }
 
-        // Direction bias from scan_results
-        const buys = sessScans.filter((s: any) => s.direction === "BUY").length;
-        const sells = sessScans.filter((s: any) => s.direction === "SELL").length;
-        const total = buys + sells || 1;
-        const buyPct = Math.round((buys / total) * 100);
-        const sellPct = 100 - buyPct;
+        results.push(buildInstrumentAnalytics(symbol, candles, period));
+      }
 
-        // Generate tip
-        const tips = [
-          buyPct > 60 ? `Strong BUY bias during ${sess.label} — trend-following setups favored` : "",
-          sellPct > 60 ? `Strong SELL bias during ${sess.label} — reversal/short setups favored` : "",
-          peakHourUtc !== null ? `Volume spike at session ${peakHourUtc === sess.startUtcHour ? "open" : "mid-session"} often precedes breakout` : "",
-          "Watch for reversal patterns at session boundaries",
-        ].filter(Boolean);
+      if (cancelRef.current) return;
+      setAnalytics(results);
 
-        return {
-          session: sess,
-          peakHourUtc,
-          peakAvgVolume,
-          lowestHourUtc,
-          lowestAvgVolume,
-          buyPct,
-          sellPct,
-          tip: tips[0] || "Insufficient data for pattern detection",
-          dataPoints: sessSums.length,
-        };
-      });
-
-      // Overall note
-      const sessionVols = sessionPatterns.map(sp => ({ label: sp.session.label, vol: sp.peakAvgVolume }));
-      const maxSess = sessionVols.reduce((a, b) => a.vol > b.vol ? a : b, sessionVols[0]);
-      const minSess = sessionVols.reduce((a, b) => a.vol < b.vol ? a : b, sessionVols[0]);
-      const ratio = minSess.vol > 0 ? (maxSess.vol / minSess.vol).toFixed(1) : "N/A";
-
-      return {
-        symbol,
-        sessions: sessionPatterns,
-        overallNote: `${symbol} is most traded during ${maxSess.label} session with ${ratio}x ${minSess.label} volume.`,
-        totalDays,
-      };
-    });
-
-    setAnalytics(results);
-    setLoading(false);
-
-    // Store patterns as insights for AI brain
-    storeInsights(uid, results);
+      // Store as insights for AI brain
+      storeInsights(uid, results);
+    } catch (e: any) {
+      setError(e.message || "Failed to load analytics");
+    } finally {
+      if (!cancelRef.current) setLoading(false);
+    }
   };
 
   const storeInsights = async (userId: string, data: InstrumentAnalytics[]) => {
-    const weekStart = getWeekStart();
     for (const inst of data) {
-      const insightData = {
-        sessions: inst.sessions.map(sp => ({
-          session: sp.session.key,
-          peakHourUtc: sp.peakHourUtc,
-          peakAvgVolume: sp.peakAvgVolume,
-          buyPct: sp.buyPct,
-          sellPct: sp.sellPct,
-        })),
-        overallNote: inst.overallNote,
-        totalDays: inst.totalDays,
-      };
+      if (inst.sessions.every(s => s.dataPoints === 0)) continue;
+      // Delete existing then insert to avoid duplicates
+      await supabase.from("insights")
+        .delete()
+        .eq("user_id", userId)
+        .eq("insight_type", "session_volume_pattern")
+        .eq("symbol", inst.symbol);
 
-      await supabase.from("insights").upsert({
+      await supabase.from("insights").insert({
         user_id: userId,
         insight_type: "session_volume_pattern",
         symbol: inst.symbol,
         title: `Volume pattern: ${inst.symbol}`,
         description: inst.overallNote,
-        data: insightData,
+        data: {
+          sessions: inst.sessions.map(sp => ({
+            session: sp.session.key,
+            peakHourUtc: sp.peakHourUtc,
+            peakAvgVolume: sp.peakAvgVolume,
+            buyPct: sp.buyPct,
+            sellPct: sp.sellPct,
+          })),
+          totalDays: inst.totalDays,
+        },
         severity: "info",
-        week_start: weekStart,
-      }, { onConflict: "id" }).select();
+      });
     }
-  };
-
-  const getWeekStart = () => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    return new Date(d.setDate(diff)).toISOString().split("T")[0];
   };
 
   if (!open) return null;
@@ -199,7 +144,7 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <BarChart3 size={20} color="#34D399" />
             <span style={{ fontSize: 16, fontWeight: 800, color: C.text }}>Volume Analytics — Session Patterns</span>
@@ -209,8 +154,36 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
           </button>
         </div>
 
+        {/* Period selector */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          <span style={{ fontSize: 11, color: C.muted, lineHeight: "26px" }}>Period:</span>
+          {HISTORY_PERIOD_OPTIONS.map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              style={{
+                padding: "3px 12px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                border: period === p ? "1.5px solid #34D399" : `1px solid ${C.border}`,
+                background: period === p ? "#34D39920" : "transparent",
+                color: period === p ? "#34D399" : C.sec,
+              }}
+            >
+              {p} days
+            </button>
+          ))}
+        </div>
+
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted }}>Loading analytics...</div>
+          <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+            Fetching broker candle data for {period} days...
+          </div>
+        ) : error ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#EF4444" }}>
+            {error}
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
+              Make sure your broker account is connected in Settings.
+            </div>
+          </div>
         ) : analytics.length === 0 ? (
           <div style={{ textAlign: "center", padding: 40, color: C.muted }}>No instruments found</div>
         ) : (
@@ -228,7 +201,7 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
                     </div>
 
                     {sp.dataPoints === 0 ? (
-                      <div style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>No data yet for this session</div>
+                      <div style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>No candle data for this session in the selected period</div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         {sp.peakHourUtc !== null && (
@@ -256,9 +229,6 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
                 </div>
                 <div style={{ fontSize: 9, color: C.muted, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
                   <Clock size={8} /> Based on {inst.totalDays} day{inst.totalDays !== 1 ? "s" : ""} of data — patterns improve with more history
-                </div>
-                <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
-                  30-day backtest data will accumulate automatically as the platform collects more session data
                 </div>
               </div>
             ))}

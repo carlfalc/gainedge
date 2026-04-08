@@ -69,10 +69,11 @@ export async function fetchCandles(
   accountId: string,
   symbol: string,
   timeframe: string,
-  limit = 500
+  limit = 500,
+  lookbackDays = 14
 ): Promise<FormattedCandle[]> {
   const tf = TF_MAP[timeframe] || "15m";
-  const startTime = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  const startTime = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
 
   const data = await callEdge({
     action: "candles",
