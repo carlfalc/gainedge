@@ -31,6 +31,7 @@ import {
   Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import BrokerModal from "@/components/dashboard/BrokerModal";
 
 /* ───── types ───── */
 interface ScanResult {
@@ -89,6 +90,8 @@ export default function ChartsPage() {
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
   const [indicatorSearch, setIndicatorSearch] = useState("");
   const [hLineMode, setHLineMode] = useState(false);
+  const [showBrokerModal, setShowBrokerModal] = useState(false);
+  const [brokerLabel, setBrokerLabel] = useState("");
 
   // MetaApi state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
@@ -103,6 +106,22 @@ export default function ChartsPage() {
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
+
+  /* ─── load broker label from profile ─── */
+  const BROKER_LABELS: Record<string, string> = {
+    eightcap: "EIGHTCAP", ic_markets: "IC MARKETS", pepperstone: "PEPPERSTONE",
+    oanda: "OANDA", "forex_com": "FOREX.COM", interactive_brokers: "INTERACTIVE BROKERS",
+    saxo_bank: "SAXO BANK", avatrade: "AVATRADE", plus500: "PLUS500", "capital_com": "CAPITAL.COM",
+    xtb: "XTB", fusion_markets: "FUSION MARKETS", fp_markets: "FP MARKETS", vantage: "VANTAGE",
+    fxcm: "FXCM", ig: "IG", cmc_markets: "CMC MARKETS", admirals: "ADMIRALS",
+    tickmill: "TICKMILL", thinkmarkets: "THINKMARKETS",
+  };
+
+  useEffect(() => {
+    if (profile?.broker) {
+      setBrokerLabel(BROKER_LABELS[profile.broker] || profile.broker.toUpperCase());
+    }
+  }, [profile]);
 
   /* ─── fetch instruments ─── */
   useEffect(() => {
@@ -556,6 +575,14 @@ export default function ChartsPage() {
           </button>
         ))}
         <div className="w-px h-6 bg-white/10 mx-1" />
+        {/* Broker badge */}
+        <button
+          onClick={() => setShowBrokerModal(true)}
+          className="px-3 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all border border-[#EAB308]/50 bg-[#EAB308]/10 text-white hover:bg-[#EAB308]/20 hover:border-[#EAB308] flex items-center gap-1.5"
+        >
+          <span className="text-[#EAB308] text-[10px]">●</span>
+          {brokerLabel || "BROKER"}
+        </button>
         <button onClick={() => setShowIndicatorModal(true)} className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1">
           <Search className="w-3 h-3" /> Indicators
         </button>
@@ -668,6 +695,17 @@ export default function ChartsPage() {
           </div>
         </div>
       )}
+
+      {/* Broker modal */}
+      <BrokerModal
+        open={showBrokerModal}
+        onClose={() => setShowBrokerModal(false)}
+        userId={userId}
+        onBrokerChange={(key, label) => {
+          setBrokerLabel(label.toUpperCase());
+          setShowBrokerModal(false);
+        }}
+      />
     </div>
   );
 }

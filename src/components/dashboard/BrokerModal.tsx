@@ -15,9 +15,10 @@ interface BrokerModalProps {
   open: boolean;
   onClose: () => void;
   userId?: string;
+  onBrokerChange?: (brokerKey: string, brokerLabel: string) => void;
 }
 
-export default function BrokerModal({ open, onClose, userId }: BrokerModalProps) {
+export default function BrokerModal({ open, onClose, userId, onBrokerChange }: BrokerModalProps) {
   const [selected, setSelected] = useState("eightcap");
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export default function BrokerModal({ open, onClose, userId }: BrokerModalProps)
     if (userId) {
       await supabase.from("profiles").update({ broker: key }).eq("id", userId);
       toast.success(`Broker set to ${broker}`);
+      onBrokerChange?.(key, broker);
     }
   };
 
