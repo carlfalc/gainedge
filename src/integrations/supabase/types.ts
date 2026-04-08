@@ -214,6 +214,60 @@ export type Database = {
           },
         ]
       }
+      live_market_data: {
+        Row: {
+          adx: number | null
+          ask: number | null
+          bid: number | null
+          id: string
+          last_price: number | null
+          macd_status: string | null
+          market_open: boolean | null
+          price_direction: string | null
+          rsi: number | null
+          sparkline_data: Json | null
+          stoch_rsi: number | null
+          symbol: string
+          updated_at: string
+          user_id: string
+          volume_today: number | null
+        }
+        Insert: {
+          adx?: number | null
+          ask?: number | null
+          bid?: number | null
+          id?: string
+          last_price?: number | null
+          macd_status?: string | null
+          market_open?: boolean | null
+          price_direction?: string | null
+          rsi?: number | null
+          sparkline_data?: Json | null
+          stoch_rsi?: number | null
+          symbol: string
+          updated_at?: string
+          user_id: string
+          volume_today?: number | null
+        }
+        Update: {
+          adx?: number | null
+          ask?: number | null
+          bid?: number | null
+          id?: string
+          last_price?: number | null
+          macd_status?: string | null
+          market_open?: boolean | null
+          price_direction?: string | null
+          rsi?: number | null
+          sparkline_data?: Json | null
+          stoch_rsi?: number | null
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+          volume_today?: number | null
+        }
+        Relationships: []
+      }
       news_items: {
         Row: {
           created_at: string
