@@ -9,9 +9,10 @@ const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-// MetaApi REST API base URLs
+// MetaApi REST API base URLs — market data uses a DIFFERENT host
 const PROVISIONING_URL = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
-const CLIENT_URL = "https://mt-client-api-v1.agiliumtrade.agiliumtrade.ai";
+const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
+const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 
 // Default demo credentials
 const DEMO_LOGIN = "7940685";
@@ -155,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
       const candleLimit = limit || 500;
       const start = startTime || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const url = `${CLIENT_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
 
       const res = await fetch(url, {
         headers: { "auth-token": METAAPI_TOKEN },
@@ -186,7 +187,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(symbol)}/current-price`;
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(symbol)}/current-price`;
       const res = await fetch(url, {
         headers: { "auth-token": METAAPI_TOKEN },
       });
@@ -216,7 +217,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols`;
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/symbols`;
       const res = await fetch(url, {
         headers: { "auth-token": METAAPI_TOKEN },
       });
