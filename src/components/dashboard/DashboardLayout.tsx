@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb
+  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { label: "Backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
   { label: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { label: "Settings", icon: Settings, path: "/dashboard/settings" },
+  { label: "Clock Settings", icon: Clock, path: "/dashboard/clock-settings" },
 ];
 
 export default function DashboardLayout() {
@@ -150,10 +151,10 @@ export default function DashboardLayout() {
             <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>{sessionLabel}</span>
             <span style={{ color: C.muted, fontSize: 12 }}>•</span>
             <span style={{ color: C.muted, fontSize: 12 }}>Last scan: 2 min ago</span>
+            <WorldClocks clocks={clockConfigs} onSessionChange={handleSessionChange} />
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
-            <WorldClocks clocks={clockConfigs} onSessionChange={handleSessionChange} />
+          <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", marginLeft: "auto" }}>
             <button
               onClick={() => setUserMenuOpen(o => !o)}
               style={{

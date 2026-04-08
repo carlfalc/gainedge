@@ -16,6 +16,7 @@ import InsightsPage from "./pages/dashboard/InsightsPage.tsx";
 import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
 import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
+import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="backtesting" element={<BacktestingPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="clock-settings" element={<ClockSettingsPage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
