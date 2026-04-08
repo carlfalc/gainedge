@@ -147,12 +147,13 @@ export default function DashboardLayout() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, animation: "pulse-dot 2s infinite" }} />
-            <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>London Session</span>
+            <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>{sessionLabel}</span>
             <span style={{ color: C.muted, fontSize: 12 }}>•</span>
             <span style={{ color: C.muted, fontSize: 12 }}>Last scan: 2 min ago</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
+            <WorldClocks clocks={clockConfigs} onSessionChange={handleSessionChange} />
             <button
               onClick={() => setUserMenuOpen(o => !o)}
               style={{
