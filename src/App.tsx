@@ -17,6 +17,8 @@ import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
 import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
+import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
+import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
 
 const queryClient = new QueryClient();
 
