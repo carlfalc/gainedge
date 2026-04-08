@@ -695,6 +695,17 @@ export default function ChartsPage() {
           </div>
         </div>
       )}
+
+      {/* Broker modal */}
+      <BrokerModal
+        open={showBrokerModal}
+        onClose={() => setShowBrokerModal(false)}
+        userId={userId}
+        onBrokerChange={(key, label) => {
+          setBrokerLabel(label.toUpperCase());
+          setShowBrokerModal(false);
+        }}
+      />
     </div>
   );
 }
