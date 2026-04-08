@@ -17,6 +17,8 @@ import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
 import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
+import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
+import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +42,8 @@ const App = () => (
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="clock-settings" element={<ClockSettingsPage />} />
+            <Route path="news-settings" element={<NewsSettingsPage />} />
+            <Route path="my-news" element={<MyNewsPage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
