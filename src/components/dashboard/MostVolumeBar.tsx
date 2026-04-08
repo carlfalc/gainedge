@@ -37,7 +37,8 @@ export function MostVolumeBar() {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const { data: scans } = await supabase
+    // Try today's scans first, fall back to most recent scans
+    let { data: scans } = await supabase
       .from("scan_results")
       .select("symbol, volume, confidence, scanned_at")
       .eq("user_id", uid)
@@ -45,6 +46,17 @@ export function MostVolumeBar() {
       .gte("scanned_at", todayStart.toISOString())
       .order("scanned_at", { ascending: false })
       .limit(100);
+
+    if (!scans || scans.length === 0) {
+      const { data: recentScans } = await supabase
+        .from("scan_results")
+        .select("symbol, volume, confidence, scanned_at")
+        .eq("user_id", uid)
+        .in("symbol", symbols)
+        .order("scanned_at", { ascending: false })
+        .limit(100);
+      scans = recentScans;
+    }
 
     if (!scans || scans.length === 0) return;
 
