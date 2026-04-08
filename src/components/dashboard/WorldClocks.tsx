@@ -118,7 +118,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
               height: 40,
               borderRadius: 8,
               background: C.card,
-              border: `1px solid ${isHighlighted ? C.jade : C.border}`,
+              border: `1px solid ${isLocal ? C.jade : isHighlighted ? C.jade : C.border}`,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
