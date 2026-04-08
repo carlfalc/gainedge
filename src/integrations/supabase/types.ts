@@ -626,24 +626,30 @@ export type Database = {
       user_signal_preferences: {
         Row: {
           created_at: string
+          currency: string
           id: string
           instrument_filters: Json
+          lot_size: number
           min_confidence: number
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          currency?: string
           id?: string
           instrument_filters?: Json
+          lot_size?: number
           min_confidence?: number
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          currency?: string
           id?: string
           instrument_filters?: Json
+          lot_size?: number
           min_confidence?: number
           updated_at?: string
           user_id?: string
