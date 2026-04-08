@@ -7,6 +7,7 @@ import { AlertTriangle, Play, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
+import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 
 interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
