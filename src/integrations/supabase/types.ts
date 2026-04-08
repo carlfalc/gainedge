@@ -474,6 +474,42 @@ export type Database = {
           },
         ]
       }
+      session_volume_summary: {
+        Row: {
+          buyer_volume: number | null
+          created_at: string
+          date: string
+          id: string
+          peak_hour_start: string | null
+          seller_volume: number | null
+          session: string
+          symbol: string
+          total_volume: number | null
+        }
+        Insert: {
+          buyer_volume?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          peak_hour_start?: string | null
+          seller_volume?: number | null
+          session: string
+          symbol: string
+          total_volume?: number | null
+        }
+        Update: {
+          buyer_volume?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          peak_hour_start?: string | null
+          seller_volume?: number | null
+          session?: string
+          symbol?: string
+          total_volume?: number | null
+        }
+        Relationships: []
+      }
       signals: {
         Row: {
           closed_at: string | null
