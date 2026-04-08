@@ -267,6 +267,12 @@ export default function DashboardHome() {
             </div>
           );
         })}
+      </div>
+
+      <div style={{
+        background: C.amber + "10", border: `1px solid ${C.amber}30`, borderRadius: 12,
+        padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10,
+      }}>
         <AlertTriangle size={16} color={C.amber} />
         <span style={{ fontSize: 12, color: C.amber }}>
           NAS100 + US30 correlated — pick one. &nbsp; AUDUSD + NZDUSD correlated — pick one.
