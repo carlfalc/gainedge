@@ -159,7 +159,7 @@ export default function DashboardHome() {
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <Gauge value={inst.confidence} color={color} size={44} />
-                <Sparkline data={sparkMap[inst.symbol] || [1,2,3]} color={color} w={120} h={32} />
+                <Sparkline data={generateSparkData(inst.direction, inst.confidence)} color={color} w={120} h={32} />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
