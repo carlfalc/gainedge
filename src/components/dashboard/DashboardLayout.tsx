@@ -151,6 +151,7 @@ export default function DashboardLayout() {
             <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>{sessionLabel}</span>
             <span style={{ color: C.muted, fontSize: 12 }}>•</span>
             <span style={{ color: C.muted, fontSize: 12 }}>Last scan: 2 min ago</span>
+            <WorldClocks clocks={clockConfigs} onSessionChange={handleSessionChange} />
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", marginLeft: "auto" }}>

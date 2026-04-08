@@ -132,24 +132,6 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      <Section icon={<Clock size={16} color={C.cyan} />} title="Clock Settings">
-        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>Customize the 6 world market clocks shown in your dashboard header.</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {clockSlots.map((slot, i) => (
-            <Field key={i} label={`Clock ${i + 1}`}>
-              <select
-                value={slot.timezone}
-                onChange={e => updateClockSlot(i, e.target.value)}
-                style={inputStyle}
-              >
-                {AVAILABLE_CITIES.map(c => (
-                  <option key={c.timezone} value={c.timezone}>{c.abbr} — {c.city}</option>
-                ))}
-              </select>
-            </Field>
-          ))}
-        </div>
-      </Section>
 
       <Section icon={<Bell size={16} color={C.amber} />} title="Notifications">
         <Toggle label="Email Alerts" checked={emailAlerts} onChange={setEmailAlerts} />

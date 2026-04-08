@@ -39,6 +39,7 @@ const App = () => (
             <Route path="backtesting" element={<BacktestingPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="clock-settings" element={<ClockSettingsPage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
