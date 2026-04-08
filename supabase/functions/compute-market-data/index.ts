@@ -742,6 +742,7 @@ serve(async (req) => {
       users: userInstruments.size,
       rows: upserts.length,
       auto_scans: autoScans,
+      signals_resolved: resolvedCount,
       live: usedLive,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
