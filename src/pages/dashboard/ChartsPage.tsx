@@ -97,66 +97,89 @@ export default function ChartsPage() {
     return () => {};
   }, []);
 
-  const getSymbol = useCallback(() => {
-    return TV_SYMBOL_MAP[selected] || selected;
-  }, [selected]);
+  const getSymbolAtIndex = useCallback((sym: string, index: number) => {
+    const fallbacks = TV_SYMBOL_FALLBACKS[sym];
+    if (fallbacks && index < fallbacks.length) return fallbacks[index];
+    return TV_SYMBOL_MAP[sym] || sym;
+  }, []);
+
+  const createWidget = useCallback((symbol: string) => {
+    if (!window.TradingView || !containerRef.current) return;
+    const container = document.getElementById("tradingview_chart");
+    if (container) container.innerHTML = "";
+
+    try {
+      widgetRef.current = new window.TradingView.widget({
+        autosize: true,
+        symbol,
+        interval: "15",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        theme: "dark",
+        style: "1",
+        locale: "en",
+        enable_publishing: false,
+        allow_symbol_change: true,
+        hide_top_toolbar: false,
+        hide_side_toolbar: false,
+        hide_legend: false,
+        save_image: true,
+        toolbar_bg: "#111724",
+        withdateranges: true,
+        details: true,
+        hotlist: true,
+        calendar: true,
+        show_popup_button: true,
+        popup_width: "1200",
+        popup_height: "800",
+        backgroundColor: "rgba(17, 23, 36, 1)",
+        gridColor: "rgba(255, 255, 255, 0.04)",
+        studies: ["MAExp@tv-basicstudies"],
+        container_id: "tradingview_chart",
+      });
+    } catch (e) {
+      console.error("TradingView widget error:", e);
+    }
+  }, []);
 
   // Create/recreate widget when symbol changes
   useEffect(() => {
     if (!selected) return;
+    fallbackIndexRef.current = 0;
 
     const initWidget = () => {
-      if (!window.TradingView || !containerRef.current) return;
+      const sym = getSymbolAtIndex(selected, 0);
+      createWidget(sym);
 
-      // Clear previous widget
-      const container = document.getElementById("tradingview_chart");
-      if (container) container.innerHTML = "";
+      // Fallback: if iframe shows error after 5s, try next symbol
+      const fallbacks = TV_SYMBOL_FALLBACKS[selected];
+      if (!fallbacks || fallbacks.length <= 1) return;
 
-      try {
-        widgetRef.current = new window.TradingView.widget({
-          autosize: true,
-          symbol: getSymbol(),
-          interval: "15",
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          theme: "dark",
-          style: "1",
-          locale: "en",
-          enable_publishing: false,
-          allow_symbol_change: true,
-          hide_top_toolbar: false,
-          hide_side_toolbar: false,
-          hide_legend: false,
-          save_image: true,
-          toolbar_bg: "#111724",
-          withdateranges: true,
-          details: true,
-          hotlist: true,
-          calendar: true,
-          show_popup_button: true,
-          popup_width: "1200",
-          popup_height: "800",
-          backgroundColor: "rgba(17, 23, 36, 1)",
-          gridColor: "rgba(255, 255, 255, 0.04)",
-          studies: ["MAExp@tv-basicstudies"],
-          container_id: "tradingview_chart",
-        });
-      } catch (e) {
-        console.error("TradingView widget error:", e);
-      }
+      const fallbackTimer = setTimeout(() => {
+        const iframe = containerRef.current?.querySelector("iframe");
+        if (!iframe || iframe.offsetHeight < 50) {
+          fallbackIndexRef.current = 1;
+          const nextSym = getSymbolAtIndex(selected, 1);
+          console.log(`Trying fallback symbol: ${nextSym}`);
+          createWidget(nextSym);
+        }
+      }, 5000);
+      return fallbackTimer;
     };
 
+    let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
     if (scriptLoaded.current && window.TradingView) {
-      initWidget();
+      fallbackTimer = initWidget();
     } else {
       const check = setInterval(() => {
         if (window.TradingView) {
           clearInterval(check);
-          initWidget();
+          fallbackTimer = initWidget();
         }
       }, 200);
-      return () => clearInterval(check);
+      return () => { clearInterval(check); if (fallbackTimer) clearTimeout(fallbackTimer); };
     }
-  }, [selected, getSymbol]);
+    return () => { if (fallbackTimer) clearTimeout(fallbackTimer); };
+  }, [selected, getSymbolAtIndex, createWidget]);
 
   const dirColor = (d: string) =>
     d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
