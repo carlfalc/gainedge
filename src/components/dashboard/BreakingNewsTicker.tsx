@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
+import { isExpired } from "@/lib/expiry";
 
 interface NewsItem {
   id: string;
@@ -21,7 +22,11 @@ export function BreakingNewsTicker() {
         .select("id, headline, published_at, impact")
         .order("published_at", { ascending: false })
         .limit(20);
-      if (data) setNews(data as NewsItem[]);
+      if (data) {
+        // Filter to only show news from last 12 hours
+        const fresh = (data as NewsItem[]).filter(n => !isExpired(n.published_at, 720));
+        setNews(fresh);
+      }
     };
     load();
 
@@ -35,6 +40,8 @@ export function BreakingNewsTicker() {
     new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   const tickerContent = news.map(n => `${formatTime(n.published_at)} — ${n.headline}`).join("   •••   ");
+
+  if (news.length === 0) return null;
 
   return (
     <div
@@ -52,7 +59,6 @@ export function BreakingNewsTicker() {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Red dot + label */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.red }} />
         <span style={{ fontSize: 11, fontWeight: 700, color: C.text, whiteSpace: "nowrap", letterSpacing: 0.5 }}>
@@ -62,7 +68,6 @@ export function BreakingNewsTicker() {
 
       <div style={{ width: 1, height: 18, background: C.border, flexShrink: 0 }} />
 
-      {/* Scrolling ticker */}
       <div style={{ overflow: "hidden", flex: 1, position: "relative" }} ref={scrollRef}>
         <div
           style={{

@@ -3,8 +3,9 @@ import { SpinCard } from "@/components/dashboard/SpinCard";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
-import { AlertTriangle, Play, Loader2 } from "lucide-react";
+import { AlertTriangle, Play, Loader2, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { signalFreshness, formatAge, type SignalFreshness } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
@@ -15,7 +16,7 @@ interface ScanResult {
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
   macd_status: string | null; stoch_rsi: number | null; reasoning: string;
-  ema_crossover_status: string; verdict: string;
+  ema_crossover_status: string; verdict: string; scanned_at: string;
 }
 
 const directionColor = (dir: string) => {
@@ -111,9 +112,18 @@ export default function DashboardHome() {
     setTimeout(() => { setScanning(false); loadData(); }, 3000);
   };
 
-  const best = scans.length ? scans.reduce((a, b) => a.confidence > b.confidence ? a : b) : null;
+  // Highest conviction: only from last 20 minutes
+  const recentScans = scans.filter(s => signalFreshness(s.scanned_at) !== "expired");
+  const best = recentScans.length ? recentScans.reduce((a, b) => a.confidence > b.confidence ? a : b) : null;
   const totalTrades = stats.wins + stats.losses;
   const winRate = totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 100) : 0;
+
+  const freshnessStyle = (f: SignalFreshness) => {
+    if (f === "fresh") return { opacity: 1, dirOpacity: 1, pulse: true };
+    if (f === "recent") return { opacity: 1, dirOpacity: 1, pulse: false };
+    if (f === "aging") return { opacity: 0.8, dirOpacity: 0.7, pulse: false };
+    return { opacity: 0.4, dirOpacity: 0.4, pulse: false };
+  };
 
   return (
     <div style={{ maxWidth: 1200 }}>
@@ -128,7 +138,7 @@ export default function DashboardHome() {
         <SpinCard front={{ label: "Avg R:R", value: `${stats.avgRR}:1` }} back={{ label: "R:R Detail", value: `${totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 80) : 0}% of trades met 2:1 minimum | Best R:R achieved: ${Math.max(stats.avgRR * 1.8, 3.2).toFixed(1)}:1` }} color={C.purple} />
       </div>
 
-      {best && (
+      {best ? (
         <div style={{
           background: C.card, border: `1px solid ${C.jade}30`, borderRadius: 14,
           padding: "16px 20px", marginBottom: 20,
@@ -149,24 +159,49 @@ export default function DashboardHome() {
             {best.confidence}
           </div>
         </div>
+      ) : (
+        <div style={{
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
+          padding: "16px 20px", marginBottom: 20,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <Clock size={16} color={C.sec} />
+          <span style={{ fontSize: 12, color: C.sec }}>No active signals — waiting for next scan</span>
+        </div>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {scans.map(inst => {
-          const color = directionColor(inst.direction);
+          const fresh = signalFreshness(inst.scanned_at);
+          const style = freshnessStyle(fresh);
+          const expired = fresh === "expired";
+          const color = expired ? "#555F73" : directionColor(inst.direction);
           return (
-            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18 }}>
+            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: style.opacity, transition: "opacity 0.3s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</div>
-                  <div style={{ fontSize: 10, color: C.muted }}>15m Heiken Ashi</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+                    <span>15m Heiken Ashi</span>
+                    <Clock size={10} />
+                    <span>{formatAge(inst.scanned_at)}</span>
+                  </div>
                 </div>
-                <div style={{
-                  fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-                  background: inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
-                  color: inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
-                }}>
-                  {inst.direction}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
+                    background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
+                    color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
+                    opacity: style.dirOpacity,
+                    textDecoration: expired ? "line-through" : "none",
+                  }}>
+                    {expired ? "EXPIRED" : inst.direction}
+                  </div>
+                  {fresh === "aging" && (
+                    <span style={{ fontSize: 9, color: "#F59E0B", fontWeight: 600, display: "flex", alignItems: "center", gap: 2 }}>
+                      ⏰ Expiring soon
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -183,9 +218,9 @@ export default function DashboardHome() {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.entry_price ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: C.green, fontFamily: "'JetBrains Mono', monospace" }}>{inst.take_profit ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: C.red, fontFamily: "'JetBrains Mono', monospace" }}>{inst.stop_loss ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? C.muted : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: expired ? C.muted : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
                 <div><span style={{ color: C.sec }}>R:R:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
               </div>
 

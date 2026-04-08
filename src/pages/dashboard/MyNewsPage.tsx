@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw } from "lucide-react";
+import { newsFreshness, isExpired } from "@/lib/expiry";
 
 interface NewsItem {
   id: string;
@@ -140,6 +141,9 @@ export default function MyNewsPage() {
         {filtered.map(item => {
           const impact = item.impact || "low";
           const badge = BADGE_STYLES[impact] || BADGE_STYLES.low;
+          const freshness = newsFreshness(item.published_at);
+          const isOld = isExpired(item.published_at, 720);
+          const opacity = freshness === "expired" ? 0.45 : freshness === "old" ? 0.65 : 1;
           return (
             <div
               key={item.id}
@@ -148,6 +152,7 @@ export default function MyNewsPage() {
                 padding: "14px 18px",
                 borderLeft: `3px solid ${BORDER_COLORS[impact] || C.border}`,
                 transition: "all 0.3s ease",
+                opacity,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
@@ -159,12 +164,17 @@ export default function MyNewsPage() {
                     {item.source && (
                       <span style={{ fontSize: 10, color: C.muted }}>• {item.source}</span>
                     )}
+                    {freshness === "fresh" && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: C.jade + "20", color: C.jade }}>NEW</span>
+                    )}
+                    {isOld && (
+                      <span style={{ fontSize: 9, fontWeight: 600, color: C.muted }}>12+ hours ago</span>
+                    )}
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6, lineHeight: 1.4 }}>
                     {item.headline}
                   </div>
 
-                  {/* Instrument tags */}
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {(item.instruments_affected || []).map(inst => (
                       <span
@@ -182,7 +192,6 @@ export default function MyNewsPage() {
                   </div>
                 </div>
 
-                {/* Impact badge */}
                 <span style={{
                   fontSize: 9, fontWeight: 700, padding: "3px 10px", borderRadius: 4,
                   background: badge.bg, color: badge.color,

@@ -11,6 +11,7 @@ import {
   CrosshairMode,
 } from "lightweight-charts";
 import { supabase } from "@/integrations/supabase/client";
+import { signalFreshness, formatAge } from "@/lib/expiry";
 import { useProfile } from "@/hooks/use-profile";
 import { generateMockCandles } from "@/lib/mock-candles";
 import {
@@ -639,26 +640,38 @@ export default function ChartsPage() {
       </div>
 
       {/* AI Analysis Panel */}
-      {!isFullscreen && scanResult && (
-        <div className="rounded-lg border border-white/[0.06] bg-[#111724] p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Activity className="w-4 h-4 text-[#00CFA5]" />
-            <span className="text-xs font-bold text-[#00CFA5] tracking-wider">AI ANALYSIS — {scanResult.symbol}</span>
+      {!isFullscreen && scanResult && (() => {
+        const fresh = signalFreshness(scanResult.scanned_at);
+        const expired = fresh === "expired";
+        const aging = fresh === "aging";
+        return (
+          <div className={`rounded-lg border border-white/[0.06] bg-[#111724] p-4 ${expired ? "opacity-60" : ""}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className={`w-4 h-4 ${expired ? "text-amber-400" : "text-[#00CFA5]"}`} />
+              <span className={`text-xs font-bold tracking-wider ${expired ? "text-amber-400" : "text-[#00CFA5]"}`}>
+                {expired ? `SIGNAL EXPIRED — last scan ${formatAge(scanResult.scanned_at)}` : `AI ANALYSIS — ${scanResult.symbol}`}
+              </span>
+              {aging && <span className="text-[10px] text-amber-400 font-semibold ml-2">⏰ Expiring soon</span>}
+            </div>
+            {!expired && (
+              <>
+                <div className="flex flex-wrap gap-4 text-xs mb-2">
+                  <span className={`font-bold flex items-center gap-1 ${dirColor(scanResult.direction)}`}>
+                    {dirIcon(scanResult.direction)} {scanResult.direction}
+                  </span>
+                  <span className="text-white/60">Confidence: <span className="text-white font-bold">{scanResult.confidence}/10</span></span>
+                  {scanResult.entry_price && <span className="text-white/60">Entry: <span className="text-white font-bold">{scanResult.entry_price}</span></span>}
+                  {scanResult.take_profit && <span className="text-white/60">TP: <span className="text-green-400 font-bold">{scanResult.take_profit}</span></span>}
+                  {scanResult.stop_loss && <span className="text-white/60">SL: <span className="text-red-400 font-bold">{scanResult.stop_loss}</span></span>}
+                  {scanResult.risk_reward && <span className="text-white/60">R:R: <span className="text-amber-400 font-bold">{scanResult.risk_reward}</span></span>}
+                </div>
+                <p className="text-xs text-white/50 leading-relaxed">{scanResult.reasoning}</p>
+              </>
+            )}
+            <p className="text-[10px] text-white/20 mt-2">Scanned: {new Date(scanResult.scanned_at).toLocaleString()}</p>
           </div>
-          <div className="flex flex-wrap gap-4 text-xs mb-2">
-            <span className={`font-bold flex items-center gap-1 ${dirColor(scanResult.direction)}`}>
-              {dirIcon(scanResult.direction)} {scanResult.direction}
-            </span>
-            <span className="text-white/60">Confidence: <span className="text-white font-bold">{scanResult.confidence}/10</span></span>
-            {scanResult.entry_price && <span className="text-white/60">Entry: <span className="text-white font-bold">{scanResult.entry_price}</span></span>}
-            {scanResult.take_profit && <span className="text-white/60">TP: <span className="text-green-400 font-bold">{scanResult.take_profit}</span></span>}
-            {scanResult.stop_loss && <span className="text-white/60">SL: <span className="text-red-400 font-bold">{scanResult.stop_loss}</span></span>}
-            {scanResult.risk_reward && <span className="text-white/60">R:R: <span className="text-amber-400 font-bold">{scanResult.risk_reward}</span></span>}
-          </div>
-          <p className="text-xs text-white/50 leading-relaxed">{scanResult.reasoning}</p>
-          <p className="text-[10px] text-white/20 mt-2">Scanned: {new Date(scanResult.scanned_at).toLocaleString()}</p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Attribution */}
       {!isFullscreen && (
