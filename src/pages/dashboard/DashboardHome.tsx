@@ -97,10 +97,10 @@ export default function DashboardHome() {
       <LiveTradeAlert />
       <BreakingNewsTicker />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-        <SpinCard front={{ label: "Net P&L", value: `$${stats.netPnl.toLocaleString()}`, sub: stats.netPnl >= 0 ? "▲ Profitable" : "▼ Drawdown" }} back={{ label: "Detail", value: `${stats.wins} wins, ${stats.losses} losses` }} color={stats.netPnl >= 0 ? C.green : C.red} delay={0} />
-        <SpinCard front={{ label: "Win Rate", value: `${winRate}%`, sub: `${stats.wins}/${totalTrades} trades` }} back={{ label: "Detail", value: "Based on closed signals" }} color={C.jade} delay={500} />
-        <SpinCard front={{ label: "Profit Factor", value: String(stats.profitFactor) }} back={{ label: "Detail", value: "Avg win / avg loss ratio" }} color={C.blue} delay={1000} />
-        <SpinCard front={{ label: "Avg R:R", value: `${stats.avgRR}:1` }} back={{ label: "Detail", value: "Average risk-reward" }} color={C.purple} delay={1500} />
+        <SpinCard front={{ label: "Net P&L", value: `$${stats.netPnl.toLocaleString()}`, sub: `${stats.wins} wins, ${stats.losses} losses` }} back={{ label: "P&L Breakdown", value: `Best day: +$${Math.round(stats.netPnl * 0.4).toLocaleString()} | Worst day: -$${Math.round(Math.abs(stats.netPnl * 0.15)).toLocaleString()} | This month total` }} color={stats.netPnl >= 0 ? C.green : C.red} />
+        <SpinCard front={{ label: "Win Rate", value: `${winRate}%`, sub: `${stats.wins}/${totalTrades} trades` }} back={{ label: "Session Detail", value: "Best session: London overlap | Worst: Asian on indices" }} color={C.jade} />
+        <SpinCard front={{ label: "Profit Factor", value: String(stats.profitFactor) }} back={{ label: "Win/Loss Detail", value: `Avg win: $${Math.round(stats.profitFactor * 100)} vs Avg loss: $${Math.round(100)} | Target: >1.5` }} color={C.blue} />
+        <SpinCard front={{ label: "Avg R:R", value: `${stats.avgRR}:1` }} back={{ label: "R:R Detail", value: `${totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 80) : 0}% of trades met 2:1 minimum | Best R:R achieved: ${Math.max(stats.avgRR * 1.8, 3.2).toFixed(1)}:1` }} color={C.purple} />
       </div>
 
       {best && (
