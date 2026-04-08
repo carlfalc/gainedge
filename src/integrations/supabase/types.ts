@@ -275,6 +275,7 @@ export type Database = {
           email_alerts: boolean
           full_name: string | null
           id: string
+          metaapi_account_id: string | null
           news_preferences: Json | null
           push_notifications: boolean
           sms_alerts: boolean
@@ -295,6 +296,7 @@ export type Database = {
           email_alerts?: boolean
           full_name?: string | null
           id: string
+          metaapi_account_id?: string | null
           news_preferences?: Json | null
           push_notifications?: boolean
           sms_alerts?: boolean
@@ -315,6 +317,7 @@ export type Database = {
           email_alerts?: boolean
           full_name?: string | null
           id?: string
+          metaapi_account_id?: string | null
           news_preferences?: Json | null
           push_notifications?: boolean
           sms_alerts?: boolean
