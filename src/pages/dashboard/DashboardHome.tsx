@@ -140,7 +140,7 @@ export default function DashboardHome() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {scans.map(inst => {
-          const color = colorMap[inst.symbol] || C.jade;
+          const color = directionColor(inst.direction);
           return (
             <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
