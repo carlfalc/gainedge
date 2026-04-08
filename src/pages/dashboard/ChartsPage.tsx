@@ -15,27 +15,25 @@ interface ScanResult {
   risk_reward: string | null; reasoning: string; scanned_at: string;
 }
 
-const BROKER_PREFIX_MAP: Record<string, string> = {
-  "Eightcap": "EIGHTCAP",
-  "IC Markets": "ICMARKETS",
-  "Pepperstone": "PEPPERSTONE",
-  "OANDA": "OANDA",
-  "Forex.com": "FOREXCOM",
-  "Interactive Brokers": "IBKR",
-  "Saxo Bank": "SAXO",
-  "AvaTrade": "AVATRADE",
-  "Plus500": "PLUS500",
-  "Capital.com": "CAPITALCOM",
-  "XTB": "XTB",
-  "Fusion Markets": "FUSIONMARKETS",
-  "FP Markets": "FPMARKETS",
-  "Vantage": "VANTAGEMARKETS",
-  "FXCM": "FXCM",
-  "IG": "IG",
-  "CMC Markets": "CMCMARKETS",
-  "Admirals": "ADMIRALS",
-  "Tickmill": "TICKMILL",
-  "ThinkMarkets": "THINKMARKETS",
+const TV_SYMBOL_MAP: Record<string, string> = {
+  "XAUUSD": "OANDA:XAUUSD",
+  "US30": "TVC:DJI",
+  "NAS100": "PEPPERSTONE:NAS100",
+  "NZDUSD": "FX:NZDUSD",
+  "AUDUSD": "FX:AUDUSD",
+  "EURUSD": "FX:EURUSD",
+  "GBPUSD": "FX:GBPUSD",
+  "USDJPY": "FX:USDJPY",
+  "USDCAD": "FX:USDCAD",
+  "USDCHF": "FX:USDCHF",
+  "GBPJPY": "FX:GBPJPY",
+  "EURJPY": "FX:EURJPY",
+  "EURGBP": "FX:EURGBP",
+  "XAGUSD": "OANDA:XAGUSD",
+  "BTCUSD": "COINBASE:BTCUSD",
+  "ETHUSD": "COINBASE:ETHUSD",
+  "US500": "TVC:SPX",
+  "SPX500": "TVC:SPX",
 };
 
 export default function ChartsPage() {
@@ -88,10 +86,8 @@ export default function ChartsPage() {
   }, []);
 
   const getSymbol = useCallback(() => {
-    const broker = profile?.broker || "OANDA";
-    const prefix = BROKER_PREFIX_MAP[broker] || "OANDA";
-    return `${prefix}:${selected}`;
-  }, [profile?.broker, selected]);
+    return TV_SYMBOL_MAP[selected] || selected;
+  }, [selected]);
 
   // Create/recreate widget when symbol changes
   useEffect(() => {
