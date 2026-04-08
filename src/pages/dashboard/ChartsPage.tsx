@@ -31,6 +31,7 @@ import {
   Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff,
 } from "lucide-react";
 import { toast } from "sonner";
+import BrokerModal from "@/components/dashboard/BrokerModal";
 
 /* ───── types ───── */
 interface ScanResult {
