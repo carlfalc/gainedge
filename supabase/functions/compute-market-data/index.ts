@@ -652,24 +652,14 @@ serve(async (req) => {
               ? Math.abs(prev.entry_price - analysis.entry_price) / analysis.entry_price > 0.005
               : false;
 
-           // Also check if the previous signal for this symbol is still pending
-           const { data: prevPendingSig } = await supabase
-             .from("signals")
-             .select("id")
-             .eq("user_id", userId)
-             .eq("symbol", inst.symbol)
-             .eq("result", "pending")
-             .limit(1);
-           const hasPendingSignal = prevPendingSig && prevPendingSig.length > 0;
-
-           // Only insert if direction changed OR entry changed by >0.5% OR no pending signal exists
-           if (!dirChanged && !entryChanged && hasPendingSignal) {
+            // Skip scan if nothing meaningful changed (same direction AND entry within 0.5%)
+            if (!dirChanged && !entryChanged) {
               shouldInsertScan = false;
               // Just update the timestamp on existing scan
               await supabase.from("scan_results")
                 .update({ scanned_at: new Date().toISOString() })
                 .eq("id", prev.id);
-             console.log(`Dedup skip: ${inst.symbol} — same direction, entry within 0.5%, pending signal exists`);
+              console.log(`Dedup skip: ${inst.symbol} — same direction, entry within 0.5%`);
             }
           }
 
