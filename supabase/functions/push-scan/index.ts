@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
         let isDuplicate = false;
         if (recentPending && recentPending.length > 0 && r.entry_price) {
           const priceDiff = Math.abs(recentPending[0].entry_price - r.entry_price) / r.entry_price;
-          if (priceDiff < 0.001) isDuplicate = true;
+          if (priceDiff < 0.005) isDuplicate = true; // within 0.5%
         }
 
         if (!isDuplicate) {
