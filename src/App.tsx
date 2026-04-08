@@ -19,6 +19,7 @@ import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
 import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
 import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
+import ChartsPage from "./pages/dashboard/ChartsPage.tsx";
 
 const queryClient = new QueryClient();
 
