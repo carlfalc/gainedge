@@ -42,9 +42,19 @@ export default function DashboardHome() {
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0 });
   const [equityCurve, setEquityCurve] = useState<number[]>([]);
+  const [userId, setUserId] = useState<string>();
+  const { data: liveData } = useLiveMarketData(userId);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setUserId(session.user.id);
+    });
+  }, []);
 
   useEffect(() => {
     loadData();
+    // Trigger compute on load
+    triggerMarketDataCompute();
 
     // Trigger initial news fetch & poll every 2 minutes
     const fetchNews = () => {
