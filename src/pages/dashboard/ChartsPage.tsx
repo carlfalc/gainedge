@@ -107,6 +107,22 @@ export default function ChartsPage() {
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
 
+  /* ─── load broker label from profile ─── */
+  const BROKER_LABELS: Record<string, string> = {
+    eightcap: "EIGHTCAP", ic_markets: "IC MARKETS", pepperstone: "PEPPERSTONE",
+    oanda: "OANDA", "forex_com": "FOREX.COM", interactive_brokers: "INTERACTIVE BROKERS",
+    saxo_bank: "SAXO BANK", avatrade: "AVATRADE", plus500: "PLUS500", "capital_com": "CAPITAL.COM",
+    xtb: "XTB", fusion_markets: "FUSION MARKETS", fp_markets: "FP MARKETS", vantage: "VANTAGE",
+    fxcm: "FXCM", ig: "IG", cmc_markets: "CMC MARKETS", admirals: "ADMIRALS",
+    tickmill: "TICKMILL", thinkmarkets: "THINKMARKETS",
+  };
+
+  useEffect(() => {
+    if (profile?.broker) {
+      setBrokerLabel(BROKER_LABELS[profile.broker] || profile.broker.toUpperCase());
+    }
+  }, [profile]);
+
   /* ─── fetch instruments ─── */
   useEffect(() => {
     if (!userId) return;
