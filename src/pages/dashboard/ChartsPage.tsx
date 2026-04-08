@@ -86,10 +86,8 @@ export default function ChartsPage() {
   }, []);
 
   const getSymbol = useCallback(() => {
-    const broker = profile?.broker || "OANDA";
-    const prefix = BROKER_PREFIX_MAP[broker] || "OANDA";
-    return `${prefix}:${selected}`;
-  }, [profile?.broker, selected]);
+    return TV_SYMBOL_MAP[selected] || selected;
+  }, [selected]);
 
   // Create/recreate widget when symbol changes
   useEffect(() => {
