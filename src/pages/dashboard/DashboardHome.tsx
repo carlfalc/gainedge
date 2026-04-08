@@ -173,11 +173,11 @@ export default function DashboardHome() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {scans.map(inst => {
           const fresh = signalFreshness(inst.scanned_at);
-          const style = freshnessStyle(fresh);
           const expired = fresh === "expired";
+          const dimmed = expired ? 0.55 : 1;
           const color = expired ? "#555F73" : directionColor(inst.direction);
           return (
-            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: style.opacity, transition: "opacity 0.3s" }}>
+            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: expired ? 0.75 : 1, transition: "opacity 0.3s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</div>
@@ -192,10 +192,8 @@ export default function DashboardHome() {
                     fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
                     background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
                     color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
-                    opacity: style.dirOpacity,
-                    textDecoration: expired ? "line-through" : "none",
                   }}>
-                    {expired ? "EXPIRED" : inst.direction}
+                    {inst.direction}
                   </div>
                   {fresh === "aging" && (
                     <span style={{ fontSize: 9, color: "#F59E0B", fontWeight: 600, display: "flex", alignItems: "center", gap: 2 }}>
@@ -210,23 +208,34 @@ export default function DashboardHome() {
                 <Sparkline data={generateSparkData(inst.direction, inst.confidence)} color={color} w={120} h={32} />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12, opacity: dimmed }}>
                 <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.adx ?? "—"}</span></span>
                 <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.rsi ?? "—"}</span></span>
                 <span>MACD <span style={{ color: inst.macd_status === "Bullish" ? C.green : inst.macd_status === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{inst.macd_status ?? "—"}</span></span>
                 <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.stoch_rsi ?? "—"}</span></span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.5 : 1 }}>
                 <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
                 <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? C.muted : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
                 <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: expired ? C.muted : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
                 <div><span style={{ color: C.sec }}>R:R:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
               </div>
 
-              <div style={{ fontSize: 11, color: C.sec, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                <span style={{ color: C.jade, fontWeight: 600 }}>AI Reasoning: </span>{inst.reasoning || "No reasoning available."}
+              <div style={{ fontSize: 11, color: expired ? C.muted : C.sec, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: dimmed }}>
+                {expired && (
+                  <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 600, marginBottom: 4 }}>
+                    (Expired — {formatAge(inst.scanned_at)})
+                  </div>
+                )}
+                <span style={{ color: expired ? C.muted : C.jade, fontWeight: 600 }}>AI Reasoning: </span>{inst.reasoning || "No reasoning available."}
               </div>
+
+              {expired && (
+                <div style={{ fontSize: 10, color: C.muted, fontStyle: "italic", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                  <Clock size={10} /> Awaiting next scan...
+                </div>
+              )}
             </div>
           );
         })}
