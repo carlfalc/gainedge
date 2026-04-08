@@ -85,6 +85,17 @@ export default function DashboardHome() {
     if (!session) return;
     const uid = session.user.id;
 
+    // Load instrument timeframes
+    const { data: instData } = await supabase
+      .from("user_instruments")
+      .select("symbol, timeframe")
+      .eq("user_id", uid);
+    if (instData) {
+      const tfMap = new Map<string, string>();
+      instData.forEach((i: any) => tfMap.set(i.symbol, i.timeframe || "15m"));
+      setInstrumentTfs(tfMap);
+    }
+
     const { data: scanData } = await supabase
       .from("scan_results")
       .select("*")
