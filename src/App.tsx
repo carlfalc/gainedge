@@ -19,6 +19,7 @@ import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
 import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
 import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
+import ChartsPage from "./pages/dashboard/ChartsPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="clock-settings" element={<ClockSettingsPage />} />
             <Route path="news-settings" element={<NewsSettingsPage />} />
             <Route path="my-news" element={<MyNewsPage />} />
+            <Route path="charts" element={<ChartsPage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
