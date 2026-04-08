@@ -214,7 +214,7 @@ export default function NewsSettingsPage() {
     setSaving(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setSaving(false); return; }
-    await supabase.from("profiles").update({ news_preferences: prefs as unknown as Record<string, unknown> }).eq("id", session.user.id);
+    await supabase.from("profiles").update({ news_preferences: prefs as unknown as Record<string, never> }).eq("id", session.user.id);
     toast.success("News preferences saved — your feed is being updated");
     setSaving(false);
   };
