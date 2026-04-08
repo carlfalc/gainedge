@@ -20,6 +20,11 @@ interface ScanResult {
   ema_crossover_status: string; verdict: string; scanned_at: string;
 }
 
+interface InstrumentTimeframe {
+  symbol: string;
+  timeframe: string;
+}
+
 const directionColor = (dir: string) => {
   if (dir === "BUY") return "#22C55E";
   if (dir === "SELL") return "#EF4444";
@@ -40,6 +45,7 @@ function generateSparkData(direction: string, confidence: number): number[] {
 export default function DashboardHome() {
   const [scanning, setScanning] = useState(false);
   const [scans, setScans] = useState<ScanResult[]>([]);
+  const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(new Map());
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0 });
   const [equityCurve, setEquityCurve] = useState<number[]>([]);
   const [userId, setUserId] = useState<string>();
@@ -78,6 +84,17 @@ export default function DashboardHome() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
     const uid = session.user.id;
+
+    // Load instrument timeframes
+    const { data: instData } = await supabase
+      .from("user_instruments")
+      .select("symbol, timeframe")
+      .eq("user_id", uid);
+    if (instData) {
+      const tfMap = new Map<string, string>();
+      instData.forEach((i: any) => tfMap.set(i.symbol, i.timeframe || "15m"));
+      setInstrumentTfs(tfMap);
+    }
 
     const { data: scanData } = await supabase
       .from("scan_results")
@@ -199,6 +216,9 @@ export default function DashboardHome() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {instrumentTfs.get(inst.symbol) || "15m"}
+                    </span>
                     {live && (
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: live.market_open ? "#22C55E" : "#555F73", display: "inline-block" }} title={live.market_open ? "Market open" : "Market closed"} />
                     )}
@@ -209,7 +229,7 @@ export default function DashboardHome() {
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-                    <span>15m Heiken Ashi</span>
+                    <span>Last scan:</span>
                     <Clock size={10} />
                     <span>{formatAge(inst.scanned_at)}</span>
                   </div>
