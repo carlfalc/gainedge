@@ -57,6 +57,21 @@ function getLocalTimezone(): string {
   }
 }
 
+const TZ_ABBR_MAP: Record<string, string> = {
+  "Pacific/Auckland": "AKL", "Australia/Sydney": "SYD", "Australia/Melbourne": "MEL",
+  "Asia/Tokyo": "TYO", "Asia/Hong_Kong": "HKG", "Asia/Singapore": "SGP",
+  "Asia/Kolkata": "BOM", "Asia/Dubai": "DXB", "Europe/London": "LDN",
+  "Europe/Berlin": "FRA", "Europe/Zurich": "ZRH", "America/New_York": "NYC",
+  "America/Chicago": "CHI", "America/Denver": "DEN", "America/Los_Angeles": "LAX",
+  "America/Toronto": "YYZ", "America/Sao_Paulo": "GRU",
+};
+
+function getLocalClock(): ClockConfig {
+  const tz = getLocalTimezone();
+  const abbr = TZ_ABBR_MAP[tz] || tz.split("/").pop()?.slice(0, 3).toUpperCase() || "LOC";
+  return { city: "Local", abbr, timezone: tz };
+}
+
 interface WorldClocksProps {
   clocks?: ClockConfig[];
   onSessionChange?: (session: string) => void;
