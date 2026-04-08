@@ -148,6 +148,27 @@ export default function DashboardLayout() {
             <DollarSign size={18} strokeWidth={1.8} />
             {!collapsed && <span>Broker</span>}
           </button>
+          {/* Charts button */}
+          <button
+            onClick={() => navigate("/dashboard/charts")}
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: collapsed ? "10px 0" : "10px 12px",
+              justifyContent: collapsed ? "center" : "flex-start",
+              borderRadius: 10, border: "none", cursor: "pointer",
+              background: isActive("/dashboard/charts") ? "rgba(245,158,11,0.12)" : "transparent",
+              color: "#F59E0B",
+              fontSize: 13, fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif",
+              transition: "all 0.2s",
+              borderLeft: isActive("/dashboard/charts") ? "2px solid #F59E0B" : "2px solid transparent",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(245,158,11,0.08)"; }}
+            onMouseLeave={e => { if (!isActive("/dashboard/charts")) e.currentTarget.style.background = "transparent"; }}
+          >
+            <CandlestickChart size={18} strokeWidth={1.8} />
+            {!collapsed && <span>Charts</span>}
+          </button>
         </nav>
 
         {/* Collapse toggle */}
