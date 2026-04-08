@@ -332,7 +332,7 @@ function getCompletedSessions(utcHour: number): typeof SESSION_DEFS {
 }
 
 async function fetchHourlyCandles(token: string, accountId: string, symbol: string, startISO: string, endISO: string) {
-  const variants = BROKER_SYMBOL_VARIANTS[symbol] || [symbol];
+  const variants = getBrokerVariants(symbol);
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
