@@ -291,8 +291,9 @@ function runAnalysis(candles: any[]): AnalysisResult {
 
 /* ─── Session detection for volume summaries ─── */
 const SESSION_DEFS = [
-  { key: "asian", startUtc: 0, endUtc: 9 },
-  { key: "london", startUtc: 7, endUtc: 16 },
+  { key: "asian", startUtc: 0, endUtc: 8 },
+  { key: "london", startUtc: 8, endUtc: 16 },
+  { key: "new_york", startUtc: 13, endUtc: 21 },
   { key: "new_york", startUtc: 13, endUtc: 22 },
 ];
 
