@@ -185,7 +185,6 @@ export default function DashboardHome() {
         {scans.map(inst => {
           const fresh = signalFreshness(inst.scanned_at);
           const expired = fresh === "expired";
-          const dimmed = expired ? 0.55 : 1;
           const live = liveData.get(inst.symbol);
           const sparkData = live?.sparkline_data?.length ? live.sparkline_data : generateSparkData(inst.direction, inst.confidence);
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
@@ -195,7 +194,7 @@ export default function DashboardHome() {
           const liveMacd = live?.macd_status ?? inst.macd_status;
           const liveStoch = live?.stoch_rsi ?? inst.stoch_rsi;
           return (
-            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: expired ? 0.75 : 1, transition: "opacity 0.3s" }}>
+            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: expired ? 0.9 : 1, transition: "opacity 0.3s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -236,7 +235,8 @@ export default function DashboardHome() {
                 <Sparkline data={sparkData} color={live ? sparkColor : color} w={120} h={32} />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12, opacity: dimmed }}>
+              {/* Live indicators — always bright since they're real-time */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
                 <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span></span>
                 <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span></span>
                 <span>MACD <span style={{ color: liveMacd === "Bullish" ? C.green : liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{liveMacd ?? "—"}</span></span>
