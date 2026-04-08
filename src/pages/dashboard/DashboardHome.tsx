@@ -186,12 +186,29 @@ export default function DashboardHome() {
           const fresh = signalFreshness(inst.scanned_at);
           const expired = fresh === "expired";
           const dimmed = expired ? 0.55 : 1;
+          const live = liveData.get(inst.symbol);
+          const sparkData = live?.sparkline_data?.length ? live.sparkline_data : generateSparkData(inst.direction, inst.confidence);
+          const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
           const color = expired ? "#555F73" : directionColor(inst.direction);
+          const liveRsi = live?.rsi ?? inst.rsi;
+          const liveAdx = live?.adx ?? inst.adx;
+          const liveMacd = live?.macd_status ?? inst.macd_status;
+          const liveStoch = live?.stoch_rsi ?? inst.stoch_rsi;
           return (
             <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: expired ? 0.75 : 1, transition: "opacity 0.3s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
+                    {live && (
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: live.market_open ? "#22C55E" : "#555F73", display: "inline-block" }} title={live.market_open ? "Market open" : "Market closed"} />
+                    )}
+                  </div>
+                  {live?.last_price && (
+                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: live.price_direction === "up" ? C.green : live.price_direction === "down" ? C.red : C.text, marginTop: 2 }}>
+                      ${live.last_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                    </div>
+                  )}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
                     <span>15m Heiken Ashi</span>
                     <Clock size={10} />
@@ -216,14 +233,14 @@ export default function DashboardHome() {
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <Gauge value={inst.confidence} color={color} size={44} />
-                <Sparkline data={generateSparkData(inst.direction, inst.confidence)} color={color} w={120} h={32} />
+                <Sparkline data={sparkData} color={live ? sparkColor : color} w={120} h={32} />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12, opacity: dimmed }}>
-                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.adx ?? "—"}</span></span>
-                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.rsi ?? "—"}</span></span>
-                <span>MACD <span style={{ color: inst.macd_status === "Bullish" ? C.green : inst.macd_status === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{inst.macd_status ?? "—"}</span></span>
-                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.stoch_rsi ?? "—"}</span></span>
+                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span></span>
+                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span></span>
+                <span>MACD <span style={{ color: liveMacd === "Bullish" ? C.green : liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{liveMacd ?? "—"}</span></span>
+                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span></span>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.5 : 1 }}>
@@ -250,12 +267,6 @@ export default function DashboardHome() {
             </div>
           );
         })}
-      </div>
-
-      <div style={{
-        background: C.amber + "10", border: `1px solid ${C.amber}30`, borderRadius: 12,
-        padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10,
-      }}>
         <AlertTriangle size={16} color={C.amber} />
         <span style={{ fontSize: 12, color: C.amber }}>
           NAS100 + US30 correlated — pick one. &nbsp; AUDUSD + NZDUSD correlated — pick one.

@@ -13,10 +13,15 @@ interface LiveScan {
   scanned_at: string;
 }
 
+interface LivePrice {
+  last_price: number | null;
+}
+
 export function LiveTradeAlert() {
   const [trade, setTrade] = useState<LiveScan | null>(null);
   const [pulse, setPulse] = useState(false);
-  const [, setTick] = useState(0); // force re-render for expiry
+  const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [, setTick] = useState(0);
 
   const loadLatest = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -29,11 +34,24 @@ export function LiveTradeAlert() {
       .order("scanned_at", { ascending: false })
       .limit(1);
     if (data && data.length > 0) {
-      setTrade(data[0] as LiveScan);
+      const scan = data[0] as LiveScan;
+      setTrade(scan);
       triggerPulse();
+      // Fetch live price for this symbol
+      loadLivePrice(session.user.id, scan.symbol);
     } else {
       setTrade(null);
     }
+  };
+
+  const loadLivePrice = async (userId: string, symbol: string) => {
+    const { data } = await supabase
+      .from("live_market_data")
+      .select("last_price")
+      .eq("user_id", userId)
+      .eq("symbol", symbol)
+      .single();
+    if (data) setLivePrice((data as LivePrice).last_price);
   };
 
   const triggerPulse = () => {
@@ -50,11 +68,26 @@ export function LiveTradeAlert() {
           triggerPulse();
         }
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_market_data" }, (payload: any) => {
+        if (trade && payload.new?.symbol === trade.symbol) {
+          setLivePrice(payload.new.last_price);
+        }
+      })
       .subscribe();
-    // Tick every 30s to update expiry state
     const timer = setInterval(() => setTick(t => t + 1), 30000);
     return () => { supabase.removeChannel(channel); clearInterval(timer); };
   }, []);
+
+  // Re-subscribe to price updates when trade symbol changes
+  useEffect(() => {
+    if (!trade) return;
+    const sub = supabase.channel("live-trade-price-" + trade.symbol)
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_market_data", filter: `symbol=eq.${trade.symbol}` }, (payload: any) => {
+        setLivePrice(payload.new?.last_price ?? null);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(sub); };
+  }, [trade?.symbol]);
 
   const freshness = trade ? signalFreshness(trade.scanned_at) : null;
   const isExpired = freshness === "expired";
@@ -62,10 +95,14 @@ export function LiveTradeAlert() {
   const isFresh = freshness === "fresh";
   const isBuy = trade?.direction === "BUY";
 
-  // Only show active trade if not expired
   const showTrade = trade && !isExpired;
   const accentColor = showTrade ? (isBuy ? C.jade : C.red) : C.red;
   const time = trade ? new Date(trade.scanned_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+
+  // Calculate live P&L
+  const livePnl = (showTrade && trade?.entry_price && livePrice)
+    ? isBuy ? livePrice - trade.entry_price : trade.entry_price - livePrice
+    : null;
 
   return (
     <div style={{
@@ -81,7 +118,6 @@ export function LiveTradeAlert() {
       transition: "all 0.4s ease",
       opacity: isExpired ? 0.5 : 1,
     }}>
-      {/* Pulsing dot */}
       <div style={{ position: "relative", width: 14, height: 14, flexShrink: 0 }}>
         <div style={{
           width: 10, height: 10, borderRadius: "50%", background: C.red,
@@ -109,6 +145,20 @@ export function LiveTradeAlert() {
           <span style={{ color: isBuy ? C.jade : C.red, fontWeight: 700 }}>{trade!.symbol} {trade!.direction}</span>
           <span style={{ color: C.border }}>|</span>
           <span>Entry: <span style={{ color: C.text }}>{trade!.entry_price ?? "—"}</span></span>
+          {livePrice && (
+            <>
+              <span style={{ color: C.border }}>|</span>
+              <span>Current: <span style={{ color: C.text, fontWeight: 700 }}>{livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</span></span>
+            </>
+          )}
+          {livePnl !== null && (
+            <>
+              <span style={{ color: C.border }}>|</span>
+              <span>P&L: <span style={{ color: livePnl >= 0 ? C.jade : C.red, fontWeight: 700 }}>
+                {livePnl >= 0 ? "+" : ""}{livePnl.toFixed(2)}
+              </span></span>
+            </>
+          )}
           <span style={{ color: C.border }}>|</span>
           <span>TP: <span style={{ color: C.jade }}>{trade!.take_profit ?? "—"}</span></span>
           <span style={{ color: C.border }}>|</span>
