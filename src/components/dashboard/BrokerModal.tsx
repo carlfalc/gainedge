@@ -15,6 +15,7 @@ interface BrokerModalProps {
   open: boolean;
   onClose: () => void;
   userId?: string;
+  onBrokerChange?: (brokerKey: string, brokerLabel: string) => void;
 }
 
 export default function BrokerModal({ open, onClose, userId }: BrokerModalProps) {
