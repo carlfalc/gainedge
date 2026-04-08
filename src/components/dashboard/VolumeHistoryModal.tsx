@@ -25,10 +25,6 @@ const SYMBOL_VARIANTS: Record<string, string[]> = {
   GBPUSD: ["GBPUSD.i", "GBPUSD"],
   USDJPY: ["USDJPY.i", "USDJPY"],
 };
-  XAUUSD: ["XAUUSD", "GOLD"],
-  NZDUSD: ["NZDUSD"],
-  AUDUSD: ["AUDUSD"],
-};
 
 export function VolumeHistoryModal({ open, onClose }: Props) {
   const [analytics, setAnalytics] = useState<InstrumentAnalytics[]>([]);
