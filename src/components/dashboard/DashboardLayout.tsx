@@ -29,6 +29,7 @@ export default function DashboardLayout() {
   const [userId, setUserId] = useState<string>();
   const [sessionLabel, setSessionLabel] = useState("London Session");
   const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
+  const [brokerOpen, setBrokerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
