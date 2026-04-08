@@ -216,6 +216,9 @@ export default function DashboardHome() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
+                    <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                      {instrumentTfs.get(inst.symbol) || "15m"}
+                    </span>
                     {live && (
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: live.market_open ? "#22C55E" : "#555F73", display: "inline-block" }} title={live.market_open ? "Market open" : "Market closed"} />
                     )}
@@ -226,7 +229,7 @@ export default function DashboardHome() {
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
-                    <span>15m Heiken Ashi</span>
+                    <span>Last scan:</span>
                     <Clock size={10} />
                     <span>{formatAge(inst.scanned_at)}</span>
                   </div>
