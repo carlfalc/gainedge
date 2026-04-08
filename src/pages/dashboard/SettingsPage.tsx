@@ -35,6 +35,10 @@ export default function SettingsPage() {
       setPushAlerts(profile.push_notifications);
       setSmsAlerts(profile.sms_alerts);
       setBroker(profile.broker);
+      // Load clock preferences
+      if ((profile as any).clock_timezones && Array.isArray((profile as any).clock_timezones) && (profile as any).clock_timezones.length > 0) {
+        setClockSlots((profile as any).clock_timezones as ClockConfig[]);
+      }
     }
   }, [profile]);
 
