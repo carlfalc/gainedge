@@ -187,7 +187,7 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(symbol)}/current-price`;
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(symbol)}/current-price`;
       const res = await fetch(url, {
         headers: { "auth-token": METAAPI_TOKEN },
       });
