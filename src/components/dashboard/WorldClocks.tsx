@@ -108,7 +108,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
         });
 
         const isHighlighted = session.highlightTimezones.includes(clock.timezone);
-        const isLocal = localTz === clock.timezone;
+        const isLocal = isLocalClock || (localDuplicate && localClock.timezone === clock.timezone);
 
         return (
           <div
