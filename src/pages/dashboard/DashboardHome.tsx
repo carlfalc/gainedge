@@ -16,7 +16,7 @@ interface ScanResult {
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
   macd_status: string | null; stoch_rsi: number | null; reasoning: string;
-  ema_crossover_status: string; verdict: string;
+  ema_crossover_status: string; verdict: string; scanned_at: string;
 }
 
 const directionColor = (dir: string) => {
