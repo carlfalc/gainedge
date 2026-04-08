@@ -33,7 +33,6 @@ function calcRSI(closes: number[], period = 14): number | null {
 
 function calcADX(highs: number[], lows: number[], closes: number[], period = 14): number | null {
   if (closes.length < period * 2) return null;
-  // Simplified ADX
   let trSum = 0, pDmSum = 0, nDmSum = 0;
   for (let i = 1; i < closes.length; i++) {
     const tr = Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1]));
@@ -50,7 +49,6 @@ function calcADX(highs: number[], lows: number[], closes: number[], period = 14)
 
 function calcStochRSI(closes: number[], rsiPeriod = 14, stochPeriod = 14): number | null {
   if (closes.length < rsiPeriod + stochPeriod + 1) return null;
-  // Calculate RSI series
   const rsis: number[] = [];
   let gainSum = 0, lossSum = 0;
   for (let i = 1; i <= rsiPeriod; i++) {
@@ -87,8 +85,14 @@ function calcMACDStatus(closes: number[]): string {
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
 
+// Map timeframe string to minutes for candle start time calculation
+const TF_MINUTES: Record<string, number> = {
+  "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
+};
+
 async function fetchCandlesFromBroker(token: string, accountId: string, symbol: string, timeframe: string, limit: number) {
-  const start = new Date(Date.now() - limit * 15 * 60000).toISOString();
+  const tfMinutes = TF_MINUTES[timeframe] || 15;
+  const start = new Date(Date.now() - limit * tfMinutes * 60000).toISOString();
   const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${limit}`;
   const res = await fetch(url, { headers: { "auth-token": token } });
   if (!res.ok) throw new Error(`Candles ${res.status}: ${await res.text()}`);
@@ -131,6 +135,157 @@ function generateMockData(symbol: string) {
     market_open: true,
     sparkline_data: sparkline,
     price_direction: direction,
+    last_candle_time: null as string | null,
+  };
+}
+
+/* ─── Auto-scan analysis on candle close ─── */
+function detectSession(): string {
+  const h = new Date().getUTCHours();
+  if (h >= 13 && h < 22) return "new_york";
+  if (h >= 7 && h < 16) return "london";
+  if (h >= 0 && h < 9) return "asian";
+  return "off_hours";
+}
+
+interface AnalysisResult {
+  direction: string;
+  confidence: number;
+  entry_price: number | null;
+  take_profit: number | null;
+  stop_loss: number | null;
+  risk_reward: string | null;
+  ema_crossover_status: string;
+  ema_crossover_direction: string | null;
+  reasoning: string;
+  verdict: string;
+  rsi: number | null;
+  adx: number | null;
+  macd_status: string | null;
+  stoch_rsi: number | null;
+}
+
+function runAnalysis(candles: any[]): AnalysisResult {
+  const closes = candles.map((c: any) => c.close);
+  const highs = candles.map((c: any) => c.high);
+  const lows = candles.map((c: any) => c.low);
+
+  // EMA 4/17 crossover
+  const ema4 = calcEMA(closes, 4);
+  const ema17 = calcEMA(closes, 17);
+  const currFast = ema4[ema4.length - 1];
+  const currSlow = ema17[ema17.length - 1];
+  const prevFast = ema4[ema4.length - 2];
+  const prevSlow = ema17[ema17.length - 2];
+
+  let crossoverStatus = "NONE";
+  let crossoverDir: string | null = null;
+  if (prevFast <= prevSlow && currFast > currSlow) {
+    crossoverStatus = "CONFIRMED"; crossoverDir = "BULLISH";
+  } else if (prevFast >= prevSlow && currFast < currSlow) {
+    crossoverStatus = "CONFIRMED"; crossoverDir = "BEARISH";
+  } else if (Math.abs(currFast - currSlow) / currSlow < 0.0005) {
+    crossoverStatus = "FORMING";
+    crossoverDir = currFast > currSlow ? "BULLISH" : "BEARISH";
+  }
+
+  // Indicators
+  const rsi = calcRSI(closes);
+  const adx = calcADX(highs, lows, closes);
+  const macd = calcMACDStatus(closes);
+  const stochRsi = calcStochRSI(closes);
+
+  // Confidence scoring
+  let bullishPoints = 0, bearishPoints = 0;
+  const reasons: string[] = [];
+
+  // EMA crossover (weight: 2)
+  if (crossoverStatus === "CONFIRMED" && crossoverDir === "BULLISH") {
+    bullishPoints += 2; reasons.push("EMA 4/17 bullish crossover confirmed");
+  } else if (crossoverStatus === "CONFIRMED" && crossoverDir === "BEARISH") {
+    bearishPoints += 2; reasons.push("EMA 4/17 bearish crossover confirmed");
+  } else if (crossoverStatus === "FORMING") {
+    const pts = crossoverDir === "BULLISH" ? 1 : 0;
+    bullishPoints += pts; bearishPoints += (1 - pts);
+    reasons.push(`EMA 4/17 crossover forming (${crossoverDir})`);
+  }
+
+  // RSI
+  if (rsi !== null) {
+    if (rsi < 30) { bullishPoints += 1; reasons.push(`RSI oversold at ${rsi}`); }
+    else if (rsi > 70) { bearishPoints += 1; reasons.push(`RSI overbought at ${rsi}`); }
+    else if (rsi > 50) { bullishPoints += 0.5; reasons.push(`RSI bullish at ${rsi}`); }
+    else { bearishPoints += 0.5; reasons.push(`RSI bearish at ${rsi}`); }
+  }
+
+  // ADX (trend strength)
+  if (adx !== null) {
+    if (adx > 25) { reasons.push(`Strong trend (ADX ${adx})`); bullishPoints += 0.5; bearishPoints += 0.5; }
+    else { reasons.push(`Weak trend (ADX ${adx})`); }
+  }
+
+  // MACD
+  if (macd === "Bullish") { bullishPoints += 1.5; reasons.push("MACD bullish momentum"); }
+  else if (macd === "Bearish") { bearishPoints += 1.5; reasons.push("MACD bearish momentum"); }
+
+  // StochRSI
+  if (stochRsi !== null) {
+    if (stochRsi < 20) { bullishPoints += 1; reasons.push(`StochRSI oversold at ${stochRsi}`); }
+    else if (stochRsi > 80) { bearishPoints += 1; reasons.push(`StochRSI overbought at ${stochRsi}`); }
+  }
+
+  // Determine direction and confidence
+  const totalPoints = bullishPoints + bearishPoints;
+  const maxSide = Math.max(bullishPoints, bearishPoints);
+  const alignment = totalPoints > 0 ? maxSide / totalPoints : 0;
+  let confidence = Math.min(10, Math.max(1, Math.round(alignment * maxSide * 2)));
+  let direction: string;
+  let verdict: string;
+
+  if (bullishPoints > bearishPoints && alignment > 0.6) {
+    direction = "BUY"; verdict = "BUY";
+  } else if (bearishPoints > bullishPoints && alignment > 0.6) {
+    direction = "SELL"; verdict = "SELL";
+  } else if (totalPoints > 2) {
+    direction = "WAIT"; verdict = "WAIT"; confidence = Math.min(confidence, 4);
+  } else {
+    direction = "NO TRADE"; verdict = "NO_TRADE"; confidence = 1;
+  }
+
+  // Entry/TP/SL from recent price structure
+  const lastClose = closes[closes.length - 1];
+  const recentHigh = Math.max(...highs.slice(-10));
+  const recentLow = Math.min(...lows.slice(-10));
+  const range = recentHigh - recentLow;
+
+  let entry: number | null = null;
+  let tp: number | null = null;
+  let sl: number | null = null;
+  let rr: string | null = null;
+
+  if (direction === "BUY" || direction === "SELL") {
+    entry = +lastClose.toFixed(5);
+    if (direction === "BUY") {
+      sl = +(recentLow - range * 0.1).toFixed(5);
+      tp = +(lastClose + (lastClose - sl) * 2).toFixed(5);
+    } else {
+      sl = +(recentHigh + range * 0.1).toFixed(5);
+      tp = +(lastClose - (sl - lastClose) * 2).toFixed(5);
+    }
+    const risk = Math.abs(entry - sl);
+    const reward = Math.abs(tp - entry);
+    rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2:1";
+  }
+
+  const reasoning = reasons.length > 0
+    ? reasons.join(". ") + `. Overall ${direction} with ${confidence}/10 confidence.`
+    : `No clear setup. ${direction}.`;
+
+  return {
+    direction, confidence, entry_price: entry, take_profit: tp, stop_loss: sl,
+    risk_reward: rr, ema_crossover_status: crossoverStatus,
+    ema_crossover_direction: crossoverDir, reasoning, verdict,
+    rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
   };
 }
 
@@ -142,7 +297,6 @@ const SESSION_DEFS = [
 ];
 
 function getEndingSessions(utcHour: number): string[] {
-  // A session is "ending" in its last hour
   return SESSION_DEFS.filter(s => utcHour === s.endUtc - 1).map(s => s.key);
 }
 
@@ -156,10 +310,10 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Get all users with their instruments
+    // Get all users with their instruments INCLUDING timeframe
     const { data: instruments } = await supabase
       .from("user_instruments")
-      .select("user_id, symbol");
+      .select("user_id, symbol, timeframe");
 
     if (!instruments || instruments.length === 0) {
       return new Response(JSON.stringify({ success: true, message: "No instruments to process" }), {
@@ -167,18 +321,26 @@ serve(async (req) => {
       });
     }
 
-    // Group by user
-    const userSymbols = new Map<string, string[]>();
+    // Group by user, preserving timeframe per instrument
+    interface UserInstrument { symbol: string; timeframe: string; }
+    const userInstruments = new Map<string, UserInstrument[]>();
     for (const row of instruments) {
-      const syms = userSymbols.get(row.user_id) || [];
-      if (!syms.includes(row.symbol)) syms.push(row.symbol);
-      userSymbols.set(row.user_id, syms);
+      const list = userInstruments.get(row.user_id) || [];
+      if (!list.some(i => i.symbol === row.symbol)) {
+        list.push({ symbol: row.symbol, timeframe: row.timeframe || "15m" });
+      }
+      userInstruments.set(row.user_id, list);
     }
 
-    // Get unique symbols
-    const allSymbols = [...new Set(instruments.map(i => i.symbol))];
+    // Unique symbol+timeframe combos to fetch
+    const symbolTfSet = new Map<string, string>(); // symbol -> timeframe (use first user's)
+    for (const list of userInstruments.values()) {
+      for (const inst of list) {
+        if (!symbolTfSet.has(inst.symbol)) symbolTfSet.set(inst.symbol, inst.timeframe);
+      }
+    }
 
-    // Try to get MetaApi accountId from any user's profile
+    // Try to get MetaApi accountId
     let accountId: string | null = null;
     const { data: profiles } = await supabase
       .from("profiles")
@@ -189,15 +351,27 @@ serve(async (req) => {
       accountId = profiles[0].metaapi_account_id;
     }
 
+    // Get existing last_candle_time from live_market_data (for candle close detection)
+    const { data: existingLive } = await supabase
+      .from("live_market_data")
+      .select("user_id, symbol, last_candle_time");
+    const prevCandleTimes = new Map<string, string | null>();
+    if (existingLive) {
+      for (const row of existingLive as any[]) {
+        prevCandleTimes.set(`${row.user_id}:${row.symbol}`, row.last_candle_time);
+      }
+    }
+
     // Fetch data for each unique symbol
     const symbolData = new Map<string, any>();
+    const symbolCandles = new Map<string, any[]>(); // for auto-scan analysis
     let usedLive = false;
 
-    for (const symbol of allSymbols) {
+    for (const [symbol, timeframe] of symbolTfSet) {
       if (METAAPI_TOKEN && accountId) {
         try {
           const [candles, price] = await Promise.all([
-            fetchCandlesFromBroker(METAAPI_TOKEN, accountId, symbol, "15m", 100),
+            fetchCandlesFromBroker(METAAPI_TOKEN, accountId, symbol, timeframe, 100),
             fetchPriceFromBroker(METAAPI_TOKEN, accountId, symbol),
           ]);
 
@@ -209,6 +383,8 @@ serve(async (req) => {
             const first = sparkline[0], last = sparkline[sparkline.length - 1];
             const direction = last > first * 1.001 ? "up" : last < first * 0.999 ? "down" : "flat";
             const todayVolume = candles.slice(-96).reduce((s: number, c: any) => s + (c.tickVolume || 0), 0);
+            // Last candle time for close detection
+            const lastCandleTime = candles[candles.length - 1]?.time || null;
 
             symbolData.set(symbol, {
               bid: price?.bid ?? last,
@@ -222,7 +398,9 @@ serve(async (req) => {
               market_open: true,
               sparkline_data: sparkline,
               price_direction: direction,
+              last_candle_time: lastCandleTime,
             });
+            symbolCandles.set(symbol, candles);
             usedLive = true;
             continue;
           }
@@ -230,19 +408,24 @@ serve(async (req) => {
           console.warn(`MetaApi failed for ${symbol}: ${e.message}`);
         }
       }
-      // Fallback to mock
-      symbolData.set(symbol, generateMockData(symbol));
+      // Fallback to mock — also generate a mock candle time that changes per timeframe period
+      const mock = generateMockData(symbol);
+      const tfMin = TF_MINUTES[timeframe] || 15;
+      const now = Date.now();
+      const candleBucket = Math.floor(now / (tfMin * 60000));
+      mock.last_candle_time = new Date(candleBucket * tfMin * 60000).toISOString();
+      symbolData.set(symbol, mock);
     }
 
-    // Upsert data for each user
+    // Upsert live_market_data for each user
     const upserts: any[] = [];
-    for (const [userId, syms] of userSymbols) {
-      for (const symbol of syms) {
-        const data = symbolData.get(symbol);
+    for (const [userId, instList] of userInstruments) {
+      for (const inst of instList) {
+        const data = symbolData.get(inst.symbol);
         if (!data) continue;
         upserts.push({
           user_id: userId,
-          symbol,
+          symbol: inst.symbol,
           ...data,
           updated_at: new Date().toISOString(),
         });
@@ -256,22 +439,118 @@ serve(async (req) => {
       if (error) console.error("Upsert error:", error);
     }
 
+    // ─── AUTO-SCAN: detect candle closes and insert scan_results ───
+    let autoScans = 0;
+    const session = detectSession();
+
+    for (const [userId, instList] of userInstruments) {
+      // Get user's profile for EMA settings
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("default_candle_type, ema_fast, ema_slow")
+        .eq("id", userId)
+        .single();
+
+      for (const inst of instList) {
+        const data = symbolData.get(inst.symbol);
+        if (!data || !data.last_candle_time) continue;
+
+        const prevKey = `${userId}:${inst.symbol}`;
+        const prevTime = prevCandleTimes.get(prevKey);
+        const newTime = data.last_candle_time;
+
+        // Candle close detected: new candle time differs from previous
+        if (prevTime && newTime && prevTime !== newTime) {
+          console.log(`Candle close detected: ${inst.symbol} (${inst.timeframe}) for user ${userId.slice(0, 8)}`);
+
+          // Run analysis on available candles
+          const candles = symbolCandles.get(inst.symbol);
+          let analysis: AnalysisResult;
+
+          if (candles && candles.length > 20) {
+            analysis = runAnalysis(candles);
+          } else {
+            // Mock analysis from mock data
+            const mockRsi = data.rsi;
+            const mockAdx = data.adx;
+            const mockMacd = data.macd_status;
+            const mockStoch = data.stoch_rsi;
+            const bullish = (mockRsi < 50 ? 0 : 1) + (mockMacd === "Bullish" ? 1.5 : 0) + (mockStoch < 30 ? 1 : 0);
+            const bearish = (mockRsi > 50 ? 0 : 1) + (mockMacd === "Bearish" ? 1.5 : 0) + (mockStoch > 70 ? 1 : 0);
+            const dir = bullish > bearish + 1 ? "BUY" : bearish > bullish + 1 ? "SELL" : "WAIT";
+            const conf = Math.min(10, Math.max(1, Math.round(Math.max(bullish, bearish) * 2)));
+            const lastPrice = data.last_price || 100;
+            const range = lastPrice * 0.005;
+
+            analysis = {
+              direction: dir,
+              confidence: conf,
+              entry_price: dir !== "WAIT" && dir !== "NO TRADE" ? lastPrice : null,
+              take_profit: dir === "BUY" ? +(lastPrice + range * 2).toFixed(5) : dir === "SELL" ? +(lastPrice - range * 2).toFixed(5) : null,
+              stop_loss: dir === "BUY" ? +(lastPrice - range).toFixed(5) : dir === "SELL" ? +(lastPrice + range).toFixed(5) : null,
+              risk_reward: dir !== "WAIT" && dir !== "NO TRADE" ? "2:1" : null,
+              ema_crossover_status: "NONE",
+              ema_crossover_direction: null,
+              reasoning: `Auto-scan on ${inst.timeframe} candle close. RSI ${mockRsi}, ADX ${mockAdx}, MACD ${mockMacd}, StochRSI ${mockStoch}. ${dir} signal generated.`,
+              verdict: dir === "NO TRADE" ? "NO_TRADE" : dir,
+              rsi: mockRsi, adx: mockAdx, macd_status: mockMacd, stoch_rsi: mockStoch,
+            };
+          }
+
+          // Insert scan_result
+          const { error: scanErr } = await supabase.from("scan_results").insert({
+            user_id: userId,
+            symbol: inst.symbol,
+            direction: analysis.direction,
+            confidence: analysis.confidence,
+            entry_price: analysis.entry_price,
+            take_profit: analysis.take_profit,
+            stop_loss: analysis.stop_loss,
+            risk_reward: analysis.risk_reward,
+            rsi: analysis.rsi,
+            adx: analysis.adx,
+            macd_status: analysis.macd_status,
+            stoch_rsi: analysis.stoch_rsi,
+            ema_crossover_status: analysis.ema_crossover_status,
+            ema_crossover_direction: analysis.ema_crossover_direction,
+            reasoning: analysis.reasoning,
+            verdict: analysis.verdict,
+            timeframe: inst.timeframe,
+            candle_type: profile?.default_candle_type || "heiken_ashi",
+            session,
+            scanned_at: new Date().toISOString(),
+          });
+          if (scanErr) console.error(`Scan insert error for ${inst.symbol}:`, scanErr);
+          else autoScans++;
+
+          // Auto-create signal if confidence >= 5 and direction is BUY or SELL
+          if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
+            await supabase.from("signals").insert({
+              user_id: userId,
+              symbol: inst.symbol,
+              direction: analysis.direction,
+              confidence: analysis.confidence,
+              entry_price: analysis.entry_price,
+              take_profit: analysis.take_profit,
+              stop_loss: analysis.stop_loss,
+              risk_reward: analysis.risk_reward || "2:1",
+            });
+          }
+        }
+      }
+    }
+
     // ─── Session volume summaries ───
-    // Check if any session is ending (within its last hour)
     const utcHour = new Date().getUTCHours();
     const utcMinute = new Date().getUTCMinutes();
     const endingSessions = getEndingSessions(utcHour);
 
-    // Only write summary once near the end of the hour (minute 55-59)
     if (endingSessions.length > 0 && utcMinute >= 55) {
       const today = new Date().toISOString().split("T")[0];
       for (const sessionKey of endingSessions) {
-        const sessionDef = SESSION_DEFS.find(s => s.key === sessionKey)!;
-        for (const symbol of allSymbols) {
+        for (const [symbol] of symbolTfSet) {
           const data = symbolData.get(symbol);
           if (!data) continue;
-
-          // Estimate peak hour from sparkline
           let peakHourStart: string | null = null;
           const spark = data.sparkline_data as number[];
           if (spark && spark.length >= 4) {
@@ -289,25 +568,20 @@ serve(async (req) => {
             d.setUTCHours(peakUtcHour, 0, 0, 0);
             peakHourStart = d.toISOString();
           }
-
-          await supabase
-            .from("session_volume_summary")
-            .upsert({
-              session: sessionKey,
-              symbol,
-              date: today,
-              total_volume: data.volume_today || 0,
-              peak_hour_start: peakHourStart,
-            }, { onConflict: "session,symbol,date" });
+          await supabase.from("session_volume_summary").upsert({
+            session: sessionKey, symbol, date: today,
+            total_volume: data.volume_today || 0, peak_hour_start: peakHourStart,
+          }, { onConflict: "session,symbol,date" });
         }
       }
     }
 
     return new Response(JSON.stringify({
       success: true,
-      symbols: allSymbols.length,
-      users: userSymbols.size,
+      symbols: symbolTfSet.size,
+      users: userInstruments.size,
       rows: upserts.length,
+      auto_scans: autoScans,
       live: usedLive,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
