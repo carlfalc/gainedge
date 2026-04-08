@@ -80,10 +80,10 @@ interface WorldClocksProps {
 export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProps) {
   const [now, setNow] = useState(new Date());
   const activeClocks = clocks && clocks.length > 0 ? clocks : DEFAULT_CLOCKS;
-  const localTz = getLocalTimezone();
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
+  const localClock = getLocalClock();
+  // Prepend local clock, skip if it duplicates an existing one
+  const localDuplicate = activeClocks.some(c => c.timezone === localClock.timezone);
+  const allClocks = localDuplicate ? activeClocks : [localClock, ...activeClocks];
     return () => clearInterval(id);
   }, []);
 
