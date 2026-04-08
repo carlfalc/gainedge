@@ -20,6 +20,8 @@ const NAV_ITEMS = [
   { label: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { label: "Settings", icon: Settings, path: "/dashboard/settings" },
   { label: "Clock Settings", icon: Clock, path: "/dashboard/clock-settings" },
+  { label: "News Settings", icon: Newspaper, path: "/dashboard/news-settings" },
+  { label: "My News", icon: Globe, path: "/dashboard/my-news" },
 ];
 
 export default function DashboardLayout() {
