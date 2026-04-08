@@ -17,12 +17,22 @@ interface ScanResult {
   ema_crossover_status: string; verdict: string;
 }
 
-const colorMap: Record<string, string> = { NAS100: C.green, US30: C.blue, AUDUSD: C.amber, NZDUSD: C.cyan, XAUUSD: C.orange };
-const sparkMap: Record<string, number[]> = {
-  NAS100: [20,22,21,25,28,27,30,32,35,34,38], US30: [40,42,41,43,44,43,46,45,47,46,48],
-  AUDUSD: [68,69,68,69,69,68,69,69,70,69,69], NZDUSD: [56,57,56,57,57,56,57,57,57,57,57],
-  XAUUSD: [46,47,46,45,46,47,46,45,46,47,46],
+const directionColor = (dir: string) => {
+  if (dir === "BUY") return "#22C55E";
+  if (dir === "SELL") return "#EF4444";
+  if (dir === "WAIT") return "#F59E0B";
+  return "#555F73";
 };
+
+function generateSparkData(direction: string, confidence: number): number[] {
+  const len = 20;
+  const c = Math.max(1, Math.min(10, confidence));
+  const slope = direction === "BUY" ? c * 0.3 : direction === "SELL" ? -c * 0.3 : 0;
+  const noise = direction === "WAIT" || direction === "NO TRADE" ? 2.5 : 1.2;
+  const seed = (i: number) => Math.sin(i * 13.7 + c * 3.1) * noise + Math.cos(i * 7.3) * noise * 0.5;
+  let val = 50;
+  return Array.from({ length: len }, (_, i) => { val += slope + seed(i); return val; });
+}
 
 export default function DashboardHome() {
   const [scanning, setScanning] = useState(false);
