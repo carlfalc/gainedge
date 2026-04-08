@@ -16,11 +16,14 @@ interface Props {
 }
 
 const SYMBOL_VARIANTS: Record<string, string[]> = {
-  US30: ["US30", "DJ30", "DJI30"],
-  NAS100: ["NAS100", "USTEC", "NDX100"],
+  NAS100: ["NDX100", "NAS100", "USTEC"],
+  US30: ["US30", "DJ30"],
   XAUUSD: ["XAUUSD", "GOLD"],
-  NZDUSD: ["NZDUSD"],
-  AUDUSD: ["AUDUSD"],
+  NZDUSD: ["NZDUSD.i", "NZDUSD"],
+  AUDUSD: ["AUDUSD.i", "AUDUSD"],
+  EURUSD: ["EURUSD.i", "EURUSD"],
+  GBPUSD: ["GBPUSD.i", "GBPUSD"],
+  USDJPY: ["USDJPY.i", "USDJPY"],
 };
 
 export function VolumeHistoryModal({ open, onClose }: Props) {

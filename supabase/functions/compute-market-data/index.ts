@@ -90,20 +90,49 @@ const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
 };
 
+// Eightcap-Demo symbol mapping: forex pairs use ".i" suffix, indices have special names
+const BROKER_SYMBOL_MAP: Record<string, string[]> = {
+  NAS100: ["NDX100", "NAS100", "USTEC"],
+  US30: ["US30", "DJ30"],
+  XAUUSD: ["XAUUSD", "GOLD"],
+  NZDUSD: ["NZDUSD.i", "NZDUSD"],
+  AUDUSD: ["AUDUSD.i", "AUDUSD"],
+  EURUSD: ["EURUSD.i", "EURUSD"],
+  GBPUSD: ["GBPUSD.i", "GBPUSD"],
+  USDJPY: ["USDJPY.i", "USDJPY"],
+};
+
+function getBrokerVariants(symbol: string): string[] {
+  return BROKER_SYMBOL_MAP[symbol] || [symbol];
+}
+
 async function fetchCandlesFromBroker(token: string, accountId: string, symbol: string, timeframe: string, limit: number) {
   const tfMinutes = TF_MINUTES[timeframe] || 15;
   const start = new Date(Date.now() - limit * tfMinutes * 60000).toISOString();
-  const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${limit}`;
-  const res = await fetch(url, { headers: { "auth-token": token } });
-  if (!res.ok) throw new Error(`Candles ${res.status}: ${await res.text()}`);
-  return await res.json();
+  const variants = getBrokerVariants(symbol);
+  for (const variant of variants) {
+    try {
+      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${limit}`;
+      const res = await fetch(url, { headers: { "auth-token": token } });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    } catch { /* try next variant */ }
+  }
+  throw new Error(`No valid broker symbol found for ${symbol} (tried: ${variants.join(", ")})`);
 }
 
 async function fetchPriceFromBroker(token: string, accountId: string, symbol: string) {
-  const url = `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(symbol)}/current-price`;
-  const res = await fetch(url, { headers: { "auth-token": token } });
-  if (!res.ok) return null;
-  return await res.json();
+  const variants = getBrokerVariants(symbol);
+  for (const variant of variants) {
+    try {
+      const url = `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
+      const res = await fetch(url, { headers: { "auth-token": token } });
+      if (!res.ok) continue;
+      return await res.json();
+    } catch { /* try next variant */ }
+  }
+  return null;
 }
 
 /* ─── Mock data fallback ─── */
@@ -296,18 +325,14 @@ const SESSION_DEFS = [
   { key: "new_york", startUtc: 16, endUtc: 21 },
 ];
 
-const BROKER_SYMBOL_VARIANTS: Record<string, string[]> = {
-  US30: ["US30", "DJ30", "DJI30"],
-  NAS100: ["NAS100", "USTEC", "NDX100"],
-  XAUUSD: ["XAUUSD", "GOLD"],
-};
+// Reuse the global BROKER_SYMBOL_MAP for hourly candle fetching too
 
 function getCompletedSessions(utcHour: number): typeof SESSION_DEFS {
   return SESSION_DEFS.filter(s => utcHour >= s.endUtc);
 }
 
 async function fetchHourlyCandles(token: string, accountId: string, symbol: string, startISO: string, endISO: string) {
-  const variants = BROKER_SYMBOL_VARIANTS[symbol] || [symbol];
+  const variants = getBrokerVariants(symbol);
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
