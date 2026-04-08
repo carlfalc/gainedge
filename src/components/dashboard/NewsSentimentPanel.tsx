@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
+import { isExpired, newsFreshness } from "@/lib/expiry";
 
 interface NewsItem {
   id: string;
@@ -10,14 +11,6 @@ interface NewsItem {
   instruments_affected: string[] | null;
   published_at: string;
 }
-
-const mockSentiments = [
-  { headline: "US inflation data above expectations", impacts: [{ symbol: "XAUUSD", dir: "↑" }, { symbol: "NAS100", dir: "↓" }, { symbol: "US30", dir: "↓" }, { symbol: "USD", dir: "↑" }], severity: "high", time: new Date(Date.now() - 15 * 60000) },
-  { headline: "RBNZ holds rates at 4.25% — dovish tone", impacts: [{ symbol: "NZDUSD", dir: "↓" }, { symbol: "AUDUSD", dir: "↓" }], severity: "medium", time: new Date(Date.now() - 28 * 60000) },
-  { headline: "Trump announces new tariffs on China", impacts: [{ symbol: "NAS100", dir: "↓" }, { symbol: "AUDUSD", dir: "↓" }, { symbol: "XAUUSD", dir: "↑" }], severity: "high", time: new Date(Date.now() - 42 * 60000) },
-  { headline: "OPEC+ considers output increase", impacts: [{ symbol: "OIL", dir: "↓" }], severity: "medium", time: new Date(Date.now() - 65 * 60000) },
-  { headline: "Strong UK GDP data released", impacts: [{ symbol: "GBP", dir: "↑" }, { symbol: "XAUUSD", dir: "↓" }], severity: "low", time: new Date(Date.now() - 79 * 60000) },
-];
 
 const severityColor: Record<string, { bg: string; text: string }> = {
   high: { bg: C.red + "20", text: C.red },
@@ -30,7 +23,7 @@ function formatTime(date: Date) {
 }
 
 export function NewsSentimentPanel() {
-  const [items, setItems] = useState<typeof mockSentiments>([]);
+  const [items, setItems] = useState<{ headline: string; impacts: { symbol: string; dir: string }[]; severity: string; time: Date }[]>([]);
 
   useEffect(() => {
     loadNews();
@@ -46,10 +39,12 @@ export function NewsSentimentPanel() {
       .from("news_items")
       .select("*")
       .order("published_at", { ascending: false })
-      .limit(5);
+      .limit(10);
 
     if (data && data.length > 0) {
-      const mapped = data.map((n: NewsItem) => {
+      // Filter to last 12 hours only
+      const fresh = (data as NewsItem[]).filter(n => !isExpired(n.published_at, 720));
+      const mapped = fresh.map((n) => {
         const instruments = (n.instruments_affected || []).map(s => {
           const bullish = ["XAUUSD", "GBP", "USD"].includes(s);
           return { symbol: s, dir: bullish ? "↑" : "↓" };
@@ -63,7 +58,7 @@ export function NewsSentimentPanel() {
       });
       setItems(mapped);
     } else {
-      setItems(mockSentiments);
+      setItems([]);
     }
   };
 
@@ -86,12 +81,14 @@ export function NewsSentimentPanel() {
 
       {display.length === 0 ? (
         <div style={{ fontSize: 12, color: C.sec, padding: "8px 0" }}>
-          Monitoring global news feeds for market-moving events...
+          No recent market-moving events in the last 12 hours.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {display.map((item, i) => {
             const sev = severityColor[item.severity] || severityColor.medium;
+            const freshness = newsFreshness(item.time);
+            const opacity = freshness === "old" ? 0.6 : 1;
             return (
               <div
                 key={i}
@@ -101,6 +98,7 @@ export function NewsSentimentPanel() {
                   gap: 10,
                   height: 38,
                   animation: "fade-in 0.4s ease-out",
+                  opacity,
                 }}
               >
                 <span style={{
@@ -124,6 +122,13 @@ export function NewsSentimentPanel() {
                 }}>
                   {item.headline}
                 </span>
+
+                {freshness === "fresh" && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                    background: C.jade + "20", color: C.jade,
+                  }}>NEW</span>
+                )}
 
                 <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                   {item.impacts.map((imp, j) => (

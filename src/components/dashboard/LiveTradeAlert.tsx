@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
+import { signalFreshness, formatAge } from "@/lib/expiry";
 
 interface LiveScan {
   symbol: string;
@@ -15,6 +16,7 @@ interface LiveScan {
 export function LiveTradeAlert() {
   const [trade, setTrade] = useState<LiveScan | null>(null);
   const [pulse, setPulse] = useState(false);
+  const [, setTick] = useState(0); // force re-render for expiry
 
   const loadLatest = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -49,11 +51,20 @@ export function LiveTradeAlert() {
         }
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    // Tick every 30s to update expiry state
+    const timer = setInterval(() => setTick(t => t + 1), 30000);
+    return () => { supabase.removeChannel(channel); clearInterval(timer); };
   }, []);
 
+  const freshness = trade ? signalFreshness(trade.scanned_at) : null;
+  const isExpired = freshness === "expired";
+  const isAging = freshness === "aging";
+  const isFresh = freshness === "fresh";
   const isBuy = trade?.direction === "BUY";
-  const accentColor = trade ? (isBuy ? C.jade : C.red) : C.red;
+
+  // Only show active trade if not expired
+  const showTrade = trade && !isExpired;
+  const accentColor = showTrade ? (isBuy ? C.jade : C.red) : C.red;
   const time = trade ? new Date(trade.scanned_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
@@ -66,8 +77,9 @@ export function LiveTradeAlert() {
       display: "flex",
       alignItems: "center",
       gap: 14,
-      boxShadow: trade ? `0 0 30px ${accentColor}15, inset 0 0 60px ${accentColor}05` : "none",
+      boxShadow: showTrade ? `0 0 30px ${accentColor}15, inset 0 0 60px ${accentColor}05` : "none",
       transition: "all 0.4s ease",
+      opacity: isExpired ? 0.5 : 1,
     }}>
       {/* Pulsing dot */}
       <div style={{ position: "relative", width: 14, height: 14, flexShrink: 0 }}>
@@ -75,7 +87,7 @@ export function LiveTradeAlert() {
           width: 10, height: 10, borderRadius: "50%", background: C.red,
           position: "absolute", top: 2, left: 2,
         }} />
-        {(pulse || trade) && (
+        {(isFresh && (pulse || showTrade)) && (
           <div style={{
             width: 14, height: 14, borderRadius: "50%", background: `${C.red}40`,
             position: "absolute", top: 0, left: 0,
@@ -87,21 +99,25 @@ export function LiveTradeAlert() {
       <span style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>Live Trade</span>
       <span style={{ color: C.border, fontSize: 13 }}>|</span>
 
-      {trade ? (
+      {showTrade ? (
         <div style={{ fontSize: 12, color: C.sec, fontFamily: "'JetBrains Mono', monospace", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
           <span style={{ color: C.muted }}>{time}</span>
+          {isAging && (
+            <span style={{ color: "#F59E0B", fontSize: 10, fontWeight: 700 }}>⏰ Expiring soon</span>
+          )}
           <span style={{ color: C.border }}>|</span>
-          <span style={{ color: isBuy ? C.jade : C.red, fontWeight: 700 }}>{trade.symbol} {trade.direction}</span>
+          <span style={{ color: isBuy ? C.jade : C.red, fontWeight: 700 }}>{trade!.symbol} {trade!.direction}</span>
           <span style={{ color: C.border }}>|</span>
-          <span>Entry: <span style={{ color: C.text }}>{trade.entry_price ?? "—"}</span></span>
+          <span>Entry: <span style={{ color: C.text }}>{trade!.entry_price ?? "—"}</span></span>
           <span style={{ color: C.border }}>|</span>
-          <span>TP: <span style={{ color: C.jade }}>{trade.take_profit ?? "—"}</span></span>
+          <span>TP: <span style={{ color: C.jade }}>{trade!.take_profit ?? "—"}</span></span>
           <span style={{ color: C.border }}>|</span>
-          <span>SL: <span style={{ color: C.red }}>{trade.stop_loss ?? "—"}</span></span>
+          <span>SL: <span style={{ color: C.red }}>{trade!.stop_loss ?? "—"}</span></span>
         </div>
       ) : (
         <span style={{ fontSize: 12, color: C.muted, fontStyle: "italic" }}>
-          Monitoring... waiting for high-conviction setup
+          🔴 Monitoring... waiting for high-conviction setup
+          {trade && isExpired && <span style={{ marginLeft: 8, color: "#F59E0B", fontSize: 10 }}>Last signal {formatAge(trade.scanned_at)}</span>}
         </span>
       )}
 
