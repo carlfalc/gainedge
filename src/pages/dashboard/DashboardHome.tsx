@@ -112,9 +112,18 @@ export default function DashboardHome() {
     setTimeout(() => { setScanning(false); loadData(); }, 3000);
   };
 
-  const best = scans.length ? scans.reduce((a, b) => a.confidence > b.confidence ? a : b) : null;
+  // Highest conviction: only from last 20 minutes
+  const recentScans = scans.filter(s => signalFreshness(s.scanned_at) !== "expired");
+  const best = recentScans.length ? recentScans.reduce((a, b) => a.confidence > b.confidence ? a : b) : null;
   const totalTrades = stats.wins + stats.losses;
   const winRate = totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 100) : 0;
+
+  const freshnessStyle = (f: SignalFreshness) => {
+    if (f === "fresh") return { opacity: 1, dirOpacity: 1, pulse: true };
+    if (f === "recent") return { opacity: 1, dirOpacity: 1, pulse: false };
+    if (f === "aging") return { opacity: 0.8, dirOpacity: 0.7, pulse: false };
+    return { opacity: 0.4, dirOpacity: 0.4, pulse: false };
+  };
 
   return (
     <div style={{ maxWidth: 1200 }}>
