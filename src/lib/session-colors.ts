@@ -20,7 +20,7 @@ export const SESSION_COLORS = {
 export const SESSIONS: SessionDef[] = [
   { key: "asian", label: "Asian", color: SESSION_COLORS.asian, startUtcHour: 0, endUtcHour: 8 },
   { key: "london", label: "London", color: SESSION_COLORS.london, startUtcHour: 8, endUtcHour: 16 },
-  { key: "new_york", label: "New York", color: SESSION_COLORS.new_york, startUtcHour: 13, endUtcHour: 21 },
+  { key: "new_york", label: "New York", color: SESSION_COLORS.new_york, startUtcHour: 16, endUtcHour: 21 },
 ];
 
 export type SessionKey = "asian" | "london" | "new_york";
