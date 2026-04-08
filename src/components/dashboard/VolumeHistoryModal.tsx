@@ -240,6 +240,46 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
   );
 }
 
+function LoadingState({ period }: { period: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const message = elapsed >= 90
+    ? "Still loading — large dataset being processed..."
+    : `Fetching volume data for ${period} days... this may take up to 60 seconds`;
+
+  return (
+    <div style={{ textAlign: "center", padding: 48, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+      {/* Spinner */}
+      <div style={{
+        width: 36, height: 36, border: `3px solid ${C.border}`,
+        borderTop: "3px solid #34D399", borderRadius: "50%",
+        animation: "spin 1s linear infinite",
+      }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ color: C.muted, fontSize: 13 }}>{message}</div>
+      {/* Pulsing dots */}
+      <div style={{ display: "flex", gap: 6 }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{
+            width: 6, height: 6, borderRadius: "50%", background: "#34D399",
+            animation: `pulse-dot 1.4s ease-in-out ${i * 0.2}s infinite`,
+          }} />
+        ))}
+      </div>
+      <style>{`@keyframes pulse-dot { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }`}</style>
+      {elapsed > 0 && (
+        <div style={{ color: C.muted, fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>
+          {elapsed}s elapsed
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Row({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div style={{ fontSize: 11, color: C.sec, display: "flex", gap: 6, alignItems: "baseline" }}>
