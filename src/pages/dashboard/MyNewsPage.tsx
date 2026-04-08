@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw } from "lucide-react";
+import { newsFreshness, isExpired } from "@/lib/expiry";
 
 interface NewsItem {
   id: string;
