@@ -167,12 +167,6 @@ export default function ChartsPage() {
         secondsVisible: false,
         rightOffset: 5,
       },
-      watermark: {
-        visible: true,
-        text: "GAINEDGE",
-        color: "rgba(0, 207, 165, 0.07)",
-        fontSize: 48,
-      },
     });
     chartRef.current = chart;
 
