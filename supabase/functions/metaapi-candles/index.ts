@@ -187,23 +187,39 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(symbol)}/current-price`;
-      const res = await fetch(url, {
-        headers: { "auth-token": METAAPI_TOKEN },
-      });
+      // Try symbol variants for broker compatibility (e.g. XAUUSD -> XAUUSD.i)
+      const PRICE_SYMBOL_VARIANTS: Record<string, string[]> = {
+        XAUUSD: ["XAUUSD.i", "XAUUSD"],
+        EURUSD: ["EURUSD.i", "EURUSD"],
+        GBPUSD: ["GBPUSD.i", "GBPUSD"],
+        USDJPY: ["USDJPY.i", "USDJPY"],
+        AUDUSD: ["AUDUSD.i", "AUDUSD"],
+        NZDUSD: ["NZDUSD.i", "NZDUSD"],
+        NAS100: ["NDX100", "NAS100", "USTEC"],
+        US30: ["DJ30", "US30"],
+      };
+      const variants = PRICE_SYMBOL_VARIANTS[symbol] || [symbol];
 
-      const price = await res.json();
-      if (!res.ok) {
-        return new Response(JSON.stringify({
-          error: price.message || "Failed to fetch price",
-          details: price,
-        }), {
-          status: res.status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+      let lastError: any = null;
+      for (const variant of variants) {
+        const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
+        const res = await fetch(url, {
+          headers: { "auth-token": METAAPI_TOKEN },
         });
+        const price = await res.json();
+        if (res.ok) {
+          return new Response(JSON.stringify({ success: true, price }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        lastError = price;
       }
 
-      return new Response(JSON.stringify({ success: true, price }), {
+      return new Response(JSON.stringify({
+        error: lastError?.message || "Failed to fetch price",
+        details: lastError,
+      }), {
+        status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
