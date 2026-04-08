@@ -138,7 +138,7 @@ export default function DashboardHome() {
         <SpinCard front={{ label: "Avg R:R", value: `${stats.avgRR}:1` }} back={{ label: "R:R Detail", value: `${totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 80) : 0}% of trades met 2:1 minimum | Best R:R achieved: ${Math.max(stats.avgRR * 1.8, 3.2).toFixed(1)}:1` }} color={C.purple} />
       </div>
 
-      {best && (
+      {best ? (
         <div style={{
           background: C.card, border: `1px solid ${C.jade}30`, borderRadius: 14,
           padding: "16px 20px", marginBottom: 20,
@@ -158,6 +158,15 @@ export default function DashboardHome() {
           }}>
             {best.confidence}
           </div>
+        </div>
+      ) : (
+        <div style={{
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
+          padding: "16px 20px", marginBottom: 20,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <Clock size={16} color={C.sec} />
+          <span style={{ fontSize: 12, color: C.sec }}>No active signals — waiting for next scan</span>
         </div>
       )}
 
