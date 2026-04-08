@@ -81,9 +81,11 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
   const [now, setNow] = useState(new Date());
   const activeClocks = clocks && clocks.length > 0 ? clocks : DEFAULT_CLOCKS;
   const localClock = getLocalClock();
-  // Prepend local clock, skip if it duplicates an existing one
   const localDuplicate = activeClocks.some(c => c.timezone === localClock.timezone);
   const allClocks = localDuplicate ? activeClocks : [localClock, ...activeClocks];
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -96,7 +98,8 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      {activeClocks.map((clock) => {
+      {allClocks.map((clock, idx) => {
+        const isLocalClock = !localDuplicate && idx === 0;
         const timeStr = now.toLocaleTimeString("en-GB", {
           timeZone: clock.timezone,
           hour: "2-digit",
