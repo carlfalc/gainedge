@@ -3,11 +3,12 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock
+  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock, DollarSign
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
 import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
+import BrokerModal from "./BrokerModal";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -28,6 +29,7 @@ export default function DashboardLayout() {
   const [userId, setUserId] = useState<string>();
   const [sessionLabel, setSessionLabel] = useState("London Session");
   const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
+  const [brokerOpen, setBrokerOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -123,6 +125,27 @@ export default function DashboardLayout() {
               {!collapsed && <span>{item.label}</span>}
             </button>
           ))}
+          {/* Broker button */}
+          <button
+            onClick={() => setBrokerOpen(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: collapsed ? "10px 0" : "10px 12px",
+              justifyContent: collapsed ? "center" : "flex-start",
+              borderRadius: 10, border: "none", cursor: "pointer",
+              background: "transparent",
+              color: "#F59E0B",
+              fontSize: 13, fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif",
+              transition: "all 0.2s",
+              borderLeft: "2px solid transparent",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(245,158,11,0.08)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <DollarSign size={18} strokeWidth={1.8} />
+            {!collapsed && <span>Broker</span>}
+          </button>
         </nav>
 
         {/* Collapse toggle */}
@@ -195,6 +218,7 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+      <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
     </div>
   );
 }
