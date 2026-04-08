@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { C } from "@/lib/mock-data";
-import { ChevronDown, ChevronUp, Filter, Settings, TrendingUp, TrendingDown, Target, BarChart3, Award } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, Settings, TrendingUp, TrendingDown, Target, BarChart3, Award, DollarSign } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, startOfWeek, startOfDay } from "date-fns";
 import { SignalAlertSettingsModal } from "@/components/dashboard/SignalAlertSettingsModal";
@@ -16,6 +16,23 @@ interface Signal {
 type SortKey = "date" | "instrument" | "confidence";
 type DateRange = "today" | "week" | "month" | "all";
 
+const CURRENCIES = ["NZD", "USD", "AUD", "GBP", "EUR", "JPY"];
+
+// Pip value per standard lot (100k units) for common pairs
+function getPipValuePerStdLot(symbol: string): number {
+  // For indices: 1 point = $1 per 0.01 lot → $100 per standard lot
+  if (["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol)) return 100;
+  // XAUUSD: 0.01 move = $0.01 per 0.01 lot → $1 per 0.01 move per standard lot
+  if (symbol === "XAUUSD") return 100;
+  // Standard 4-decimal forex: pip = 0.0001 → $10 per standard lot
+  return 10;
+}
+
+function calcCurrencyPnl(pips: number, symbol: string, lotSize: number): number {
+  const pipValueStd = getPipValuePerStdLot(symbol);
+  return pips * pipValueStd * lotSize;
+}
+
 export default function SignalsPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>("date");
@@ -28,9 +45,13 @@ export default function SignalsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [instruments, setInstruments] = useState<string[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [currency, setCurrency] = useState("NZD");
+  const [lotSize, setLotSize] = useState(0.01);
+  const [prefsSaving, setPrefsSaving] = useState(false);
 
   useEffect(() => {
     loadSignals();
+    loadPrefs();
     const channel = supabase.channel('signals-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, () => loadSignals())
       .subscribe();
@@ -52,6 +73,33 @@ export default function SignalsPage() {
     }
   };
 
+  const loadPrefs = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from("user_signal_preferences")
+      .select("currency, lot_size")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+    if (data) {
+      setCurrency((data as any).currency || "NZD");
+      setLotSize((data as any).lot_size ?? 0.01);
+    }
+  };
+
+  const savePrefs = async (newCurrency: string, newLotSize: number) => {
+    setPrefsSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setPrefsSaving(false); return; }
+    await supabase.from("user_signal_preferences").upsert({
+      user_id: session.user.id,
+      currency: newCurrency,
+      lot_size: newLotSize,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    setPrefsSaving(false);
+  };
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir("desc"); }
@@ -62,14 +110,17 @@ export default function SignalsPage() {
     const resolved = signals.filter(s => s.result !== "pending");
     const wins = resolved.filter(s => s.result === "win");
     const losses = resolved.filter(s => s.result === "loss");
-    const allTimePnl = resolved.reduce((sum, s) => sum + (s.pnl ?? 0), 0);
+    const allTimePnlPips = resolved.reduce((sum, s) => sum + (s.pnl_pips ?? 0), 0);
+    const allTimePnlCurrency = resolved.reduce((sum, s) => sum + calcCurrencyPnl(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
 
     const now = new Date();
     const monthStart = startOfMonth(now);
     const monthSignals = resolved.filter(s => new Date(s.resolved_at || s.created_at) >= monthStart);
-    const monthPnl = monthSignals.reduce((sum, s) => sum + (s.pnl ?? 0), 0);
+    const monthPnlCurrency = monthSignals.reduce((sum, s) => sum + calcCurrencyPnl(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
 
-    const winRate = resolved.length > 0 ? (wins.length / resolved.length) * 100 : 0;
+    // Win rate: wins / (wins + losses) — exclude expired/pending
+    const winsAndLosses = wins.length + losses.length;
+    const winRate = winsAndLosses > 0 ? (wins.length / winsAndLosses) * 100 : 0;
 
     // Parse R:R strings like "2.1:1" and average them for resolved wins/losses
     const rrValues = resolved
@@ -81,8 +132,8 @@ export default function SignalsPage() {
       .filter(v => v > 0);
     const avgRR = rrValues.length > 0 ? rrValues.reduce((a, b) => a + b, 0) / rrValues.length : 0;
 
-    return { allTimePnl, monthPnl, winRate, totalSignals: signals.length, avgRR, wins: wins.length, losses: losses.length, resolved: resolved.length };
-  }, [signals]);
+    return { allTimePnlCurrency, monthPnlCurrency, winRate, totalSignals: signals.length, avgRR, wins: wins.length, losses: losses.length, resolved: resolved.length, winsAndLosses };
+  }, [signals, lotSize, currency]);
 
   // Filter
   const filtered = useMemo(() => {
@@ -121,15 +172,14 @@ export default function SignalsPage() {
     return C.amber;
   };
 
-  const formatPnl = (s: Signal) => {
+  const formatPnl = (s: Signal): { text: string; color: string } => {
     if (s.result === "pending") return { text: "Pending...", color: C.amber };
     if (s.result === "expired") return { text: "0 (expired)", color: C.muted };
-    const pnl = s.pnl ?? 0;
     const pips = s.pnl_pips ?? 0;
-    const sign = pnl >= 0 ? "+" : "";
-    const color = pnl >= 0 ? C.green : C.red;
-    const pipsStr = `${sign}${pips.toFixed(1)} pips`;
-    return { text: pipsStr, color };
+    const dollarsVal = calcCurrencyPnl(pips, s.symbol, lotSize);
+    const sign = pips >= 0 ? "+" : "";
+    const color = pips >= 0 ? C.green : C.red;
+    return { text: `${sign}${pips.toFixed(1)} pips ($${Math.abs(dollarsVal).toFixed(2)})`, color };
   };
 
   const hdr: React.CSSProperties = {
@@ -148,15 +198,15 @@ export default function SignalsPage() {
         <StatTile
           icon={<TrendingUp size={16} />}
           label="All-Time P&L"
-          value={`${stats.allTimePnl >= 0 ? "+" : ""}${stats.allTimePnl.toFixed(2)}`}
-          color={stats.allTimePnl >= 0 ? C.green : C.red}
+          value={`${stats.allTimePnlCurrency >= 0 ? "+$" : "-$"}${Math.abs(stats.allTimePnlCurrency).toFixed(2)} ${currency}`}
+          color={stats.allTimePnlCurrency >= 0 ? C.green : C.red}
           sub={`${stats.wins}W / ${stats.losses}L`}
         />
         <StatTile
           icon={<BarChart3 size={16} />}
           label="This Month P&L"
-          value={`${stats.monthPnl >= 0 ? "+" : ""}${stats.monthPnl.toFixed(2)}`}
-          color={stats.monthPnl >= 0 ? C.green : C.red}
+          value={`${stats.monthPnlCurrency >= 0 ? "+$" : "-$"}${Math.abs(stats.monthPnlCurrency).toFixed(2)} ${currency}`}
+          color={stats.monthPnlCurrency >= 0 ? C.green : C.red}
           sub={format(new Date(), "MMMM yyyy")}
         />
         <StatTile
@@ -164,7 +214,7 @@ export default function SignalsPage() {
           label="Win Rate"
           value={`${stats.winRate.toFixed(1)}%`}
           color={stats.winRate >= 50 ? C.green : stats.winRate > 0 ? C.amber : C.muted}
-          sub={`${stats.resolved} resolved`}
+          sub={`${stats.winsAndLosses} decided (${stats.resolved} resolved)`}
         />
         <StatTile
           icon={<Target size={16} />}
@@ -180,6 +230,36 @@ export default function SignalsPage() {
           color={stats.avgRR >= 1.5 ? C.green : C.amber}
           sub="risk:reward"
         />
+      </div>
+
+      {/* Currency & Lot Size Settings */}
+      <div style={{
+        display: "flex", gap: 12, alignItems: "center", marginBottom: 16,
+        padding: "10px 14px", background: C.card, border: `1px solid ${C.border}`, borderRadius: 10,
+      }}>
+        <DollarSign size={14} color={C.jade} />
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.sec, textTransform: "uppercase", letterSpacing: 0.8 }}>P&L Settings</span>
+        <select
+          value={currency}
+          onChange={e => { setCurrency(e.target.value); savePrefs(e.target.value, lotSize); }}
+          style={selStyle}
+        >
+          {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <label style={{ fontSize: 11, color: C.sec, fontWeight: 600 }}>Lot Size:</label>
+        <input
+          type="number"
+          value={lotSize}
+          min={0.01}
+          step={0.01}
+          onChange={e => {
+            const v = parseFloat(e.target.value) || 0.01;
+            setLotSize(v);
+            savePrefs(currency, v);
+          }}
+          style={{ ...selStyle, width: 72, textAlign: "center" as const }}
+        />
+        {prefsSaving && <span style={{ fontSize: 10, color: C.muted }}>Saving...</span>}
       </div>
 
       {/* Filters */}
