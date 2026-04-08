@@ -572,7 +572,17 @@ export default function ChartsPage() {
         {TIMEFRAMES.map(tf => (
           <button
             key={tf}
-            onClick={() => setTimeframe(tf)}
+            onClick={() => {
+              setTimeframe(tf);
+              instrumentTfRef.current.set(selected, tf);
+              if (userId && selected) {
+                supabase.from("user_instruments")
+                  .update({ timeframe: tf })
+                  .eq("user_id", userId)
+                  .eq("symbol", selected)
+                  .then(() => {});
+              }
+            }}
             className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border ${
               timeframe === tf
                 ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
