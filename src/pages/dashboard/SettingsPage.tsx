@@ -151,6 +151,7 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <Section icon={<Bell size={16} color={C.amber} />} title="Notifications">
         <Toggle label="Email Alerts" checked={emailAlerts} onChange={setEmailAlerts} />
         <Toggle label="Push Notifications" checked={pushAlerts} onChange={setPushAlerts} />
         <Toggle label="SMS Alerts" checked={smsAlerts} onChange={setSmsAlerts} />
