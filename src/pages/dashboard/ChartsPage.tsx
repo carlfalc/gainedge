@@ -124,17 +124,34 @@ export default function ChartsPage() {
     }
   }, [profile]);
 
+  /* ─── per-instrument timeframe map ─── */
+  const instrumentTfRef = useRef<Map<string, string>>(new Map());
+
   /* ─── fetch instruments ─── */
   useEffect(() => {
     if (!userId) return;
-    supabase.from("user_instruments").select("symbol").eq("user_id", userId)
+    supabase.from("user_instruments").select("symbol, timeframe").eq("user_id", userId)
       .then(({ data }) => {
         const syms = data?.map(d => d.symbol) ?? [];
         const list = syms.length > 0 ? syms : ["NAS100", "US30", "XAUUSD", "AUDUSD", "NZDUSD"];
+        // Store per-instrument timeframes
+        const tfMap = new Map<string, string>();
+        data?.forEach(d => tfMap.set(d.symbol, d.timeframe || "15m"));
+        instrumentTfRef.current = tfMap;
         setInstruments(list);
-        if (!selected) setSelected(list[0]);
+        if (!selected) {
+          setSelected(list[0]);
+          setTimeframe(tfMap.get(list[0]) || "15m");
+        }
       });
   }, [userId]);
+
+  /* ─── When instrument changes, load its saved timeframe ─── */
+  useEffect(() => {
+    if (!selected) return;
+    const savedTf = instrumentTfRef.current.get(selected);
+    if (savedTf) setTimeframe(savedTf);
+  }, [selected]);
 
   /* ─── fetch scan result ─── */
   useEffect(() => {
