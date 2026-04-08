@@ -185,7 +185,6 @@ export default function DashboardHome() {
         {scans.map(inst => {
           const fresh = signalFreshness(inst.scanned_at);
           const expired = fresh === "expired";
-          const dimmed = expired ? 0.55 : 1;
           const live = liveData.get(inst.symbol);
           const sparkData = live?.sparkline_data?.length ? live.sparkline_data : generateSparkData(inst.direction, inst.confidence);
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
@@ -195,7 +194,7 @@ export default function DashboardHome() {
           const liveMacd = live?.macd_status ?? inst.macd_status;
           const liveStoch = live?.stoch_rsi ?? inst.stoch_rsi;
           return (
-            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: expired ? 0.75 : 1, transition: "opacity 0.3s" }}>
+            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: expired ? 0.9 : 1, transition: "opacity 0.3s" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -236,31 +235,33 @@ export default function DashboardHome() {
                 <Sparkline data={sparkData} color={live ? sparkColor : color} w={120} h={32} />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12, opacity: dimmed }}>
+              {/* Live indicators — always bright since they're real-time */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
                 <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span></span>
                 <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span></span>
                 <span>MACD <span style={{ color: liveMacd === "Bullish" ? C.green : liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{liveMacd ?? "—"}</span></span>
                 <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span></span>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.5 : 1 }}>
-                <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? C.muted : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: expired ? C.muted : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>R:R:</span> <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
+              {/* AI scan data — dimmed when expired */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
+                <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
+                <div><span style={{ color: C.sec }}>R:R:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
               </div>
 
-              <div style={{ fontSize: 11, color: expired ? C.muted : C.sec, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: dimmed }}>
+              <div style={{ fontSize: 11, color: expired ? "rgba(255,255,255,0.7)" : C.sec, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
                 {expired && (
                   <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 600, marginBottom: 4 }}>
                     (Expired — {formatAge(inst.scanned_at)})
                   </div>
                 )}
-                <span style={{ color: expired ? C.muted : C.jade, fontWeight: 600 }}>AI Reasoning: </span>{inst.reasoning || "No reasoning available."}
+                <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>AI Reasoning: </span>{inst.reasoning || "No reasoning available."}
               </div>
 
               {expired && (
-                <div style={{ fontSize: 10, color: C.muted, fontStyle: "italic", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ fontSize: 10, color: "#F59E0B", fontStyle: "italic", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
                   <Clock size={10} /> Awaiting next scan...
                 </div>
               )}
