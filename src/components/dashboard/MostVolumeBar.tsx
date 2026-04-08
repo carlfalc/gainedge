@@ -14,8 +14,10 @@ export function MostVolumeBar() {
 
   useEffect(() => {
     load();
+    // Listen to live_market_data updates for volume changes
     const channel = supabase
       .channel("most-volume")
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_market_data" }, () => load())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "scan_results" }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
@@ -34,10 +36,32 @@ export function MostVolumeBar() {
     if (!instruments || instruments.length === 0) return;
     const symbols = instruments.map((i) => i.symbol);
 
+    // Try live_market_data first for real volume
+    const { data: liveRows } = await supabase
+      .from("live_market_data")
+      .select("symbol, volume_today")
+      .eq("user_id", uid)
+      .in("symbol", symbols);
+
+    const hasLiveVolume = liveRows && liveRows.some(r => r.volume_today != null && Number(r.volume_today) > 0);
+
+    if (hasLiveVolume && liveRows) {
+      setMetric("volume");
+      const sorted = [...liveRows]
+        .map(r => ({ symbol: r.symbol, score: Number(r.volume_today) || 0 }))
+        .sort((a, b) => b.score - a.score);
+      const result = [sorted[0]];
+      if (sorted.length > 1 && sorted[1].score >= sorted[0].score * 0.85) {
+        result.push(sorted[1]);
+      }
+      setTop(result);
+      return;
+    }
+
+    // Fallback to scan_results confidence
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    // Try today's scans first, fall back to most recent scans
     let { data: scans } = await supabase
       .from("scan_results")
       .select("symbol, volume, confidence, scanned_at")
@@ -60,9 +84,7 @@ export function MostVolumeBar() {
 
     if (!scans || scans.length === 0) return;
 
-    // Check if any scan has volume data
     const hasVolume = scans.some(s => s.volume != null && Number(s.volume) > 0);
-
     const latest = new Map<string, TopInstrument>();
     for (const s of scans) {
       if (!latest.has(s.symbol)) {
@@ -74,7 +96,6 @@ export function MostVolumeBar() {
     }
 
     setMetric(hasVolume ? "volume" : "confidence");
-
     const sorted = Array.from(latest.values()).sort((a, b) => b.score - a.score);
     const result = [sorted[0]];
     if (sorted.length > 1 && sorted[1].score >= sorted[0].score * 0.85) {
