@@ -90,6 +90,8 @@ export default function ChartsPage() {
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
   const [indicatorSearch, setIndicatorSearch] = useState("");
   const [hLineMode, setHLineMode] = useState(false);
+  const [showBrokerModal, setShowBrokerModal] = useState(false);
+  const [brokerLabel, setBrokerLabel] = useState("");
 
   // MetaApi state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
