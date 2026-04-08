@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
+import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
 
 interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
@@ -119,6 +120,7 @@ export default function DashboardHome() {
       <LiveTradeAlert />
       <BreakingNewsTicker />
       <NewsSentimentPanel />
+      <MostVolumeBar />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         <SpinCard front={{ label: "Net P&L", value: `$${stats.netPnl.toLocaleString()}`, sub: `${stats.wins} wins, ${stats.losses} losses` }} back={{ label: "P&L Breakdown", value: `Best day: +$${Math.round(stats.netPnl * 0.4).toLocaleString()} | Worst day: -$${Math.round(Math.abs(stats.netPnl * 0.15)).toLocaleString()} | This month total` }} color={stats.netPnl >= 0 ? C.green : C.red} />
         <SpinCard front={{ label: "Win Rate", value: `${winRate}%`, sub: `${stats.wins}/${totalTrades} trades` }} back={{ label: "Session Detail", value: "Best session: London overlap | Worst: Asian on indices" }} color={C.jade} />
