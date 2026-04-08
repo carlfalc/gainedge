@@ -577,18 +577,112 @@ serve(async (req) => {
           else autoScans++;
 
           // Auto-create signal if confidence >= 5 and direction is BUY or SELL
+          // WITH DEDUPLICATION: skip if recent pending signal has same direction & entry within 0.1%
           if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
-            await supabase.from("signals").insert({
-              user_id: userId,
-              symbol: inst.symbol,
-              direction: analysis.direction,
-              confidence: analysis.confidence,
-              entry_price: analysis.entry_price,
-              take_profit: analysis.take_profit,
-              stop_loss: analysis.stop_loss,
-              risk_reward: analysis.risk_reward || "2:1",
-            });
+            const { data: recentPending } = await supabase
+              .from("signals")
+              .select("entry_price")
+              .eq("user_id", userId)
+              .eq("symbol", inst.symbol)
+              .eq("direction", analysis.direction)
+              .eq("result", "pending")
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            let isDuplicate = false;
+            if (recentPending && recentPending.length > 0) {
+              const priceDiff = Math.abs(recentPending[0].entry_price - analysis.entry_price) / analysis.entry_price;
+              if (priceDiff < 0.001) isDuplicate = true; // within 0.1%
+            }
+
+            if (!isDuplicate) {
+              await supabase.from("signals").insert({
+                user_id: userId,
+                symbol: inst.symbol,
+                direction: analysis.direction,
+                confidence: analysis.confidence,
+                entry_price: analysis.entry_price,
+                take_profit: analysis.take_profit,
+                stop_loss: analysis.stop_loss,
+                risk_reward: analysis.risk_reward || "2:1",
+              });
+            }
           }
+        }
+      }
+    }
+
+    // ─── RESOLVE PENDING SIGNALS: check TP/SL/expiry ───
+    let resolvedCount = 0;
+    const { data: pendingSignals } = await supabase
+      .from("signals")
+      .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at")
+      .eq("result", "pending");
+
+    if (pendingSignals && pendingSignals.length > 0) {
+      for (const sig of pendingSignals) {
+        // Check expiry first (20 minutes)
+        const ageMs = Date.now() - new Date(sig.created_at).getTime();
+        if (ageMs > 20 * 60 * 1000) {
+          await supabase.from("signals").update({
+            result: "expired", pnl: 0, pnl_pips: 0, resolved_at: new Date().toISOString(),
+          }).eq("id", sig.id);
+          // Store outcome insight
+          await supabase.from("insights").insert({
+            user_id: sig.user_id, insight_type: "signal_outcome",
+            title: `${sig.symbol} ${sig.direction} — Expired`,
+            description: `Signal expired after 20 minutes without hitting TP or SL. Entry: ${sig.entry_price}`,
+            symbol: sig.symbol, severity: "low",
+          });
+          resolvedCount++;
+          continue;
+        }
+
+        // Get live price for this user+symbol
+        const liveData = symbolData.get(sig.symbol);
+        if (!liveData || !liveData.last_price) continue;
+
+        const livePrice = liveData.last_price;
+        let result: string | null = null;
+        let pnl = 0;
+        let pnlPips = 0;
+
+        if (sig.direction === "BUY") {
+          if (livePrice >= sig.take_profit) {
+            result = "win";
+            pnl = sig.take_profit - sig.entry_price;
+            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+          } else if (livePrice <= sig.stop_loss) {
+            result = "loss";
+            pnl = sig.stop_loss - sig.entry_price;
+            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+          }
+        } else if (sig.direction === "SELL") {
+          if (livePrice <= sig.take_profit) {
+            result = "win";
+            pnl = sig.entry_price - sig.take_profit;
+            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+          } else if (livePrice >= sig.stop_loss) {
+            result = "loss";
+            pnl = sig.entry_price - sig.stop_loss;
+            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+          }
+        }
+
+        if (result) {
+          await supabase.from("signals").update({
+            result, pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1),
+            resolved_at: new Date().toISOString(),
+          }).eq("id", sig.id);
+          // Store outcome insight for AI brain
+          await supabase.from("insights").insert({
+            user_id: sig.user_id, insight_type: "signal_outcome",
+            title: `${sig.symbol} ${sig.direction} — ${result.toUpperCase()}`,
+            description: `Signal resolved as ${result}. Entry: ${sig.entry_price}, P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
+            symbol: sig.symbol, severity: result === "win" ? "positive" : "negative",
+            data: { entry_price: sig.entry_price, take_profit: sig.take_profit, stop_loss: sig.stop_loss, pnl, pnl_pips: pnlPips },
+          });
+          resolvedCount++;
         }
       }
     }
