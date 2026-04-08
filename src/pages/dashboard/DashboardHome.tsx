@@ -3,13 +3,14 @@ import { SpinCard } from "@/components/dashboard/SpinCard";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
-import { AlertTriangle, Play, Loader2, Clock } from "lucide-react";
+import { AlertTriangle, Play, Loader2, Clock, Wifi } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signalFreshness, formatAge, type SignalFreshness } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
+import { useLiveMarketData, triggerMarketDataCompute, type LiveMarketRow } from "@/services/broker-data";
 
 interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
