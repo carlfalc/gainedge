@@ -20,6 +20,11 @@ interface ScanResult {
   ema_crossover_status: string; verdict: string; scanned_at: string;
 }
 
+interface InstrumentTimeframe {
+  symbol: string;
+  timeframe: string;
+}
+
 const directionColor = (dir: string) => {
   if (dir === "BUY") return "#22C55E";
   if (dir === "SELL") return "#EF4444";
