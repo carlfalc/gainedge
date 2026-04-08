@@ -91,27 +91,44 @@ Deno.serve(async (req) => {
 
       totalScansInserted += inserted?.length || 0;
 
-      // Create signals for confidence >= 5
+      // Create signals for confidence >= 5 WITH DEDUPLICATION
       const highConf = (inserted || []).filter((r: any) =>
         s.confidence >= 5 && r.entry_price && r.take_profit && r.stop_loss
       );
 
-      if (highConf.length > 0) {
-        const signalRows = highConf.map((r: any) => ({
-          user_id: r.user_id,
-          scan_result_id: r.id,
-          symbol: r.symbol,
-          direction: r.direction,
-          confidence: s.confidence,
-          entry_price: r.entry_price,
-          take_profit: r.take_profit,
-          stop_loss: r.stop_loss,
-          risk_reward: r.risk_reward || "1:1",
-          result: "pending",
-        }));
+      for (const r of highConf) {
+        // Check for duplicate: same user+symbol+direction with entry within 0.1%
+        const { data: recentPending } = await supabase
+          .from("signals")
+          .select("entry_price")
+          .eq("user_id", r.user_id)
+          .eq("symbol", r.symbol)
+          .eq("direction", r.direction)
+          .eq("result", "pending")
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-        const { data: sigs } = await supabase.from("signals").insert(signalRows).select("id");
-        totalSignalsCreated += sigs?.length || 0;
+        let isDuplicate = false;
+        if (recentPending && recentPending.length > 0 && r.entry_price) {
+          const priceDiff = Math.abs(recentPending[0].entry_price - r.entry_price) / r.entry_price;
+          if (priceDiff < 0.001) isDuplicate = true;
+        }
+
+        if (!isDuplicate) {
+          const { data: sigs } = await supabase.from("signals").insert({
+            user_id: r.user_id,
+            scan_result_id: r.id,
+            symbol: r.symbol,
+            direction: r.direction,
+            confidence: s.confidence,
+            entry_price: r.entry_price,
+            take_profit: r.take_profit,
+            stop_loss: r.stop_loss,
+            risk_reward: r.risk_reward || "1:1",
+            result: "pending",
+          }).select("id");
+          totalSignalsCreated += sigs?.length || 0;
+        }
       }
     }
 

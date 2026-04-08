@@ -1,17 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { C } from "@/lib/mock-data";
-import { ChevronDown, ChevronUp, Filter } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, Settings, TrendingUp, TrendingDown, Target, BarChart3, Award } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, startOfMonth, startOfWeek, startOfDay } from "date-fns";
+import { SignalAlertSettingsModal } from "@/components/dashboard/SignalAlertSettingsModal";
 
 interface Signal {
   id: string; symbol: string; direction: string; confidence: number;
   entry_price: number; take_profit: number; stop_loss: number;
   risk_reward: string; result: string; pnl: number | null;
-  notes: string | null; created_at: string;
+  pnl_pips: number | null; notes: string | null;
+  created_at: string; resolved_at: string | null;
 }
 
 type SortKey = "date" | "instrument" | "confidence";
+type DateRange = "today" | "week" | "month" | "all";
 
 export default function SignalsPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
@@ -19,17 +22,18 @@ export default function SignalsPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [filterInst, setFilterInst] = useState("");
   const [filterDir, setFilterDir] = useState("");
+  const [filterResult, setFilterResult] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
   const [minConf, setMinConf] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [instruments, setInstruments] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     loadSignals();
-
     const channel = supabase.channel('signals-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, () => loadSignals())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, []);
 
@@ -53,29 +57,131 @@ export default function SignalsPage() {
     else { setSortKey(key); setSortDir("desc"); }
   };
 
-  const filtered = signals
-    .filter(s => !filterInst || s.symbol === filterInst)
-    .filter(s => !filterDir || s.direction === filterDir)
-    .filter(s => s.confidence >= minConf)
-    .sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "date") cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      else if (sortKey === "instrument") cmp = a.symbol.localeCompare(b.symbol);
-      else if (sortKey === "confidence") cmp = a.confidence - b.confidence;
-      return sortDir === "desc" ? -cmp : cmp;
-    });
+  // Stats
+  const stats = useMemo(() => {
+    const resolved = signals.filter(s => s.result !== "pending");
+    const wins = resolved.filter(s => s.result === "win");
+    const losses = resolved.filter(s => s.result === "loss");
+    const allTimePnl = resolved.reduce((sum, s) => sum + (s.pnl ?? 0), 0);
+
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthSignals = resolved.filter(s => new Date(s.resolved_at || s.created_at) >= monthStart);
+    const monthPnl = monthSignals.reduce((sum, s) => sum + (s.pnl ?? 0), 0);
+
+    const winRate = resolved.length > 0 ? (wins.length / resolved.length) * 100 : 0;
+
+    // Parse R:R strings like "2.1:1" and average them for resolved wins/losses
+    const rrValues = resolved
+      .filter(s => s.risk_reward)
+      .map(s => {
+        const match = s.risk_reward.match(/([\d.]+):\d/);
+        return match ? parseFloat(match[1]) : 0;
+      })
+      .filter(v => v > 0);
+    const avgRR = rrValues.length > 0 ? rrValues.reduce((a, b) => a + b, 0) / rrValues.length : 0;
+
+    return { allTimePnl, monthPnl, winRate, totalSignals: signals.length, avgRR, wins: wins.length, losses: losses.length, resolved: resolved.length };
+  }, [signals]);
+
+  // Filter
+  const filtered = useMemo(() => {
+    const now = new Date();
+    return signals
+      .filter(s => !filterInst || s.symbol === filterInst)
+      .filter(s => !filterDir || s.direction === filterDir)
+      .filter(s => !filterResult || s.result === filterResult)
+      .filter(s => s.confidence >= minConf)
+      .filter(s => {
+        if (dateRange === "all") return true;
+        const d = new Date(s.created_at);
+        if (dateRange === "today") return d >= startOfDay(now);
+        if (dateRange === "week") return d >= startOfWeek(now, { weekStartsOn: 1 });
+        if (dateRange === "month") return d >= startOfMonth(now);
+        return true;
+      })
+      .sort((a, b) => {
+        let cmp = 0;
+        if (sortKey === "date") cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        else if (sortKey === "instrument") cmp = a.symbol.localeCompare(b.symbol);
+        else if (sortKey === "confidence") cmp = a.confidence - b.confidence;
+        return sortDir === "desc" ? -cmp : cmp;
+      });
+  }, [signals, filterInst, filterDir, filterResult, minConf, dateRange, sortKey, sortDir]);
 
   const SortIcon = ({ k }: { k: SortKey }) => sortKey === k ?
     (sortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />) : null;
 
-  const hdr: React.CSSProperties = { fontSize: 11, color: C.sec, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" };
-
   const formatPrice = (v: number) => v >= 100 ? v.toLocaleString() : v.toFixed(4);
+
+  const resultColor = (r: string) => {
+    if (r === "win") return C.green;
+    if (r === "loss") return C.red;
+    if (r === "expired") return C.muted;
+    return C.amber;
+  };
+
+  const formatPnl = (s: Signal) => {
+    if (s.result === "pending") return { text: "Pending...", color: C.amber };
+    if (s.result === "expired") return { text: "0 (expired)", color: C.muted };
+    const pnl = s.pnl ?? 0;
+    const pips = s.pnl_pips ?? 0;
+    const sign = pnl >= 0 ? "+" : "";
+    const color = pnl >= 0 ? C.green : C.red;
+    const pipsStr = `${sign}${pips.toFixed(1)} pips`;
+    return { text: pipsStr, color };
+  };
+
+  const hdr: React.CSSProperties = {
+    fontSize: 11, color: C.sec, fontWeight: 600, textTransform: "uppercase",
+    letterSpacing: 1, padding: "10px 12px", cursor: "pointer",
+    display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+  };
 
   return (
     <div style={{ maxWidth: 1200 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 20 }}>Signal History</h1>
 
+      {/* Performance Tiles */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 20 }}>
+        <StatTile
+          icon={<TrendingUp size={16} />}
+          label="All-Time P&L"
+          value={`${stats.allTimePnl >= 0 ? "+" : ""}${stats.allTimePnl.toFixed(2)}`}
+          color={stats.allTimePnl >= 0 ? C.green : C.red}
+          sub={`${stats.wins}W / ${stats.losses}L`}
+        />
+        <StatTile
+          icon={<BarChart3 size={16} />}
+          label="This Month P&L"
+          value={`${stats.monthPnl >= 0 ? "+" : ""}${stats.monthPnl.toFixed(2)}`}
+          color={stats.monthPnl >= 0 ? C.green : C.red}
+          sub={format(new Date(), "MMMM yyyy")}
+        />
+        <StatTile
+          icon={<Award size={16} />}
+          label="Win Rate"
+          value={`${stats.winRate.toFixed(1)}%`}
+          color={stats.winRate >= 50 ? C.green : stats.winRate > 0 ? C.amber : C.muted}
+          sub={`${stats.resolved} resolved`}
+        />
+        <StatTile
+          icon={<Target size={16} />}
+          label="Total Signals"
+          value={String(stats.totalSignals)}
+          color={C.jade}
+          sub={`${signals.filter(s => s.result === "pending").length} pending`}
+        />
+        <StatTile
+          icon={<TrendingDown size={16} />}
+          label="Avg R:R Achieved"
+          value={`${stats.avgRR.toFixed(1)}:1`}
+          color={stats.avgRR >= 1.5 ? C.green : C.amber}
+          sub="risk:reward"
+        />
+      </div>
+
+      {/* Filters */}
       <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
         <Filter size={14} color={C.sec} />
         <select value={filterInst} onChange={e => setFilterInst(e.target.value)} style={selStyle}>
@@ -87,14 +193,38 @@ export default function SignalsPage() {
           <option value="BUY">BUY</option>
           <option value="SELL">SELL</option>
         </select>
+        <select value={filterResult} onChange={e => setFilterResult(e.target.value)} style={selStyle}>
+          <option value="">All Results</option>
+          <option value="win">WIN</option>
+          <option value="loss">LOSS</option>
+          <option value="expired">EXPIRED</option>
+          <option value="pending">PENDING</option>
+        </select>
         <select value={minConf} onChange={e => setMinConf(Number(e.target.value))} style={selStyle}>
           <option value={0}>Min Confidence: Any</option>
           {[3, 5, 7].map(v => <option key={v} value={v}>≥ {v}</option>)}
         </select>
+        <select value={dateRange} onChange={e => setDateRange(e.target.value as DateRange)} style={selStyle}>
+          <option value="all">All Time</option>
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          style={{
+            background: C.amber + "15", border: `1px solid ${C.amber}40`, borderRadius: 8,
+            padding: "6px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+          }}
+        >
+          <Settings size={14} color={C.amber} />
+          <span style={{ fontSize: 12, color: C.amber, fontWeight: 600 }}>Alerts</span>
+        </button>
       </div>
 
+      {/* Signal Table */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "140px 90px 60px 50px 80px 80px 80px 50px 70px 70px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "140px 90px 60px 50px 80px 80px 80px 50px 80px 100px", borderBottom: `1px solid ${C.border}` }}>
           <div style={hdr} onClick={() => toggleSort("date")}>Date <SortIcon k="date" /></div>
           <div style={hdr} onClick={() => toggleSort("instrument")}>Instrument <SortIcon k="instrument" /></div>
           <div style={hdr}>Dir</div>
@@ -106,54 +236,79 @@ export default function SignalsPage() {
           <div style={hdr}>Result</div>
           <div style={hdr}>P&L</div>
         </div>
-        {filtered.map(s => (
-          <div key={s.id}>
-            <div
-              onClick={() => setExpanded(expanded === s.id ? null : s.id)}
-              style={{
-                display: "grid", gridTemplateColumns: "140px 90px 60px 50px 80px 80px 80px 50px 70px 70px",
-                padding: 0, cursor: "pointer", borderBottom: `1px solid ${C.border}`,
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = C.cardH}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-            >
-              <Cell mono>{format(new Date(s.created_at), "MMM d HH:mm")}</Cell>
-              <Cell bold>{s.symbol}</Cell>
-              <Cell><span style={{ color: s.direction === "BUY" ? C.green : C.red, fontWeight: 700 }}>{s.direction}</span></Cell>
-              <Cell mono>{s.confidence}</Cell>
-              <Cell mono>{formatPrice(s.entry_price)}</Cell>
-              <Cell mono>{formatPrice(s.take_profit)}</Cell>
-              <Cell mono>{formatPrice(s.stop_loss)}</Cell>
-              <Cell mono>{s.risk_reward}</Cell>
-              <Cell>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                  background: s.result === "win" ? C.green + "20" : s.result === "loss" ? C.red + "20" : C.muted + "20",
-                  color: s.result === "win" ? C.green : s.result === "loss" ? C.red : C.sec,
-                  textTransform: "capitalize",
-                }}>{s.result}</span>
-              </Cell>
-              <Cell mono style={{ color: (s.pnl ?? 0) >= 0 ? C.green : C.red }}>
-                {s.pnl != null ? `${s.pnl >= 0 ? "+" : ""}$${s.pnl.toLocaleString()}` : "—"}
-              </Cell>
-            </div>
-            {expanded === s.id && s.notes && (
-              <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, background: C.bg2 }}>
-                <span style={{ color: C.jade, fontWeight: 600, fontSize: 12 }}>Notes: </span>
-                <span style={{ color: C.sec, fontSize: 12, lineHeight: 1.6 }}>{s.notes}</span>
+        {filtered.map(s => {
+          const pnlInfo = formatPnl(s);
+          return (
+            <div key={s.id}>
+              <div
+                onClick={() => setExpanded(expanded === s.id ? null : s.id)}
+                style={{
+                  display: "grid", gridTemplateColumns: "140px 90px 60px 50px 80px 80px 80px 50px 80px 100px",
+                  padding: 0, cursor: "pointer", borderBottom: `1px solid ${C.border}`,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = C.cardH}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <Cell mono>{format(new Date(s.created_at), "MMM d HH:mm")}</Cell>
+                <Cell bold>{s.symbol}</Cell>
+                <Cell><span style={{ color: s.direction === "BUY" ? C.green : C.red, fontWeight: 700 }}>{s.direction}</span></Cell>
+                <Cell mono>{s.confidence}</Cell>
+                <Cell mono>{formatPrice(s.entry_price)}</Cell>
+                <Cell mono>{formatPrice(s.take_profit)}</Cell>
+                <Cell mono>{formatPrice(s.stop_loss)}</Cell>
+                <Cell mono>{s.risk_reward}</Cell>
+                <Cell>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                    background: resultColor(s.result) + "20",
+                    color: resultColor(s.result),
+                    textTransform: "uppercase",
+                  }}>{s.result}</span>
+                </Cell>
+                <Cell mono style={{ color: pnlInfo.color, fontWeight: 600, fontSize: 11 }}>
+                  {pnlInfo.text}
+                </Cell>
               </div>
-            )}
-          </div>
-        ))}
+              {expanded === s.id && s.notes && (
+                <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, background: C.bg2 }}>
+                  <span style={{ color: C.jade, fontWeight: 600, fontSize: 12 }}>Notes: </span>
+                  <span style={{ color: C.sec, fontSize: 12, lineHeight: 1.6 }}>{s.notes}</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
         {filtered.length === 0 && (
           <div style={{ padding: 24, textAlign: "center", color: C.muted, fontSize: 13 }}>No signals found.</div>
         )}
       </div>
+
+      <SignalAlertSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
 
+/* ─── Stat Tile ─── */
+function StatTile({ icon, label, value, color, sub }: {
+  icon: React.ReactNode; label: string; value: string; color: string; sub: string;
+}) {
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${color}30`, borderRadius: 12,
+      padding: "16px 18px", display: "flex", flexDirection: "column", gap: 6,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ color }}>{icon}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.sec, textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 800, color, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
+      <div style={{ fontSize: 11, color: C.muted }}>{sub}</div>
+    </div>
+  );
+}
+
+/* ─── Cell ─── */
 function Cell({ children, mono, bold, style }: { children: React.ReactNode; mono?: boolean; bold?: boolean; style?: React.CSSProperties }) {
   return (
     <div style={{
