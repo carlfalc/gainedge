@@ -18,19 +18,34 @@ type DateRange = "today" | "week" | "month" | "all";
 
 const CURRENCIES = ["NZD", "USD", "AUD", "GBP", "EUR", "JPY"];
 
-// Pip value per standard lot (100k units) for common pairs
-function getPipValuePerStdLot(symbol: string): number {
-  // For indices: 1 point = $1 per 0.01 lot → $100 per standard lot
-  if (["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol)) return 100;
-  // XAUUSD: 0.01 move = $0.01 per 0.01 lot → $1 per 0.01 move per standard lot
-  if (symbol === "XAUUSD") return 100;
-  // Standard 4-decimal forex: pip = 0.0001 → $10 per standard lot
-  return 10;
+// USD P&L per pip for a given lot size
+// Forex 4-decimal: 1 pip = $10 per standard lot (1.0), so $0.10 per 0.01 lot
+// XAUUSD: 1 pip (0.01 move) = $1 per standard lot, so $0.01 per 0.01 lot
+// Indices: 1 point = $1 per standard lot, so $0.01 per 0.01 lot
+function pipToUsd(pips: number, symbol: string, lotSize: number): number {
+  const isIndex = ["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol);
+  const isGold = symbol === "XAUUSD";
+  // pip value per standard lot (1.0 lot)
+  const pipValuePerLot = isIndex ? 1 : isGold ? 1 : 10;
+  return pips * pipValuePerLot * lotSize;
 }
 
-function calcCurrencyPnl(pips: number, symbol: string, lotSize: number): number {
-  const pipValueStd = getPipValuePerStdLot(symbol);
-  return pips * pipValueStd * lotSize;
+// Convert USD amount to display currency using live FX rates
+function convertToDisplayCurrency(usdAmount: number, currency: string, fxRates: Record<string, number>): number {
+  if (currency === "USD") return usdAmount;
+  // For XXX/USD pairs (NZD, AUD): USD→XXX = usdAmount * (1 / XXXUSD rate)
+  // For USD/XXX pairs (GBP, EUR): USD→XXX = usdAmount / XXXUSD rate
+  // Since live_market_data stores NZDUSD, AUDUSD, GBPUSD, EURUSD, USDJPY
+  const rate = fxRates[currency];
+  if (!rate || rate === 0) {
+    // Fallback static rates
+    const fallback: Record<string, number> = { NZD: 1.72, AUD: 1.55, GBP: 0.79, EUR: 0.92, JPY: 155 };
+    return usdAmount * (fallback[currency] || 1);
+  }
+  // NZDUSD=0.58 means 1 NZD = 0.58 USD, so 1 USD = 1/0.58 NZD
+  // USDJPY=155 means 1 USD = 155 JPY — but we store it as USDJPY
+  if (currency === "JPY") return usdAmount * rate; // USDJPY is already USD→JPY
+  return usdAmount / rate; // NZDUSD, AUDUSD, GBPUSD, EURUSD: divide to get local
 }
 
 export default function SignalsPage() {
@@ -48,15 +63,40 @@ export default function SignalsPage() {
   const [currency, setCurrency] = useState("NZD");
   const [lotSize, setLotSize] = useState(0.01);
   const [prefsSaving, setPrefsSaving] = useState(false);
+  const [fxRates, setFxRates] = useState<Record<string, number>>({});
 
   useEffect(() => {
     loadSignals();
     loadPrefs();
+    loadFxRates();
     const channel = supabase.channel('signals-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, () => loadSignals())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  const loadFxRates = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    // Fetch live prices for FX conversion pairs
+    const { data } = await supabase
+      .from("live_market_data")
+      .select("symbol, last_price")
+      .eq("user_id", session.user.id)
+      .in("symbol", ["NZDUSD", "AUDUSD", "GBPUSD", "EURUSD", "USDJPY"]);
+    const rates: Record<string, number> = {};
+    if (data) {
+      for (const row of data as any[]) {
+        // Map symbol to currency code
+        if (row.symbol === "NZDUSD") rates["NZD"] = row.last_price;
+        else if (row.symbol === "AUDUSD") rates["AUD"] = row.last_price;
+        else if (row.symbol === "GBPUSD") rates["GBP"] = row.last_price;
+        else if (row.symbol === "EURUSD") rates["EUR"] = row.last_price;
+        else if (row.symbol === "USDJPY") rates["JPY"] = row.last_price;
+      }
+    }
+    setFxRates(rates);
+  };
 
   const loadSignals = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -110,13 +150,14 @@ export default function SignalsPage() {
     const resolved = signals.filter(s => s.result !== "pending");
     const wins = resolved.filter(s => s.result === "win");
     const losses = resolved.filter(s => s.result === "loss");
-    const allTimePnlPips = resolved.reduce((sum, s) => sum + (s.pnl_pips ?? 0), 0);
-    const allTimePnlCurrency = resolved.reduce((sum, s) => sum + calcCurrencyPnl(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
+    const allTimePnlUsd = resolved.reduce((sum, s) => sum + pipToUsd(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
+    const allTimePnlCurrency = convertToDisplayCurrency(allTimePnlUsd, currency, fxRates);
 
     const now = new Date();
     const monthStart = startOfMonth(now);
     const monthSignals = resolved.filter(s => new Date(s.resolved_at || s.created_at) >= monthStart);
-    const monthPnlCurrency = monthSignals.reduce((sum, s) => sum + calcCurrencyPnl(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
+    const monthPnlUsd = monthSignals.reduce((sum, s) => sum + pipToUsd(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
+    const monthPnlCurrency = convertToDisplayCurrency(monthPnlUsd, currency, fxRates);
 
     // Win rate: wins / (wins + losses) — exclude expired/pending
     const winsAndLosses = wins.length + losses.length;
@@ -133,7 +174,7 @@ export default function SignalsPage() {
     const avgRR = rrValues.length > 0 ? rrValues.reduce((a, b) => a + b, 0) / rrValues.length : 0;
 
     return { allTimePnlCurrency, monthPnlCurrency, winRate, totalSignals: signals.length, avgRR, wins: wins.length, losses: losses.length, resolved: resolved.length, winsAndLosses };
-  }, [signals, lotSize, currency]);
+  }, [signals, lotSize, currency, fxRates]);
 
   // Filter
   const filtered = useMemo(() => {
@@ -176,10 +217,12 @@ export default function SignalsPage() {
     if (s.result === "pending") return { text: "Pending...", color: C.amber };
     if (s.result === "expired") return { text: "0 (expired)", color: C.muted };
     const pips = s.pnl_pips ?? 0;
-    const dollarsVal = calcCurrencyPnl(pips, s.symbol, lotSize);
+    const usdVal = pipToUsd(pips, s.symbol, lotSize);
+    const displayVal = convertToDisplayCurrency(usdVal, currency, fxRates);
     const sign = pips >= 0 ? "+" : "";
     const color = pips >= 0 ? C.green : C.red;
-    return { text: `${sign}${pips.toFixed(1)} pips ($${Math.abs(dollarsVal).toFixed(2)})`, color };
+    const currSymbol = currency === "JPY" ? "¥" : "$";
+    return { text: `${sign}${pips.toFixed(1)} pips (${currSymbol}${Math.abs(displayVal).toFixed(2)} ${currency})`, color };
   };
 
   const hdr: React.CSSProperties = {
