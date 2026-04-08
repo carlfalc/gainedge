@@ -57,6 +57,8 @@ export default function SettingsPage() {
   }, [userId]);
 
   const handleSave = async () => {
+    if (!userId) return;
+    // Save standard profile fields
     await updateProfile({
       full_name: name,
       default_timeframe: timeframe,
@@ -68,7 +70,15 @@ export default function SettingsPage() {
       sms_alerts: smsAlerts,
       broker,
     });
+    // Save clock preferences separately (column not in typed Profile)
+    await supabase.from("profiles").update({ clock_timezones: clockSlots as any }).eq("id", userId);
     toast.success("Settings saved");
+  };
+
+  const updateClockSlot = (index: number, timezone: string) => {
+    const city = AVAILABLE_CITIES.find(c => c.timezone === timezone);
+    if (!city) return;
+    setClockSlots(prev => prev.map((s, i) => i === index ? { ...city } : s));
   };
 
   if (loading) return <div style={{ color: C.sec }}>Loading...</div>;
