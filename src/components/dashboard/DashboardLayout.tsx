@@ -153,8 +153,7 @@ export default function DashboardLayout() {
             <span style={{ color: C.muted, fontSize: 12 }}>Last scan: 2 min ago</span>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
-            <WorldClocks clocks={clockConfigs} onSessionChange={handleSessionChange} />
+          <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", marginLeft: "auto" }}>
             <button
               onClick={() => setUserMenuOpen(o => !o)}
               style={{
