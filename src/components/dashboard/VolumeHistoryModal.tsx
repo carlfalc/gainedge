@@ -177,9 +177,7 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
-            Fetching broker candle data for {period} days...
-          </div>
+          <LoadingIndicator period={period} />
         ) : error ? (
           <div style={{ textAlign: "center", padding: 40, color: "#EF4444" }}>
             {error}
