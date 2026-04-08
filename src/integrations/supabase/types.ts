@@ -351,6 +351,7 @@ export type Database = {
           timeframe: string
           user_id: string
           verdict: string
+          volume: number | null
         }
         Insert: {
           adx?: number | null
@@ -377,6 +378,7 @@ export type Database = {
           timeframe: string
           user_id: string
           verdict: string
+          volume?: number | null
         }
         Update: {
           adx?: number | null
@@ -403,6 +405,7 @@ export type Database = {
           timeframe?: string
           user_id?: string
           verdict?: string
+          volume?: number | null
         }
         Relationships: [
           {

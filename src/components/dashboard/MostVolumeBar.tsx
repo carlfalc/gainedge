@@ -10,6 +10,7 @@ interface TopInstrument {
 
 export function MostVolumeBar() {
   const [top, setTop] = useState<TopInstrument[]>([]);
+  const [metric, setMetric] = useState<"volume" | "confidence">("confidence");
 
   useEffect(() => {
     load();
@@ -25,7 +26,6 @@ export function MostVolumeBar() {
     if (!session) return;
     const uid = session.user.id;
 
-    // Get user's watchlist
     const { data: instruments } = await supabase
       .from("user_instruments")
       .select("symbol")
@@ -34,30 +34,36 @@ export function MostVolumeBar() {
     if (!instruments || instruments.length === 0) return;
     const symbols = instruments.map((i) => i.symbol);
 
-    // Get latest scan per symbol
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     const { data: scans } = await supabase
       .from("scan_results")
-      .select("symbol, adx, confidence, scanned_at")
+      .select("symbol, volume, confidence, scanned_at")
       .eq("user_id", uid)
       .in("symbol", symbols)
+      .gte("scanned_at", todayStart.toISOString())
       .order("scanned_at", { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (!scans || scans.length === 0) return;
 
-    // Latest scan per symbol, score = ADX (if available) or confidence
+    // Check if any scan has volume data
+    const hasVolume = scans.some(s => s.volume != null && Number(s.volume) > 0);
+
     const latest = new Map<string, TopInstrument>();
     for (const s of scans) {
       if (!latest.has(s.symbol)) {
         latest.set(s.symbol, {
           symbol: s.symbol,
-          score: s.adx ?? s.confidence ?? 0,
+          score: hasVolume ? (Number(s.volume) || 0) : (s.confidence ?? 0),
         });
       }
     }
 
+    setMetric(hasVolume ? "volume" : "confidence");
+
     const sorted = Array.from(latest.values()).sort((a, b) => b.score - a.score);
-    // Show top 1, or top 2 if scores are close (within 15%)
     const result = [sorted[0]];
     if (sorted.length > 1 && sorted[1].score >= sorted[0].score * 0.85) {
       result.push(sorted[1]);
@@ -85,7 +91,7 @@ export function MostVolumeBar() {
         Most Volume Today
       </span>
 
-      <div style={{ display: "flex", gap: 8, marginLeft: 4 }}>
+      <div style={{ display: "flex", gap: 8, marginLeft: 4, alignItems: "center" }}>
         {top.map((t) => (
           <span
             key={t.symbol}
@@ -104,6 +110,9 @@ export function MostVolumeBar() {
             {t.symbol}
           </span>
         ))}
+        <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>
+          by {metric}
+        </span>
       </div>
     </div>
   );
