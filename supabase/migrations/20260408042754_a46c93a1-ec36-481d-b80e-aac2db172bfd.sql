@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN clock_timezones jsonb DEFAULT NULL;
