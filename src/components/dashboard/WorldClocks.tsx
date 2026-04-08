@@ -57,6 +57,21 @@ function getLocalTimezone(): string {
   }
 }
 
+const TZ_ABBR_MAP: Record<string, string> = {
+  "Pacific/Auckland": "AKL", "Australia/Sydney": "SYD", "Australia/Melbourne": "MEL",
+  "Asia/Tokyo": "TYO", "Asia/Hong_Kong": "HKG", "Asia/Singapore": "SGP",
+  "Asia/Kolkata": "BOM", "Asia/Dubai": "DXB", "Europe/London": "LDN",
+  "Europe/Berlin": "FRA", "Europe/Zurich": "ZRH", "America/New_York": "NYC",
+  "America/Chicago": "CHI", "America/Denver": "DEN", "America/Los_Angeles": "LAX",
+  "America/Toronto": "YYZ", "America/Sao_Paulo": "GRU",
+};
+
+function getLocalClock(): ClockConfig {
+  const tz = getLocalTimezone();
+  const abbr = TZ_ABBR_MAP[tz] || tz.split("/").pop()?.slice(0, 3).toUpperCase() || "LOC";
+  return { city: "Local", abbr, timezone: tz };
+}
+
 interface WorldClocksProps {
   clocks?: ClockConfig[];
   onSessionChange?: (session: string) => void;
@@ -65,7 +80,9 @@ interface WorldClocksProps {
 export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProps) {
   const [now, setNow] = useState(new Date());
   const activeClocks = clocks && clocks.length > 0 ? clocks : DEFAULT_CLOCKS;
-  const localTz = getLocalTimezone();
+  const localClock = getLocalClock();
+  const localDuplicate = activeClocks.some(c => c.timezone === localClock.timezone);
+  const allClocks = localDuplicate ? activeClocks : [localClock, ...activeClocks];
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -81,7 +98,8 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      {activeClocks.map((clock) => {
+      {allClocks.map((clock, idx) => {
+        const isLocalClock = !localDuplicate && idx === 0;
         const timeStr = now.toLocaleTimeString("en-GB", {
           timeZone: clock.timezone,
           hour: "2-digit",
@@ -90,7 +108,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
         });
 
         const isHighlighted = session.highlightTimezones.includes(clock.timezone);
-        const isLocal = localTz === clock.timezone;
+        const isLocal = isLocalClock || (localDuplicate && localClock.timezone === clock.timezone);
 
         return (
           <div
@@ -100,7 +118,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
               height: 40,
               borderRadius: 8,
               background: C.card,
-              border: `1px solid ${isHighlighted ? C.jade : C.border}`,
+              border: `1px solid ${isLocal ? C.jade : isHighlighted ? C.jade : C.border}`,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
