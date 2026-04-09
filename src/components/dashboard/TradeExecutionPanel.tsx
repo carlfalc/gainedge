@@ -293,7 +293,7 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
                   Spread: {spread !== null ? spread.toFixed(priceDec > 3 ? 1 : priceDec) : "—"}
                 </div>
                 <div className="text-center">
-                  <div className="text-[9px] text-white uppercase">Ask</div>
+                  <div className="text-[9px] text-red-500 uppercase">Ask</div>
                   <div className="text-white font-bold">{ask !== null ? ask.toFixed(priceDec) : "—"}</div>
                 </div>
               </div>
