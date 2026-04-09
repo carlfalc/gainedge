@@ -9,15 +9,12 @@ const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-// MetaApi REST API base URLs — market data uses a DIFFERENT host
-const PROVISIONING_URL = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
+// MetaApi REST API base URLs
 const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 
-// Default demo credentials
-const DEMO_LOGIN = "7940685";
-const DEMO_PASSWORD = "11@Asdcxz";
-const DEMO_SERVER = "Eightcap-Demo";
+// HARDCODED account ID — do NOT provision new accounts
+const METAAPI_ACCOUNT_ID = "ea940a26-d263-4017-ad2c-0412f8399b69";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
