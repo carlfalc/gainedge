@@ -101,10 +101,11 @@ export async function fetchCandles(
   const ranges = raw.map(c => c.high - c.low);
   const avgRange = ranges.reduce((a, b) => a + b, 0) / ranges.length;
 
-  // Filter out anomalous candles (range > 5x average) — likely data errors
+  // Filter out anomalous candles (range > 10x average) — likely data errors
+  // Relaxed from 5x to 10x to avoid filtering valid volatile candles
   const filtered = raw.filter((c, i) => {
     const range = c.high - c.low;
-    if (avgRange > 0 && range > avgRange * 5) return false;
+    if (avgRange > 0 && range > avgRange * 10) return false;
     return true;
   });
 
@@ -113,7 +114,7 @@ export async function fetchCandles(
   const expectedGapSec: Record<string, number> = {
     "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400,
   };
-  const maxGap = (expectedGapSec[tfKey] || 900) * 3; // allow up to 3x expected gap
+  const maxGap = (expectedGapSec[tfKey] || 900) * 5; // allow up to 5x expected gap
 
   const result: FormattedCandle[] = [filtered[0]];
   for (let i = 1; i < filtered.length; i++) {
