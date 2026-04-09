@@ -202,17 +202,22 @@ Deno.serve(async (req: Request) => {
 
       let lastError: any = null;
       for (const variant of variants) {
-        const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
-        const res = await fetch(url, {
-          headers: { "auth-token": METAAPI_TOKEN },
-        });
-        const price = await res.json();
-        if (res.ok) {
-          return new Response(JSON.stringify({ success: true, price }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        try {
+          const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
+          const res = await fetch(url, {
+            headers: { "auth-token": METAAPI_TOKEN },
           });
+          const price = await res.json();
+          if (res.ok) {
+            return new Response(JSON.stringify({ success: true, price }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          lastError = price;
+        } catch (fetchErr) {
+          console.error(`Price fetch failed for ${variant}:`, fetchErr.message);
+          lastError = { message: fetchErr.message };
         }
-        lastError = price;
       }
 
       return new Response(JSON.stringify({
