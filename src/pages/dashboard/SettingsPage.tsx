@@ -4,6 +4,7 @@ import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff,
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel from "@/components/dashboard/FalconerPreferencesPanel";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
+import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
