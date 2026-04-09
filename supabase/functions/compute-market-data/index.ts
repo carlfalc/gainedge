@@ -867,6 +867,10 @@ serve(async (req) => {
     }
 
     // ─── FALCONER AI AUTO-SCAN: detect candle closes with STRICT DEDUP ───
+    // Load V2 knowledge base rules
+    const { data: v2Rules } = await supabase.from("falconer_knowledge").select("*").eq("is_active", true);
+    const activeRules: KnowledgeRule[] = (v2Rules || []) as KnowledgeRule[];
+
     let autoScans = 0;
     let signalsCreated = 0;
     const session = detectSession();
@@ -877,6 +881,9 @@ serve(async (req) => {
         .select("default_candle_type, ema_fast, ema_slow")
         .eq("id", userId)
         .single();
+
+      // Check if user has V2 enabled (default: v2)
+      const useV2 = true; // V2 is default for all users
 
       for (const inst of instList) {
         const data = symbolData.get(inst.symbol);
@@ -890,11 +897,20 @@ serve(async (req) => {
         if (prevTime && newTime && prevTime !== newTime) {
           console.log(`Candle close: ${inst.symbol} (${inst.timeframe}) user ${userId.slice(0, 8)}`);
 
+          // Count recent signals for overtrading prevention
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+          const { count: recentSignalCount } = await supabase
+            .from("signals")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", userId)
+            .eq("symbol", inst.symbol)
+            .gte("created_at", twoHoursAgo);
+
           const candles = symbolCandles.get(inst.symbol);
           let analysis: AnalysisResult;
 
           if (candles && candles.length > 20) {
-            analysis = runAnalysis(candles);
+            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2);
           } else {
             // Mock analysis — still apply Falconer AI logic
             const mockRsi = data.rsi;
