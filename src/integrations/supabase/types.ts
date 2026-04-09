@@ -120,6 +120,39 @@ export type Database = {
           },
         ]
       }
+      chart_drawings: {
+        Row: {
+          created_at: string
+          drawing_data: Json
+          drawing_type: string
+          id: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          drawing_data?: Json
+          drawing_type: string
+          id?: string
+          symbol: string
+          timeframe?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          drawing_data?: Json
+          drawing_type?: string
+          id?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       falconer_knowledge: {
         Row: {
           category: string
@@ -674,6 +707,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_indicator_preferences: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          indicator_id: string
+          params: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          indicator_id: string
+          params?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          indicator_id?: string
+          params?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_instruments: {
         Row: {
