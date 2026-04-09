@@ -158,11 +158,23 @@ Deno.serve(async (req: Request) => {
       const start = startTime || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
 
-      const res = await fetch(url, {
-        headers: { "auth-token": METAAPI_TOKEN },
-      });
+      let res, candles;
+      try {
+        res = await fetch(url, {
+          headers: { "auth-token": METAAPI_TOKEN },
+        });
+        candles = await res.json();
+      } catch (fetchErr) {
+        console.error("Candles fetch network error:", fetchErr.message);
+        return new Response(JSON.stringify({
+          error: "SERVICE_UNAVAILABLE",
+          fallback: true,
+          candles: [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      const candles = await res.json();
       if (!res.ok) {
         return new Response(JSON.stringify({
           error: candles.message || "Failed to fetch candles",
@@ -202,17 +214,22 @@ Deno.serve(async (req: Request) => {
 
       let lastError: any = null;
       for (const variant of variants) {
-        const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
-        const res = await fetch(url, {
-          headers: { "auth-token": METAAPI_TOKEN },
-        });
-        const price = await res.json();
-        if (res.ok) {
-          return new Response(JSON.stringify({ success: true, price }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        try {
+          const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
+          const res = await fetch(url, {
+            headers: { "auth-token": METAAPI_TOKEN },
           });
+          const price = await res.json();
+          if (res.ok) {
+            return new Response(JSON.stringify({ success: true, price }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          lastError = price;
+        } catch (fetchErr) {
+          console.error(`Price fetch failed for ${variant}:`, fetchErr.message);
+          lastError = { message: fetchErr.message };
         }
-        lastError = price;
       }
 
       return new Response(JSON.stringify({
@@ -233,12 +250,20 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols`;
-      const res = await fetch(url, {
-        headers: { "auth-token": METAAPI_TOKEN },
-      });
+      let res, symbols;
+      try {
+        const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols`;
+        res = await fetch(url, {
+          headers: { "auth-token": METAAPI_TOKEN },
+        });
+        symbols = await res.json();
+      } catch (fetchErr) {
+        console.error("Symbols fetch network error:", fetchErr.message);
+        return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true, symbols: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      const symbols = await res.json();
       if (!res.ok) {
         return new Response(JSON.stringify({
           error: symbols.message || "Failed to fetch symbols",
