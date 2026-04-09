@@ -896,8 +896,8 @@ export default function ChartsPage() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-white/40">Next close:</span>
-          <span className="text-[#00CFA5] font-bold font-mono">{countdown}</span>
+          <span className="text-white/40 text-lg">Next close:</span>
+          <span className="text-[#00CFA5] font-bold font-mono text-lg">{countdown}</span>
         </div>
       </div>
 
