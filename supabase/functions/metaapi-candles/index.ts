@@ -250,12 +250,20 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols`;
-      const res = await fetch(url, {
-        headers: { "auth-token": METAAPI_TOKEN },
-      });
+      let res, symbols;
+      try {
+        const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols`;
+        res = await fetch(url, {
+          headers: { "auth-token": METAAPI_TOKEN },
+        });
+        symbols = await res.json();
+      } catch (fetchErr) {
+        console.error("Symbols fetch network error:", fetchErr.message);
+        return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true, symbols: [] }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      const symbols = await res.json();
       if (!res.ok) {
         return new Response(JSON.stringify({
           error: symbols.message || "Failed to fetch symbols",
