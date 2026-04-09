@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock } from "lucide-react";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
+import FalconerPreferencesPanel from "@/components/dashboard/FalconerPreferencesPanel";
+import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
