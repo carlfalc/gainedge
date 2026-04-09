@@ -388,8 +388,8 @@ export default function SignalsPage() {
                 <Cell>
                   <span style={{
                     fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
-                    background: resultColor(s.result) + "20",
-                    color: resultColor(s.result),
+                    background: resultColor(s.result, s.pnl_pips) + "20",
+                    color: resultColor(s.result, s.pnl_pips),
                     textTransform: "uppercase",
                   }}>{s.result}</span>
                 </Cell>
