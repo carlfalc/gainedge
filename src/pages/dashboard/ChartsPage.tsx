@@ -27,6 +27,9 @@ import {
   toHeikenAshi,
   type OHLCData,
 } from "@/lib/chart-indicators";
+import { getAllIndicators, type IndicatorMeta } from "@/lib/indicator-registry";
+import IndicatorModal, { type ActiveIndicator } from "@/components/dashboard/IndicatorModal";
+import DrawingToolbar from "@/components/dashboard/DrawingToolbar";
 import {
   Activity, ArrowUpRight, ArrowDownRight, Minus,
   Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff,
@@ -46,36 +49,47 @@ interface CrosshairData {
   open: number; high: number; low: number; close: number; volume: number; time: number;
 }
 
+interface SavedDrawing {
+  id: string;
+  drawing_type: string;
+  drawing_data: any;
+}
+
 const TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"];
 const CHART_TYPES = ["Candlestick", "Heiken Ashi"] as const;
 
 type ConnectionStatus = "disconnected" | "connecting" | "live" | "demo";
 
-/* ───── indicator config ───── */
-interface IndicatorConfig {
-  id: string; label: string; enabled: boolean; params?: Record<string, number>;
-}
-
-const DEFAULT_INDICATORS: IndicatorConfig[] = [
-  { id: "ema_fast", label: "EMA 4", enabled: true, params: { period: 4 } },
-  { id: "ema_slow", label: "EMA 17", enabled: true, params: { period: 17 } },
-  { id: "bollinger", label: "Bollinger Bands", enabled: false, params: { period: 20, stdDev: 2 } },
-  { id: "sma_50", label: "SMA 50", enabled: false, params: { period: 50 } },
-  { id: "sma_200", label: "SMA 200", enabled: false, params: { period: 200 } },
-  { id: "rsi", label: "RSI 14", enabled: false, params: { period: 14 } },
-  { id: "macd", label: "MACD", enabled: false },
-];
-
 /* ───── symbol mapping for Eightcap MT5 ───── */
 const BROKER_SYMBOL_MAP: Record<string, string[]> = {
-  XAUUSD: ["XAUUSD"],
-  US30: ["US30", "DJ30"],
-  NAS100: ["NAS100", "USTEC"],
-  NZDUSD: ["NZDUSD"],
-  AUDUSD: ["AUDUSD"],
-  EURUSD: ["EURUSD"],
-  GBPUSD: ["GBPUSD"],
-  USDJPY: ["USDJPY"],
+  XAUUSD: ["XAUUSD"], US30: ["US30", "DJ30"], NAS100: ["NAS100", "USTEC"],
+  NZDUSD: ["NZDUSD"], AUDUSD: ["AUDUSD"], EURUSD: ["EURUSD"],
+  GBPUSD: ["GBPUSD"], USDJPY: ["USDJPY"],
+};
+
+/* ───── Drawing tool → DrawingManager mapping ───── */
+const DRAWING_TOOL_MAP: Record<string, string> = {
+  trend_line: "TrendLine", horizontal_line: "HorizontalLine", vertical_line: "VerticalLine",
+  ray: "Ray", arrow: "Arrow", extended_line: "ExtendedLine", cross_line: "CrossLine",
+  info_line: "InfoLine", trend_angle: "TrendAngle", horizontal_ray: "HorizontalRay",
+  fib_retracement: "FibRetracement", fib_extension: "FibExtension", fib_channel: "FibChannel",
+  fib_time_zone: "FibTimeZone", fib_speed_fan: "FibSpeedFan", fib_circles: "FibCircles",
+  fib_spiral: "FibSpiral", fib_arcs: "FibArcs", fib_wedge: "FibWedge", pitchfan: "Pitchfan",
+  trend_fib_time: "TrendBasedFibTime",
+  parallel_channel: "ParallelChannel", regression_trend: "RegressionTrend",
+  flat_top_bottom: "FlatTopBottom", disjoint_channel: "DisjointChannel",
+  andrews_pitchfork: "AndrewsPitchfork", schiff_pitchfork: "SchiffPitchfork",
+  modified_schiff: "ModifiedSchiffPitchfork", inside_pitchfork: "InsidePitchfork",
+  gann_box: "GannBox", gann_fan: "GannFan", gann_square_fixed: "GannSquareFixed", gann_square: "GannSquare",
+  rectangle: "Rectangle", circle: "Circle", triangle: "Triangle", ellipse: "Ellipse",
+  arc: "Arc", price_range: "PriceRange", rotated_rectangle: "RotatedRectangle",
+  path: "Path", polyline: "Polyline", curve: "Curve", double_curve: "DoubleCurve",
+  text: "Text", callout: "Callout", anchored_text: "AnchoredText", note: "Note",
+  price_note: "PriceNote", price_label: "PriceLabel", arrow_marker: "ArrowMarker",
+  flag_mark: "FlagMark", comment: "Comment",
+  long_position: "LongPosition", short_position: "ShortPosition",
+  projection: "Projection", forecast: "Forecast", bars_pattern: "BarsPattern",
+  date_range: "DateRange", date_price_range: "DateAndPriceRange",
 };
 
 export default function ChartsPage() {
@@ -88,15 +102,21 @@ export default function ChartsPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [crosshair, setCrosshair] = useState<CrosshairData | null>(null);
   const [countdown, setCountdown] = useState("");
-  const [indicators, setIndicators] = useState<IndicatorConfig[]>(DEFAULT_INDICATORS);
   const [showIndicatorModal, setShowIndicatorModal] = useState(false);
-  const [indicatorSearch, setIndicatorSearch] = useState("");
-  const [hLineMode, setHLineMode] = useState(false);
   const [showBrokerModal, setShowBrokerModal] = useState(false);
   const [brokerLabel, setBrokerLabel] = useState("");
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
+
+  // Indicators
+  const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]);
+  const indicatorsLoadedRef = useRef(false);
+
+  // Drawing tools
+  const [activeDrawingTool, setActiveDrawingTool] = useState<string | null>(null);
+  const [savedDrawings, setSavedDrawings] = useState<SavedDrawing[]>([]);
+  const drawingManagerRef = useRef<any>(null);
 
   // MetaApi state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
@@ -108,6 +128,7 @@ export default function ChartsPage() {
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const overlaySeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
+  const paneSeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
   const tradeLinesRef = useRef<any[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
@@ -139,7 +160,6 @@ export default function ChartsPage() {
       .then(({ data }) => {
         const syms = data?.map(d => d.symbol) ?? [];
         const list = syms.length > 0 ? syms : ["NAS100", "US30", "XAUUSD", "AUDUSD", "NZDUSD"];
-        // Store per-instrument timeframes
         const tfMap = new Map<string, string>();
         data?.forEach(d => tfMap.set(d.symbol, d.timeframe || "15m"));
         instrumentTfRef.current = tfMap;
@@ -150,6 +170,53 @@ export default function ChartsPage() {
         }
       });
   }, [userId]);
+
+  /* ─── load saved indicator preferences ─── */
+  useEffect(() => {
+    if (!userId || indicatorsLoadedRef.current) return;
+    indicatorsLoadedRef.current = true;
+
+    supabase.from("user_indicator_preferences").select("*").eq("user_id", userId)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const allInds = getAllIndicators();
+          const loaded: ActiveIndicator[] = data.map((row: any) => {
+            const meta = allInds.find(i => i.id === row.indicator_id);
+            return {
+              id: row.indicator_id,
+              meta: meta || { id: row.indicator_id, name: row.indicator_id, shortName: row.indicator_id, category: "Other", overlay: true, group: "standard", inputConfig: [], plotConfig: [], calculate: () => ({ metadata: { title: "", shorttitle: "", overlay: true }, plots: {} }) },
+              enabled: row.enabled,
+              params: row.params || {},
+            };
+          });
+          setActiveIndicators(loaded);
+        } else {
+          // Default indicators
+          const allInds = getAllIndicators();
+          const defaults = [
+            { id: "ema", params: { len: 4 } },
+            { id: "ema", params: { len: 17 } },
+          ];
+          const defaultActive: ActiveIndicator[] = [];
+          const emaMeta = allInds.find(i => i.id === "ema");
+          if (emaMeta) {
+            defaultActive.push({ id: "ema_4", meta: emaMeta, enabled: true, params: { len: 4 } });
+            defaultActive.push({ id: "ema_17", meta: emaMeta, enabled: true, params: { len: 17 } });
+          }
+          setActiveIndicators(defaultActive);
+        }
+      });
+  }, [userId]);
+
+  /* ─── load saved drawings ─── */
+  useEffect(() => {
+    if (!userId || !selected) return;
+    supabase.from("chart_drawings").select("id, drawing_type, drawing_data")
+      .eq("user_id", userId).eq("symbol", selected).eq("timeframe", timeframe)
+      .then(({ data }) => {
+        setSavedDrawings((data as SavedDrawing[]) || []);
+      });
+  }, [userId, selected, timeframe]);
 
   /* ─── When instrument changes, load its saved timeframe ─── */
   useEffect(() => {
@@ -200,7 +267,6 @@ export default function ChartsPage() {
 
         if (state === "DEPLOYING") {
           setLoadingMessage("Deploying account (may take up to 60s)...");
-          // Poll for deployment completion
           for (let i = 0; i < 30; i++) {
             await new Promise(r => setTimeout(r, 2000));
             if (cancelled) return;
@@ -239,7 +305,6 @@ export default function ChartsPage() {
     if (acctId && connectionStatus === "live") {
       try {
         setLoadingMessage("Loading candles...");
-        // Try broker symbol variants
         const variants = BROKER_SYMBOL_MAP[selected] ?? [selected];
         let candles: FormattedCandle[] = [];
 
@@ -254,16 +319,10 @@ export default function ChartsPage() {
 
         if (candles.length > 0) {
           return candles.map(c => ({
-            time: c.time,
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: c.volume,
+            time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
           }));
         }
 
-        // No candles returned — fall back to mock
         toast.error(`No data for ${selected}. Showing simulated data.`);
       } catch (e: any) {
         setLoadingMessage("");
@@ -271,7 +330,6 @@ export default function ChartsPage() {
       }
     }
 
-    // Fallback to mock data
     if (connectionStatus === "live") setConnectionStatus("demo");
     return generateMockCandles(selected, timeframe, 500);
   }, [selected, timeframe, connectionStatus]);
@@ -282,13 +340,12 @@ export default function ChartsPage() {
 
     const acctId = accountIdRef.current;
     if (!acctId || connectionStatus !== "live") {
-      // Use mock tick simulation
       startMockTicks();
       return;
     }
 
     const variants = BROKER_SYMBOL_MAP[selected] ?? [selected];
-    const brokerSymbol = variants[0]; // Use primary symbol
+    const brokerSymbol = variants[0];
 
     pricePollingRef.current = setInterval(async () => {
       try {
@@ -300,10 +357,7 @@ export default function ChartsPage() {
 
         const mid = (price.bid + price.ask) / 2;
         const updated: OHLCData = {
-          ...last,
-          close: mid,
-          high: Math.max(last.high, mid),
-          low: Math.min(last.low, mid),
+          ...last, close: mid, high: Math.max(last.high, mid), low: Math.min(last.low, mid),
         };
         rawDataRef.current[rawDataRef.current.length - 1] = updated;
 
@@ -328,10 +382,7 @@ export default function ChartsPage() {
       const change = (Math.random() - 0.5) * vol;
       const newClose = +(last.close + change).toFixed(5);
       const updated: OHLCData = {
-        ...last,
-        close: newClose,
-        high: Math.max(last.high, newClose),
-        low: Math.min(last.low, newClose),
+        ...last, close: newClose, high: Math.max(last.high, newClose), low: Math.min(last.low, newClose),
       };
       rawDataRef.current[rawDataRef.current.length - 1] = updated;
       const display = chartType === "Heiken Ashi"
@@ -346,7 +397,6 @@ export default function ChartsPage() {
 
   /* ─── draw trade level lines ─── */
   const drawTradeLines = useCallback((candleSeries: ISeriesApi<"Candlestick">) => {
-    // Remove old trade lines
     tradeLinesRef.current.forEach(line => {
       try { candleSeries.removePriceLine(line); } catch {}
     });
@@ -354,13 +404,11 @@ export default function ChartsPage() {
 
     const addLine = (price: number, color: string, title: string) => {
       const line = candleSeries.createPriceLine({
-        price, color, lineWidth: 1, lineStyle: 2,
-        axisLabelVisible: true, title,
+        price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title,
       });
       tradeLinesRef.current.push(line);
     };
 
-    // 1. Active signal lines
     if (scanResult) {
       const fresh = signalFreshness(scanResult.scanned_at);
       if (fresh !== "expired") {
@@ -370,7 +418,6 @@ export default function ChartsPage() {
       }
     }
 
-    // 2. Open position lines for current symbol
     const symbolPositions = tradePositions.filter(p => {
       const sym = p.symbol?.replace(".i", "").replace("NDX100", "NAS100");
       return sym === selected || p.symbol === selected;
@@ -382,35 +429,244 @@ export default function ChartsPage() {
       if (p.takeProfit) addLine(p.takeProfit, "#22C55E", `Pos TP${label}`);
     });
 
-    // 3. Limit/stop order lines
     if (limitPrices && (orderMode === "limit" || orderMode === "stop")) {
-      if (limitPrices.entry) {
-        addLine(limitPrices.entry, "#FFFFFF", orderMode === "limit" ? "Limit Entry" : "Stop Entry");
-      }
-      if (limitPrices.slEnabled && limitPrices.sl) {
-        addLine(limitPrices.sl, "#EF4444", "Pending SL");
-      }
-      if (limitPrices.tpEnabled && limitPrices.tp) {
-        addLine(limitPrices.tp, "#22C55E", "Pending TP");
-      }
+      if (limitPrices.entry) addLine(limitPrices.entry, "#FFFFFF", orderMode === "limit" ? "Limit Entry" : "Stop Entry");
+      if (limitPrices.slEnabled && limitPrices.sl) addLine(limitPrices.sl, "#EF4444", "Pending SL");
+      if (limitPrices.tpEnabled && limitPrices.tp) addLine(limitPrices.tp, "#22C55E", "Pending TP");
     }
   }, [scanResult, tradePositions, selected, limitPrices, orderMode]);
 
-  /* ─── redraw trade lines when deps change ─── */
   useEffect(() => {
-    if (candleSeriesRef.current) {
-      drawTradeLines(candleSeriesRef.current);
-    }
+    if (candleSeriesRef.current) drawTradeLines(candleSeriesRef.current);
   }, [drawTradeLines]);
+
+  /* ─── indicator toggle handler ─── */
+  const handleIndicatorToggle = useCallback((meta: IndicatorMeta, params?: Record<string, any>) => {
+    setActiveIndicators(prev => {
+      const existing = prev.find(a => a.id === meta.id);
+      if (existing) {
+        // Toggle off
+        const updated = prev.map(a => a.id === meta.id ? { ...a, enabled: !a.enabled } : a);
+        saveIndicatorPrefs(updated);
+        return updated;
+      }
+      // Add new
+      const defaultParams: Record<string, any> = {};
+      meta.inputConfig.forEach(input => {
+        if (input.defval !== undefined) defaultParams[input.id] = input.defval;
+      });
+      const newInd: ActiveIndicator = {
+        id: meta.id,
+        meta,
+        enabled: true,
+        params: params || defaultParams,
+      };
+      const updated = [...prev, newInd];
+      saveIndicatorPrefs(updated);
+      return updated;
+    });
+  }, [userId]);
+
+  const handleIndicatorRemove = useCallback((id: string) => {
+    setActiveIndicators(prev => {
+      const updated = prev.filter(a => a.id !== id);
+      saveIndicatorPrefs(updated);
+      return updated;
+    });
+  }, [userId]);
+
+  const saveIndicatorPrefs = useCallback(async (indicators: ActiveIndicator[]) => {
+    if (!userId) return;
+    // Delete all existing prefs, then insert new ones
+    await supabase.from("user_indicator_preferences").delete().eq("user_id", userId);
+    if (indicators.length > 0) {
+      await supabase.from("user_indicator_preferences").insert(
+        indicators.map(ind => ({
+          user_id: userId,
+          indicator_id: ind.id,
+          enabled: ind.enabled,
+          params: ind.params,
+        }))
+      );
+    }
+  }, [userId]);
+
+  /* ─── Drawing tools ─── */
+  const initDrawingManager = useCallback(async (chart: IChartApi, series: ISeriesApi<"Candlestick">) => {
+    try {
+      const drawingMod = await import("lightweight-charts-drawing");
+      const { DrawingManager } = drawingMod;
+      const dm = new DrawingManager();
+      dm.attach(chart, series, containerRef.current!);
+      drawingManagerRef.current = dm;
+
+      // Load saved drawings
+      if (savedDrawings.length > 0) {
+        try {
+          const drawingData = savedDrawings.map(d => d.drawing_data);
+          // importDrawings requires a factory function
+          dm.importDrawings(drawingData, (type: string, data: any) => {
+            const ToolClass = (drawingMod as any)[type];
+            if (ToolClass) {
+              try { return new ToolClass(data); } catch { return null; }
+            }
+            return null;
+          });
+        } catch (e) {
+          console.warn("Failed to import saved drawings:", e);
+        }
+      }
+
+      return dm;
+    } catch (e) {
+      console.warn("DrawingManager init failed:", e);
+      return null;
+    }
+  }, [savedDrawings]);
+
+  const handleSelectDrawingTool = useCallback((toolId: string | null) => {
+    setActiveDrawingTool(toolId);
+    const dm = drawingManagerRef.current;
+    if (!dm) return;
+
+    if (!toolId) {
+      dm.setActiveTool(null);
+      return;
+    }
+
+    const toolClass = DRAWING_TOOL_MAP[toolId];
+    if (toolClass) {
+      dm.setActiveTool(toolClass);
+    }
+  }, []);
+
+  const handleClearDrawings = useCallback(async () => {
+    const dm = drawingManagerRef.current;
+    if (dm) dm.clearAll();
+    setSavedDrawings([]);
+    if (userId && selected) {
+      await supabase.from("chart_drawings").delete()
+        .eq("user_id", userId).eq("symbol", selected).eq("timeframe", timeframe);
+    }
+  }, [userId, selected, timeframe]);
+
+  const saveDrawings = useCallback(async () => {
+    const dm = drawingManagerRef.current;
+    if (!dm || !userId || !selected) return;
+
+    try {
+      const exported = dm.exportDrawings();
+      // Delete existing, insert new
+      await supabase.from("chart_drawings").delete()
+        .eq("user_id", userId).eq("symbol", selected).eq("timeframe", timeframe);
+
+      if (exported && exported.length > 0) {
+        await supabase.from("chart_drawings").insert(
+          exported.map((d: any) => ({
+            user_id: userId,
+            symbol: selected,
+            timeframe,
+            drawing_type: d.type || "unknown",
+            drawing_data: d,
+          }))
+        );
+      }
+    } catch (e) {
+      console.warn("Failed to save drawings:", e);
+    }
+  }, [userId, selected, timeframe]);
+
+  /* ─── apply indicators using community library ─── */
+  const applyIndicators = useCallback((chart: IChartApi, rawData: OHLCData[]) => {
+    // Clean up existing series
+    overlaySeriesRefs.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
+    overlaySeriesRefs.current = [];
+    paneSeriesRefs.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
+    paneSeriesRefs.current = [];
+
+    const bars = rawData.map(d => ({
+      time: d.time, open: d.open, high: d.high, low: d.low, close: d.close, volume: d.volume ?? 0,
+    }));
+
+    if (bars.length < 5) return;
+
+    // Indicator legend data
+    const legendItems: string[] = [];
+
+    for (const ind of activeIndicators) {
+      if (!ind.enabled || !ind.meta.calculate) continue;
+
+      try {
+        const result = ind.meta.calculate(bars, ind.params);
+        if (!result || !result.plots) continue;
+
+        const plotKeys = Object.keys(result.plots);
+        const isOverlay = result.metadata?.overlay ?? ind.meta.overlay;
+        const plotConfigs = ind.meta.plotConfig || [];
+
+        plotKeys.forEach((plotKey, plotIdx) => {
+          const plotData = result.plots[plotKey];
+          if (!plotData || plotData.length === 0) return;
+
+          // Skip hidden plots
+          const plotCfg = plotConfigs[plotIdx];
+          if (plotCfg?.display === "none") return;
+
+          // Filter out null values
+          const validData = plotData
+            .filter((p: any) => p.value !== null && p.value !== undefined && isFinite(p.value))
+            .map((p: any) => ({ time: p.time as Time, value: p.value }));
+
+          if (validData.length === 0) return;
+
+          const color = plotCfg?.color || getDefaultColor(plotIdx);
+          const lineWidth = plotCfg?.lineWidth ?? 1;
+
+          if (isOverlay) {
+            const s = chart.addSeries(LineSeries, {
+              color, lineWidth: lineWidth as any, priceLineVisible: false, lastValueVisible: false,
+            });
+            s.setData(validData);
+            overlaySeriesRefs.current.push(s);
+          } else {
+            // Oscillator pane
+            const s = chart.addSeries(LineSeries, {
+              color, lineWidth: lineWidth as any, priceLineVisible: false, lastValueVisible: true,
+              priceScaleId: `pane_${ind.id}`,
+            });
+            chart.priceScale(`pane_${ind.id}`).applyOptions({
+              scaleMargins: { top: 0.8, bottom: 0 },
+              borderVisible: false,
+            });
+            s.setData(validData);
+            paneSeriesRefs.current.push(s);
+          }
+        });
+
+        // Last value for legend
+        const mainPlot = result.plots[plotKeys[0]];
+        const lastVal = mainPlot?.filter((p: any) => p.value !== null).pop();
+        if (lastVal) {
+          legendItems.push(`${ind.meta.shortName}: ${typeof lastVal.value === 'number' ? lastVal.value.toFixed(2) : lastVal.value}`);
+        }
+      } catch (e) {
+        console.warn(`Indicator ${ind.meta.shortName} failed:`, e);
+      }
+    }
+  }, [activeIndicators]);
 
   /* ─── create chart ─── */
   const buildChart = useCallback(async () => {
     if (!containerRef.current || !selected) return;
     if (chartRef.current) {
+      // Save drawings before destroying
+      await saveDrawings();
       chartRef.current.remove();
       chartRef.current = null;
     }
     overlaySeriesRefs.current = [];
+    paneSeriesRefs.current = [];
+    drawingManagerRef.current = null;
 
     const chart = createChart(containerRef.current, {
       autoSize: true,
@@ -429,16 +685,12 @@ export default function ChartsPage() {
         horzLine: { color: "#00CFA5", labelBackgroundColor: "#00CFA5" },
       },
       rightPriceScale: {
-        visible: true,
-        borderColor: "rgba(255,255,255,0.1)",
+        visible: true, borderColor: "rgba(255,255,255,0.1)",
         scaleMargins: { top: 0.1, bottom: 0.2 },
       },
       timeScale: {
-        visible: true,
-        borderColor: "rgba(255,255,255,0.1)",
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 5,
+        visible: true, borderColor: "rgba(255,255,255,0.1)",
+        timeVisible: true, secondsVisible: false, rightOffset: 5,
       },
     });
     chartRef.current = chart;
@@ -451,13 +703,11 @@ export default function ChartsPage() {
     candleSeriesRef.current = candleSeries;
 
     const volSeries = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: "volume" },
-      priceScaleId: "volume",
+      priceFormat: { type: "volume" }, priceScaleId: "volume",
     });
     chart.priceScale("volume").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
     volumeSeriesRef.current = volSeries;
 
-    // Load data (real or mock)
     const rawData = await loadCandles();
     rawDataRef.current = rawData;
     const displayData = chartType === "Heiken Ashi" ? toHeikenAshi(rawData) : rawData;
@@ -481,11 +731,11 @@ export default function ChartsPage() {
       });
     }
 
-    // Draw trade level lines (signal + positions + limit orders)
     drawTradeLines(candleSeries);
+    applyIndicators(chart, rawData);
 
-    // Overlay indicators
-    applyIndicators(chart, rawData, displayData);
+    // Initialize drawing manager
+    await initDrawingManager(chart, candleSeries);
 
     // Crosshair
     chart.subscribeCrosshairMove((param) => {
@@ -500,73 +750,14 @@ export default function ChartsPage() {
       }
     });
 
-    // H-Line click
-    if (hLineMode) {
-      chart.subscribeClick((param) => {
-        if (!param.point) return;
-        const price = candleSeries.coordinateToPrice(param.point.y);
-        if (price !== null) {
-          candleSeries.createPriceLine({ price, color: "#F59E0B", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "" });
-        }
-        setHLineMode(false);
-      });
-    }
-
     chart.timeScale().fitContent();
-
-    // Start price updates
     startPricePolling();
-  }, [selected, timeframe, chartType, scanResult, hLineMode, indicators, loadCandles, startPricePolling]);
-
-  const applyIndicators = (chart: IChartApi, rawData: OHLCData[], _displayData: OHLCData[]) => {
-    overlaySeriesRefs.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
-    overlaySeriesRefs.current = [];
-
-    for (const ind of indicators) {
-      if (!ind.enabled) continue;
-      if (ind.id === "ema_fast" || ind.id === "ema_slow") {
-        const period = ind.params?.period ?? 17;
-        const emaData = calculateEMA(rawData, period);
-        const s = chart.addSeries(LineSeries, {
-          color: ind.id === "ema_fast" ? "#00CFA5" : "#8B5CF6",
-          lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
-        });
-        s.setData(emaData.map(d => ({ time: d.time as Time, value: d.value })));
-        overlaySeriesRefs.current.push(s);
-      }
-      if (ind.id === "sma_50" || ind.id === "sma_200") {
-        const period = ind.params?.period ?? 50;
-        const smaData = calculateSMA(rawData, period);
-        const s = chart.addSeries(LineSeries, {
-          color: ind.id === "sma_50" ? "#F59E0B" : "#EC4899",
-          lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
-        });
-        s.setData(smaData.map(d => ({ time: d.time as Time, value: d.value })));
-        overlaySeriesRefs.current.push(s);
-      }
-      if (ind.id === "bollinger") {
-        const { upper, middle, lower } = calculateBollingerBands(rawData, ind.params?.period ?? 20, ind.params?.stdDev ?? 2);
-        const colors = ["#3B82F6", "#6B7280", "#3B82F6"];
-        [upper, middle, lower].forEach((band, idx) => {
-          const s = chart.addSeries(LineSeries, {
-            color: colors[idx], lineWidth: 1, priceLineVisible: false, lastValueVisible: false,
-          });
-          s.setData(band.map(d => ({ time: d.time as Time, value: d.value })));
-          overlaySeriesRefs.current.push(s);
-        });
-      }
-    }
-  };
+  }, [selected, timeframe, chartType, scanResult, activeIndicators, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
 
   /* rebuild chart on deps change */
   useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      await buildChart();
-    };
-    run();
+    buildChart();
     return () => {
-      cancelled = true;
       if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
       if (pricePollingRef.current) clearInterval(pricePollingRef.current);
       if (chartRef.current) {
@@ -575,6 +766,11 @@ export default function ChartsPage() {
       }
     };
   }, [buildChart]);
+
+  // Save drawings on unmount or symbol change
+  useEffect(() => {
+    return () => { saveDrawings(); };
+  }, [selected, timeframe]);
 
   /* ─── helpers ─── */
   const dirColor = (d: string) => d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
@@ -589,9 +785,8 @@ export default function ChartsPage() {
     close: lastCandle.close, volume: lastCandle.volume ?? 0, time: lastCandle.time,
   } : null);
 
-  const filteredIndicators = indicators.filter(i =>
-    i.label.toLowerCase().includes(indicatorSearch.toLowerCase())
-  );
+  const activeCount = activeIndicators.filter(i => i.enabled).length;
+  const drawingCount = drawingManagerRef.current?.getAllDrawings?.()?.length ?? savedDrawings.length;
 
   const statusDot = connectionStatus === "live" ? "bg-green-400" : connectionStatus === "connecting" ? "bg-amber-400 animate-pulse" : connectionStatus === "demo" ? "bg-red-400" : "bg-gray-500";
   const statusText = connectionStatus === "live" ? "Live" : connectionStatus === "connecting" ? "Connecting..." : connectionStatus === "demo" ? "Demo" : "Offline";
@@ -672,9 +867,7 @@ export default function ChartsPage() {
         </button>
         <button onClick={() => setShowIndicatorModal(true)} className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1">
           <Search className="w-3 h-3" /> Indicators
-        </button>
-        <button onClick={() => setHLineMode(m => !m)} className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all border flex items-center gap-1 ${hLineMode ? "bg-[#F59E0B]/15 border-[#F59E0B]/40 text-[#F59E0B]" : "bg-[#111724] border-white/10 text-[#8892A4] hover:text-white"}`}>
-          <MinusIcon className="w-3 h-3" /> H-Line
+          {activeCount > 0 && <span className="text-[9px] text-[#00CFA5] ml-0.5">({activeCount})</span>}
         </button>
         <button onClick={() => chartRef.current?.timeScale().fitContent()} className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1">
           <ZoomIn className="w-3 h-3" /> Fit
@@ -684,7 +877,7 @@ export default function ChartsPage() {
         </button>
       </div>
 
-      {/* OHLCV overlay + countdown */}
+      {/* OHLCV overlay + countdown + indicator legend */}
       <div className="flex items-center justify-between text-[11px] px-1">
         <div className="flex items-center gap-3 font-mono">
           <span className="text-white/40">{selected}</span>
@@ -697,6 +890,10 @@ export default function ChartsPage() {
               <span className="text-white/60">V: <span className="text-white">{currentPrice.volume?.toLocaleString()}</span></span>
             </>
           )}
+          {/* Active indicator names */}
+          {activeIndicators.filter(i => i.enabled).slice(0, 4).map(ind => (
+            <span key={ind.id} className="text-[10px] text-[#00CFA5]/60">{ind.meta.shortName}</span>
+          ))}
         </div>
         <div className="flex items-center gap-2">
           <span className="text-white/40">Next close:</span>
@@ -704,20 +901,31 @@ export default function ChartsPage() {
         </div>
       </div>
 
-      {/* Chart container */}
-      <div className="relative">
-        <div
-          ref={containerRef}
-          className={`rounded-lg overflow-hidden border border-white/[0.06] ${isFullscreen ? "flex-1" : "min-h-[55vh]"}`}
-          style={{ cursor: hLineMode ? "crosshair" : undefined }}
+      {/* Chart container with drawing toolbar */}
+      <div className="relative flex gap-1">
+        {/* Drawing toolbar (left) */}
+        <DrawingToolbar
+          activeTool={activeDrawingTool}
+          onSelectTool={handleSelectDrawingTool}
+          onClearAll={handleClearDrawings}
+          drawingCount={drawingCount}
         />
-        {/* Loading overlay */}
-        {(connectionStatus === "connecting" || loadingMessage) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#080B12]/80 rounded-lg z-10">
-            <Loader2 className="w-8 h-8 text-[#00CFA5] animate-spin mb-3" />
-            <span className="text-sm text-white/60">{loadingMessage || "Connecting to broker..."}</span>
-          </div>
-        )}
+
+        {/* Chart */}
+        <div className="flex-1 relative">
+          <div
+            ref={containerRef}
+            className={`rounded-lg overflow-hidden border border-white/[0.06] ${isFullscreen ? "flex-1" : "min-h-[55vh]"}`}
+            style={{ cursor: activeDrawingTool ? "crosshair" : undefined }}
+          />
+          {/* Loading overlay */}
+          {(connectionStatus === "connecting" || loadingMessage) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#080B12]/80 rounded-lg z-10">
+              <Loader2 className="w-8 h-8 text-[#00CFA5] animate-spin mb-3" />
+              <span className="text-sm text-white/60">{loadingMessage || "Connecting to broker..."}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Trade Execution Panel */}
@@ -777,35 +985,13 @@ export default function ChartsPage() {
       )}
 
       {/* Indicator modal */}
-      {showIndicatorModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60" onClick={() => setShowIndicatorModal(false)}>
-          <div className="bg-[#111724] border border-white/10 rounded-xl p-5 w-[360px] max-h-[70vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-bold text-white">Indicators</span>
-              <button onClick={() => setShowIndicatorModal(false)} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
-            </div>
-            <input
-              value={indicatorSearch} onChange={e => setIndicatorSearch(e.target.value)}
-              placeholder="Search indicators..."
-              className="w-full bg-[#080B12] border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 mb-3 outline-none focus:border-[#00CFA5]/40"
-            />
-            <div className="flex flex-col gap-1">
-              {filteredIndicators.map(ind => (
-                <button
-                  key={ind.id}
-                  onClick={() => setIndicators(prev => prev.map(i => i.id === ind.id ? { ...i, enabled: !i.enabled } : i))}
-                  className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-xs transition-all ${
-                    ind.enabled ? "bg-[#00CFA5]/10 text-[#00CFA5] border border-[#00CFA5]/30" : "text-white/60 hover:bg-white/5 border border-transparent"
-                  }`}
-                >
-                  <span className="font-medium">{ind.label}</span>
-                  <span className="text-[10px]">{ind.enabled ? "ON" : "OFF"}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <IndicatorModal
+        open={showIndicatorModal}
+        onClose={() => setShowIndicatorModal(false)}
+        active={activeIndicators}
+        onToggle={handleIndicatorToggle}
+        onRemove={handleIndicatorRemove}
+      />
 
       {/* Broker modal */}
       <BrokerModal
@@ -827,3 +1013,11 @@ const VOLATILITY_MAP: Record<string, number> = {
   USDCHF: 0.0002, GBPJPY: 0.04, EURJPY: 0.03, XAGUSD: 0.02,
   BTCUSD: 30, ETHUSD: 3, US500: 1, SPX500: 1,
 };
+
+function getDefaultColor(index: number): string {
+  const colors = [
+    "#00CFA5", "#8B5CF6", "#F59E0B", "#EC4899", "#3B82F6",
+    "#EF4444", "#10B981", "#6366F1", "#F97316", "#14B8A6",
+  ];
+  return colors[index % colors.length];
+}

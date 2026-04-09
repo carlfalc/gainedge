@@ -43,8 +43,11 @@
         "embla-carousel-react": "^8.6.0",
         "input-otp": "^1.4.2",
         "lightweight-charts": "^5.1.0",
+        "lightweight-charts-drawing": "^0.1.1",
+        "lightweight-charts-indicators": "^0.4.0",
         "lucide-react": "^0.462.0",
         "next-themes": "^0.3.0",
+        "oakscriptjs": "^0.2.7",
         "react": "^18.3.1",
         "react-day-picker": "^8.10.1",
         "react-dom": "^18.3.1",
@@ -805,6 +808,10 @@
 
     "lightweight-charts": ["lightweight-charts@5.1.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/lightweight-charts/-/lightweight-charts-5.1.0.tgz", { "dependencies": { "fancy-canvas": "2.1.0" } }, "sha512-jEAYR4ODYeyNZcWUigsoLTl52rbPmgXnvd5FLIv/ZoA/2sSDw63YKnef8n4yhzum7W926yHeFwlm7ididKb7YQ=="],
 
+    "lightweight-charts-drawing": ["lightweight-charts-drawing@0.1.1", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/lightweight-charts-drawing/-/lightweight-charts-drawing-0.1.1.tgz", { "dependencies": { "fancy-canvas": "^2.1.0" }, "peerDependencies": { "lightweight-charts": "^5.0.0" } }, "sha512-lS5s94QnMA6mkXAbOCdLdux1rgzdlJn5vIxQSBNj+1pFtuMHaAlV+ciElSI0wNTzLNM1LQo8JN7j83GpApTcgQ=="],
+
+    "lightweight-charts-indicators": ["lightweight-charts-indicators@0.4.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/lightweight-charts-indicators/-/lightweight-charts-indicators-0.4.0.tgz", { "peerDependencies": { "oakscriptjs": "^0.2.0" } }, "sha512-RCcJcjZBvAyWGe7CCoFkWG5vttzCI8WvDjtoEQ7oaDA7Hy0Ku2F71G+CI/SxDn1T0ahU4SMefG7BviR5vSzCYQ=="],
+
     "lilconfig": ["lilconfig@3.1.3", "", {}, "sha512-/vlFKAoH5Cgt3Ie+JLhRbwOsCQePABiU3tJ1egGvyQ+33R/vcwM2Zl2QR/LzjsBeItPt3oSVXapn+m4nQDvpzw=="],
 
     "lines-and-columns": ["lines-and-columns@1.2.4", "", {}, "sha512-7ylylesZQ/PV29jhEDl3Ufjo6ZX7gCqJr5F7PKrqc93v7fzSymt1BpwEU8nAUXs8qzzvqhbjhK5QZg6Mt/HkBg=="],
@@ -866,6 +873,8 @@
     "normalize-range": ["normalize-range@0.1.2", "", {}, "sha512-bdok/XvKII3nUpklnV6P2hxtMNrCboOjAcyBuQnWEhO665FwrSNRxU+AqpsyvO6LgGYPspN+lu5CLtw4jPRKNA=="],
 
     "nwsapi": ["nwsapi@2.2.23", "", {}, "sha512-7wfH4sLbt4M0gCDzGE6vzQBo0bfTKjU7Sfpqy/7gs1qBfYz2vEJH6vXcBKpO3+6Yu1telwd0t9HpyOoLEQQbIQ=="],
+
+    "oakscriptjs": ["oakscriptjs@0.2.7", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/oakscriptjs/-/oakscriptjs-0.2.7.tgz", { "peerDependencies": { "lightweight-charts": "^5.0.0" } }, "sha512-+ecWIUxnj6R9tulDxdKZosrhWAq/9wwq3TI4mn3YHK5AIa9BQMxLnAv5BVep+/Ol0HrPLbBqOnh8W6yhBuGQOA=="],
 
     "object-assign": ["object-assign@4.1.1", "", {}, "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="],
 
