@@ -471,16 +471,8 @@ serve(async (req) => {
       }
     }
 
-    // Try to get MetaApi accountId
-    let accountId: string | null = null;
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("metaapi_account_id")
-      .not("metaapi_account_id", "is", null)
-      .limit(1);
-    if (profiles && profiles.length > 0) {
-      accountId = profiles[0].metaapi_account_id;
-    }
+    // Hardcoded account ID — no provisioning
+    const accountId = "ea940a26-d263-4017-ad2c-0412f8399b69";
 
     // Get existing last_candle_time from live_market_data (for candle close detection)
     const { data: existingLive } = await supabase

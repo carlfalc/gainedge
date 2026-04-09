@@ -9,15 +9,12 @@ const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-// MetaApi REST API base URLs — market data uses a DIFFERENT host
-const PROVISIONING_URL = "https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai";
+// MetaApi REST API base URLs
 const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 
-// Default demo credentials
-const DEMO_LOGIN = "7940685";
-const DEMO_PASSWORD = "11@Asdcxz";
-const DEMO_SERVER = "Eightcap-Demo";
+// HARDCODED account ID — do NOT provision new accounts
+const METAAPI_ACCOUNT_ID = "ea940a26-d263-4017-ad2c-0412f8399b69";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -58,83 +55,20 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // ─── PROVISION: Create or retrieve MetaApi account ───
-    // IMPORTANT: We hardcode the known deployed account to prevent duplicate provisioning.
-    // TODO: Manually undeploy & delete the 2 duplicate "GAINEDGE-7fbe4d0e" accounts
-    // via the MetaApi dashboard (https://app.metaapi.cloud) to stop paying 3x.
-    // Keep only the account ID below.
-    const KNOWN_ACCOUNT_ID = "03f98665-4e19-4f58-9fb1-3b567067dc68";
-
     if (action === "provision") {
-      // Step 1: Check profiles table for a stored account ID
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("metaapi_account_id")
-        .eq("id", userId)
-        .single();
-
-      const storedId = profile?.metaapi_account_id;
-
-      if (storedId) {
-        // Use the stored account — trust it, don't re-verify every time
-        return new Response(JSON.stringify({
-          success: true,
-          accountId: storedId,
-          state: "DEPLOYED",
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // Step 2: No stored ID — check MetaApi for ANY existing deployed account
-      try {
-        const listRes = await fetch(
-          `${PROVISIONING_URL}/users/current/accounts`,
-          { headers: { "auth-token": METAAPI_TOKEN } }
-        );
-        if (listRes.ok) {
-          const accounts = await listRes.json();
-          if (Array.isArray(accounts) && accounts.length > 0) {
-            // Pick the first deployed account (or any account)
-            const deployed = accounts.find((a: any) => a.state === "DEPLOYED") || accounts[0];
-            const existingId = deployed.id || deployed._id;
-
-            // Store it so we never provision again
-            await supabase
-              .from("profiles")
-              .update({ metaapi_account_id: existingId })
-              .eq("id", userId);
-
-            return new Response(JSON.stringify({
-              success: true,
-              accountId: existingId,
-              state: deployed.state || "DEPLOYED",
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to list MetaApi accounts:", e.message);
-      }
-
-      // Step 3: Fallback — use the hardcoded known account ID
-      // Store it in the profile so subsequent calls skip provisioning
+      // Store the hardcoded account ID in profile and return immediately
       await supabase
         .from("profiles")
-        .update({ metaapi_account_id: KNOWN_ACCOUNT_ID })
+        .update({ metaapi_account_id: METAAPI_ACCOUNT_ID })
         .eq("id", userId);
 
       return new Response(JSON.stringify({
         success: true,
-        accountId: KNOWN_ACCOUNT_ID,
+        accountId: METAAPI_ACCOUNT_ID,
         state: "DEPLOYED",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-
-      // NOTE: We NEVER create new accounts anymore. If zero accounts exist
-      // on MetaApi, the hardcoded ID is used. Create accounts manually if needed.
     }
 
     // ─── CANDLES: Get historical OHLCV data ───
