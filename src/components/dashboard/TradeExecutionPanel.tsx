@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchCurrentPrice } from "@/services/metaapi-client";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
@@ -59,7 +58,6 @@ async function callTrade(body: Record<string, unknown>) {
 
 export default function TradeExecutionPanel({ symbol, accountId, connectionStatus }: TradeExecutionPanelProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [tab, setTab] = useState("trade");
   const [lotSize, setLotSize] = useState("0.01");
   const [sl, setSl] = useState("");
   const [tp, setTp] = useState("");
@@ -70,9 +68,9 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
   const [executing, setExecuting] = useState(false);
   const [positions, setPositions] = useState<Position[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [loadingPositions, setLoadingPositions] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Intelligent Trader state
   const [autoTradeEnabled, setAutoTradeEnabled] = useState(false);
@@ -102,10 +100,10 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
     return () => { if (priceRef.current) clearInterval(priceRef.current); };
   }, [symbol, accountId, isLive]);
 
-  // Poll positions
+  // Poll positions — always active when live
   useEffect(() => {
     if (posRef.current) clearInterval(posRef.current);
-    if (!isLive || tab !== "positions") return;
+    if (!isLive) return;
 
     const load = async () => {
       try {
@@ -116,17 +114,17 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
     load();
     posRef.current = setInterval(load, 5000);
     return () => { if (posRef.current) clearInterval(posRef.current); };
-  }, [isLive, accountId, tab]);
+  }, [isLive, accountId]);
 
-  // Load history
+  // Load history when toggled
   useEffect(() => {
-    if (!isLive || tab !== "history") return;
+    if (!isLive || !showHistory) return;
     setLoadingHistory(true);
     callTrade({ action: "history", accountId })
       .then(d => setDeals(d.deals ?? []))
       .catch(() => {})
       .finally(() => setLoadingHistory(false));
-  }, [isLive, accountId, tab]);
+  }, [isLive, accountId, showHistory]);
 
   const spread = bid !== null && ask !== null ? Math.abs(ask - bid) : null;
 
@@ -198,18 +196,10 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
 
   return (
     <>
-      <div className="rounded-lg border border-white/[0.06] bg-[#0D1117] overflow-hidden" style={{ minHeight: 180 }}>
+      <div className="rounded-lg border border-white/[0.06] bg-[#0D1117] overflow-hidden" style={{ minHeight: 120 }}>
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-1.5 bg-[#111724] border-b border-white/[0.06]">
-          <Tabs value={tab} onValueChange={setTab} className="flex-1">
-            <TabsList className="bg-transparent h-7 p-0 gap-1">
-              <TabsTrigger value="trade" className="text-[11px] h-6 px-3 rounded data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">Trade</TabsTrigger>
-              <TabsTrigger value="positions" className="text-[11px] h-6 px-3 rounded data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">
-                Positions {positions.length > 0 && <span className="ml-1 text-[9px] bg-[#00CFA5]/20 text-[#00CFA5] px-1.5 rounded-full">{positions.length}</span>}
-              </TabsTrigger>
-              <TabsTrigger value="history" className="text-[11px] h-6 px-3 rounded data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50">History</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <span className="text-[11px] font-semibold text-white/70">Trade Panel</span>
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-[10px] text-white/40 cursor-pointer select-none">
               <input
@@ -225,216 +215,200 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
           </div>
         </div>
 
-        {/* Tab content */}
-        <div className="p-3">
-          {/* ─── TRADE TAB ─── */}
-          {tab === "trade" && (
-            <div className="flex flex-col gap-2">
-              {/* Warning banner */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-400">
-                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>Live trading — real money at risk. Trades execute on your broker account.</span>
-              </div>
+        <div className="p-3 flex flex-col gap-2">
+          {/* ─── 1. INTELLIGENT TRADER ─── */}
+          <div>
+            <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader</div>
+            <div className="flex items-center gap-4 flex-wrap">
+              <button
+                onClick={() => setAutoTradeEnabled(!autoTradeEnabled)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                  autoTradeEnabled
+                    ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
+                    : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                Auto {autoTradeEnabled ? "ON" : "OFF"}
+              </button>
 
-              {/* Order entry row */}
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Bid/Ask */}
-                <div className="flex items-center gap-2 font-mono text-sm">
-                  <div className="text-center">
-                    <div className="text-[9px] text-white uppercase">Bid</div>
-                    <div className="text-white font-bold">{bid !== null ? bid.toFixed(priceDec) : "—"}</div>
-                  </div>
-                  <div className="text-[10px] text-white px-1">
-                    Spread: {spread !== null ? spread.toFixed(priceDec > 3 ? 1 : priceDec) : "—"}
-                  </div>
-                  <div className="text-center">
-                    <div className="text-[9px] text-white uppercase">Ask</div>
-                    <div className="text-white font-bold">{ask !== null ? ask.toFixed(priceDec) : "—"}</div>
-                  </div>
-                </div>
-
-                <div className="w-px h-8 bg-white/10" />
-
-                {/* Lot size */}
-                <div>
-                  <div className="text-[9px] text-white mb-0.5">Volume</div>
-                  <select
-                    value={lotSize} onChange={e => setLotSize(e.target.value)}
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
-                  >
-                    {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-
-                {/* SL */}
-                <div>
-                  <div className="text-[9px] text-white mb-0.5">Stop Loss</div>
+              {autoTradeEnabled && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] text-white/40">Lot:</span>
                   <input
-                    type="number" value={sl} onChange={e => setSl(e.target.value)}
-                    placeholder="Optional"
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-red-400/40 placeholder:text-white/50"
+                    type="number"
+                    value={autoLotSize}
+                    onChange={e => setAutoLotSize(e.target.value)}
+                    step="0.01"
+                    min="0.01"
+                    className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
                   />
-                </div>
-
-                {/* TP */}
-                <div>
-                  <div className="text-[9px] text-white mb-0.5">Take Profit</div>
-                  <input
-                    type="number" value={tp} onChange={e => setTp(e.target.value)}
-                    placeholder="Optional"
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-green-400/40 placeholder:text-white/50"
-                  />
-                </div>
-
-                <div className="w-px h-8 bg-white/10" />
-
-                {/* SELL / Volume / BUY */}
-                <div className="flex items-center gap-2 ml-auto">
-                  <button
-                    onClick={() => handleOrderClick("SELL")}
-                    disabled={!isLive || executing}
-                    title={!isLive ? "Connect broker account to enable trading" : undefined}
-                    className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#EF4444] border border-red-500/40 text-white font-bold text-sm hover:bg-[#DC2626] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
-                  >
-                    <span className="text-[9px] text-white/70 uppercase">Sell</span>
-                    <span className="font-mono text-white">{bid !== null ? bid.toFixed(priceDec) : "—"}</span>
-                  </button>
-
-                  {/* Inline volume between buttons */}
-                  <div className="flex flex-col items-center">
-                    <div className="text-[8px] text-white/40 uppercase">Vol</div>
-                    <input
-                      type="number"
-                      value={lotSize}
-                      onChange={e => setLotSize(e.target.value)}
-                      step="0.01"
-                      min="0.01"
-                      className="w-14 bg-[#080B12] border border-white/10 rounded px-1.5 py-1 text-xs text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => handleOrderClick("BUY")}
-                    disabled={!isLive || executing}
-                    title={!isLive ? "Connect broker account to enable trading" : undefined}
-                    className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#22C55E] border border-green-500/40 text-white font-bold text-sm hover:bg-[#16A34A] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
-                  >
-                    <span className="text-[9px] text-white/70 uppercase">Buy</span>
-                    <span className="font-mono text-white">{ask !== null ? ask.toFixed(priceDec) : "—"}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* ─── Intelligent Trader Section ─── */}
-              <div className="mt-1 border-t border-white/[0.06] pt-2">
-                <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader</div>
-                <div className="flex items-center gap-4 flex-wrap">
-                  {/* Auto toggle */}
-                  <button
-                    onClick={() => setAutoTradeEnabled(!autoTradeEnabled)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
-                      autoTradeEnabled
-                        ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
-                        : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
-                    }`}
-                  >
-                    <Zap className="w-3 h-3" />
-                    Auto {autoTradeEnabled ? "ON" : "OFF"}
-                  </button>
-
-                  {/* Auto lot size (visible when auto is on) */}
-                  {autoTradeEnabled && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] text-white/40">Lot:</span>
-                      <input
-                        type="number"
-                        value={autoLotSize}
-                        onChange={e => setAutoLotSize(e.target.value)}
-                        step="0.01"
-                        min="0.01"
-                        className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
-                      />
-                    </div>
-                  )}
-
-                  <div className="w-px h-5 bg-white/10" />
-
-                  {/* My Trades toggle */}
-                  <button
-                    onClick={() => setMyTradesEnabled(!myTradesEnabled)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
-                      myTradesEnabled
-                        ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
-                        : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
-                    }`}
-                  >
-                    <User className="w-3 h-3" />
-                    My Trades {myTradesEnabled ? "ON" : "OFF"}
-                  </button>
-                </div>
-
-                {/* Status text */}
-                <div className="mt-1.5 text-[10px]">
-                  {autoTradeEnabled ? (
-                    <span className="text-amber-400">
-                      ⚡ Falconer AI will execute trades when high-confidence signals fire (confidence ≥ 7)
-                    </span>
-                  ) : (
-                    <span className="text-white/40">
-                      Manual trading mode — you control all entries
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {!isLive && (
-                <div className="text-[10px] text-white/30 text-center">
-                  Connect your broker account to enable live trading
                 </div>
               )}
-            </div>
-          )}
 
-          {/* ─── POSITIONS TAB ─── */}
-          {tab === "positions" && (
-            <div className="overflow-x-auto">
-              {!isLive ? (
-                <div className="text-xs text-white/30 text-center py-6">Connect broker to view positions</div>
-              ) : positions.length === 0 ? (
-                <div className="text-xs text-white/30 text-center py-6">No open positions</div>
+              <div className="w-px h-5 bg-white/10" />
+
+              <button
+                onClick={() => setMyTradesEnabled(!myTradesEnabled)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                  myTradesEnabled
+                    ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
+                    : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
+                }`}
+              >
+                <User className="w-3 h-3" />
+                My Trades {myTradesEnabled ? "ON" : "OFF"}
+              </button>
+            </div>
+
+            <div className="mt-1.5 text-[10px]">
+              {autoTradeEnabled ? (
+                <span className="text-amber-400">
+                  ⚡ Falconer AI will execute trades when high-confidence signals fire (confidence ≥ 7)
+                </span>
               ) : (
+                <span className="text-white/40">
+                  Manual trading mode — you control all entries
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* ─── 2. TRADE BAR ─── */}
+          <div className="border-t border-white/[0.06] pt-2">
+            {/* Warning banner */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-400 mb-2">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Live trading — real money at risk. Trades execute on your broker account.</span>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Bid/Ask */}
+              <div className="flex items-center gap-2 font-mono text-sm">
+                <div className="text-center">
+                  <div className="text-[9px] text-white uppercase">Bid</div>
+                  <div className="text-white font-bold">{bid !== null ? bid.toFixed(priceDec) : "—"}</div>
+                </div>
+                <div className="text-[10px] text-white px-1">
+                  Spread: {spread !== null ? spread.toFixed(priceDec > 3 ? 1 : priceDec) : "—"}
+                </div>
+                <div className="text-center">
+                  <div className="text-[9px] text-white uppercase">Ask</div>
+                  <div className="text-white font-bold">{ask !== null ? ask.toFixed(priceDec) : "—"}</div>
+                </div>
+              </div>
+
+              <div className="w-px h-8 bg-white/10" />
+
+              <div>
+                <div className="text-[9px] text-white mb-0.5">Volume</div>
+                <select
+                  value={lotSize} onChange={e => setLotSize(e.target.value)}
+                  className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
+                >
+                  {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <div className="text-[9px] text-white mb-0.5">Stop Loss</div>
+                <input
+                  type="number" value={sl} onChange={e => setSl(e.target.value)}
+                  placeholder="Optional"
+                  className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-red-400/40 placeholder:text-white/50"
+                />
+              </div>
+
+              <div>
+                <div className="text-[9px] text-white mb-0.5">Take Profit</div>
+                <input
+                  type="number" value={tp} onChange={e => setTp(e.target.value)}
+                  placeholder="Optional"
+                  className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-green-400/40 placeholder:text-white/50"
+                />
+              </div>
+
+              <div className="w-px h-8 bg-white/10" />
+
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={() => handleOrderClick("SELL")}
+                  disabled={!isLive || executing}
+                  title={!isLive ? "Connect broker account to enable trading" : undefined}
+                  className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#EF4444] border border-red-500/40 text-white font-bold text-sm hover:bg-[#DC2626] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
+                >
+                  <span className="text-[9px] text-white/70 uppercase">Sell</span>
+                  <span className="font-mono text-white">{bid !== null ? bid.toFixed(priceDec) : "—"}</span>
+                </button>
+
+                <div className="flex flex-col items-center">
+                  <div className="text-[8px] text-white/40 uppercase">Vol</div>
+                  <input
+                    type="number"
+                    value={lotSize}
+                    onChange={e => setLotSize(e.target.value)}
+                    step="0.01"
+                    min="0.01"
+                    className="w-14 bg-[#080B12] border border-white/10 rounded px-1.5 py-1 text-xs text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
+                  />
+                </div>
+
+                <button
+                  onClick={() => handleOrderClick("BUY")}
+                  disabled={!isLive || executing}
+                  title={!isLive ? "Connect broker account to enable trading" : undefined}
+                  className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#22C55E] border border-green-500/40 text-white font-bold text-sm hover:bg-[#16A34A] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
+                >
+                  <span className="text-[9px] text-white/70 uppercase">Buy</span>
+                  <span className="font-mono text-white">{ask !== null ? ask.toFixed(priceDec) : "—"}</span>
+                </button>
+              </div>
+            </div>
+
+            {!isLive && (
+              <div className="text-[10px] text-white/30 text-center mt-1">
+                Connect your broker account to enable live trading
+              </div>
+            )}
+          </div>
+
+          {/* ─── 3. OPEN POSITIONS (always visible) ─── */}
+          <div className="border-t border-white/[0.06] pt-2">
+            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Open Positions</div>
+            {!isLive ? (
+              <div className="text-[11px] text-white/30 py-2">Connect broker to view positions</div>
+            ) : positions.length === 0 ? (
+              <div className="text-[11px] text-white/30 py-2">No open positions</div>
+            ) : (
+              <div className="overflow-x-auto">
                 <table className="w-full text-[11px] font-mono">
                   <thead>
                     <tr className="text-white/30 text-left border-b border-white/5">
-                      <th className="py-1.5 px-2">Ticket</th>
-                      <th className="py-1.5 px-2">Symbol</th>
-                      <th className="py-1.5 px-2">Type</th>
-                      <th className="py-1.5 px-2">Vol</th>
-                      <th className="py-1.5 px-2">Open</th>
-                      <th className="py-1.5 px-2">SL</th>
-                      <th className="py-1.5 px-2">TP</th>
-                      <th className="py-1.5 px-2">Current</th>
-                      <th className="py-1.5 px-2 text-right">P&L</th>
-                      <th className="py-1.5 px-2"></th>
+                      <th className="py-1 px-2">Ticket</th>
+                      <th className="py-1 px-2">Symbol</th>
+                      <th className="py-1 px-2">Type</th>
+                      <th className="py-1 px-2">Vol</th>
+                      <th className="py-1 px-2">Open</th>
+                      <th className="py-1 px-2">Current</th>
+                      <th className="py-1 px-2 text-right">P&L</th>
+                      <th className="py-1 px-2"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {positions.map(p => (
                       <tr key={p.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                        <td className="py-1.5 px-2 text-white/50">{p.id?.slice(-6)}</td>
-                        <td className="py-1.5 px-2 text-white">{p.symbol}</td>
-                        <td className={`py-1.5 px-2 font-bold ${p.type?.includes("BUY") ? "text-green-400" : "text-red-400"}`}>
+                        <td className="py-1 px-2 text-white/50">{p.id?.slice(-6)}</td>
+                        <td className="py-1 px-2 text-white">{p.symbol}</td>
+                        <td className={`py-1 px-2 font-bold ${p.type?.includes("BUY") ? "text-green-400" : "text-red-400"}`}>
                           {p.type?.includes("BUY") ? "Buy" : "Sell"}
                         </td>
-                        <td className="py-1.5 px-2 text-white/60">{p.volume}</td>
-                        <td className="py-1.5 px-2 text-white/80">{fmt(p.openPrice, priceDec)}</td>
-                        <td className="py-1.5 px-2 text-red-400/60">{p.stopLoss ? fmt(p.stopLoss, priceDec) : "—"}</td>
-                        <td className="py-1.5 px-2 text-green-400/60">{p.takeProfit ? fmt(p.takeProfit, priceDec) : "—"}</td>
-                        <td className="py-1.5 px-2 text-white">{fmt(p.currentPrice, priceDec)}</td>
-                        <td className={`py-1.5 px-2 text-right font-bold ${(p.profit ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        <td className="py-1 px-2 text-white/60">{p.volume}</td>
+                        <td className="py-1 px-2 text-white/80">{fmt(p.openPrice, priceDec)}</td>
+                        <td className="py-1 px-2 text-white">{fmt(p.currentPrice, priceDec)}</td>
+                        <td className={`py-1 px-2 text-right font-bold ${(p.profit ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
                           {(p.profit ?? 0) >= 0 ? "+" : ""}{fmt(p.profit)}
                         </td>
-                        <td className="py-1.5 px-2">
+                        <td className="py-1 px-2">
                           <button
                             onClick={() => closePosition(p.id)}
                             disabled={closingId === p.id}
@@ -447,68 +421,78 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
 
-          {/* ─── HISTORY TAB ─── */}
-          {tab === "history" && (
-            <div className="overflow-x-auto">
-              {!isLive ? (
-                <div className="text-xs text-white/30 text-center py-6">Connect broker to view history</div>
-              ) : loadingHistory ? (
-                <div className="flex items-center justify-center py-6 gap-2 text-white/30 text-xs">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading...
-                </div>
-              ) : deals.length === 0 ? (
-                <div className="text-xs text-white/30 text-center py-6">No trades today</div>
-              ) : (
-                <>
-                  <table className="w-full text-[11px] font-mono">
-                    <thead>
-                      <tr className="text-white/30 text-left border-b border-white/5">
-                        <th className="py-1.5 px-2">Ticket</th>
-                        <th className="py-1.5 px-2">Symbol</th>
-                        <th className="py-1.5 px-2">Type</th>
-                        <th className="py-1.5 px-2">Vol</th>
-                        <th className="py-1.5 px-2">Open</th>
-                        <th className="py-1.5 px-2">Close</th>
-                        <th className="py-1.5 px-2 text-right">P&L</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {deals.map(d => (
-                        <tr key={d.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
-                          <td className="py-1.5 px-2 text-white/50">{d.id?.slice(-6)}</td>
-                          <td className="py-1.5 px-2 text-white">{d.symbol}</td>
-                          <td className={`py-1.5 px-2 font-bold ${d.type?.includes("BUY") ? "text-green-400" : "text-red-400"}`}>
-                            {d.type?.includes("BUY") ? "Buy" : "Sell"}
-                          </td>
-                          <td className="py-1.5 px-2 text-white/60">{d.volume}</td>
-                          <td className="py-1.5 px-2 text-white/80">{fmt(d.price, priceDec)}</td>
-                          <td className="py-1.5 px-2 text-white/80">{d.closePrice ? fmt(d.closePrice, priceDec) : "—"}</td>
-                          <td className={`py-1.5 px-2 text-right font-bold ${(d.profit ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
-                            {(d.profit ?? 0) >= 0 ? "+" : ""}${fmt(d.profit)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  <div className="mt-2 px-2 py-1.5 rounded bg-white/[0.03] text-[11px] font-mono flex items-center gap-4">
-                    <span className="text-white/40">Today:</span>
-                    <span className={`font-bold ${historyTotals.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {historyTotals.pnl >= 0 ? "+" : ""}${historyTotals.pnl.toFixed(2)}
-                    </span>
-                    <span className="text-white/40">
-                      <span className="text-green-400">{historyTotals.wins} Win{historyTotals.wins !== 1 ? "s" : ""}</span>
-                      {" / "}
-                      <span className="text-red-400">{historyTotals.losses} Loss{historyTotals.losses !== 1 ? "es" : ""}</span>
-                    </span>
+          {/* ─── 4. HISTORY (collapsible) ─── */}
+          <div className="border-t border-white/[0.06] pt-1">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center gap-1 text-[10px] text-white/40 hover:text-white/60 transition-colors"
+            >
+              {showHistory ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              {showHistory ? "Hide History" : "Show History"}
+            </button>
+
+            {showHistory && (
+              <div className="mt-1.5 overflow-x-auto">
+                {!isLive ? (
+                  <div className="text-[11px] text-white/30 py-2">Connect broker to view history</div>
+                ) : loadingHistory ? (
+                  <div className="flex items-center gap-2 text-white/30 text-[11px] py-2">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Loading...
                   </div>
-                </>
-              )}
-            </div>
-          )}
+                ) : deals.length === 0 ? (
+                  <div className="text-[11px] text-white/30 py-2">No trades today</div>
+                ) : (
+                  <>
+                    <table className="w-full text-[11px] font-mono">
+                      <thead>
+                        <tr className="text-white/30 text-left border-b border-white/5">
+                          <th className="py-1 px-2">Ticket</th>
+                          <th className="py-1 px-2">Symbol</th>
+                          <th className="py-1 px-2">Type</th>
+                          <th className="py-1 px-2">Vol</th>
+                          <th className="py-1 px-2">Open</th>
+                          <th className="py-1 px-2">Close</th>
+                          <th className="py-1 px-2 text-right">P&L</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deals.map(d => (
+                          <tr key={d.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
+                            <td className="py-1 px-2 text-white/50">{d.id?.slice(-6)}</td>
+                            <td className="py-1 px-2 text-white">{d.symbol}</td>
+                            <td className={`py-1 px-2 font-bold ${d.type?.includes("BUY") ? "text-green-400" : "text-red-400"}`}>
+                              {d.type?.includes("BUY") ? "Buy" : "Sell"}
+                            </td>
+                            <td className="py-1 px-2 text-white/60">{d.volume}</td>
+                            <td className="py-1 px-2 text-white/80">{fmt(d.price, priceDec)}</td>
+                            <td className="py-1 px-2 text-white/80">{d.closePrice ? fmt(d.closePrice, priceDec) : "—"}</td>
+                            <td className={`py-1 px-2 text-right font-bold ${(d.profit ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                              {(d.profit ?? 0) >= 0 ? "+" : ""}${fmt(d.profit)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="mt-1.5 px-2 py-1 rounded bg-white/[0.03] text-[11px] font-mono flex items-center gap-4">
+                      <span className="text-white/40">Today:</span>
+                      <span className={`font-bold ${historyTotals.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {historyTotals.pnl >= 0 ? "+" : ""}${historyTotals.pnl.toFixed(2)}
+                      </span>
+                      <span className="text-white/40">
+                        <span className="text-green-400">{historyTotals.wins} Win{historyTotals.wins !== 1 ? "s" : ""}</span>
+                        {" / "}
+                        <span className="text-red-400">{historyTotals.losses} Loss{historyTotals.losses !== 1 ? "es" : ""}</span>
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
