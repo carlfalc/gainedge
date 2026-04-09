@@ -7,7 +7,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import {
-  ChevronUp, ChevronDown, AlertTriangle, X, Loader2,
+  ChevronUp, ChevronDown, AlertTriangle, X, Loader2, Zap, User,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -73,6 +73,11 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
   const [loadingPositions, setLoadingPositions] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
+
+  // Intelligent Trader state
+  const [autoTradeEnabled, setAutoTradeEnabled] = useState(false);
+  const [autoLotSize, setAutoLotSize] = useState("0.01");
+  const [myTradesEnabled, setMyTradesEnabled] = useState(false);
 
   const priceRef = useRef<ReturnType<typeof setInterval>>();
   const posRef = useRef<ReturnType<typeof setInterval>>();
@@ -236,15 +241,15 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
                 {/* Bid/Ask */}
                 <div className="flex items-center gap-2 font-mono text-sm">
                   <div className="text-center">
-                    <div className="text-[9px] text-white/30 uppercase">Bid</div>
-                    <div className="text-green-400 font-bold">{bid !== null ? bid.toFixed(priceDec) : "—"}</div>
+                    <div className="text-[9px] text-white uppercase">Bid</div>
+                    <div className="text-white font-bold">{bid !== null ? bid.toFixed(priceDec) : "—"}</div>
                   </div>
-                  <div className="text-[10px] text-white/20 px-1">
-                    {spread !== null ? `Spread: ${spread.toFixed(priceDec > 3 ? 1 : priceDec)}` : "—"}
+                  <div className="text-[10px] text-white px-1">
+                    Spread: {spread !== null ? spread.toFixed(priceDec > 3 ? 1 : priceDec) : "—"}
                   </div>
                   <div className="text-center">
-                    <div className="text-[9px] text-white/30 uppercase">Ask</div>
-                    <div className="text-red-400 font-bold">{ask !== null ? ask.toFixed(priceDec) : "—"}</div>
+                    <div className="text-[9px] text-white uppercase">Ask</div>
+                    <div className="text-white font-bold">{ask !== null ? ask.toFixed(priceDec) : "—"}</div>
                   </div>
                 </div>
 
@@ -252,7 +257,7 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
 
                 {/* Lot size */}
                 <div>
-                  <div className="text-[9px] text-white/30 mb-0.5">Volume</div>
+                  <div className="text-[9px] text-white mb-0.5">Volume</div>
                   <select
                     value={lotSize} onChange={e => setLotSize(e.target.value)}
                     className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
@@ -263,46 +268,122 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
 
                 {/* SL */}
                 <div>
-                  <div className="text-[9px] text-white/30 mb-0.5">Stop Loss</div>
+                  <div className="text-[9px] text-white mb-0.5">Stop Loss</div>
                   <input
                     type="number" value={sl} onChange={e => setSl(e.target.value)}
                     placeholder="Optional"
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-red-400/40 placeholder:text-white/20"
+                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-red-400/40 placeholder:text-white/50"
                   />
                 </div>
 
                 {/* TP */}
                 <div>
-                  <div className="text-[9px] text-white/30 mb-0.5">Take Profit</div>
+                  <div className="text-[9px] text-white mb-0.5">Take Profit</div>
                   <input
                     type="number" value={tp} onChange={e => setTp(e.target.value)}
                     placeholder="Optional"
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-green-400/40 placeholder:text-white/20"
+                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-green-400/40 placeholder:text-white/50"
                   />
                 </div>
 
                 <div className="w-px h-8 bg-white/10" />
 
-                {/* BUY / SELL buttons */}
-                <div className="flex gap-2 ml-auto">
+                {/* SELL / Volume / BUY */}
+                <div className="flex items-center gap-2 ml-auto">
                   <button
                     onClick={() => handleOrderClick("SELL")}
                     disabled={!isLive || executing}
                     title={!isLive ? "Connect broker account to enable trading" : undefined}
-                    className="flex flex-col items-center px-5 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
+                    className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#EF4444] border border-red-500/40 text-white font-bold text-sm hover:bg-[#DC2626] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
                   >
-                    <span className="text-[9px] text-red-400/60 uppercase">Sell</span>
-                    <span className="font-mono">{bid !== null ? bid.toFixed(priceDec) : "—"}</span>
+                    <span className="text-[9px] text-white/70 uppercase">Sell</span>
+                    <span className="font-mono text-white">{bid !== null ? bid.toFixed(priceDec) : "—"}</span>
                   </button>
+
+                  {/* Inline volume between buttons */}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[8px] text-white/40 uppercase">Vol</div>
+                    <input
+                      type="number"
+                      value={lotSize}
+                      onChange={e => setLotSize(e.target.value)}
+                      step="0.01"
+                      min="0.01"
+                      className="w-14 bg-[#080B12] border border-white/10 rounded px-1.5 py-1 text-xs text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
+                    />
+                  </div>
+
                   <button
                     onClick={() => handleOrderClick("BUY")}
                     disabled={!isLive || executing}
                     title={!isLive ? "Connect broker account to enable trading" : undefined}
-                    className="flex flex-col items-center px-5 py-2 rounded-lg bg-green-500/20 border border-green-500/40 text-green-400 font-bold text-sm hover:bg-green-500/30 transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
+                    className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#22C55E] border border-green-500/40 text-white font-bold text-sm hover:bg-[#16A34A] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
                   >
-                    <span className="text-[9px] text-green-400/60 uppercase">Buy</span>
-                    <span className="font-mono">{ask !== null ? ask.toFixed(priceDec) : "—"}</span>
+                    <span className="text-[9px] text-white/70 uppercase">Buy</span>
+                    <span className="font-mono text-white">{ask !== null ? ask.toFixed(priceDec) : "—"}</span>
                   </button>
+                </div>
+              </div>
+
+              {/* ─── Intelligent Trader Section ─── */}
+              <div className="mt-1 border-t border-white/[0.06] pt-2">
+                <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader</div>
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* Auto toggle */}
+                  <button
+                    onClick={() => setAutoTradeEnabled(!autoTradeEnabled)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                      autoTradeEnabled
+                        ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
+                        : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
+                    }`}
+                  >
+                    <Zap className="w-3 h-3" />
+                    Auto {autoTradeEnabled ? "ON" : "OFF"}
+                  </button>
+
+                  {/* Auto lot size (visible when auto is on) */}
+                  {autoTradeEnabled && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] text-white/40">Lot:</span>
+                      <input
+                        type="number"
+                        value={autoLotSize}
+                        onChange={e => setAutoLotSize(e.target.value)}
+                        step="0.01"
+                        min="0.01"
+                        className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
+                      />
+                    </div>
+                  )}
+
+                  <div className="w-px h-5 bg-white/10" />
+
+                  {/* My Trades toggle */}
+                  <button
+                    onClick={() => setMyTradesEnabled(!myTradesEnabled)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                      myTradesEnabled
+                        ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
+                        : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
+                    }`}
+                  >
+                    <User className="w-3 h-3" />
+                    My Trades {myTradesEnabled ? "ON" : "OFF"}
+                  </button>
+                </div>
+
+                {/* Status text */}
+                <div className="mt-1.5 text-[10px]">
+                  {autoTradeEnabled ? (
+                    <span className="text-amber-400">
+                      ⚡ Falconer AI will execute trades when high-confidence signals fire (confidence ≥ 7)
+                    </span>
+                  ) : (
+                    <span className="text-white/40">
+                      Manual trading mode — you control all entries
+                    </span>
+                  )}
                 </div>
               </div>
 

@@ -86,7 +86,7 @@ export async function fetchCandles(
 
   if (!Array.isArray(data.candles)) return [];
 
-  return data.candles.map((c: MetaApiCandle) => ({
+  const raw: FormattedCandle[] = data.candles.map((c: MetaApiCandle) => ({
     time: Math.floor(new Date(c.time).getTime() / 1000),
     open: c.open,
     high: c.high,
@@ -94,6 +94,43 @@ export async function fetchCandles(
     close: c.close,
     volume: c.tickVolume ?? c.volume ?? 0,
   }));
+
+  if (raw.length < 3) return raw;
+
+  // Calculate average candle range for anomaly filtering
+  const ranges = raw.map(c => c.high - c.low);
+  const avgRange = ranges.reduce((a, b) => a + b, 0) / ranges.length;
+
+  // Filter out anomalous candles (range > 5x average) — likely data errors
+  const filtered = raw.filter((c, i) => {
+    const range = c.high - c.low;
+    if (avgRange > 0 && range > avgRange * 5) return false;
+    return true;
+  });
+
+  // Detect time gaps and remove candles that create giant bars across gaps
+  const tfKey = TF_MAP[timeframe] || "15m";
+  const expectedGapSec: Record<string, number> = {
+    "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400,
+  };
+  const maxGap = (expectedGapSec[tfKey] || 900) * 3; // allow up to 3x expected gap
+
+  const result: FormattedCandle[] = [filtered[0]];
+  for (let i = 1; i < filtered.length; i++) {
+    const gap = filtered[i].time - filtered[i - 1].time;
+    if (gap > maxGap) {
+      // Insert a gap marker by resetting open to match close of gap candle
+      // This prevents visual giant bars across weekend/data gaps
+      result.push({
+        ...filtered[i],
+        open: filtered[i].close, // collapse the gap candle
+      });
+    } else {
+      result.push(filtered[i]);
+    }
+  }
+
+  return result;
 }
 
 /** Fetch current price tick */

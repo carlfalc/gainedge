@@ -546,6 +546,56 @@ serve(async (req) => {
       symbolData.set(symbol, mock);
     }
 
+    // ─── SPIKE / ANOMALY DETECTION ───
+    const spikeAlerts: { symbol: string; magnitude: number; direction: string }[] = [];
+
+    for (const [symbol, candles] of symbolCandles) {
+      if (!Array.isArray(candles) || candles.length < 6) continue;
+      const recent = candles.slice(-6);
+      const priceNow = recent[recent.length - 1].close;
+      const price5Ago = recent[0].close;
+      const pctMove = ((priceNow - price5Ago) / price5Ago) * 100;
+
+      if (Math.abs(pctMove) >= 1.0) {
+        spikeAlerts.push({
+          symbol,
+          magnitude: +pctMove.toFixed(2),
+          direction: pctMove > 0 ? "up" : "down",
+        });
+
+        // Update symbolData with spike info
+        const sd = symbolData.get(symbol);
+        if (sd) {
+          sd.last_spike_at = new Date().toISOString();
+          sd.spike_magnitude = +Math.abs(pctMove).toFixed(2);
+        }
+
+        // Insert spike alert into news_items
+        await supabase.from("news_items").insert({
+          headline: `⚡ SPIKE DETECTED — ${symbol} moved ${pctMove > 0 ? "+" : ""}${pctMove.toFixed(1)}% in 5 candles`,
+          source: "SPIKE_ALERT",
+          impact: "high",
+          instruments_affected: [symbol],
+        });
+      }
+
+      // Anomalous candle detection: single candle range > 3x average
+      const ranges = candles.map((c: any) => c.high - c.low);
+      const avgRange = ranges.reduce((a: number, b: number) => a + b, 0) / ranges.length;
+      const lastRange = ranges[ranges.length - 1];
+      if (avgRange > 0 && lastRange > avgRange * 3) {
+        // Add insight for anomalous candle
+        // We'll insert for all users below
+        const anomalyMag = (lastRange / avgRange).toFixed(1);
+        await supabase.from("news_items").insert({
+          headline: `🕯️ Anomalous candle on ${symbol} — range ${anomalyMag}x average`,
+          source: "SPIKE_ALERT",
+          impact: "medium",
+          instruments_affected: [symbol],
+        });
+      }
+    }
+
     // Upsert live_market_data for each user
     const upserts: any[] = [];
     for (const [userId, instList] of userInstruments) {
@@ -558,6 +608,21 @@ serve(async (req) => {
           ...data,
           updated_at: new Date().toISOString(),
         });
+      }
+
+      // Insert spike insights for each user
+      for (const spike of spikeAlerts) {
+        if (instList.some(i => i.symbol === spike.symbol)) {
+          await supabase.from("insights").insert({
+            user_id: userId,
+            insight_type: "spike_detection",
+            title: `⚡ ${spike.symbol} Spike: ${spike.direction === "up" ? "+" : ""}${spike.magnitude}%`,
+            description: `Price moved ${spike.magnitude}% in 5 candles. ${spike.direction === "up" ? "Bullish" : "Bearish"} spike detected — monitor for continuation or reversal.`,
+            symbol: spike.symbol,
+            severity: Math.abs(spike.magnitude) >= 2 ? "high" : "medium",
+            data: { magnitude: spike.magnitude, direction: spike.direction },
+          });
+        }
       }
     }
 
