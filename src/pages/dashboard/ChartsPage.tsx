@@ -422,18 +422,8 @@ export default function ChartsPage() {
       });
     }
 
-    // Scan result lines
-    if (scanResult) {
-      if (scanResult.entry_price) {
-        candleSeries.createPriceLine({ price: scanResult.entry_price, color: "#3B82F6", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "Entry" });
-      }
-      if (scanResult.take_profit) {
-        candleSeries.createPriceLine({ price: scanResult.take_profit, color: "#22C55E", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "TP" });
-      }
-      if (scanResult.stop_loss) {
-        candleSeries.createPriceLine({ price: scanResult.stop_loss, color: "#EF4444", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "SL" });
-      }
-    }
+    // Draw trade level lines (signal + positions + limit orders)
+    drawTradeLines(candleSeries);
 
     // Overlay indicators
     applyIndicators(chart, rawData, displayData);
