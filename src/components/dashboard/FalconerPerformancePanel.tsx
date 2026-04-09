@@ -43,7 +43,7 @@ export default function FalconerPerformancePanel() {
 
     for (const sig of signals) {
       const reasoning = sig.scan_result_id ? (scanMap.get(sig.scan_result_id) || "") : "";
-      const isV2 = reasoning.includes("[Falconer V2]");
+      const isV2 = reasoning.includes("[RON V2]") || reasoning.includes("[Falconer V2]");
       const stats = isV2 ? v2Stats : v1Stats;
 
       stats.totalSignals++;

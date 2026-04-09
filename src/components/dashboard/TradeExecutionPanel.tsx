@@ -264,7 +264,7 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
             <div className="mt-1.5 text-[10px]">
               {autoTradeEnabled ? (
                 <span className="text-amber-400">
-                  ⚡ Falconer AI will execute trades when high-confidence signals fire (confidence ≥ 7)
+                  ⚡ RON will execute trades when high-confidence signals fire (confidence ≥ 7)
                 </span>
               ) : (
                 <span className="text-white/40">
