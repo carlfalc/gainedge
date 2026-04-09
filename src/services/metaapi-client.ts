@@ -3,6 +3,7 @@
  * Keeps the MetaApi token secure on the server side.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { filterByPriceRange } from "@/lib/price-ranges";
 
 const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const FUNCTION_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/metaapi-candles`;
@@ -97,13 +98,15 @@ export async function fetchCandles(
 
   if (raw.length < 3) return raw;
 
+  // Hard price range validation — catches decimal errors like XAUUSD showing 47757 instead of 4775.7
+  const priceValid = filterByPriceRange(raw, symbol);
+
   // Calculate average candle range for anomaly filtering
-  const ranges = raw.map(c => c.high - c.low);
+  const ranges = priceValid.map(c => c.high - c.low);
   const avgRange = ranges.reduce((a, b) => a + b, 0) / ranges.length;
 
-  // Filter out anomalous candles (range > 10x average) — likely data errors
-  // Relaxed from 5x to 10x to avoid filtering valid volatile candles
-  const filtered = raw.filter((c, i) => {
+  // Filter out anomalous candles (range > 10x average)
+  const filtered = priceValid.filter(c => {
     const range = c.high - c.low;
     if (avgRange > 0 && range > avgRange * 10) return false;
     return true;
