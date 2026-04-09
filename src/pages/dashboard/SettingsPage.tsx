@@ -189,6 +189,16 @@ export default function SettingsPage() {
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>This action cannot be undone. All data will be permanently deleted.</div>
         <button style={{ ...btnStyle, background: C.red + "20", color: C.red, border: `1px solid ${C.red}30` }}>Delete Account</button>
       </Section>
+
+      {userId && (
+        <AddInstrumentModal
+          open={showAddInstrument}
+          onClose={() => setShowAddInstrument(false)}
+          userId={userId}
+          currentInstruments={instruments}
+          onAdded={() => { loadInstruments(); }}
+        />
+      )}
     </div>
   );
 }
