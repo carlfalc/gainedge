@@ -7,6 +7,7 @@ import Index from "./pages/Index.tsx";
 import Login from "./pages/Login.tsx";
 import Signup from "./pages/Signup.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import ChartPopout from "./pages/ChartPopout.tsx";
 import DashboardLayout from "./components/dashboard/DashboardLayout.tsx";
 import DashboardHome from "./pages/dashboard/DashboardHome.tsx";
 import SignalsPage from "./pages/dashboard/SignalsPage.tsx";
@@ -20,6 +21,7 @@ import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
 import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
 import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
 import ChartsPage from "./pages/dashboard/ChartsPage.tsx";
+import TradingViewChartPage from "./pages/dashboard/TradingViewChartPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +35,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/chart-popout" element={<ChartPopout />} />
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
             <Route path="signals" element={<SignalsPage />} />
@@ -46,6 +49,7 @@ const App = () => (
             <Route path="news-settings" element={<NewsSettingsPage />} />
             <Route path="my-news" element={<MyNewsPage />} />
             <Route path="charts" element={<ChartsPage />} />
+            <Route path="tradingview-chart" element={<TradingViewChartPage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
