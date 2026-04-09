@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
+import TradeExecutionPanel from "@/components/dashboard/TradeExecutionPanel";
 
 /* ───── types ───── */
 interface ScanResult {
