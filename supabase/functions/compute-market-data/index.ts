@@ -176,7 +176,7 @@ function generateMockData(symbol: string) {
   };
 }
 
-/* ─── Falconer AI: Improved analysis with NO-TRADE filters ─── */
+/* ─── Falconer AI V1 (Legacy): analysis with NO-TRADE filters ─── */
 function detectSession(): string {
   const h = new Date().getUTCHours();
   if (h >= 13 && h < 22) return "new_york";
@@ -220,13 +220,14 @@ function findSwingHigh(highs: number[], endIdx: number, lookback = 20): number {
   return maxVal;
 }
 
-function runAnalysis(candles: any[]): AnalysisResult {
+// ─── V1 Legacy Analysis (preserved as-is) ───
+function runAnalysisV1(candles: any[]): AnalysisResult {
   const closes = candles.map((c: any) => c.close);
   const highs = candles.map((c: any) => c.high);
   const lows = candles.map((c: any) => c.low);
   const volumes = candles.map((c: any) => c.tickVolume || 0);
 
-  // EMA 4/17 crossover — use CLOSED candle (second-to-last vs third-to-last)
+  // EMA 4/17 crossover — use CLOSED candle
   const ema4 = calcEMA(closes, 4);
   const ema17 = calcEMA(closes, 17);
   const lastIdx = ema4.length - 1;
@@ -246,28 +247,23 @@ function runAnalysis(candles: any[]): AnalysisResult {
     crossoverDir = currFast > currSlow ? "BULLISH" : "BEARISH";
   }
 
-  // Indicators
   const rsi = calcRSI(closes);
   const adx = calcADX(highs, lows, closes);
   const macd = calcMACDStatus(closes);
   const stochRsi = calcStochRSI(closes);
   const atr = calcATR(highs, lows, closes);
-
-  // Calculate average ATR for comparison
   const avgVolume = volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : 0;
   const lastVolume = volumes[volumes.length - 1] || 0;
 
-  // ─── NO-TRADE FILTERS ───
+  // ─── V1 NO-TRADE FILTERS ───
   const reasons: string[] = [];
   let noTrade = false;
 
-  // ADX < 20: no trend
   if (adx !== null && adx < 20) {
     noTrade = true;
     reasons.push(`ADX at ${adx} — no clear trend, staying flat`);
   }
 
-  // ATR below average: tight range
   if (atr !== null) {
     const avgAtr = calcATR(highs.slice(0, -14), lows.slice(0, -14), closes.slice(0, -14));
     if (avgAtr && atr < avgAtr * 0.6) {
@@ -276,7 +272,6 @@ function runAnalysis(candles: any[]): AnalysisResult {
     }
   }
 
-  // EMA flat/parallel: no crossover forming
   if (crossoverStatus === "NONE") {
     const emaDiff = Math.abs(currFast - currSlow) / currSlow;
     const prevDiff = Math.abs(prevFast - prevSlow) / prevSlow;
@@ -291,77 +286,60 @@ function runAnalysis(candles: any[]): AnalysisResult {
       direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
       stop_loss: null, risk_reward: null, ema_crossover_status: crossoverStatus,
       ema_crossover_direction: crossoverDir,
-      reasoning: `Falconer AI: ${reasons.join(". ")}. No trade conditions met.`,
+      reasoning: `[Legacy V1] ${reasons.join(". ")}. No trade conditions met.`,
       verdict: "NO_TRADE", rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
     };
   }
 
-  // ─── CONFIDENCE SCORING (start at 0, add points) ───
+  // ─── V1 CONFIDENCE SCORING ───
   let confidence = 0;
   const tradeReasons: string[] = [];
 
-  // +3: Confirmed EMA crossover on closed candle
   if (crossoverStatus === "CONFIRMED" && crossoverDir === "BULLISH") {
-    confidence += 3;
-    tradeReasons.push("Confirmed bullish EMA crossover on closed candle");
+    confidence += 3; tradeReasons.push("Confirmed bullish EMA crossover on closed candle");
   } else if (crossoverStatus === "CONFIRMED" && crossoverDir === "BEARISH") {
-    confidence += 3;
-    tradeReasons.push("Confirmed bearish EMA crossover on closed candle");
+    confidence += 3; tradeReasons.push("Confirmed bearish EMA crossover on closed candle");
   } else if (crossoverStatus === "FORMING") {
-    confidence += 1;
-    tradeReasons.push(`EMA crossover forming (${crossoverDir})`);
+    confidence += 1; tradeReasons.push(`EMA crossover forming (${crossoverDir})`);
   }
 
-  // +1: RSI confirming direction
   const isBullish = crossoverDir === "BULLISH" || (crossoverStatus === "NONE" && currFast > currSlow);
   const isBearish = crossoverDir === "BEARISH" || (crossoverStatus === "NONE" && currFast < currSlow);
   if (rsi !== null) {
     if (isBullish && rsi > 55) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bullish momentum`); }
     else if (isBearish && rsi < 45) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bearish momentum`); }
-    // RSI neutral zone penalty
     if (rsi >= 45 && rsi <= 55) { confidence -= 2; tradeReasons.push(`RSI ${rsi} in neutral zone — reduced conviction`); }
   }
 
-  // +1: MACD aligned
   if (macd === "Bullish" && isBullish) { confidence += 1; tradeReasons.push("MACD bullish momentum aligned"); }
   else if (macd === "Bearish" && isBearish) { confidence += 1; tradeReasons.push("MACD bearish momentum aligned"); }
 
-  // +1: ADX > 25
   if (adx !== null && adx > 25) { confidence += 1; tradeReasons.push(`ADX at ${adx} confirms trend strength`); }
 
-  // +1: StochRSI confirming
   if (stochRsi !== null) {
     if (isBullish && stochRsi > 60) { confidence += 1; tradeReasons.push(`StochRSI ${stochRsi} confirms bullish`); }
     else if (isBearish && stochRsi < 40) { confidence += 1; tradeReasons.push(`StochRSI ${stochRsi} confirms bearish`); }
   }
 
-  // +1: Volume above average on crossover candle
   if (lastVolume > avgVolume * 1.2 && crossoverStatus === "CONFIRMED") {
-    confidence += 1;
-    tradeReasons.push("Volume spike on crossover candle");
+    confidence += 1; tradeReasons.push("Volume spike on crossover candle");
   }
 
-  // Clamp confidence
   confidence = Math.max(1, Math.min(10, confidence));
 
-  // Determine direction
   let direction: string;
   let verdict: string;
-
   if (confidence >= 5 && crossoverStatus === "CONFIRMED") {
     direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
     verdict = direction;
   } else if (confidence >= 3 && crossoverStatus !== "NONE") {
     direction = isBullish ? "BUY" : "SELL";
-    verdict = "WAIT";
-    confidence = Math.min(confidence, 4);
+    verdict = "WAIT"; confidence = Math.min(confidence, 4);
   } else {
-    direction = "WAIT";
-    verdict = "WAIT";
-    confidence = Math.min(confidence, 3);
+    direction = "WAIT"; verdict = "WAIT"; confidence = Math.min(confidence, 3);
   }
 
-  // ─── ENTRY / TP / SL with swing structure ───
+  // ─── V1 ENTRY / TP / SL ───
   const lastClose = closes[closes.length - 1];
   let entry: number | null = null;
   let tp: number | null = null;
@@ -386,10 +364,9 @@ function runAnalysis(candles: any[]): AnalysisResult {
     rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
   }
 
-  // Build Falconer AI reasoning — expert trader style
   const reasoningText = tradeReasons.length > 0
-    ? `Falconer AI: ${tradeReasons.join(". ")}. ${entry ? `Entry at ${entry.toLocaleString()} with SL ${direction === "BUY" ? "below swing low" : "above swing high"} at ${sl}. R:R ${rr}.` : ""} ${confidence >= 7 ? "High conviction setup." : confidence >= 5 ? "Moderate conviction." : "Low conviction — monitoring."}`
-    : `Falconer AI: No clear setup forming. Monitoring price action.`;
+    ? `[Legacy V1] ${tradeReasons.join(". ")}. ${entry ? `Entry at ${entry} with SL at ${sl}. R:R ${rr}.` : ""}`
+    : `[Legacy V1] No clear setup forming. Monitoring price action.`;
 
   return {
     direction, confidence, entry_price: entry, take_profit: tp, stop_loss: sl,
@@ -397,6 +374,249 @@ function runAnalysis(candles: any[]): AnalysisResult {
     ema_crossover_direction: crossoverDir, reasoning: reasoningText, verdict,
     rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
   };
+}
+
+// ─── Falconer V2: Knowledge Base layer on top of V1 ───
+interface KnowledgeRule {
+  id: string;
+  category: string;
+  rule_name: string;
+  rule_text: string;
+  priority: number;
+  is_active: boolean;
+  version: string;
+}
+
+function countCrossovers(ema4: number[], ema17: number[], lookback: number): number {
+  let count = 0;
+  const start = Math.max(1, ema4.length - lookback);
+  for (let i = start; i < ema4.length; i++) {
+    const prevAbove = ema4[i - 1] > ema17[i - 1];
+    const currAbove = ema4[i] > ema17[i];
+    if (prevAbove !== currAbove) count++;
+  }
+  return count;
+}
+
+function calcSMA(values: number[], period: number): number[] {
+  const result: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (i < period - 1) { result.push(values[i]); continue; }
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += values[j];
+    result.push(sum / period);
+  }
+  return result;
+}
+
+function applyV2Rules(v1Result: AnalysisResult, candles: any[], rules: KnowledgeRule[], session: string, recentSignalCount: number): AnalysisResult {
+  if (rules.length === 0) return v1Result;
+
+  const closes = candles.map((c: any) => c.close);
+  const highs = candles.map((c: any) => c.high);
+  const lows = candles.map((c: any) => c.low);
+  const ema4 = calcEMA(closes, 4);
+  const ema17 = calcEMA(closes, 17);
+
+  let confidence = v1Result.confidence;
+  const v2Notes: string[] = [];
+  let forceNoTrade = false;
+
+  // Get active rules by category
+  const noTradeRules = rules.filter(r => r.category === "no_trade_rules" && r.is_active);
+  const entryRules = rules.filter(r => r.category === "entry_rules" && r.is_active);
+  const sessionRules = rules.filter(r => r.category === "session_rules" && r.is_active);
+  const riskRules = rules.filter(r => r.category === "risk_management" && r.is_active);
+
+  // ─── Apply NO-TRADE rules FIRST (priority 9+ override to NO_TRADE) ───
+  for (const rule of noTradeRules) {
+    if (rule.rule_name === "Low ADX Filter" && v1Result.adx !== null && v1Result.adx < 18) {
+      if (rule.priority >= 9) forceNoTrade = true;
+      v2Notes.push(`ADX ${v1Result.adx} < 18 — no trend ✗`);
+    }
+
+    if (rule.rule_name === "Choppy Market Detection") {
+      const crossovers = countCrossovers(ema4, ema17, 25);
+      if (crossovers >= 3) {
+        if (rule.priority >= 9) forceNoTrade = true;
+        v2Notes.push(`${crossovers} crossovers in 25 candles — choppy ✗`);
+      } else {
+        v2Notes.push("Not in choppy market ✓");
+      }
+    }
+
+    if (rule.rule_name === "Overtrading Prevention" && recentSignalCount >= 2) {
+      if (rule.priority >= 8) forceNoTrade = true;
+      v2Notes.push(`${recentSignalCount} signals in 2h window — overtrading ✗`);
+    }
+
+    if (rule.rule_name === "RSI Extreme Caution" && v1Result.rsi !== null) {
+      if (v1Result.rsi > 75 && v1Result.direction === "BUY") {
+        confidence -= 1;
+        v2Notes.push(`RSI ${v1Result.rsi} overbought — no BUY ✗`);
+        if (rule.priority >= 8) forceNoTrade = true;
+      }
+      if (v1Result.rsi < 25 && v1Result.direction === "SELL") {
+        confidence -= 1;
+        v2Notes.push(`RSI ${v1Result.rsi} oversold — no SELL ✗`);
+        if (rule.priority >= 8) forceNoTrade = true;
+      }
+    }
+
+    if (rule.rule_name === "Tight Range Filter") {
+      const recent10 = candles.slice(-10);
+      const range10 = Math.max(...recent10.map((c: any) => c.high)) - Math.min(...recent10.map((c: any) => c.low));
+      const avg50 = candles.slice(-50);
+      const range50 = avg50.length > 0 ? (Math.max(...avg50.map((c: any) => c.high)) - Math.min(...avg50.map((c: any) => c.low))) / (avg50.length / 10) : range10;
+      if (range10 < range50 * 0.5) {
+        v2Notes.push("Tight range — market too quiet ✗");
+        if (rule.priority >= 7) confidence -= 1;
+      }
+    }
+  }
+
+  if (forceNoTrade) {
+    return {
+      ...v1Result,
+      direction: "NO TRADE", confidence: 0, verdict: "NO_TRADE",
+      entry_price: null, take_profit: null, stop_loss: null, risk_reward: null,
+      reasoning: `${v1Result.reasoning} [Falconer V2] ${v2Notes.join(" | ")} | BLOCKED by knowledge base rules.`,
+    };
+  }
+
+  // ─── Apply ENTRY rules ───
+  for (const rule of entryRules) {
+    if (rule.rule_name === "EMA Crossover Confirmation" && v1Result.ema_crossover_status === "CONFIRMED") {
+      if (rule.priority >= 9) confidence += 1;
+      v2Notes.push("Crossover confirmed on closed candle ✓");
+    }
+
+    if (rule.rule_name === "Multiple Confluence Required") {
+      let confluenceCount = 0;
+      if (v1Result.ema_crossover_status === "CONFIRMED") confluenceCount++;
+      if (v1Result.rsi !== null && ((v1Result.direction === "BUY" && v1Result.rsi > 55) || (v1Result.direction === "SELL" && v1Result.rsi < 45))) confluenceCount++;
+      if (v1Result.macd_status === "Bullish" && v1Result.direction === "BUY") confluenceCount++;
+      if (v1Result.macd_status === "Bearish" && v1Result.direction === "SELL") confluenceCount++;
+      if (v1Result.adx !== null && v1Result.adx > 25) confluenceCount++;
+      v2Notes.push(`Multiple confluence: ${confluenceCount}/5 indicators aligned ${confluenceCount >= 3 ? "✓" : "✗"}`);
+      if (confluenceCount < 3 && rule.priority >= 9) confidence -= 1;
+    }
+
+    if (rule.rule_name === "Fresh Crossover Only") {
+      const crossovers = countCrossovers(ema4, ema17, 20);
+      if (crossovers >= 3) {
+        v2Notes.push(`${crossovers} crossovers in 20 candles — not fresh ✗`);
+        if (rule.priority >= 9) confidence -= 2;
+      }
+    }
+
+    if (rule.rule_name === "Trend Alignment" && closes.length >= 50) {
+      const sma50 = calcSMA(closes, 50);
+      const smaSlope = sma50[sma50.length - 1] - sma50[sma50.length - 5];
+      const trendUp = smaSlope > 0;
+      if ((v1Result.direction === "BUY" && !trendUp) || (v1Result.direction === "SELL" && trendUp)) {
+        confidence -= 2;
+        v2Notes.push(`SMA50 conflicts with ${v1Result.direction} — reduced confidence ✗`);
+      } else if ((v1Result.direction === "BUY" && trendUp) || (v1Result.direction === "SELL" && !trendUp)) {
+        v2Notes.push(`SMA50 aligns with ${v1Result.direction} ✓`);
+      }
+    }
+  }
+
+  // ─── Apply SESSION rules ───
+  const utcHour = new Date().getUTCHours();
+  for (const rule of sessionRules) {
+    if (rule.rule_name === "London Open Power" && utcHour >= 8 && utcHour < 9) {
+      confidence += 1;
+      v2Notes.push("London session open +1 bonus ✓");
+    }
+    if (rule.rule_name === "NY/London Overlap" && utcHour >= 13 && utcHour < 17) {
+      confidence += 1;
+      v2Notes.push("NY/London overlap +1 bonus ✓");
+    }
+    if (rule.rule_name === "Asian Session Caution" && utcHour >= 0 && utcHour < 8) {
+      v2Notes.push("Asian session — tighter TP applied");
+    }
+  }
+
+  // ─── Apply RISK rules: recalculate SL/TP with swing structure ───
+  let entry = v1Result.entry_price;
+  let tp = v1Result.take_profit;
+  let sl = v1Result.stop_loss;
+  let rr = v1Result.risk_reward;
+
+  if (entry && (v1Result.direction === "BUY" || v1Result.direction === "SELL")) {
+    for (const rule of riskRules) {
+      if (rule.rule_name === "Stop Loss Behind Structure") {
+        if (v1Result.direction === "BUY") {
+          const swingLow = findSwingLow(lows, lows.length - 1, 20);
+          sl = +(swingLow * 0.999).toFixed(5); // 0.1% buffer
+          v2Notes.push(`SL placed behind swing low at ${sl} ✓`);
+        } else {
+          const swingHigh = findSwingHigh(highs, highs.length - 1, 20);
+          sl = +(swingHigh * 1.001).toFixed(5);
+          v2Notes.push(`SL placed behind swing high at ${sl} ✓`);
+        }
+      }
+    }
+
+    // Recalculate TP for 2:1 minimum
+    if (sl && entry) {
+      const risk = Math.abs(entry - sl);
+      tp = v1Result.direction === "BUY" ? +(entry + risk * 2).toFixed(5) : +(entry - risk * 2).toFixed(5);
+      const reward = Math.abs(tp - entry);
+      const rrVal = risk > 0 ? reward / risk : 2;
+      rr = `${rrVal.toFixed(1)}:1`;
+      v2Notes.push(`R:R ${rr} ✓`);
+
+      // Asian session: tighter TP
+      if (utcHour >= 0 && utcHour < 8 && sessionRules.some(r => r.rule_name === "Asian Session Caution")) {
+        tp = v1Result.direction === "BUY" ? +(entry + risk * 1.4).toFixed(5) : +(entry - risk * 1.4).toFixed(5);
+        rr = "1.4:1";
+      }
+
+      // Minimum R:R check
+      if (rrVal < 2 && riskRules.some(r => r.rule_name === "Minimum R:R 2:1" && r.priority >= 10)) {
+        v2Notes.push("R:R below 2:1 — structure doesn't support trade ✗");
+        confidence -= 2;
+      }
+    }
+  }
+
+  // ─── Final confidence clamping ───
+  confidence = Math.max(0, Math.min(10, confidence));
+
+  // V2: require >= 6 for BUY/SELL
+  let finalDirection = v1Result.direction;
+  let finalVerdict = v1Result.verdict;
+  if (confidence < 6 && (finalDirection === "BUY" || finalDirection === "SELL")) {
+    finalVerdict = "WAIT";
+  }
+
+  const convictionLabel = confidence >= 8 ? "HIGH CONVICTION" : confidence >= 6 ? "MODERATE" : "LOW";
+  v2Notes.push(`${session} session active`);
+  v2Notes.push(`Final confidence: ${confidence}/10 ${convictionLabel} ${finalDirection}`);
+
+  const fullReasoning = `${v1Result.reasoning} [Falconer V2] ${v2Notes.join(" | ")}`;
+
+  return {
+    ...v1Result,
+    direction: finalDirection,
+    confidence,
+    verdict: finalVerdict,
+    entry_price: entry,
+    take_profit: tp,
+    stop_loss: sl,
+    risk_reward: rr,
+    reasoning: fullReasoning,
+  };
+}
+
+// Wrapper: runs V1, then optionally layers V2
+function runAnalysis(candles: any[], v2Rules: KnowledgeRule[] = [], session = "", recentSignalCount = 0, useV2 = true): AnalysisResult {
+  const v1Result = runAnalysisV1(candles);
+  if (!useV2 || v2Rules.length === 0) return v1Result;
+  return applyV2Rules(v1Result, candles, v2Rules, session, recentSignalCount);
 }
 
 /* ─── Session detection for volume summaries ─── */
@@ -647,6 +867,10 @@ serve(async (req) => {
     }
 
     // ─── FALCONER AI AUTO-SCAN: detect candle closes with STRICT DEDUP ───
+    // Load V2 knowledge base rules
+    const { data: v2Rules } = await supabase.from("falconer_knowledge").select("*").eq("is_active", true);
+    const activeRules: KnowledgeRule[] = (v2Rules || []) as KnowledgeRule[];
+
     let autoScans = 0;
     let signalsCreated = 0;
     const session = detectSession();
@@ -657,6 +881,9 @@ serve(async (req) => {
         .select("default_candle_type, ema_fast, ema_slow")
         .eq("id", userId)
         .single();
+
+      // Check if user has V2 enabled (default: v2)
+      const useV2 = true; // V2 is default for all users
 
       for (const inst of instList) {
         const data = symbolData.get(inst.symbol);
@@ -670,11 +897,20 @@ serve(async (req) => {
         if (prevTime && newTime && prevTime !== newTime) {
           console.log(`Candle close: ${inst.symbol} (${inst.timeframe}) user ${userId.slice(0, 8)}`);
 
+          // Count recent signals for overtrading prevention
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+          const { count: recentSignalCount } = await supabase
+            .from("signals")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", userId)
+            .eq("symbol", inst.symbol)
+            .gte("created_at", twoHoursAgo);
+
           const candles = symbolCandles.get(inst.symbol);
           let analysis: AnalysisResult;
 
           if (candles && candles.length > 20) {
-            analysis = runAnalysis(candles);
+            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2);
           } else {
             // Mock analysis — still apply Falconer AI logic
             const mockRsi = data.rsi;
