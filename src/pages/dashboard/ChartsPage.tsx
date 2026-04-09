@@ -108,6 +108,7 @@ export default function ChartsPage() {
   const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const overlaySeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
+  const tradeLinesRef = useRef<any[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
