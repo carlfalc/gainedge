@@ -287,7 +287,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({
         success: true,
         candles: filteredCandles,
-        filteredOut: Array.isArray(candles) ? candles.length - filteredCandles.length : 0,
+        filteredOut: Array.isArray(candles) ? (candles as any[]).length - filteredCandles.length : 0,
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
