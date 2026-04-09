@@ -218,7 +218,7 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
         <div className="p-3 flex flex-col gap-2">
           {/* ─── 1. INTELLIGENT TRADER ─── */}
           <div>
-            <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader</div>
+            <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( R O N ) is:</div>
             <div className="flex items-center gap-4 flex-wrap">
               <button
                 onClick={() => setAutoTradeEnabled(!autoTradeEnabled)}
