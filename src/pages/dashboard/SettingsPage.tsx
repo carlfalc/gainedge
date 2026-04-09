@@ -54,12 +54,15 @@ export default function SettingsPage() {
         setIsAdmin(session.user.email === ADMIN_EMAIL);
       }
     });
-    if (userId) {
-      supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
-        if (data) setInstruments(data.map(d => d.symbol));
-      });
-    }
+    loadInstruments();
   }, [userId]);
+
+  const loadInstruments = () => {
+    if (!userId) return;
+    supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
+      if (data) setInstruments(data.map(d => d.symbol));
+    });
+  };
 
   const handleSave = async () => {
     if (!userId) return;
