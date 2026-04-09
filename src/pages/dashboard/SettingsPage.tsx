@@ -172,7 +172,12 @@ export default function SettingsPage() {
         Save All Settings
       </button>
 
+      {/* All users see AI Preferences */}
+      <FalconerPreferencesPanel />
+
+      {/* Admin-only sections */}
       {isAdmin && <FalconerRulesPanel />}
+      {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
 
       <Section icon={<AlertTriangle size={16} color={C.red} />} title="Danger Zone">
