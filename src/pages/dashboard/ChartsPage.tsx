@@ -667,6 +667,15 @@ export default function ChartsPage() {
         )}
       </div>
 
+      {/* Trade Execution Panel */}
+      {!isFullscreen && (
+        <TradeExecutionPanel
+          symbol={selected}
+          accountId={accountIdRef.current}
+          connectionStatus={connectionStatus}
+        />
+      )}
+
       {/* Falconer AI Analysis Panel */}
       {!isFullscreen && scanResult && (() => {
         const fresh = signalFreshness(scanResult.scanned_at);
