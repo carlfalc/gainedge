@@ -179,7 +179,6 @@ export default function FalconerRulesPanel() {
                 padding: "4px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, border: "none", cursor: "pointer",
                 background: versionFilter === v ? C.purple + "20" : C.bg,
                 color: versionFilter === v ? C.purple : C.sec,
-                border: `1px solid ${versionFilter === v ? C.purple + "40" : C.border}`,
               }}
             >
               {v.toUpperCase()}
