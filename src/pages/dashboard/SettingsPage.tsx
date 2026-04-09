@@ -170,6 +170,7 @@ export default function SettingsPage() {
         Save All Settings
       </button>
 
+      {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <AdminPanel />}
 
       <Section icon={<AlertTriangle size={16} color={C.red} />} title="Danger Zone">
