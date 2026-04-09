@@ -12,6 +12,7 @@ import BrokerModal from "./BrokerModal";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
   { label: "Signals", icon: Zap, path: "/dashboard/signals" },
   { label: "Trade Journal", icon: BookOpen, path: "/dashboard/journal" },
   { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
@@ -22,7 +23,7 @@ const NAV_ITEMS = [
   { label: "Clock Settings", icon: Clock, path: "/dashboard/clock-settings" },
   { label: "News Settings", icon: Newspaper, path: "/dashboard/news-settings" },
   { label: "My News", icon: Globe, path: "/dashboard/my-news" },
-];
+] as const;
 
 export default function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
