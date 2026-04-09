@@ -94,6 +94,9 @@ export default function ChartsPage() {
   const [hLineMode, setHLineMode] = useState(false);
   const [showBrokerModal, setShowBrokerModal] = useState(false);
   const [brokerLabel, setBrokerLabel] = useState("");
+  const [orderMode, setOrderMode] = useState<OrderMode>("market");
+  const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
+  const [tradePositions, setTradePositions] = useState<Position[]>([]);
 
   // MetaApi state
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
