@@ -120,6 +120,39 @@ export type Database = {
           },
         ]
       }
+      falconer_knowledge: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: number
+          rule_name: string
+          rule_text: string
+          version: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          rule_name: string
+          rule_text: string
+          version?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          rule_name?: string
+          rule_text?: string
+          version?: string
+        }
+        Relationships: []
+      }
       insights: {
         Row: {
           created_at: string
