@@ -344,6 +344,65 @@ export default function ChartsPage() {
     }, 1500);
   }, [selected, chartType]);
 
+  /* ─── draw trade level lines ─── */
+  const drawTradeLines = useCallback((candleSeries: ISeriesApi<"Candlestick">) => {
+    // Remove old trade lines
+    tradeLinesRef.current.forEach(line => {
+      try { candleSeries.removePriceLine(line); } catch {}
+    });
+    tradeLinesRef.current = [];
+
+    const addLine = (price: number, color: string, title: string) => {
+      const line = candleSeries.createPriceLine({
+        price, color, lineWidth: 1, lineStyle: 2,
+        axisLabelVisible: true, title,
+      });
+      tradeLinesRef.current.push(line);
+    };
+
+    // 1. Active signal lines
+    if (scanResult) {
+      const fresh = signalFreshness(scanResult.scanned_at);
+      if (fresh !== "expired") {
+        if (scanResult.entry_price) addLine(scanResult.entry_price, "#FFFFFF", `Entry: ${scanResult.entry_price.toLocaleString()}`);
+        if (scanResult.stop_loss) addLine(scanResult.stop_loss, "#EF4444", `SL: ${scanResult.stop_loss.toLocaleString()}`);
+        if (scanResult.take_profit) addLine(scanResult.take_profit, "#22C55E", `TP: ${scanResult.take_profit.toLocaleString()}`);
+      }
+    }
+
+    // 2. Open position lines for current symbol
+    const symbolPositions = tradePositions.filter(p => {
+      const sym = p.symbol?.replace(".i", "").replace("NDX100", "NAS100");
+      return sym === selected || p.symbol === selected;
+    });
+    symbolPositions.forEach((p, i) => {
+      const label = i > 0 ? ` #${i + 1}` : "";
+      addLine(p.openPrice, "#3B82F6", `Pos${label}: ${p.openPrice.toLocaleString()}`);
+      if (p.stopLoss) addLine(p.stopLoss, "#EF4444", `Pos SL${label}`);
+      if (p.takeProfit) addLine(p.takeProfit, "#22C55E", `Pos TP${label}`);
+    });
+
+    // 3. Limit/stop order lines
+    if (limitPrices && (orderMode === "limit" || orderMode === "stop")) {
+      if (limitPrices.entry) {
+        addLine(limitPrices.entry, "#FFFFFF", orderMode === "limit" ? "Limit Entry" : "Stop Entry");
+      }
+      if (limitPrices.slEnabled && limitPrices.sl) {
+        addLine(limitPrices.sl, "#EF4444", "Pending SL");
+      }
+      if (limitPrices.tpEnabled && limitPrices.tp) {
+        addLine(limitPrices.tp, "#22C55E", "Pending TP");
+      }
+    }
+  }, [scanResult, tradePositions, selected, limitPrices, orderMode]);
+
+  /* ─── redraw trade lines when deps change ─── */
+  useEffect(() => {
+    if (candleSeriesRef.current) {
+      drawTradeLines(candleSeriesRef.current);
+    }
+  }, [drawTradeLines]);
+
   /* ─── create chart ─── */
   const buildChart = useCallback(async () => {
     if (!containerRef.current || !selected) return;
