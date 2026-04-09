@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
+import TradeExecutionPanel from "@/components/dashboard/TradeExecutionPanel";
 
 /* ───── types ───── */
 interface ScanResult {
@@ -665,6 +666,15 @@ export default function ChartsPage() {
           </div>
         )}
       </div>
+
+      {/* Trade Execution Panel */}
+      {!isFullscreen && (
+        <TradeExecutionPanel
+          symbol={selected}
+          accountId={accountIdRef.current}
+          connectionStatus={connectionStatus}
+        />
+      )}
 
       {/* Falconer AI Analysis Panel */}
       {!isFullscreen && scanResult && (() => {
