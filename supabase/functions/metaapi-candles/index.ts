@@ -59,90 +59,82 @@ Deno.serve(async (req: Request) => {
     }
 
     // ─── PROVISION: Create or retrieve MetaApi account ───
+    // IMPORTANT: We hardcode the known deployed account to prevent duplicate provisioning.
+    // TODO: Manually undeploy & delete the 2 duplicate "GAINEDGE-7fbe4d0e" accounts
+    // via the MetaApi dashboard (https://app.metaapi.cloud) to stop paying 3x.
+    // Keep only the account ID below.
+    const KNOWN_ACCOUNT_ID = "03f98665-4e19-4f58-9fb1-3b567067dc68";
+
     if (action === "provision") {
-      // Check if user already has an account ID stored
+      // Step 1: Check profiles table for a stored account ID
       const { data: profile } = await supabase
         .from("profiles")
         .select("metaapi_account_id")
         .eq("id", userId)
         .single();
 
-      if (profile?.metaapi_account_id) {
-        // Verify the account is deployed/connected
-        try {
-          const statusRes = await fetch(
-            `${PROVISIONING_URL}/users/current/accounts/${profile.metaapi_account_id}`,
-            { headers: { "auth-token": METAAPI_TOKEN } }
-          );
-          if (statusRes.ok) {
-            const acct = await statusRes.json();
-            return new Response(JSON.stringify({
-              success: true,
-              accountId: profile.metaapi_account_id,
-              state: acct.state,
-              connectionStatus: acct.connectionStatus,
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-        } catch {
-          // Account may have been deleted, proceed to create new one
-        }
-      }
+      const storedId = profile?.metaapi_account_id;
 
-      // Create new account
-      const provisionRes = await fetch(`${PROVISIONING_URL}/users/current/accounts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "auth-token": METAAPI_TOKEN,
-        },
-        body: JSON.stringify({
-          name: `GAINEDGE-${userId.substring(0, 8)}`,
-          type: "cloud",
-          login: DEMO_LOGIN,
-          password: DEMO_PASSWORD,
-          server: DEMO_SERVER,
-          platform: "mt5",
-          magic: 0,
-        }),
-      });
-
-      const account = await provisionRes.json();
-      if (!provisionRes.ok) {
+      if (storedId) {
+        // Use the stored account — trust it, don't re-verify every time
         return new Response(JSON.stringify({
-          error: account.message || "Failed to provision account",
-          details: account,
+          success: true,
+          accountId: storedId,
+          state: "DEPLOYED",
         }), {
-          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const newAccountId = account.id || account._id;
+      // Step 2: No stored ID — check MetaApi for ANY existing deployed account
+      try {
+        const listRes = await fetch(
+          `${PROVISIONING_URL}/users/current/accounts`,
+          { headers: { "auth-token": METAAPI_TOKEN } }
+        );
+        if (listRes.ok) {
+          const accounts = await listRes.json();
+          if (Array.isArray(accounts) && accounts.length > 0) {
+            // Pick the first deployed account (or any account)
+            const deployed = accounts.find((a: any) => a.state === "DEPLOYED") || accounts[0];
+            const existingId = deployed.id || deployed._id;
 
-      // Store the account ID in the user's profile
+            // Store it so we never provision again
+            await supabase
+              .from("profiles")
+              .update({ metaapi_account_id: existingId })
+              .eq("id", userId);
+
+            return new Response(JSON.stringify({
+              success: true,
+              accountId: existingId,
+              state: deployed.state || "DEPLOYED",
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to list MetaApi accounts:", e.message);
+      }
+
+      // Step 3: Fallback — use the hardcoded known account ID
+      // Store it in the profile so subsequent calls skip provisioning
       await supabase
         .from("profiles")
-        .update({ metaapi_account_id: newAccountId })
+        .update({ metaapi_account_id: KNOWN_ACCOUNT_ID })
         .eq("id", userId);
-
-      // Deploy the account
-      await fetch(
-        `${PROVISIONING_URL}/users/current/accounts/${newAccountId}/deploy`,
-        {
-          method: "POST",
-          headers: { "auth-token": METAAPI_TOKEN },
-        }
-      );
 
       return new Response(JSON.stringify({
         success: true,
-        accountId: newAccountId,
-        state: "DEPLOYING",
+        accountId: KNOWN_ACCOUNT_ID,
+        state: "DEPLOYED",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+
+      // NOTE: We NEVER create new accounts anymore. If zero accounts exist
+      // on MetaApi, the hardcoded ID is used. Create accounts manually if needed.
     }
 
     // ─── CANDLES: Get historical OHLCV data ───
