@@ -265,6 +265,8 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
               {autoTradeEnabled ? (
                 <span className="text-amber-400">
                   ⚡ RON will execute trades when high-confidence signals fire (confidence ≥ 7)
+                  <br />
+                  <span className="text-[9px] text-white/30">Safety: max 1 trade per instrument · per-instrument loss pause (3 consecutive) · 5% daily loss limit</span>
                 </span>
               ) : (
                 <span className="text-white/40">

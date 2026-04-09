@@ -243,7 +243,7 @@ export default function SignalsPage() {
           label="All-Time P&L"
           value={`${stats.allTimePnlCurrency >= 0 ? "+$" : "-$"}${Math.abs(stats.allTimePnlCurrency).toFixed(2)} ${currency}`}
           color={stats.allTimePnlCurrency >= 0 ? C.green : C.red}
-          sub={`${stats.wins}W / ${stats.losses}L`}
+          sub="Simulated — signal entry/TP/SL vs live"
         />
         <StatTile
           icon={<BarChart3 size={16} />}
