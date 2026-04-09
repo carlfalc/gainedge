@@ -1035,35 +1035,77 @@ serve(async (req) => {
     }
 
     // ─── RESOLVE PENDING SIGNALS: check TP/SL/expiry ───
+    // Timeframe-based expiry: candle count × timeframe minutes
+    const EXPIRY_MAP: Record<string, number> = {
+      "1": 60 * 60 * 1000,       // 1m × 60 candles = 1 hour
+      "5": 48 * 5 * 60 * 1000,   // 5m × 48 candles = 4 hours
+      "15": 48 * 15 * 60 * 1000, // 15m × 48 candles = 12 hours
+      "60": 24 * 60 * 60 * 1000, // 1H × 24 candles = 24 hours
+      "240": 12 * 4 * 60 * 60 * 1000, // 4H × 12 candles = 48 hours
+      "1440": 5 * 24 * 60 * 60 * 1000, // 1D × 5 candles = 5 days
+    };
+    const DEFAULT_EXPIRY_MS = 48 * 15 * 60 * 1000; // 12 hours default
+
     let resolvedCount = 0;
     const { data: pendingSignals } = await supabase
       .from("signals")
-      .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at")
+      .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at, scan_result_id")
       .eq("result", "pending");
 
     if (pendingSignals && pendingSignals.length > 0) {
+      // Batch-fetch timeframes from linked scan_results
+      const scanIds = pendingSignals.map(s => s.scan_result_id).filter(Boolean);
+      let scanTimeframes: Record<string, string> = {};
+      if (scanIds.length > 0) {
+        const { data: scans } = await supabase
+          .from("scan_results")
+          .select("id, timeframe")
+          .in("id", scanIds);
+        if (scans) {
+          for (const sc of scans) scanTimeframes[sc.id] = sc.timeframe;
+        }
+      }
+
       for (const sig of pendingSignals) {
-        // Check expiry first (20 minutes)
+        // Determine expiry based on timeframe
+        const tf = sig.scan_result_id ? scanTimeframes[sig.scan_result_id] : null;
+        const expiryMs = tf ? (EXPIRY_MAP[tf] || DEFAULT_EXPIRY_MS) : DEFAULT_EXPIRY_MS;
         const ageMs = Date.now() - new Date(sig.created_at).getTime();
-        if (ageMs > 20 * 60 * 1000) {
+
+        // Get live price
+        const liveData = symbolData.get(sig.symbol);
+        const livePrice = liveData?.last_price ?? null;
+
+        // Check expiry
+        if (ageMs > expiryMs) {
+          // Calculate unrealized P&L at expiry
+          let pnl = 0;
+          let pnlPips = 0;
+          if (livePrice) {
+            if (sig.direction === "BUY") {
+              pnl = livePrice - sig.entry_price;
+            } else {
+              pnl = sig.entry_price - livePrice;
+            }
+            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+          }
           await supabase.from("signals").update({
-            result: "expired", pnl: 0, pnl_pips: 0, resolved_at: new Date().toISOString(),
+            result: "expired", pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1), resolved_at: new Date().toISOString(),
           }).eq("id", sig.id);
+          const expiryHours = Math.round(expiryMs / 3600000);
           await supabase.from("insights").insert({
             user_id: sig.user_id, insight_type: "signal_outcome",
             title: `${sig.symbol} ${sig.direction} — Expired`,
-            description: `Signal expired after 20 minutes without hitting TP or SL. Entry: ${sig.entry_price}`,
+            description: `Signal expired after ${expiryHours}h without hitting TP or SL. Entry: ${sig.entry_price}, Unrealized P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
             symbol: sig.symbol, severity: "low",
+            data: { entry_price: sig.entry_price, take_profit: sig.take_profit, stop_loss: sig.stop_loss, pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1), expired: true },
           });
           resolvedCount++;
           continue;
         }
 
-        // Get live price
-        const liveData = symbolData.get(sig.symbol);
-        if (!liveData || !liveData.last_price) continue;
+        if (!livePrice) continue;
 
-        const livePrice = liveData.last_price;
         let result: string | null = null;
         let pnl = 0;
         let pnlPips = 0;
@@ -1098,7 +1140,7 @@ serve(async (req) => {
           await supabase.from("insights").insert({
             user_id: sig.user_id, insight_type: "signal_outcome",
             title: `${sig.symbol} ${sig.direction} — ${result.toUpperCase()}`,
-            description: `RON signal resolved as ${result}. Entry: ${sig.entry_price}, P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
+            description: `Falconer AI signal resolved as ${result}. Entry: ${sig.entry_price}, P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
             symbol: sig.symbol, severity: result === "win" ? "positive" : "negative",
             data: { entry_price: sig.entry_price, take_profit: sig.take_profit, stop_loss: sig.stop_loss, pnl, pnl_pips: pnlPips },
           });
