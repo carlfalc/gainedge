@@ -726,6 +726,9 @@ export default function ChartsPage() {
           symbol={selected}
           accountId={accountIdRef.current}
           connectionStatus={connectionStatus}
+          currentPrice={lastCandle?.close ?? null}
+          onOrderModeChange={setOrderMode}
+          onLimitPricesChange={setLimitPrices}
         />
       )}
 
