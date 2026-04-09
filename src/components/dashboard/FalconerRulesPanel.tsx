@@ -165,7 +165,6 @@ export default function FalconerRulesPanel() {
               padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, border: "none", cursor: "pointer",
               background: filter === c.value ? (CATEGORY_COLORS[c.value] || C.jade) + "20" : C.bg,
               color: filter === c.value ? (CATEGORY_COLORS[c.value] || C.jade) : C.sec,
-              border: `1px solid ${filter === c.value ? (CATEGORY_COLORS[c.value] || C.jade) + "40" : C.border}`,
             }}
           >
             {c.label}
