@@ -15,11 +15,125 @@ const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtr
 
 // HARDCODED account ID — do NOT provision new accounts
 const METAAPI_ACCOUNT_ID = "ea940a26-d263-4017-ad2c-0412f8399b69";
+const METAAPI_TIMEOUT_MS = 30_000;
+
+const TIMEFRAME_MS: Record<string, number> = {
+  "1m": 60_000,
+  "5m": 5 * 60_000,
+  "15m": 15 * 60_000,
+  "1h": 60 * 60_000,
+  "4h": 4 * 60 * 60_000,
+  "1d": 24 * 60 * 60_000,
+};
+
+const MOCK_BASE_PRICES: Record<string, number> = {
+  XAUUSD: 4720,
+  EURUSD: 1.085,
+  GBPUSD: 1.265,
+  AUDUSD: 0.645,
+  NZDUSD: 0.595,
+  USDJPY: 155.5,
+  NAS100: 21200,
+  US30: 42500,
+};
+
+const DEFAULT_SYMBOLS = Object.keys(MOCK_BASE_PRICES);
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), METAAPI_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`MetaApi request timed out after ${METAAPI_TIMEOUT_MS / 1000} seconds`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function getTimeframeMs(timeframe: string) {
+  return TIMEFRAME_MS[timeframe] ?? TIMEFRAME_MS["15m"];
+}
+
+function getMockBasePrice(symbol: string) {
+  return MOCK_BASE_PRICES[symbol] ?? 100;
+}
+
+function generateMockCandles(symbol: string, timeframe: string, startTime?: string, limit = 500) {
+  const candleCount = Number.isFinite(limit) ? Math.max(10, Math.min(limit, 1000)) : 500;
+  const timeframeMs = getTimeframeMs(timeframe);
+  const startTs = startTime
+    ? new Date(startTime).getTime()
+    : Date.now() - candleCount * timeframeMs;
+
+  let price = getMockBasePrice(symbol);
+
+  return Array.from({ length: candleCount }, (_, index) => {
+    const time = new Date(startTs + index * timeframeMs).toISOString();
+    const drift = (Math.random() - 0.5) * price * 0.0015;
+    const open = price;
+    const close = Math.max(0.00001, open + drift);
+    const wick = Math.abs((Math.random() - 0.5) * price * 0.0008);
+    const high = Math.max(open, close) + wick;
+    const low = Math.max(0.00001, Math.min(open, close) - wick);
+    price = close;
+
+    return {
+      time,
+      open: +open.toFixed(5),
+      high: +high.toFixed(5),
+      low: +low.toFixed(5),
+      close: +close.toFixed(5),
+      tickVolume: Math.floor(50 + Math.random() * 250),
+    };
+  });
+}
+
+function generateMockPrice(symbol: string) {
+  const midpoint = getMockBasePrice(symbol);
+  const spread = midpoint >= 100
+    ? Math.max(0.1, midpoint * 0.00003)
+    : Math.max(0.0001, midpoint * 0.0002);
+
+  return {
+    symbol,
+    bid: +(midpoint - spread / 2).toFixed(5),
+    ask: +(midpoint + spread / 2).toFixed(5),
+    time: new Date().toISOString(),
+    fallback: true,
+  };
+}
+
+function filterSpikeCandles<T extends { high: number }>(candles: T[]) {
+  return candles.filter((candle, index, source) => {
+    if (index < 50) return true;
+
+    const recentCandles = source.slice(index - 50, index);
+    const averageHigh = recentCandles.reduce((sum, item) => sum + Number(item.high ?? 0), 0) / recentCandles.length;
+
+    if (!averageHigh) return true;
+
+    return Number(candle.high ?? 0) <= averageHigh * 1.03;
+  });
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  console.log("metaapi-candles called with accountId:", METAAPI_ACCOUNT_ID);
 
   try {
     // Authenticate user
@@ -46,7 +160,8 @@ Deno.serve(async (req: Request) => {
     const userId = claimsData.claims.sub;
 
     const body = await req.json();
-    const { action, accountId, symbol, timeframe, startTime, limit } = body;
+    const { action, symbol, timeframe, startTime, limit } = body;
+    const accountId = METAAPI_ACCOUNT_ID;
 
     if (!action) {
       return new Response(JSON.stringify({ error: "Missing action parameter" }), {
@@ -73,29 +188,34 @@ Deno.serve(async (req: Request) => {
 
     // ─── CANDLES: Get historical OHLCV data ───
     if (action === "candles") {
-      if (!accountId || !symbol || !timeframe) {
-        return new Response(JSON.stringify({ error: "Missing accountId, symbol, or timeframe" }), {
+      if (!symbol || !timeframe) {
+        return new Response(JSON.stringify({ error: "Missing symbol or timeframe" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const candleLimit = limit || 500;
+      const requestedLimit = typeof limit === "number" ? limit : Number(limit ?? 500);
+      const candleLimit = Number.isFinite(requestedLimit)
+        ? Math.max(10, Math.min(requestedLimit, 1000))
+        : 500;
       const start = startTime || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
 
       let res, candles;
       try {
-        res = await fetch(url, {
+        res = await fetchWithTimeout(url, {
           headers: { "auth-token": METAAPI_TOKEN },
         });
         candles = await res.json();
       } catch (fetchErr) {
-        console.error("Candles fetch network error:", fetchErr.message);
+        console.error("Candles fetch network error:", getErrorMessage(fetchErr));
         return new Response(JSON.stringify({
-          error: "SERVICE_UNAVAILABLE",
+          success: true,
           fallback: true,
-          candles: [],
+          accountId,
+          candles: generateMockCandles(symbol, timeframe, start, candleLimit),
+          error: "SERVICE_UNAVAILABLE",
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -111,15 +231,21 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      return new Response(JSON.stringify({ success: true, candles }), {
+      const filteredCandles = Array.isArray(candles) ? filterSpikeCandles(candles) : [];
+
+      return new Response(JSON.stringify({
+        success: true,
+        candles: filteredCandles,
+        filteredOut: Array.isArray(candles) ? candles.length - filteredCandles.length : 0,
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // ─── PRICE: Get current tick/price ───
     if (action === "price") {
-      if (!accountId || !symbol) {
-        return new Response(JSON.stringify({ error: "Missing accountId or symbol" }), {
+      if (!symbol) {
+        return new Response(JSON.stringify({ error: "Missing symbol" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -139,10 +265,11 @@ Deno.serve(async (req: Request) => {
       const variants = PRICE_SYMBOL_VARIANTS[symbol] || [symbol];
 
       let lastError: any = null;
+      let shouldFallback = false;
       for (const variant of variants) {
         try {
           const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
-          const res = await fetch(url, {
+          const res = await fetchWithTimeout(url, {
             headers: { "auth-token": METAAPI_TOKEN },
           });
           const price = await res.json();
@@ -153,9 +280,20 @@ Deno.serve(async (req: Request) => {
           }
           lastError = price;
         } catch (fetchErr) {
-          console.error(`Price fetch failed for ${variant}:`, fetchErr.message);
-          lastError = { message: fetchErr.message };
+          console.error(`Price fetch failed for ${variant}:`, getErrorMessage(fetchErr));
+          lastError = { message: getErrorMessage(fetchErr) };
+          shouldFallback = true;
         }
+      }
+
+      if (shouldFallback) {
+        return new Response(JSON.stringify({
+          success: true,
+          fallback: true,
+          price: generateMockPrice(symbol),
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       return new Response(JSON.stringify({
@@ -169,23 +307,21 @@ Deno.serve(async (req: Request) => {
 
     // ─── SYMBOLS: List available symbols ───
     if (action === "symbols") {
-      if (!accountId) {
-        return new Response(JSON.stringify({ error: "Missing accountId" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
       let res, symbols;
       try {
         const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols`;
-        res = await fetch(url, {
+        res = await fetchWithTimeout(url, {
           headers: { "auth-token": METAAPI_TOKEN },
         });
         symbols = await res.json();
       } catch (fetchErr) {
-        console.error("Symbols fetch network error:", fetchErr.message);
-        return new Response(JSON.stringify({ error: "SERVICE_UNAVAILABLE", fallback: true, symbols: [] }), {
+        console.error("Symbols fetch network error:", getErrorMessage(fetchErr));
+        return new Response(JSON.stringify({
+          success: true,
+          error: "SERVICE_UNAVAILABLE",
+          fallback: true,
+          symbols: DEFAULT_SYMBOLS,
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
