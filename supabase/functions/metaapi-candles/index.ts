@@ -279,7 +279,10 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const filteredCandles = Array.isArray(candles) ? filterSpikeCandles(candles) : [];
+      // Apply hard price range validation first, then spike filter
+      const priceValidCandles = Array.isArray(candles) ? filterByPriceRange(candles, symbol) : [];
+      const filteredCandles = filterSpikeCandles(priceValidCandles);
+      console.log(`Candles: ${(candles as any[])?.length ?? 0} raw → ${priceValidCandles.length} price-valid → ${filteredCandles.length} after spike filter`);
 
       return new Response(JSON.stringify({
         success: true,
