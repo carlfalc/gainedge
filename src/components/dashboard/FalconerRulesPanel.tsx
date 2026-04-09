@@ -140,7 +140,6 @@ export default function FalconerRulesPanel() {
           style={{
             padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
             background: aiVersion === "v1" ? C.amber + "30" : C.bg, color: aiVersion === "v1" ? C.amber : C.sec,
-            border: `1px solid ${aiVersion === "v1" ? C.amber : C.border}`,
           }}
         >
           V1 (Legacy)
