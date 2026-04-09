@@ -105,30 +105,38 @@ export default function DashboardLayout() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: collapsed ? "10px 0" : "10px 12px",
-                justifyContent: collapsed ? "center" : "flex-start",
-                borderRadius: 10, border: "none", cursor: "pointer",
-                background: isActive(item.path) ? C.jade + "14" : "transparent",
-                color: isActive(item.path) ? C.jade : C.sec,
-                fontSize: 13, fontWeight: isActive(item.path) ? 600 : 500,
-                fontFamily: "'DM Sans', sans-serif",
-                transition: "all 0.2s",
-                borderLeft: isActive(item.path) ? `2px solid ${C.jade}` : "2px solid transparent",
-              }}
-              onMouseEnter={e => { if (!isActive(item.path)) { e.currentTarget.style.color = C.text; e.currentTarget.style.background = "rgba(255,255,255,0.04)"; } }}
-              onMouseLeave={e => { if (!isActive(item.path)) { e.currentTarget.style.color = C.sec; e.currentTarget.style.background = "transparent"; } }}
-            >
-              <item.icon size={18} strokeWidth={1.8} />
-              {!collapsed && <span>{item.label}</span>}
-            </button>
-          ))}
-          {/* Broker button */}
+          {NAV_ITEMS.map(item => {
+            const gold = 'gold' in item && item.gold;
+            const activeColor = gold ? "#F59E0B" : C.jade;
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: collapsed ? "10px 0" : "10px 12px",
+                  justifyContent: collapsed ? "center" : "flex-start",
+                  borderRadius: 10, border: "none", cursor: "pointer",
+                  background: isActive(item.path) ? activeColor + "14" : "transparent",
+                  color: isActive(item.path) ? activeColor : gold ? "#F59E0B" : C.sec,
+                  fontSize: 13, fontWeight: isActive(item.path) || gold ? 600 : 500,
+                  fontFamily: "'DM Sans', sans-serif",
+                  transition: "all 0.2s",
+                  borderLeft: isActive(item.path) ? `2px solid ${activeColor}` : "2px solid transparent",
+                }}
+                onMouseEnter={e => { if (!isActive(item.path)) { e.currentTarget.style.color = gold ? "#F59E0B" : C.text; e.currentTarget.style.background = gold ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.04)"; } }}
+                onMouseLeave={e => { if (!isActive(item.path)) { e.currentTarget.style.color = gold ? "#F59E0B" : C.sec; e.currentTarget.style.background = "transparent"; } }}
+              >
+                <item.icon size={18} strokeWidth={1.8} />
+                {!collapsed && <span>{item.label}</span>}
+              </button>
+            );
+          })}
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
+
+          {/* Broker button — always at bottom */}
           <button
             onClick={() => setBrokerOpen(true)}
             style={{
@@ -148,27 +156,6 @@ export default function DashboardLayout() {
           >
             <DollarSign size={18} strokeWidth={1.8} />
             {!collapsed && <span>Broker</span>}
-          </button>
-          {/* Charts button */}
-          <button
-            onClick={() => navigate("/dashboard/charts")}
-            style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: collapsed ? "10px 0" : "10px 12px",
-              justifyContent: collapsed ? "center" : "flex-start",
-              borderRadius: 10, border: "none", cursor: "pointer",
-              background: isActive("/dashboard/charts") ? "rgba(245,158,11,0.12)" : "transparent",
-              color: "#F59E0B",
-              fontSize: 13, fontWeight: 600,
-              fontFamily: "'DM Sans', sans-serif",
-              transition: "all 0.2s",
-              borderLeft: isActive("/dashboard/charts") ? "2px solid #F59E0B" : "2px solid transparent",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "rgba(245,158,11,0.08)"; }}
-            onMouseLeave={e => { if (!isActive("/dashboard/charts")) e.currentTarget.style.background = "transparent"; }}
-          >
-            <CandlestickChart size={18} strokeWidth={1.8} />
-            {!collapsed && <span>Charts</span>}
           </button>
         </nav>
 
