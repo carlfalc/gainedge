@@ -149,7 +149,6 @@ export default function FalconerRulesPanel() {
           style={{
             padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
             background: aiVersion === "v2" ? C.jade + "30" : C.bg, color: aiVersion === "v2" ? C.jade : C.sec,
-            border: `1px solid ${aiVersion === "v2" ? C.jade : C.border}`,
           }}
         >
           V2 (Knowledge Base)
