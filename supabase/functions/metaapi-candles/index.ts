@@ -158,11 +158,23 @@ Deno.serve(async (req: Request) => {
       const start = startTime || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
 
-      const res = await fetch(url, {
-        headers: { "auth-token": METAAPI_TOKEN },
-      });
+      let res, candles;
+      try {
+        res = await fetch(url, {
+          headers: { "auth-token": METAAPI_TOKEN },
+        });
+        candles = await res.json();
+      } catch (fetchErr) {
+        console.error("Candles fetch network error:", fetchErr.message);
+        return new Response(JSON.stringify({
+          error: "SERVICE_UNAVAILABLE",
+          fallback: true,
+          candles: [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      const candles = await res.json();
       if (!res.ok) {
         return new Response(JSON.stringify({
           error: candles.message || "Failed to fetch candles",
