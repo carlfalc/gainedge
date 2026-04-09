@@ -27,6 +27,7 @@ export default function SettingsPage() {
   const [instruments, setInstruments] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
+  const [showAddInstrument, setShowAddInstrument] = useState(false);
 
   useEffect(() => {
     if (profile) {
