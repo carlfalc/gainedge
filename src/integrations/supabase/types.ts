@@ -203,6 +203,54 @@ export type Database = {
           },
         ]
       }
+      instrument_library: {
+        Row: {
+          category: string
+          created_at: string
+          display_name: string
+          eightcap_symbol: string | null
+          icmarkets_symbol: string | null
+          is_popular: boolean
+          max_price: number
+          min_price: number
+          oanda_symbol: string | null
+          pepperstone_symbol: string | null
+          pip_size: number
+          pip_value_per_lot: number
+          symbol: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          display_name: string
+          eightcap_symbol?: string | null
+          icmarkets_symbol?: string | null
+          is_popular?: boolean
+          max_price?: number
+          min_price?: number
+          oanda_symbol?: string | null
+          pepperstone_symbol?: string | null
+          pip_size?: number
+          pip_value_per_lot?: number
+          symbol: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          display_name?: string
+          eightcap_symbol?: string | null
+          icmarkets_symbol?: string | null
+          is_popular?: boolean
+          max_price?: number
+          min_price?: number
+          oanda_symbol?: string | null
+          pepperstone_symbol?: string | null
+          pip_size?: number
+          pip_value_per_lot?: number
+          symbol?: string
+        }
+        Relationships: []
+      }
       journal_entries: {
         Row: {
           created_at: string

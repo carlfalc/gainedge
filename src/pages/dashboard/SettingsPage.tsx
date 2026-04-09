@@ -4,6 +4,7 @@ import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff,
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel from "@/components/dashboard/FalconerPreferencesPanel";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
+import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const [instruments, setInstruments] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
+  const [showAddInstrument, setShowAddInstrument] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -52,12 +54,15 @@ export default function SettingsPage() {
         setIsAdmin(session.user.email === ADMIN_EMAIL);
       }
     });
-    if (userId) {
-      supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
-        if (data) setInstruments(data.map(d => d.symbol));
-      });
-    }
+    loadInstruments();
   }, [userId]);
+
+  const loadInstruments = () => {
+    if (!userId) return;
+    supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
+      if (data) setInstruments(data.map(d => d.symbol));
+    });
+  };
 
   const handleSave = async () => {
     if (!userId) return;
@@ -109,7 +114,7 @@ export default function SettingsPage() {
             <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: C.jade + "18", color: C.jade }}>{i}</span>
           ))}
         </div>
-        <button style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>+ Add Instrument</button>
+        <button onClick={() => setShowAddInstrument(true)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>+ Add Instrument</button>
       </Section>
 
       <Section icon={<Sliders size={16} color={C.purple} />} title="Preferences">
@@ -184,6 +189,16 @@ export default function SettingsPage() {
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>This action cannot be undone. All data will be permanently deleted.</div>
         <button style={{ ...btnStyle, background: C.red + "20", color: C.red, border: `1px solid ${C.red}30` }}>Delete Account</button>
       </Section>
+
+      {userId && (
+        <AddInstrumentModal
+          open={showAddInstrument}
+          onClose={() => setShowAddInstrument(false)}
+          userId={userId}
+          currentInstruments={instruments}
+          onAdded={() => { loadInstruments(); }}
+        />
+      )}
     </div>
   );
 }
