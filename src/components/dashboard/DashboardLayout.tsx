@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart
+  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
@@ -13,6 +13,7 @@ import BrokerModal from "./BrokerModal";
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
+  { label: "TradingView Chart", icon: ExternalLink, path: "/dashboard/tradingview-chart", white: true },
   { label: "Signals", icon: Zap, path: "/dashboard/signals" },
   { label: "Trade Journal", icon: BookOpen, path: "/dashboard/journal" },
   { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
@@ -107,7 +108,11 @@ export default function DashboardLayout() {
         <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV_ITEMS.map(item => {
             const gold = 'gold' in item && item.gold;
-            const activeColor = gold ? "#F59E0B" : C.jade;
+            const white = 'white' in item && item.white;
+            const activeColor = gold ? "#F59E0B" : white ? "#FFFFFF" : C.jade;
+            const defaultColor = gold ? "#F59E0B" : white ? "#E2E8F0" : C.sec;
+            const hoverColor = gold ? "#F59E0B" : white ? "#FFFFFF" : C.text;
+            const hoverBg = gold ? "rgba(245,158,11,0.08)" : white ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.04)";
             return (
               <button
                 key={item.path}
@@ -118,14 +123,14 @@ export default function DashboardLayout() {
                   justifyContent: collapsed ? "center" : "flex-start",
                   borderRadius: 10, border: "none", cursor: "pointer",
                   background: isActive(item.path) ? activeColor + "14" : "transparent",
-                  color: isActive(item.path) ? activeColor : gold ? "#F59E0B" : C.sec,
-                  fontSize: 13, fontWeight: isActive(item.path) || gold ? 600 : 500,
+                  color: isActive(item.path) ? activeColor : defaultColor,
+                  fontSize: 13, fontWeight: isActive(item.path) || gold || white ? 600 : 500,
                   fontFamily: "'DM Sans', sans-serif",
                   transition: "all 0.2s",
                   borderLeft: isActive(item.path) ? `2px solid ${activeColor}` : "2px solid transparent",
                 }}
-                onMouseEnter={e => { if (!isActive(item.path)) { e.currentTarget.style.color = gold ? "#F59E0B" : C.text; e.currentTarget.style.background = gold ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.04)"; } }}
-                onMouseLeave={e => { if (!isActive(item.path)) { e.currentTarget.style.color = gold ? "#F59E0B" : C.sec; e.currentTarget.style.background = "transparent"; } }}
+                onMouseEnter={e => { if (!isActive(item.path)) { e.currentTarget.style.color = hoverColor; e.currentTarget.style.background = hoverBg; } }}
+                onMouseLeave={e => { if (!isActive(item.path)) { e.currentTarget.style.color = defaultColor; e.currentTarget.style.background = "transparent"; } }}
               >
                 <item.icon size={18} strokeWidth={1.8} />
                 {!collapsed && <span>{item.label}</span>}
