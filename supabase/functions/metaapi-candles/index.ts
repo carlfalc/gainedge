@@ -248,16 +248,50 @@ Deno.serve(async (req: Request) => {
         ? Math.max(10, Math.min(requestedLimit, 1000))
         : 500;
       const start = startTime || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(symbol)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
 
-      let res, candles;
-      try {
-        res = await fetchWithTimeout(url, {
-          headers: { "auth-token": METAAPI_TOKEN },
-        });
-        candles = await res.json();
-      } catch (fetchErr) {
-        console.error("Candles fetch network error:", getErrorMessage(fetchErr));
+      // Symbol variant fallback for broker compatibility
+      const CANDLE_SYMBOL_VARIANTS: Record<string, string[]> = {
+        NAS100: ["NDX100", "NAS100", "USTEC", "NAS100.i"],
+        US30: ["US30", "DJ30", "US30.i"],
+        XAUUSD: ["XAUUSD", "GOLD", "XAUUSD.i"],
+        XAGUSD: ["XAGUSD", "SILVER", "XAGUSD.i"],
+        SPX500: ["SPX500", "SP500", "SPX500.i"],
+        UK100: ["UK100", "FTSE100", "UK100.i"],
+        GER40: ["GER40", "DAX40", "GER40.i"],
+        AUDUSD: ["AUDUSD.i", "AUDUSD"],
+        NZDUSD: ["NZDUSD.i", "NZDUSD"],
+        EURUSD: ["EURUSD.i", "EURUSD"],
+        GBPUSD: ["GBPUSD.i", "GBPUSD"],
+        USDJPY: ["USDJPY.i", "USDJPY"],
+        USDCAD: ["USDCAD.i", "USDCAD"],
+        USDCHF: ["USDCHF.i", "USDCHF"],
+      };
+      const variants = CANDLE_SYMBOL_VARIANTS[symbol] || [symbol];
+
+      let res: Response | undefined, candles: any;
+      let lastError: any = null;
+      for (const variant of variants) {
+        try {
+          const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${candleLimit}`;
+          res = await fetchWithTimeout(url, {
+            headers: { "auth-token": METAAPI_TOKEN },
+          });
+          candles = await res.json();
+          if (res.ok && Array.isArray(candles) && candles.length > 0) {
+            console.log(`Candles: resolved ${symbol} → ${variant}`);
+            break;
+          }
+          lastError = candles;
+          res = undefined; // mark as failed to try next
+        } catch (fetchErr) {
+          console.error(`Candles fetch failed for variant ${variant}:`, getErrorMessage(fetchErr));
+          lastError = { message: getErrorMessage(fetchErr) };
+        }
+      }
+
+      if (!res || !Array.isArray(candles) || candles.length === 0) {
+        // All variants failed — return mock data
+        console.error(`All candle variants failed for ${symbol}, returning mock data`);
         return new Response(JSON.stringify({
           success: true,
           fallback: true,
@@ -265,16 +299,6 @@ Deno.serve(async (req: Request) => {
           candles: generateMockCandles(symbol, timeframe, start, candleLimit),
           error: "SERVICE_UNAVAILABLE",
         }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (!res.ok) {
-        return new Response(JSON.stringify({
-          error: candles.message || "Failed to fetch candles",
-          details: candles,
-        }), {
-          status: res.status,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

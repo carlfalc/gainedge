@@ -60,33 +60,67 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const tradeBody: Record<string, unknown> = {
-        actionType,
-        symbol,
-        volume: parseFloat(volume),
+      // Symbol variant fallback for broker compatibility
+      const TRADE_SYMBOL_VARIANTS: Record<string, string[]> = {
+        NAS100: ["NDX100", "NAS100", "USTEC", "NAS100.i"],
+        US30: ["US30", "DJ30", "US30.i"],
+        XAUUSD: ["XAUUSD", "GOLD", "XAUUSD.i"],
+        XAGUSD: ["XAGUSD", "SILVER", "XAGUSD.i"],
+        SPX500: ["SPX500", "SP500", "SPX500.i"],
+        UK100: ["UK100", "FTSE100", "UK100.i"],
+        GER40: ["GER40", "DAX40", "GER40.i"],
+        AUDUSD: ["AUDUSD.i", "AUDUSD"],
+        NZDUSD: ["NZDUSD.i", "NZDUSD"],
+        EURUSD: ["EURUSD.i", "EURUSD"],
+        GBPUSD: ["GBPUSD.i", "GBPUSD"],
+        USDJPY: ["USDJPY.i", "USDJPY"],
+        USDCAD: ["USDCAD.i", "USDCAD"],
+        USDCHF: ["USDCHF.i", "USDCHF"],
       };
-      if (stopLoss !== undefined && stopLoss !== null && stopLoss !== "") {
-        tradeBody.stopLoss = parseFloat(stopLoss);
-      }
-      if (takeProfit !== undefined && takeProfit !== null && takeProfit !== "") {
-        tradeBody.takeProfit = parseFloat(takeProfit);
-      }
+      const variants = TRADE_SYMBOL_VARIANTS[symbol] || [symbol];
 
-      const res = await fetch(`${baseUrl}/trade`, {
-        method: "POST",
-        headers: metaHeaders,
-        body: JSON.stringify(tradeBody),
-      });
+      for (const variant of variants) {
+        const tradeBody: Record<string, unknown> = {
+          actionType,
+          symbol: variant,
+          volume: parseFloat(volume),
+        };
+        if (stopLoss !== undefined && stopLoss !== null && stopLoss !== "") {
+          tradeBody.stopLoss = parseFloat(stopLoss);
+        }
+        if (takeProfit !== undefined && takeProfit !== null && takeProfit !== "") {
+          tradeBody.takeProfit = parseFloat(takeProfit);
+        }
 
-      const data = await res.json();
-      if (!res.ok) {
+        const res = await fetch(`${baseUrl}/trade`, {
+          method: "POST",
+          headers: metaHeaders,
+          body: JSON.stringify(tradeBody),
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          console.log(`Trade: resolved ${symbol} → ${variant}`);
+          return new Response(JSON.stringify({ success: true, result: data }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // If symbol not found, try next variant
+        const errMsg = JSON.stringify(data).toLowerCase();
+        if (errMsg.includes("symbol") && (errMsg.includes("not found") || errMsg.includes("not exist"))) {
+          console.log(`Trade: variant ${variant} not found, trying next...`);
+          continue;
+        }
+
+        // Other error — return immediately
         return new Response(JSON.stringify({ error: data.message || data.error || "Trade failed", details: data }), {
           status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      return new Response(JSON.stringify({ success: true, result: data }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: `No valid broker symbol found for ${symbol}` }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
