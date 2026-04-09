@@ -494,15 +494,24 @@ export default function ChartsPage() {
   /* ─── Drawing tools ─── */
   const initDrawingManager = useCallback(async (chart: IChartApi, series: ISeriesApi<"Candlestick">) => {
     try {
-      const { DrawingManager } = await import("lightweight-charts-drawing");
-      const dm = new DrawingManager(chart as any, series as any);
+      const drawingMod = await import("lightweight-charts-drawing");
+      const { DrawingManager } = drawingMod;
+      const dm = new DrawingManager();
+      dm.attach(chart, series, containerRef.current!);
       drawingManagerRef.current = dm;
 
       // Load saved drawings
       if (savedDrawings.length > 0) {
         try {
           const drawingData = savedDrawings.map(d => d.drawing_data);
-          dm.importDrawings(drawingData);
+          // importDrawings requires a factory function
+          dm.importDrawings(drawingData, (type: string, data: any) => {
+            const ToolClass = (drawingMod as any)[type];
+            if (ToolClass) {
+              try { return new ToolClass(data); } catch { return null; }
+            }
+            return null;
+          });
         } catch (e) {
           console.warn("Failed to import saved drawings:", e);
         }
