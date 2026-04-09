@@ -206,22 +206,25 @@ export default function SignalsPage() {
 
   const formatPrice = (v: number) => v >= 100 ? v.toLocaleString() : v.toFixed(4);
 
-  const resultColor = (r: string) => {
+  const resultColor = (r: string, pnlPips?: number | null) => {
     if (r === "win") return C.green;
     if (r === "loss") return C.red;
-    if (r === "expired") return C.muted;
+    if (r === "expired") return (pnlPips ?? 0) >= 0 ? C.amber : C.muted;
     return C.amber;
   };
 
   const formatPnl = (s: Signal): { text: string; color: string } => {
     if (s.result === "pending") return { text: "Pending...", color: C.amber };
-    if (s.result === "expired") return { text: "0 (expired)", color: C.muted };
     const pips = s.pnl_pips ?? 0;
     const usdVal = pipToUsd(pips, s.symbol, lotSize);
     const displayVal = convertToDisplayCurrency(usdVal, currency, fxRates);
     const sign = pips >= 0 ? "+" : "";
-    const color = pips >= 0 ? C.green : C.red;
     const currSymbol = currency === "JPY" ? "¥" : "$";
+    if (s.result === "expired") {
+      const color = pips >= 0 ? C.amber : C.muted;
+      return { text: `EXPIRED (${sign}${pips.toFixed(1)} pips / ${currSymbol}${Math.abs(displayVal).toFixed(2)} ${currency})`, color };
+    }
+    const color = pips >= 0 ? C.green : C.red;
     return { text: `${sign}${pips.toFixed(1)} pips (${currSymbol}${Math.abs(displayVal).toFixed(2)} ${currency})`, color };
   };
 
@@ -234,7 +237,7 @@ export default function SignalsPage() {
   return (
     <div style={{ maxWidth: 1200 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 4 }}>Signal History</h1>
-      <p style={{ fontSize: 11, color: C.muted, marginBottom: 20, letterSpacing: 0.5 }}>Signals powered by <span style={{ color: C.jade, fontWeight: 600 }}>RON</span></p>
+      <p style={{ fontSize: 11, color: C.muted, marginBottom: 20, letterSpacing: 0.5 }}>Signals powered by <span style={{ color: C.jade, fontWeight: 600 }}>Falconer AI</span></p>
 
       {/* Performance Tiles */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 20 }}>
