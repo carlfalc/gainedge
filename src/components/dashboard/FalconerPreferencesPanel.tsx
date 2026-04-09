@@ -109,14 +109,14 @@ export default function FalconerPreferencesPanel() {
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <Brain size={16} color={C.jade} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: C.jade }}>Falconer AI Preferences</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.jade }}>RON Preferences</span>
       </div>
 
       {/* AI Signal Notifications */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${C.border}`, marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>AI Signal Notifications</div>
-          <div style={{ fontSize: 11, color: C.sec }}>Receive trade signals from Falconer AI</div>
+          <div style={{ fontSize: 11, color: C.sec }}>Receive trade signals from RON</div>
         </div>
         <div
           onClick={() => setNotifications(!notifications)}

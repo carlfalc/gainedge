@@ -277,7 +277,7 @@ export default function DashboardHome() {
                     (Expired — {formatAge(inst.scanned_at)})
                   </div>
                 )}
-                <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>Falconer AI: </span>{inst.reasoning || "No reasoning available."}
+                <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>RON: </span>{inst.reasoning || "No reasoning available."}
               </div>
 
               {expired && (
