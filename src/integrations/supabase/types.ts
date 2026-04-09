@@ -222,11 +222,13 @@ export type Database = {
           id: string
           last_candle_time: string | null
           last_price: number | null
+          last_spike_at: string | null
           macd_status: string | null
           market_open: boolean | null
           price_direction: string | null
           rsi: number | null
           sparkline_data: Json | null
+          spike_magnitude: number | null
           stoch_rsi: number | null
           symbol: string
           updated_at: string
@@ -240,11 +242,13 @@ export type Database = {
           id?: string
           last_candle_time?: string | null
           last_price?: number | null
+          last_spike_at?: string | null
           macd_status?: string | null
           market_open?: boolean | null
           price_direction?: string | null
           rsi?: number | null
           sparkline_data?: Json | null
+          spike_magnitude?: number | null
           stoch_rsi?: number | null
           symbol: string
           updated_at?: string
@@ -258,11 +262,13 @@ export type Database = {
           id?: string
           last_candle_time?: string | null
           last_price?: number | null
+          last_spike_at?: string | null
           macd_status?: string | null
           market_open?: boolean | null
           price_direction?: string | null
           rsi?: number | null
           sparkline_data?: Json | null
+          spike_magnitude?: number | null
           stoch_rsi?: number | null
           symbol?: string
           updated_at?: string
