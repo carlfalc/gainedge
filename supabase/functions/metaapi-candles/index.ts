@@ -304,14 +304,20 @@ Deno.serve(async (req: Request) => {
 
       // Try symbol variants for broker compatibility (e.g. XAUUSD -> XAUUSD.i)
       const PRICE_SYMBOL_VARIANTS: Record<string, string[]> = {
-        XAUUSD: ["XAUUSD.i", "XAUUSD"],
+        NAS100: ["NDX100", "NAS100", "USTEC", "NAS100.i"],
+        US30: ["US30", "DJ30", "US30.i"],
+        XAUUSD: ["XAUUSD", "GOLD", "XAUUSD.i"],
+        XAGUSD: ["XAGUSD", "SILVER", "XAGUSD.i"],
+        SPX500: ["SPX500", "SP500", "SPX500.i"],
+        UK100: ["UK100", "FTSE100", "UK100.i"],
+        GER40: ["GER40", "DAX40", "GER40.i"],
+        AUDUSD: ["AUDUSD.i", "AUDUSD"],
+        NZDUSD: ["NZDUSD.i", "NZDUSD"],
         EURUSD: ["EURUSD.i", "EURUSD"],
         GBPUSD: ["GBPUSD.i", "GBPUSD"],
         USDJPY: ["USDJPY.i", "USDJPY"],
-        AUDUSD: ["AUDUSD.i", "AUDUSD"],
-        NZDUSD: ["NZDUSD.i", "NZDUSD"],
-        NAS100: ["NDX100", "NAS100", "USTEC"],
-        US30: ["DJ30", "US30"],
+        USDCAD: ["USDCAD.i", "USDCAD"],
+        USDCHF: ["USDCHF.i", "USDCHF"],
       };
       const variants = PRICE_SYMBOL_VARIANTS[symbol] || [symbol];
 
