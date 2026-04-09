@@ -38,26 +38,11 @@ Deno.serve(async (req: Request) => {
 
     const userId = claimsData.claims.sub as string;
     const body = await req.json();
-    const { action, accountId } = body;
+    const { action } = body;
 
-    if (!accountId) {
-      return new Response(JSON.stringify({ error: "accountId is required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Verify user owns this account
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("metaapi_account_id")
-      .eq("id", userId)
-      .single();
-
-    if (!profile || profile.metaapi_account_id !== accountId) {
-      return new Response(JSON.stringify({ error: "Account mismatch" }), {
-        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Hardcoded account ID — no provisioning
+    const METAAPI_ACCOUNT_ID = "ea940a26-d263-4017-ad2c-0412f8399b69";
+    const accountId = METAAPI_ACCOUNT_ID;
 
     const metaHeaders = {
       "auth-token": METAAPI_TOKEN,
