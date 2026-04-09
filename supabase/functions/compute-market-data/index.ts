@@ -562,29 +562,50 @@ serve(async (req) => {
           sd.spike_magnitude = +Math.abs(pctMove).toFixed(2);
         }
 
-        // Insert spike alert into news_items
-        await supabase.from("news_items").insert({
-          headline: `⚡ SPIKE DETECTED — ${symbol} moved ${pctMove > 0 ? "+" : ""}${pctMove.toFixed(1)}% in 5 candles`,
-          source: "SPIKE_ALERT",
-          impact: "high",
-          instruments_affected: [symbol],
-        });
+        // Rate-limit: max 1 spike alert per instrument per hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const { data: existingSpike } = await supabase
+          .from("news_items")
+          .select("id")
+          .eq("source", "SPIKE_ALERT")
+          .contains("instruments_affected", [symbol])
+          .gte("published_at", oneHourAgo)
+          .limit(1);
+
+        if (!existingSpike || existingSpike.length === 0) {
+          await supabase.from("news_items").insert({
+            headline: `⚡ SPIKE DETECTED — ${symbol} moved ${pctMove > 0 ? "+" : ""}${pctMove.toFixed(1)}% in 5 candles`,
+            source: "SPIKE_ALERT",
+            impact: "high",
+            instruments_affected: [symbol],
+          });
+        }
       }
 
-      // Anomalous candle detection: single candle range > 3x average
+      // Anomalous candle detection: single candle range > 5x average (raised from 3x)
       const ranges = candles.map((c: any) => c.high - c.low);
       const avgRange = ranges.reduce((a: number, b: number) => a + b, 0) / ranges.length;
       const lastRange = ranges[ranges.length - 1];
-      if (avgRange > 0 && lastRange > avgRange * 3) {
-        // Add insight for anomalous candle
-        // We'll insert for all users below
+      if (avgRange > 0 && lastRange > avgRange * 5) {
         const anomalyMag = (lastRange / avgRange).toFixed(1);
-        await supabase.from("news_items").insert({
-          headline: `🕯️ Anomalous candle on ${symbol} — range ${anomalyMag}x average`,
-          source: "SPIKE_ALERT",
-          impact: "medium",
-          instruments_affected: [symbol],
-        });
+        // Rate-limit: max 1 anomaly alert per instrument per hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const { data: existingAnomaly } = await supabase
+          .from("news_items")
+          .select("id")
+          .eq("source", "SPIKE_ALERT")
+          .contains("instruments_affected", [symbol])
+          .gte("published_at", oneHourAgo)
+          .limit(1);
+
+        if (!existingAnomaly || existingAnomaly.length === 0) {
+          await supabase.from("news_items").insert({
+            headline: `🕯️ Anomalous candle on ${symbol} — range ${anomalyMag}x average`,
+            source: "SPIKE_ALERT",
+            impact: "medium",
+            instruments_affected: [symbol],
+          });
+        }
       }
     }
 

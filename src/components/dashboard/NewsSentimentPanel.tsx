@@ -38,6 +38,7 @@ export function NewsSentimentPanel() {
     const { data } = await supabase
       .from("news_items")
       .select("*")
+      .neq("source", "SPIKE_ALERT")
       .order("published_at", { ascending: false })
       .limit(10);
 
