@@ -286,7 +286,7 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
               {/* Bid/Ask */}
               <div className="flex items-center gap-2 font-mono text-sm">
                 <div className="text-center">
-                  <div className="text-[9px] text-white uppercase">Bid</div>
+                  <div className="text-[9px] text-sky-400 uppercase">Bid</div>
                   <div className="text-white font-bold">{bid !== null ? bid.toFixed(priceDec) : "—"}</div>
                 </div>
                 <div className="text-[10px] text-white px-1">
