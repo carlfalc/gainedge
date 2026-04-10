@@ -33,6 +33,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   exit_rules: C.blue,
   session_rules: C.purple,
   market_structure: C.teal,
+  pattern_rules: C.blue,
 };
 
 export default function FalconerRulesPanel() {
