@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position } from "@/components/dashboard/TradeExecutionPanel";
+import { detectPatterns, type DetectedPattern } from "@/services/pattern-detection";
 
 /* ───── types ───── */
 interface ScanResult {
@@ -140,7 +141,7 @@ export default function ChartsPage() {
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
-
+  const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
   // Indicators
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]);
   const indicatorsLoadedRef = useRef(false);
@@ -162,6 +163,7 @@ export default function ChartsPage() {
   const overlaySeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
   const paneSeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
   const tradeLinesRef = useRef<any[]>([]);
+  const patternSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
@@ -846,6 +848,84 @@ export default function ChartsPage() {
     drawTradeLines(candleSeries);
     applyIndicators(chart, rawData);
 
+    // ─── RON Pattern Detection ───
+    patternSeriesRef.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
+    patternSeriesRef.current = [];
+
+    const patterns = detectPatterns(rawData.map(c => ({ time: c.time as number, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })));
+    setDetectedPatterns(patterns);
+
+    for (const pat of patterns) {
+      const color = pat.direction === "bullish" ? "#22C55E" : "#EF4444";
+      const isSR = pat.pattern_name === "Support" || pat.pattern_name === "Resistance";
+
+      // Draw support/resistance as price lines on the candle series
+      if (isSR) {
+        const level = pat.key_prices.support ?? pat.key_prices.resistance;
+        if (level) {
+          candleSeries.createPriceLine({
+            price: level,
+            color: "#F59E0B",
+            lineWidth: 1,
+            lineStyle: 1, // dashed
+            axisLabelVisible: true,
+            title: pat.pattern_name,
+          });
+        }
+        continue;
+      }
+
+      // Draw trendlines for triangles, flags
+      if (pat.key_prices.upper_line) {
+        const ul = pat.key_prices.upper_line;
+        const series = chart.addSeries(LineSeries, {
+          color, lineWidth: 2, lineStyle: 2, priceScaleId: "right",
+          lastValueVisible: false, priceLineVisible: false,
+        });
+        series.setData([
+          { time: ul.start.time as Time, value: ul.start.price },
+          { time: ul.end.time as Time, value: ul.end.price },
+        ]);
+        patternSeriesRef.current.push(series);
+      }
+      if (pat.key_prices.lower_line) {
+        const ll = pat.key_prices.lower_line;
+        const series = chart.addSeries(LineSeries, {
+          color, lineWidth: 2, lineStyle: 2, priceScaleId: "right",
+          lastValueVisible: false, priceLineVisible: false,
+        });
+        series.setData([
+          { time: ll.start.time as Time, value: ll.start.price },
+          { time: ll.end.time as Time, value: ll.end.price },
+        ]);
+        patternSeriesRef.current.push(series);
+      }
+
+      // Draw neckline for double top/bottom, H&S
+      if (pat.key_prices.neckline) {
+        candleSeries.createPriceLine({
+          price: pat.key_prices.neckline,
+          color,
+          lineWidth: 1,
+          lineStyle: 1,
+          axisLabelVisible: true,
+          title: `${pat.pattern_name} Neckline`,
+        });
+      }
+
+      // Draw target
+      if (pat.key_prices.target) {
+        candleSeries.createPriceLine({
+          price: pat.key_prices.target,
+          color,
+          lineWidth: 1,
+          lineStyle: 3, // dotted
+          axisLabelVisible: true,
+          title: `${pat.pattern_name} Target`,
+        });
+      }
+    }
+
     // Initialize drawing manager
     await initDrawingManager(chart, candleSeries);
 
@@ -883,6 +963,26 @@ export default function ChartsPage() {
   useEffect(() => {
     return () => { saveDrawings(); };
   }, [selected, timeframe]);
+
+  // Insert pattern insights into database
+  useEffect(() => {
+    if (!userId || detectedPatterns.length === 0) return;
+    const namedPatterns = detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance");
+    if (namedPatterns.length === 0) return;
+
+    const top = namedPatterns[0];
+    supabase.from("insights").insert({
+      user_id: userId,
+      insight_type: "pattern_detected",
+      symbol: selected,
+      title: `${top.pattern_name} — ${top.direction === "bullish" ? "Bullish" : "Bearish"}`,
+      description: `RON detected ${top.pattern_name} pattern on ${selected}. Confidence: ${top.confidence}/10.${top.key_prices.target ? ` Target: ${top.key_prices.target.toFixed(2)}` : ""}`,
+      severity: top.direction === "bullish" ? "positive" : "negative",
+      data: { pattern: top.pattern_name, direction: top.direction, confidence: top.confidence, key_prices: top.key_prices },
+    }).then(({ error }) => {
+      if (error) console.error("Pattern insight insert error:", error);
+    });
+  }, [detectedPatterns, userId, selected]);
 
   /* ─── helpers ─── */
   const dirColor = (d: string) => d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
@@ -1045,6 +1145,37 @@ export default function ChartsPage() {
           )}
         </div>
       </div>
+
+      {/* RON Pattern Detection Bar */}
+      {!isFullscreen && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/[0.06] bg-[#111724]">
+          <span className="text-[10px] font-bold text-[#00CFA5] tracking-wider shrink-0">RON PATTERN</span>
+          <div className="w-px h-4 bg-white/10" />
+          {detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance").length > 0 ? (() => {
+            const top = detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance")[0];
+            return (
+              <span className="text-[11px] text-white/80">
+                <span className={`font-bold ${top.direction === "bullish" ? "text-green-400" : "text-red-400"}`}>{top.pattern_name}</span>
+                {" detected on "}
+                <span className="text-white font-semibold">{selected}</span>
+                {" — "}
+                <span className={top.direction === "bullish" ? "text-green-400" : "text-red-400"}>{top.direction === "bullish" ? "Bullish" : "Bearish"}</span>
+                {top.key_prices.target && (
+                  <span className="text-white/60">{" | Target: "}<span className="text-white font-bold">{top.key_prices.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></span>
+                )}
+                <span className="text-white/60">{" | Confidence: "}<span className="text-white font-bold">{top.confidence}/10</span></span>
+              </span>
+            );
+          })() : (
+            <span className="text-[11px] text-white/40 italic">RON scanning for patterns...</span>
+          )}
+          {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length > 0 && (
+            <span className="ml-auto text-[10px] text-amber-400 font-medium">
+              {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length} S/R levels
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Trade Execution Panel */}
       {!isFullscreen && (
