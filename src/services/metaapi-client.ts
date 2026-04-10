@@ -3,7 +3,7 @@
  * Keeps the MetaApi token secure on the server side.
  */
 import { supabase } from "@/integrations/supabase/client";
-import { filterByPriceRange } from "@/lib/price-ranges";
+
 
 const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const FUNCTION_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/metaapi-candles`;
@@ -96,45 +96,7 @@ export async function fetchCandles(
     volume: c.tickVolume ?? c.volume ?? 0,
   }));
 
-  if (raw.length < 3) return raw;
-
-  // Hard price range validation — catches decimal errors like XAUUSD showing 47757 instead of 4775.7
-  const priceValid = filterByPriceRange(raw, symbol);
-
-  // Calculate average candle range for anomaly filtering
-  const ranges = priceValid.map(c => c.high - c.low);
-  const avgRange = ranges.reduce((a, b) => a + b, 0) / ranges.length;
-
-  // Filter out anomalous candles (range > 10x average)
-  const filtered = priceValid.filter(c => {
-    const range = c.high - c.low;
-    if (avgRange > 0 && range > avgRange * 10) return false;
-    return true;
-  });
-
-  // Detect time gaps and remove candles that create giant bars across gaps
-  const tfKey = TF_MAP[timeframe] || "15m";
-  const expectedGapSec: Record<string, number> = {
-    "1m": 60, "5m": 300, "15m": 900, "1h": 3600, "4h": 14400, "1d": 86400,
-  };
-  const maxGap = (expectedGapSec[tfKey] || 900) * 5; // allow up to 5x expected gap
-
-  const result: FormattedCandle[] = [filtered[0]];
-  for (let i = 1; i < filtered.length; i++) {
-    const gap = filtered[i].time - filtered[i - 1].time;
-    if (gap > maxGap) {
-      // Insert a gap marker by resetting open to match close of gap candle
-      // This prevents visual giant bars across weekend/data gaps
-      result.push({
-        ...filtered[i],
-        open: filtered[i].close, // collapse the gap candle
-      });
-    } else {
-      result.push(filtered[i]);
-    }
-  }
-
-  return result;
+  return raw;
 }
 
 /** Fetch current price tick */
