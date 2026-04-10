@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink
+  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
+
+/** Light background context — consumed by any page that wants to adapt */
+export const LightBgContext = createContext<boolean>(false);
 import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 import BrokerModal from "./BrokerModal";
 
@@ -34,6 +37,7 @@ export default function DashboardLayout() {
   const [sessionLabel, setSessionLabel] = useState("London Session");
   const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const [brokerOpen, setBrokerOpen] = useState(false);
+  const [lightBg, setLightBg] = useState(() => localStorage.getItem("gainedge_light_bg") === "1");
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -194,6 +198,25 @@ export default function DashboardLayout() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", marginLeft: "auto" }}>
+            {/* Light/Dark background toggle */}
+            <button
+              onClick={() => {
+                const next = !lightBg;
+                setLightBg(next);
+                localStorage.setItem("gainedge_light_bg", next ? "1" : "0");
+              }}
+              title={lightBg ? "Switch to dark background" : "Switch to light background"}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 34, height: 34, borderRadius: 10, cursor: "pointer",
+                background: lightBg ? "#F1F5F9" : C.card,
+                border: `1px solid ${lightBg ? "#CBD5E1" : C.border}`,
+                color: lightBg ? "#334155" : C.sec,
+                transition: "all 0.25s",
+              }}
+            >
+              {lightBg ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
             <button
               onClick={() => setUserMenuOpen(o => !o)}
               style={{
@@ -230,8 +253,10 @@ export default function DashboardLayout() {
         </header>
 
         {/* PAGE CONTENT */}
-        <main style={{ flex: 1, padding: 24, overflowY: "auto" }}>
-          <Outlet />
+        <main style={{ flex: 1, padding: 24, overflowY: "auto", background: lightBg ? "#F8FAFC" : "transparent", transition: "background 0.3s" }}>
+          <LightBgContext.Provider value={lightBg}>
+            <Outlet />
+          </LightBgContext.Provider>
         </main>
       </div>
       <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
