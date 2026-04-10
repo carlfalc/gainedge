@@ -999,6 +999,32 @@ serve(async (req) => {
             if (scanErr) console.error(`Scan insert error for ${inst.symbol}:`, scanErr);
             else autoScans++;
 
+            // ─── PATTERN BOOST: check for active patterns ───
+            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+            const { data: activePatterns } = await supabase
+              .from("insights")
+              .select("data, title")
+              .eq("user_id", userId)
+              .eq("symbol", inst.symbol)
+              .eq("insight_type", "pattern_detected")
+              .gte("created_at", oneHourAgo)
+              .order("created_at", { ascending: false })
+              .limit(1);
+
+            if (activePatterns && activePatterns.length > 0) {
+              const patData = activePatterns[0].data as any;
+              if (patData?.direction) {
+                const patternAligns =
+                  (patData.direction === "bullish" && analysis.direction === "BUY") ||
+                  (patData.direction === "bearish" && analysis.direction === "SELL");
+                if (patternAligns) {
+                  analysis.confidence = Math.min(10, analysis.confidence + 1);
+                  analysis.reasoning += ` [RON Pattern] ${patData.pattern} pattern aligns with signal — confidence boosted.`;
+                  console.log(`Pattern boost: ${inst.symbol} ${patData.pattern} aligns with ${analysis.direction}`);
+                }
+              }
+            }
+
             // ─── SIGNAL CREATION: only on meaningful new signals with conf >= 5 ───
             if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
               // Check for duplicate pending signal: same direction & entry within 0.5%
