@@ -175,6 +175,7 @@ export default function ChartsPage() {
   const patternSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const tradeConnectorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
+  const chartTypeRef = useRef(chartType);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -518,13 +519,15 @@ export default function ChartsPage() {
           }
         }
 
+        const currentChartType = chartTypeRef.current;
+
         // If the live price belongs to a NEW candle period, start a new candle
         if (currentPeriod > last.time) {
           const newCandle: OHLCData = {
             time: currentPeriod, open: mid, high: mid, low: mid, close: mid, volume: 0,
           };
           rawDataRef.current.push(newCandle);
-          const display = chartType === "Heiken Ashi"
+          const display = currentChartType === "Heiken Ashi"
             ? toHeikenAshi(rawDataRef.current).pop()!
             : newCandle;
           candleSeriesRef.current?.update({
@@ -537,7 +540,7 @@ export default function ChartsPage() {
             ...last, close: mid, high: Math.max(last.high, mid), low: Math.min(last.low, mid),
           };
           rawDataRef.current[rawDataRef.current.length - 1] = updated;
-          const display = chartType === "Heiken Ashi"
+          const display = currentChartType === "Heiken Ashi"
             ? toHeikenAshi(rawDataRef.current).pop()!
             : updated;
           candleSeriesRef.current?.update({
@@ -547,7 +550,7 @@ export default function ChartsPage() {
         }
       } catch { /* ignore polling errors */ }
     }, 2000);
-  }, [selected, connectionStatus, chartType, timeframe]);
+  }, [selected, connectionStatus, timeframe]);
 
   const startMockTicks = useCallback(() => {
     if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
@@ -561,7 +564,8 @@ export default function ChartsPage() {
         ...last, close: newClose, high: Math.max(last.high, newClose), low: Math.min(last.low, newClose),
       };
       rawDataRef.current[rawDataRef.current.length - 1] = updated;
-      const display = chartType === "Heiken Ashi"
+      const currentChartType = chartTypeRef.current;
+      const display = currentChartType === "Heiken Ashi"
         ? toHeikenAshi(rawDataRef.current).pop()!
         : updated;
       candleSeriesRef.current?.update({
@@ -569,7 +573,7 @@ export default function ChartsPage() {
         open: display.open, high: display.high, low: display.low, close: display.close,
       });
     }, 1500);
-  }, [selected, chartType]);
+  }, [selected]);
 
   /* ─── draw trade level lines ─── */
   const drawTradeLines = useCallback((candleSeries: ISeriesApi<"Candlestick">) => {
@@ -1133,7 +1137,6 @@ export default function ChartsPage() {
   }, [buildChart]);
 
   /* lightweight chart-type switch — just re-set data, no rebuild */
-  const chartTypeRef = useRef(chartType);
   useEffect(() => {
     if (chartTypeRef.current === chartType) return; // skip initial
     chartTypeRef.current = chartType;
@@ -1153,10 +1156,7 @@ export default function ChartsPage() {
     })));
 
     scheduleChartViewportSync(true);
-
-    // restart polling so tick updates use the new chartType
-    startPricePolling();
-  }, [chartType, scheduleChartViewportSync, startPricePolling]);
+  }, [chartType, scheduleChartViewportSync]);
 
   useEffect(() => {
     scheduleChartViewportSync(true);
