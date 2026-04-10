@@ -4,6 +4,7 @@ import {
   CandlestickSeries,
   HistogramSeries,
   LineSeries,
+  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
   type CandlestickData,
