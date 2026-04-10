@@ -182,7 +182,7 @@ function generateMockData(symbol: string) {
   };
 }
 
-/* ─── Falconer AI V1 (Legacy): analysis with NO-TRADE filters ─── */
+/* ─── RON V1 (Legacy): analysis with NO-TRADE filters ─── */
 function detectSession(): string {
   const h = new Date().getUTCHours();
   if (h >= 13 && h < 22) return "new_york";
@@ -382,7 +382,7 @@ function runAnalysisV1(candles: any[]): AnalysisResult {
   };
 }
 
-// ─── Falconer AI V2: Knowledge Base layer on top of V1 ───
+// ─── RON V2: Knowledge Base layer on top of V1 ───
 interface KnowledgeRule {
   id: string;
   category: string;
@@ -486,7 +486,7 @@ function applyV2Rules(v1Result: AnalysisResult, candles: any[], rules: Knowledge
       ...v1Result,
       direction: "NO TRADE", confidence: 0, verdict: "NO_TRADE",
       entry_price: null, take_profit: null, stop_loss: null, risk_reward: null,
-      reasoning: `${v1Result.reasoning} [Falconer AI V2] ${v2Notes.join(" | ")} | BLOCKED by knowledge base rules.`,
+      reasoning: `${v1Result.reasoning} [RON V2] ${v2Notes.join(" | ")} | BLOCKED by knowledge base rules.`,
     };
   }
 
@@ -603,7 +603,7 @@ function applyV2Rules(v1Result: AnalysisResult, candles: any[], rules: Knowledge
   v2Notes.push(`${session} session active`);
   v2Notes.push(`Final confidence: ${confidence}/10 ${convictionLabel} ${finalDirection}`);
 
-  const fullReasoning = `${v1Result.reasoning} [Falconer AI V2] ${v2Notes.join(" | ")}`;
+  const fullReasoning = `${v1Result.reasoning} [RON V2] ${v2Notes.join(" | ")}`;
 
   return {
     ...v1Result,
@@ -872,7 +872,7 @@ serve(async (req) => {
       if (error) console.error("Upsert error:", error);
     }
 
-    // ─── FALCONER AI AUTO-SCAN: detect candle closes with STRICT DEDUP ───
+    // ─── RON AUTO-SCAN: detect candle closes with STRICT DEDUP ───
     // Load V2 knowledge base rules
     const { data: v2Rules } = await supabase.from("falconer_knowledge").select("*").eq("is_active", true);
     const activeRules: KnowledgeRule[] = (v2Rules || []) as KnowledgeRule[];
@@ -918,7 +918,7 @@ serve(async (req) => {
           if (candles && candles.length > 20) {
             analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2);
           } else {
-            // Mock analysis — still apply Falconer AI logic
+            // Mock analysis — still apply RON logic
             const mockRsi = data.rsi;
             const mockAdx = data.adx;
             const mockMacd = data.macd_status;
@@ -930,7 +930,7 @@ serve(async (req) => {
                 direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
                 stop_loss: null, risk_reward: null, ema_crossover_status: "NONE",
                 ema_crossover_direction: null,
-                reasoning: `Falconer AI: ADX at ${mockAdx} — no clear trend. Staying flat until momentum develops.`,
+                reasoning: `RON: ADX at ${mockAdx} — no clear trend. Staying flat until momentum develops.`,
                 verdict: "NO_TRADE", rsi: mockRsi, adx: mockAdx, macd_status: mockMacd, stoch_rsi: mockStoch,
               };
             } else {
@@ -948,7 +948,7 @@ serve(async (req) => {
                 stop_loss: dir === "BUY" ? +(lastPrice - range).toFixed(5) : dir === "SELL" ? +(lastPrice + range).toFixed(5) : null,
                 risk_reward: dir !== "WAIT" ? "2.0:1" : null,
                 ema_crossover_status: "NONE", ema_crossover_direction: null,
-                reasoning: `Falconer AI: Auto-scan on ${inst.timeframe}. RSI ${mockRsi}, ADX ${mockAdx}, MACD ${mockMacd}, StochRSI ${mockStoch}. ${dir === "WAIT" ? "No clear setup — monitoring." : `${dir} signal with ${conf}/10 confidence.`}`,
+                reasoning: `RON: Auto-scan on ${inst.timeframe}. RSI ${mockRsi}, ADX ${mockAdx}, MACD ${mockMacd}, StochRSI ${mockStoch}. ${dir === "WAIT" ? "No clear setup — monitoring." : `${dir} signal with ${conf}/10 confidence.`}`,
                 verdict: dir === "WAIT" ? "WAIT" : dir, rsi: mockRsi, adx: mockAdx, macd_status: mockMacd, stoch_rsi: mockStoch,
               };
             }
@@ -1140,7 +1140,7 @@ serve(async (req) => {
           await supabase.from("insights").insert({
             user_id: sig.user_id, insight_type: "signal_outcome",
             title: `${sig.symbol} ${sig.direction} — ${result.toUpperCase()}`,
-            description: `Falconer AI signal resolved as ${result}. Entry: ${sig.entry_price}, P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
+            description: `RON signal resolved as ${result}. Entry: ${sig.entry_price}, P&L: ${pnl.toFixed(2)} (${pnlPips.toFixed(1)} pips)`,
             symbol: sig.symbol, severity: result === "win" ? "positive" : "negative",
             data: { entry_price: sig.entry_price, take_profit: sig.take_profit, stop_loss: sig.stop_loss, pnl, pnl_pips: pnlPips },
           });
