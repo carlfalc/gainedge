@@ -964,6 +964,26 @@ export default function ChartsPage() {
     return () => { saveDrawings(); };
   }, [selected, timeframe]);
 
+  // Insert pattern insights into database
+  useEffect(() => {
+    if (!userId || detectedPatterns.length === 0) return;
+    const namedPatterns = detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance");
+    if (namedPatterns.length === 0) return;
+
+    const top = namedPatterns[0];
+    supabase.from("insights").insert({
+      user_id: userId,
+      insight_type: "pattern_detected",
+      symbol: selected,
+      title: `${top.pattern_name} — ${top.direction === "bullish" ? "Bullish" : "Bearish"}`,
+      description: `RON detected ${top.pattern_name} pattern on ${selected}. Confidence: ${top.confidence}/10.${top.key_prices.target ? ` Target: ${top.key_prices.target.toFixed(2)}` : ""}`,
+      severity: top.direction === "bullish" ? "positive" : "negative",
+      data: { pattern: top.pattern_name, direction: top.direction, confidence: top.confidence, key_prices: top.key_prices },
+    }).then(({ error }) => {
+      if (error) console.error("Pattern insight insert error:", error);
+    });
+  }, [detectedPatterns, userId, selected]);
+
   /* ─── helpers ─── */
   const dirColor = (d: string) => d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
   const dirIcon = (d: string) =>
