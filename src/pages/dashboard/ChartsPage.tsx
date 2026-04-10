@@ -1089,6 +1089,10 @@ export default function ChartsPage() {
     return () => {
       if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
       if (pricePollingRef.current) clearInterval(pricePollingRef.current);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
       if (chartRef.current) {
         try { chartRef.current.remove(); } catch {}
         chartRef.current = null;
