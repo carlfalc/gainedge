@@ -1062,6 +1062,24 @@ export default function ChartsPage() {
     });
 
     chart.timeScale().fitContent();
+
+    // ─── ResizeObserver for fullscreen / window resize ───
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
+    }
+    const ro = new ResizeObserver(() => {
+      if (!containerRef.current || !chartRef.current) return;
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      if (w > 0 && h > 0) {
+        chartRef.current.applyOptions({ width: w, height: h });
+        chartRef.current.timeScale().fitContent();
+      }
+    });
+    ro.observe(containerRef.current);
+    resizeObserverRef.current = ro;
+
     startPricePolling();
   }, [selected, timeframe, scanResult, activeIndicators, chartSignals, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
 
