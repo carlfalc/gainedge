@@ -92,6 +92,37 @@ const DRAWING_TOOL_MAP: Record<string, string> = {
   date_range: "DateRange", date_price_range: "DateAndPriceRange",
 };
 
+const EDGE_CANDLE_MAX_CLOSE_DEVIATION = 0.02;
+
+const getCloseDeviationRatio = (value: number, reference: number) => {
+  if (!Number.isFinite(value) || !Number.isFinite(reference)) return 0;
+  const baseline = Math.abs(reference);
+  if (baseline === 0) return value === 0 ? 0 : Number.POSITIVE_INFINITY;
+  return Math.abs(value - reference) / baseline;
+};
+
+const dropAnomalousEdgeCandles = <T extends { close: number }>(candles: T[]) => {
+  if (candles.length < 2) return candles;
+
+  const cleaned = [...candles];
+
+  if (
+    cleaned.length >= 2 &&
+    getCloseDeviationRatio(cleaned[0].close, cleaned[1].close) > EDGE_CANDLE_MAX_CLOSE_DEVIATION
+  ) {
+    cleaned.shift();
+  }
+
+  if (
+    cleaned.length >= 2 &&
+    getCloseDeviationRatio(cleaned[cleaned.length - 1].close, cleaned[cleaned.length - 2].close) > EDGE_CANDLE_MAX_CLOSE_DEVIATION
+  ) {
+    cleaned.pop();
+  }
+
+  return cleaned;
+};
+
 export default function ChartsPage() {
   const { profile, userId } = useProfile();
   const [instruments, setInstruments] = useState<string[]>([]);
@@ -341,8 +372,10 @@ export default function ChartsPage() {
             }
           }
 
+          const cleanedCandles = dropAnomalousEdgeCandles(candles);
+
           setLoadingMessage("");
-          return candles.map(c => ({
+          return cleanedCandles.map(c => ({
             time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
           }));
         }
