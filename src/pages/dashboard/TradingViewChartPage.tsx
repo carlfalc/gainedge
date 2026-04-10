@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-profile";
 import { provisionAccount } from "@/services/metaapi-client";
 import TradeExecutionPanel from "@/components/dashboard/TradeExecutionPanel";
 import { ExternalLink } from "lucide-react";
 
-/* ── Broker → TradingView exchange prefix ── */
 const BROKER_EXCHANGES: Record<string, string> = {
   Eightcap: "EIGHTCAP",
   Pepperstone: "PEPPERSTONE",
@@ -40,11 +39,14 @@ const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
 function getTvSymbol(sym: string, broker: string): string {
   const exchange = BROKER_EXCHANGES[broker] || "";
   const map = TV_SYMBOL_MAP[sym];
-  if (map) {
-    return map[exchange] || map.default || `FX:${sym}`;
-  }
+  if (map) return map[exchange] || map.default || `FX:${sym}`;
   if (exchange) return `${exchange}:${sym}`;
   return `FX:${sym}`;
+}
+
+function buildIframeUrl(symbol: string, broker: string): string {
+  const tvSymbol = getTvSymbol(symbol, broker);
+  return `https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(tvSymbol)}&interval=15&theme=dark&style=1&locale=en&allow_symbol_change=true&hide_top_toolbar=false&hide_side_toolbar=false`;
 }
 
 export default function TradingViewChartPage() {
@@ -54,9 +56,7 @@ export default function TradingViewChartPage() {
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "live" | "demo">("disconnected");
-  const widgetContainerRef = useRef<HTMLDivElement>(null);
 
-  // Load user broker preference
   useEffect(() => {
     if (profile?.broker) {
       const match = BROKERS.find(b => b.toLowerCase() === profile.broker.toLowerCase());
@@ -64,7 +64,6 @@ export default function TradingViewChartPage() {
     }
   }, [profile]);
 
-  // Load instruments
   useEffect(() => {
     if (!userId) return;
     supabase
@@ -79,47 +78,13 @@ export default function TradingViewChartPage() {
       });
   }, [userId]);
 
-  // Provision MetaApi account for trade execution
   useEffect(() => {
     if (!userId) return;
     setConnectionStatus("connecting");
     provisionAccount()
-      .then(({ accountId: aid }) => {
-        setAccountId(aid);
-        setConnectionStatus("live");
-      })
+      .then(({ accountId: aid }) => { setAccountId(aid); setConnectionStatus("live"); })
       .catch(() => setConnectionStatus("demo"));
   }, [userId]);
-
-  // Embed TradingView widget
-  useEffect(() => {
-    if (!selected || !widgetContainerRef.current) return;
-    const container = widgetContainerRef.current;
-    container.innerHTML = "";
-
-    const script = document.createElement("script");
-    script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    script.type = "text/javascript";
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      autosize: true,
-      symbol: getTvSymbol(selected, selectedBroker),
-      interval: "15",
-      timezone: "Etc/UTC",
-      theme: "dark",
-      style: "8",
-      locale: "en",
-      allow_symbol_change: true,
-      hide_side_toolbar: false,
-      hide_top_toolbar: false,
-      calendar: false,
-      show_popup_button: true,
-      popup_width: "1000",
-      popup_height: "650",
-      support_host: "https://www.tradingview.com",
-    });
-    container.appendChild(script);
-  }, [selected, selectedBroker]);
 
   const handlePopOut = () => {
     window.open(`/chart-popout?type=tradingview&symbol=${selected}`, "_blank", "noopener");
@@ -127,7 +92,7 @@ export default function TradingViewChartPage() {
 
   return (
     <div className="flex flex-col gap-2 h-[calc(100vh-104px)]">
-      {/* Top bar: instruments + broker selector + pop-out */}
+      {/* Top bar */}
       <div className="flex items-center gap-1.5 flex-wrap">
         {instruments.map((sym) => (
           <button
@@ -135,16 +100,15 @@ export default function TradingViewChartPage() {
             onClick={() => setSelected(sym)}
             className={`px-3 py-1.5 rounded-full text-[12px] font-bold tracking-wide transition-all border ${
               selected === sym
-                ? "bg-white/10 border-white/30 text-white"
-                : "bg-[#111724] border-white/10 text-[#8892A4] hover:text-white hover:border-white/20"
+                ? "bg-white/10 border-white/30 text-foreground"
+                : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-white/20"
             }`}
           >
             {sym}
           </button>
         ))}
 
-        {/* Broker pills */}
-        <div className="ml-2 h-5 w-px bg-white/10" />
+        <div className="ml-2 h-5 w-px bg-border" />
         {BROKERS.map((broker) => (
           <button
             key={broker}
@@ -152,7 +116,7 @@ export default function TradingViewChartPage() {
             className={`px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide transition-all border ${
               selectedBroker === broker
                 ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
-                : "bg-[#111724] border-white/10 text-[#8892A4] hover:text-amber-300 hover:border-amber-500/20"
+                : "bg-card border-border text-muted-foreground hover:text-amber-300 hover:border-amber-500/20"
             }`}
           >
             {broker}
@@ -162,33 +126,33 @@ export default function TradingViewChartPage() {
         <div className="ml-auto">
           <button
             onClick={handlePopOut}
-            className="px-3 py-1.5 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded text-[11px] font-semibold bg-card border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5"
           >
             <ExternalLink className="w-3.5 h-3.5" /> Pop Out ↗
           </button>
         </div>
       </div>
 
-      {/* TradingView widget */}
-      <div className="flex-1 rounded-lg overflow-hidden border border-white/[0.06] min-h-[300px]">
-        <div
-          className="tradingview-widget-container"
-          ref={widgetContainerRef}
-          style={{ height: "100%", width: "100%" }}
-        >
-          <div
-            className="tradingview-widget-container__widget"
-            style={{ height: "100%", width: "100%" }}
+      {/* TradingView iframe – 60% height */}
+      <div className="rounded-lg overflow-hidden border border-border" style={{ height: "60%" }}>
+        {selected && (
+          <iframe
+            key={`${selected}-${selectedBroker}`}
+            src={buildIframeUrl(selected, selectedBroker)}
+            style={{ width: "100%", height: "100%", border: "none" }}
+            allowFullScreen
           />
-        </div>
+        )}
       </div>
 
       {/* Trade Execution Panel */}
-      <TradeExecutionPanel
-        symbol={selected}
-        accountId={accountId}
-        connectionStatus={connectionStatus}
-      />
+      <div className="flex-1 overflow-auto">
+        <TradeExecutionPanel
+          symbol={selected}
+          accountId={accountId}
+          connectionStatus={connectionStatus}
+        />
+      </div>
     </div>
   );
 }
