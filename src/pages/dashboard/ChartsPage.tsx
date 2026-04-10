@@ -141,7 +141,7 @@ export default function ChartsPage() {
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
-
+  const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
   // Indicators
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]);
   const indicatorsLoadedRef = useRef(false);
