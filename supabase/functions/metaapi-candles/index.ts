@@ -346,7 +346,6 @@ Deno.serve(async (req: Request) => {
       const variants = PRICE_SYMBOL_VARIANTS[symbol] || [symbol];
 
       let lastError: any = null;
-      let shouldFallback = false;
       for (const variant of variants) {
         try {
           const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
@@ -363,25 +362,16 @@ Deno.serve(async (req: Request) => {
         } catch (fetchErr) {
           console.error(`Price fetch failed for ${variant}:`, getErrorMessage(fetchErr));
           lastError = { message: getErrorMessage(fetchErr) };
-          shouldFallback = true;
         }
       }
 
-      if (shouldFallback) {
-        return new Response(JSON.stringify({
-          success: true,
-          fallback: true,
-          price: generateMockPrice(symbol),
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
+      // All variants failed — always fall back to mock price instead of 404
+      console.error(`All price variants failed for ${symbol}, returning mock price`);
       return new Response(JSON.stringify({
-        error: lastError?.message || "Failed to fetch price",
-        details: lastError,
+        success: true,
+        fallback: true,
+        price: generateMockPrice(symbol),
       }), {
-        status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
