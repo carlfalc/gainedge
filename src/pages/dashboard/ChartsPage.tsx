@@ -4,6 +4,7 @@ import {
   CandlestickSeries,
   HistogramSeries,
   LineSeries,
+  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
   type CandlestickData,
@@ -54,6 +55,13 @@ interface SavedDrawing {
   id: string;
   drawing_type: string;
   drawing_data: any;
+}
+
+interface SignalRecord {
+  id: string; symbol: string; direction: string; confidence: number;
+  entry_price: number; stop_loss: number; take_profit: number;
+  result: string; pnl_pips: number | null; created_at: string;
+  resolved_at: string | null; closed_at: string | null;
 }
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"];
@@ -142,6 +150,7 @@ export default function ChartsPage() {
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
   const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
+  const [chartSignals, setChartSignals] = useState<SignalRecord[]>([]);
   // Indicators
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]);
   const indicatorsLoadedRef = useRef(false);
@@ -164,6 +173,7 @@ export default function ChartsPage() {
   const paneSeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
   const tradeLinesRef = useRef<any[]>([]);
   const patternSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const tradeConnectorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
@@ -268,7 +278,30 @@ export default function ChartsPage() {
       .then(({ data }) => setScanResult(data?.[0] as ScanResult ?? null));
   }, [userId, selected]);
 
-  /* ─── countdown timer ─── */
+  /* ─── fetch signals for chart markers ─── */
+  useEffect(() => {
+    if (!userId || !selected) return;
+    supabase.from("signals").select("*")
+      .eq("user_id", userId).eq("symbol", selected)
+      .order("created_at", { ascending: true }).limit(200)
+      .then(({ data }) => setChartSignals((data as SignalRecord[]) ?? []));
+
+    // Subscribe to realtime updates
+    const channel = supabase.channel(`signals-markers-${selected}`)
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "signals",
+        filter: `symbol=eq.${selected}`,
+      }, () => {
+        supabase.from("signals").select("*")
+          .eq("user_id", userId).eq("symbol", selected)
+          .order("created_at", { ascending: true }).limit(200)
+          .then(({ data }) => setChartSignals((data as SignalRecord[]) ?? []));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, selected]);
+
   useEffect(() => {
     const tfMinutes: Record<string, number> = { "1m": 1, "5m": 5, "15m": 15, "1H": 60, "4H": 240, "1D": 1440 };
     const mins = tfMinutes[timeframe] ?? 15;
@@ -926,6 +959,91 @@ export default function ChartsPage() {
       }
     }
 
+    // ─── RON Trade Markers ───
+    tradeConnectorSeriesRef.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
+    tradeConnectorSeriesRef.current = [];
+
+    if (chartSignals.length > 0 && rawData.length > 0) {
+      const firstCandleTs = rawData[0].time;
+      const lastCandleTs = rawData[rawData.length - 1].time;
+
+      // Helper: find nearest candle timestamp for a given ISO date
+      const findNearestTs = (isoDate: string): number => {
+        const ts = Math.floor(new Date(isoDate).getTime() / 1000);
+        // Find closest candle time
+        let closest = rawData[0].time;
+        let minDiff = Math.abs(ts - closest);
+        for (const c of rawData) {
+          const diff = Math.abs(ts - c.time);
+          if (diff < minDiff) { minDiff = diff; closest = c.time; }
+        }
+        return closest;
+      };
+
+      const markers: Array<{
+        time: Time; position: "belowBar" | "aboveBar" | "inBar";
+        color: string; shape: "arrowUp" | "arrowDown" | "circle";
+        text: string;
+      }> = [];
+
+      for (const sig of chartSignals) {
+        const entryTs = findNearestTs(sig.created_at);
+        if (entryTs < firstCandleTs || entryTs > lastCandleTs) continue;
+
+        // Entry marker
+        if (sig.direction === "BUY") {
+          markers.push({
+            time: entryTs as Time, position: "belowBar", color: "#22C55E",
+            shape: "arrowUp", text: `BUY (${sig.confidence})`,
+          });
+        } else {
+          markers.push({
+            time: entryTs as Time, position: "aboveBar", color: "#EF4444",
+            shape: "arrowDown", text: `SELL (${sig.confidence})`,
+          });
+        }
+
+        // Result marker
+        const resolvedDate = sig.resolved_at || sig.closed_at;
+        if (resolvedDate && sig.result !== "pending") {
+          const exitTs = findNearestTs(resolvedDate);
+          if (exitTs >= firstCandleTs && exitTs <= lastCandleTs) {
+            const isWin = sig.result.toLowerCase() === "win";
+            const isLoss = sig.result.toLowerCase() === "loss";
+            const pipsText = sig.pnl_pips != null
+              ? `${sig.pnl_pips >= 0 ? "+" : ""}${sig.pnl_pips.toFixed(1)} pips`
+              : sig.result.toUpperCase() === "EXPIRED" ? "EXP" : sig.result.toUpperCase();
+
+            markers.push({
+              time: exitTs as Time, position: "inBar",
+              color: isWin ? "#22C55E" : isLoss ? "#EF4444" : "#6B7280",
+              shape: "circle", text: pipsText,
+            });
+
+            // Connector line from entry to exit
+            if (entryTs !== exitTs) {
+              const connectorSeries = chart.addSeries(LineSeries, {
+                color: isWin ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+                lineWidth: 1, lineStyle: 2, priceScaleId: "right",
+                lastValueVisible: false, priceLineVisible: false,
+              });
+              connectorSeries.setData([
+                { time: entryTs as Time, value: sig.entry_price },
+                { time: exitTs as Time, value: sig.entry_price + (sig.pnl_pips ?? 0) * 0.01 },
+              ]);
+              tradeConnectorSeriesRef.current.push(connectorSeries);
+            }
+          }
+        }
+      }
+
+      // Sort markers by time (required by lightweight-charts)
+      markers.sort((a, b) => (a.time as number) - (b.time as number));
+      if (markers.length > 0) {
+        createSeriesMarkers(candleSeries, markers);
+      }
+    }
+
     // Initialize drawing manager
     await initDrawingManager(chart, candleSeries);
 
@@ -944,7 +1062,7 @@ export default function ChartsPage() {
 
     chart.timeScale().fitContent();
     startPricePolling();
-  }, [selected, timeframe, scanResult, activeIndicators, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
+  }, [selected, timeframe, scanResult, activeIndicators, chartSignals, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
 
   /* rebuild chart on deps change (excluding chartType) */
   useEffect(() => {
