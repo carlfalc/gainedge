@@ -1058,7 +1058,7 @@ export default function ChartsPage() {
         />
       )}
 
-      {/* Falconer AI Analysis Panel */}
+      {/* RON Analysis Panel */}
       {!isFullscreen && scanResult && (() => {
         const fresh = signalFreshness(scanResult.scanned_at);
         const expired = fresh === "expired";
@@ -1068,7 +1068,7 @@ export default function ChartsPage() {
             <div className="flex items-center gap-2 mb-2">
               <Activity className={`w-4 h-4 ${expired ? "text-amber-400" : "text-[#00CFA5]"}`} />
               <span className={`text-xs font-bold tracking-wider ${expired ? "text-amber-400" : "text-[#00CFA5]"}`}>
-                {expired ? `SIGNAL EXPIRED — last scan ${formatAge(scanResult.scanned_at)}` : `FALCONER AI ANALYSIS — ${scanResult.symbol}`}
+                {expired ? `SIGNAL EXPIRED — last scan ${formatAge(scanResult.scanned_at)}` : `RON ANALYSIS — ${scanResult.symbol}`}
               </span>
               {aging && <span className="text-[10px] text-amber-400 font-semibold ml-2">⏰ Expiring soon</span>}
             </div>

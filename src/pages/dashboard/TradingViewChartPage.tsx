@@ -153,7 +153,7 @@ export default function TradingViewChartPage() {
           connectionStatus={connectionStatus}
         />
         <div className="text-center py-2 text-[10px] font-medium" style={{ color: "#00CFA5" }}>
-          Powered by Falconer AI
+          Powered by RON
         </div>
       </div>
     </div>
