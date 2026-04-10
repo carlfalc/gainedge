@@ -149,6 +149,7 @@ export default function ChartsPage() {
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
   const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
+  const [chartSignals, setChartSignals] = useState<SignalRecord[]>([]);
   // Indicators
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]);
   const indicatorsLoadedRef = useRef(false);
@@ -171,6 +172,7 @@ export default function ChartsPage() {
   const paneSeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
   const tradeLinesRef = useRef<any[]>([]);
   const patternSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const tradeConnectorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
