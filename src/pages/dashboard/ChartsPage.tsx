@@ -277,7 +277,30 @@ export default function ChartsPage() {
       .then(({ data }) => setScanResult(data?.[0] as ScanResult ?? null));
   }, [userId, selected]);
 
-  /* ─── countdown timer ─── */
+  /* ─── fetch signals for chart markers ─── */
+  useEffect(() => {
+    if (!userId || !selected) return;
+    supabase.from("signals").select("*")
+      .eq("user_id", userId).eq("symbol", selected)
+      .order("created_at", { ascending: true }).limit(200)
+      .then(({ data }) => setChartSignals((data as SignalRecord[]) ?? []));
+
+    // Subscribe to realtime updates
+    const channel = supabase.channel(`signals-markers-${selected}`)
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "signals",
+        filter: `symbol=eq.${selected}`,
+      }, () => {
+        supabase.from("signals").select("*")
+          .eq("user_id", userId).eq("symbol", selected)
+          .order("created_at", { ascending: true }).limit(200)
+          .then(({ data }) => setChartSignals((data as SignalRecord[]) ?? []));
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [userId, selected]);
+
   useEffect(() => {
     const tfMinutes: Record<string, number> = { "1m": 1, "5m": 5, "15m": 15, "1H": 60, "4H": 240, "1D": 1440 };
     const mins = tfMinutes[timeframe] ?? 15;
