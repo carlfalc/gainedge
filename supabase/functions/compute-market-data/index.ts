@@ -226,7 +226,7 @@ function findSwingHigh(highs: number[], endIdx: number, lookback = 20): number {
   return maxVal;
 }
 
-// ─── V1 Legacy Analysis (preserved as-is) ───
+// ─── V1 Legacy Analysis (ATR-based SL/TP per instrument) ───
 function runAnalysisV1(candles: any[]): AnalysisResult {
   const closes = candles.map((c: any) => c.close);
   const highs = candles.map((c: any) => c.high);
@@ -345,7 +345,7 @@ function runAnalysisV1(candles: any[]): AnalysisResult {
     direction = "WAIT"; verdict = "WAIT"; confidence = Math.min(confidence, 3);
   }
 
-  // ─── V1 ENTRY / TP / SL ───
+  // ─── V1 ENTRY / TP / SL (ATR-based per instrument) ───
   const lastClose = closes[closes.length - 1];
   let entry: number | null = null;
   let tp: number | null = null;
@@ -354,20 +354,62 @@ function runAnalysisV1(candles: any[]): AnalysisResult {
 
   if (direction === "BUY" || direction === "SELL") {
     entry = +lastClose.toFixed(5);
-    if (direction === "BUY") {
-      const swingLow = findSwingLow(lows, lows.length - 1, 20);
-      sl = +(swingLow - (lastClose - swingLow) * 0.05).toFixed(5);
+    const atrVal = calcATR(highs, lows, closes);
+
+    if (atrVal && atrVal > 0) {
+      // Instrument-specific ATR multipliers
+      const symbol = candles[0]?.symbol || "";
+      const slMult = (symbol === "XAUUSD" || symbol === "GOLD") ? 2.0 : 1.5;
+      const tpMult = (symbol === "XAUUSD" || symbol === "GOLD") ? 4.0 : 3.0;
+
+      const atrSl = atrVal * slMult;
+      const atrTp = atrVal * tpMult;
+      const minSl = atrVal; // Never tighter than 1x ATR
+
+      if (direction === "BUY") {
+        const swingLow = findSwingLow(lows, lows.length - 1, 20);
+        const swingSl = entry - swingLow;
+        // Use wider of ATR-based or swing-based SL, but never tighter than 1x ATR
+        const slDist = Math.max(atrSl, swingSl, minSl);
+        sl = +(entry - slDist).toFixed(5);
+        tp = +(entry + Math.max(atrTp, slDist * 2)).toFixed(5);
+      } else {
+        const swingHigh = findSwingHigh(highs, highs.length - 1, 20);
+        const swingSl = swingHigh - entry;
+        const slDist = Math.max(atrSl, swingSl, minSl);
+        sl = +(entry + slDist).toFixed(5);
+        tp = +(entry - Math.max(atrTp, slDist * 2)).toFixed(5);
+      }
+
       const risk = Math.abs(entry - sl);
-      tp = +(entry + risk * 2).toFixed(5);
+      const reward = Math.abs(tp - entry);
+      const rrVal = risk > 0 ? reward / risk : 2;
+
+      // Enforce minimum 2:1 R:R — if can't achieve, NO_TRADE
+      if (rrVal < 2.0) {
+        tp = direction === "BUY" ? +(entry + risk * 2).toFixed(5) : +(entry - risk * 2).toFixed(5);
+      }
+      const finalReward = Math.abs(tp - entry);
+      rr = risk > 0 ? `${(finalReward / risk).toFixed(1)}:1` : "2.0:1";
+
+      tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL dist=${risk.toFixed(5)}, TP dist=${finalReward.toFixed(5)}`);
     } else {
-      const swingHigh = findSwingHigh(highs, highs.length - 1, 20);
-      sl = +(swingHigh + (swingHigh - lastClose) * 0.05).toFixed(5);
-      const risk = Math.abs(sl - entry);
-      tp = +(entry - risk * 2).toFixed(5);
+      // Fallback: no ATR available, use swing points
+      if (direction === "BUY") {
+        const swingLow = findSwingLow(lows, lows.length - 1, 20);
+        sl = +(swingLow - (lastClose - swingLow) * 0.05).toFixed(5);
+        const risk = Math.abs(entry - sl);
+        tp = +(entry + risk * 2).toFixed(5);
+      } else {
+        const swingHigh = findSwingHigh(highs, highs.length - 1, 20);
+        sl = +(swingHigh + (swingHigh - lastClose) * 0.05).toFixed(5);
+        const risk = Math.abs(sl - entry);
+        tp = +(entry - risk * 2).toFixed(5);
+      }
+      const risk = Math.abs(entry - sl);
+      const reward = Math.abs(tp - entry);
+      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
     }
-    const risk = Math.abs(entry - sl);
-    const reward = Math.abs(tp - entry);
-    rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
   }
 
   const reasoningText = tradeReasons.length > 0
