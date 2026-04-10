@@ -958,6 +958,91 @@ export default function ChartsPage() {
       }
     }
 
+    // ─── RON Trade Markers ───
+    tradeConnectorSeriesRef.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
+    tradeConnectorSeriesRef.current = [];
+
+    if (chartSignals.length > 0 && rawData.length > 0) {
+      const firstCandleTs = rawData[0].time;
+      const lastCandleTs = rawData[rawData.length - 1].time;
+
+      // Helper: find nearest candle timestamp for a given ISO date
+      const findNearestTs = (isoDate: string): number => {
+        const ts = Math.floor(new Date(isoDate).getTime() / 1000);
+        // Find closest candle time
+        let closest = rawData[0].time;
+        let minDiff = Math.abs(ts - closest);
+        for (const c of rawData) {
+          const diff = Math.abs(ts - c.time);
+          if (diff < minDiff) { minDiff = diff; closest = c.time; }
+        }
+        return closest;
+      };
+
+      const markers: Array<{
+        time: Time; position: "belowBar" | "aboveBar" | "inBar";
+        color: string; shape: "arrowUp" | "arrowDown" | "circle";
+        text: string;
+      }> = [];
+
+      for (const sig of chartSignals) {
+        const entryTs = findNearestTs(sig.created_at);
+        if (entryTs < firstCandleTs || entryTs > lastCandleTs) continue;
+
+        // Entry marker
+        if (sig.direction === "BUY") {
+          markers.push({
+            time: entryTs as Time, position: "belowBar", color: "#22C55E",
+            shape: "arrowUp", text: `BUY (${sig.confidence})`,
+          });
+        } else {
+          markers.push({
+            time: entryTs as Time, position: "aboveBar", color: "#EF4444",
+            shape: "arrowDown", text: `SELL (${sig.confidence})`,
+          });
+        }
+
+        // Result marker
+        const resolvedDate = sig.resolved_at || sig.closed_at;
+        if (resolvedDate && sig.result !== "pending") {
+          const exitTs = findNearestTs(resolvedDate);
+          if (exitTs >= firstCandleTs && exitTs <= lastCandleTs) {
+            const isWin = sig.result.toLowerCase() === "win";
+            const isLoss = sig.result.toLowerCase() === "loss";
+            const pipsText = sig.pnl_pips != null
+              ? `${sig.pnl_pips >= 0 ? "+" : ""}${sig.pnl_pips.toFixed(1)} pips`
+              : sig.result.toUpperCase() === "EXPIRED" ? "EXP" : sig.result.toUpperCase();
+
+            markers.push({
+              time: exitTs as Time, position: "inBar",
+              color: isWin ? "#22C55E" : isLoss ? "#EF4444" : "#6B7280",
+              shape: "circle", text: pipsText,
+            });
+
+            // Connector line from entry to exit
+            if (entryTs !== exitTs) {
+              const connectorSeries = chart.addSeries(LineSeries, {
+                color: isWin ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+                lineWidth: 1, lineStyle: 2, priceScaleId: "right",
+                lastValueVisible: false, priceLineVisible: false,
+              });
+              connectorSeries.setData([
+                { time: entryTs as Time, value: sig.entry_price },
+                { time: exitTs as Time, value: sig.entry_price + (sig.pnl_pips ?? 0) * 0.01 },
+              ]);
+              tradeConnectorSeriesRef.current.push(connectorSeries);
+            }
+          }
+        }
+      }
+
+      // Sort markers by time (required by lightweight-charts)
+      markers.sort((a, b) => (a.time as number) - (b.time as number));
+      if (markers.length > 0) {
+        candleSeries.setMarkers(markers);
+      }
+    }
+
     // Initialize drawing manager
     await initDrawingManager(chart, candleSeries);
 
