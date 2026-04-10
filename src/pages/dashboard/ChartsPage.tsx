@@ -93,6 +93,7 @@ const DRAWING_TOOL_MAP: Record<string, string> = {
 };
 
 const EDGE_CANDLE_MAX_CLOSE_DEVIATION = 0.02;
+const LIVE_PRICE_MAX_CLOSE_DEVIATION = 0.02;
 
 const getCloseDeviationRatio = (value: number, reference: number) => {
   if (!Number.isFinite(value) || !Number.isFinite(reference)) return 0;
@@ -420,6 +421,22 @@ export default function ChartsPage() {
         if (!last) return;
 
         const mid = (price.bid + price.ask) / 2;
+        const liveDeviationRatio = getCloseDeviationRatio(mid, last.close);
+
+        console.log("[ChartsPage] MetaApi price check", {
+          symbol: brokerSymbol,
+          metaApiMid: Number(mid.toFixed(5)),
+          lastCandleClose: Number(last.close.toFixed(5)),
+          deviationPercent: Number((liveDeviationRatio * 100).toFixed(3)),
+        });
+
+        if (liveDeviationRatio > LIVE_PRICE_MAX_CLOSE_DEVIATION) {
+          console.warn(
+            `[ChartsPage] Skipping stale MetaApi price for ${brokerSymbol}: mid ${mid.toFixed(5)} vs last close ${last.close.toFixed(5)} (${(liveDeviationRatio * 100).toFixed(2)}% deviation)`
+          );
+          return;
+        }
+
         const nowTs = Math.floor(Date.now() / 1000);
         const currentPeriod = Math.floor(nowTs / interval) * interval;
 
