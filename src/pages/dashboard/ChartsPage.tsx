@@ -1040,7 +1040,7 @@ export default function ChartsPage() {
       // Sort markers by time (required by lightweight-charts)
       markers.sort((a, b) => (a.time as number) - (b.time as number));
       if (markers.length > 0) {
-        candleSeries.setMarkers(markers);
+        createSeriesMarkers(candleSeries, markers);
       }
     }
 
