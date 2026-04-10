@@ -518,13 +518,15 @@ export default function ChartsPage() {
           }
         }
 
+        const currentChartType = chartTypeRef.current;
+
         // If the live price belongs to a NEW candle period, start a new candle
         if (currentPeriod > last.time) {
           const newCandle: OHLCData = {
             time: currentPeriod, open: mid, high: mid, low: mid, close: mid, volume: 0,
           };
           rawDataRef.current.push(newCandle);
-          const display = chartType === "Heiken Ashi"
+          const display = currentChartType === "Heiken Ashi"
             ? toHeikenAshi(rawDataRef.current).pop()!
             : newCandle;
           candleSeriesRef.current?.update({
@@ -537,7 +539,7 @@ export default function ChartsPage() {
             ...last, close: mid, high: Math.max(last.high, mid), low: Math.min(last.low, mid),
           };
           rawDataRef.current[rawDataRef.current.length - 1] = updated;
-          const display = chartType === "Heiken Ashi"
+          const display = currentChartType === "Heiken Ashi"
             ? toHeikenAshi(rawDataRef.current).pop()!
             : updated;
           candleSeriesRef.current?.update({
@@ -547,7 +549,7 @@ export default function ChartsPage() {
         }
       } catch { /* ignore polling errors */ }
     }, 2000);
-  }, [selected, connectionStatus, chartType, timeframe]);
+  }, [selected, connectionStatus, timeframe]);
 
   const startMockTicks = useCallback(() => {
     if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
