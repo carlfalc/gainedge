@@ -81,18 +81,15 @@ export default function TradingViewChartPage() {
 
   // Provision MetaApi account for trade execution
   useEffect(() => {
-    if (!profile?.metaapi_account_id) {
-      setConnectionStatus("demo");
-      return;
-    }
+    if (!userId) return;
     setConnectionStatus("connecting");
-    provisionAccount(profile.metaapi_account_id)
-      .then(() => {
-        setAccountId(profile.metaapi_account_id!);
+    provisionAccount()
+      .then(({ accountId: aid }) => {
+        setAccountId(aid);
         setConnectionStatus("live");
       })
       .catch(() => setConnectionStatus("demo"));
-  }, [profile?.metaapi_account_id]);
+  }, [userId]);
 
   // Embed TradingView widget
   useEffect(() => {
