@@ -1136,7 +1136,6 @@ export default function ChartsPage() {
   }, [buildChart]);
 
   /* lightweight chart-type switch — just re-set data, no rebuild */
-  const chartTypeRef = useRef(chartType);
   useEffect(() => {
     if (chartTypeRef.current === chartType) return; // skip initial
     chartTypeRef.current = chartType;
@@ -1156,10 +1155,7 @@ export default function ChartsPage() {
     })));
 
     scheduleChartViewportSync(true);
-
-    // restart polling so tick updates use the new chartType
-    startPricePolling();
-  }, [chartType, scheduleChartViewportSync, startPricePolling]);
+  }, [chartType, scheduleChartViewportSync]);
 
   useEffect(() => {
     scheduleChartViewportSync(true);
