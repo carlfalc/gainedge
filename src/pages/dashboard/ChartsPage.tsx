@@ -177,6 +177,7 @@ export default function ChartsPage() {
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   /* ─── load broker label from profile ─── */
   const BROKER_LABELS: Record<string, string> = {
@@ -816,7 +817,8 @@ export default function ChartsPage() {
     drawingManagerRef.current = null;
 
     const chart = createChart(containerRef.current, {
-      autoSize: true,
+      width: containerRef.current.clientWidth,
+      height: containerRef.current.clientHeight,
       layout: {
         background: { color: "#080B12" },
         textColor: "#9CA3AF",
@@ -1061,6 +1063,24 @@ export default function ChartsPage() {
     });
 
     chart.timeScale().fitContent();
+
+    // ─── ResizeObserver for fullscreen / window resize ───
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
+    }
+    const ro = new ResizeObserver(() => {
+      if (!containerRef.current || !chartRef.current) return;
+      const w = containerRef.current.clientWidth;
+      const h = containerRef.current.clientHeight;
+      if (w > 0 && h > 0) {
+        chartRef.current.applyOptions({ width: w, height: h });
+        chartRef.current.timeScale().fitContent();
+      }
+    });
+    ro.observe(containerRef.current);
+    resizeObserverRef.current = ro;
+
     startPricePolling();
   }, [selected, timeframe, scanResult, activeIndicators, chartSignals, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
 
@@ -1070,6 +1090,10 @@ export default function ChartsPage() {
     return () => {
       if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
       if (pricePollingRef.current) clearInterval(pricePollingRef.current);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
       if (chartRef.current) {
         try { chartRef.current.remove(); } catch {}
         chartRef.current = null;
