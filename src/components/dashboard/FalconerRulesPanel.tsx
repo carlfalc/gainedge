@@ -110,7 +110,7 @@ export default function FalconerRulesPanel() {
     if (session) {
       await supabase.from("profiles").update({ falconer_version: ver } as any).eq("id", session.user.id);
     }
-    toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
+    toast.success(`Falconer AI switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
   };
 
   const filtered = rules.filter(r => {
@@ -128,13 +128,13 @@ export default function FalconerRulesPanel() {
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <Brain size={16} color={C.purple} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>RON Rules</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Falconer AI Rules</span>
         <span style={{ fontSize: 11, color: C.sec, marginLeft: "auto" }}>{v2Active}/{v2Total} V2 rules active</span>
       </div>
 
       {/* Version Toggle */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: 12, background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>RON Version:</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Falconer AI Version:</span>
         <button
           onClick={() => switchVersion("v1")}
           style={{

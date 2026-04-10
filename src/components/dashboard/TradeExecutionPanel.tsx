@@ -376,7 +376,7 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
             <div className="mt-1.5 text-[10px]">
               {autoTradeEnabled ? (
                 <span className="text-amber-400">
-                  ⚡ RON will execute trades when high-confidence signals fire (confidence ≥ 7)
+                  ⚡ Falconer AI will execute trades when high-confidence signals fire (confidence ≥ 7)
                   <br />
                   <span className="text-[9px] text-white/30">Safety: max 1 trade per instrument · per-instrument loss pause (3 consecutive) · 5% daily loss limit</span>
                 </span>
