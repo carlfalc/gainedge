@@ -944,9 +944,9 @@ export default function ChartsPage() {
 
     chart.timeScale().fitContent();
     startPricePolling();
-  }, [selected, timeframe, chartType, scanResult, activeIndicators, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
+  }, [selected, timeframe, scanResult, activeIndicators, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
 
-  /* rebuild chart on deps change */
+  /* rebuild chart on deps change (excluding chartType) */
   useEffect(() => {
     buildChart();
     return () => {
@@ -958,6 +958,32 @@ export default function ChartsPage() {
       }
     };
   }, [buildChart]);
+
+  /* lightweight chart-type switch — just re-set data, no rebuild */
+  const chartTypeRef = useRef(chartType);
+  useEffect(() => {
+    if (chartTypeRef.current === chartType) return; // skip initial
+    chartTypeRef.current = chartType;
+
+    const raw = rawDataRef.current;
+    if (!raw.length || !candleSeriesRef.current || !volumeSeriesRef.current || !chartRef.current) return;
+
+    const displayData = chartType === "Heiken Ashi" ? toHeikenAshi(raw) : raw;
+
+    candleSeriesRef.current.setData(displayData.map(d => ({
+      time: d.time as Time, open: d.open, high: d.high, low: d.low, close: d.close,
+    })));
+
+    volumeSeriesRef.current.setData(displayData.map(d => ({
+      time: d.time as Time, value: d.volume ?? 0,
+      color: d.close >= d.open ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
+    })));
+
+    chartRef.current.timeScale().fitContent();
+
+    // restart polling so tick updates use the new chartType
+    startPricePolling();
+  }, [chartType, startPricePolling]);
 
   // Save drawings on unmount or symbol change
   useEffect(() => {
