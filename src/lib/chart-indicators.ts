@@ -113,17 +113,41 @@ export function calculateMACD(data: OHLCData[], fast = 12, slow = 26, signal = 9
 
 export function toHeikenAshi(data: OHLCData[]): OHLCData[] {
   if (data.length === 0) return [];
-  const result: OHLCData[] = [];
-  let prevClose = (data[0].open + data[0].high + data[0].low + data[0].close) / 4;
-  let prevOpen = data[0].open;
-  for (let i = 0; i < data.length; i++) {
-    const haClose = (data[i].open + data[i].high + data[i].low + data[i].close) / 4;
-    const haOpen = i === 0 ? data[0].open : (prevOpen + prevClose) / 2;
-    const haHigh = Math.max(data[i].high, haOpen, haClose);
-    const haLow = Math.min(data[i].low, haOpen, haClose);
-    result.push({ time: data[i].time, open: haOpen, high: haHigh, low: haLow, close: haClose, volume: data[i].volume });
-    prevOpen = haOpen;
-    prevClose = haClose;
+  const first = data[0];
+  const firstHaClose = (first.open + first.high + first.low + first.close) / 4;
+  const firstHaOpen = (first.open + first.close) / 2;
+
+  const result: OHLCData[] = [{
+    time: first.time,
+    open: firstHaOpen,
+    high: Math.max(first.high, firstHaOpen, firstHaClose),
+    low: Math.min(first.low, firstHaOpen, firstHaClose),
+    close: firstHaClose,
+    volume: first.volume,
+  }];
+
+  let prevHaOpen = firstHaOpen;
+  let prevHaClose = firstHaClose;
+
+  for (let i = 1; i < data.length; i++) {
+    const candle = data[i];
+    const haClose = (candle.open + candle.high + candle.low + candle.close) / 4;
+    const haOpen = (prevHaOpen + prevHaClose) / 2;
+    const haHigh = Math.max(candle.high, haOpen, haClose);
+    const haLow = Math.min(candle.low, haOpen, haClose);
+
+    result.push({
+      time: candle.time,
+      open: haOpen,
+      high: haHigh,
+      low: haLow,
+      close: haClose,
+      volume: candle.volume,
+    });
+
+    prevHaOpen = haOpen;
+    prevHaClose = haClose;
   }
+
   return result;
 }
