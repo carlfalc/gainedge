@@ -175,6 +175,7 @@ export default function ChartsPage() {
   const patternSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const tradeConnectorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
+  const chartTypeRef = useRef(chartType);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
