@@ -23,6 +23,7 @@ const CATEGORIES = [
   { value: "exit_rules", label: "Exit" },
   { value: "session_rules", label: "Session" },
   { value: "market_structure", label: "Structure" },
+  { value: "pattern_rules", label: "Patterns" },
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
