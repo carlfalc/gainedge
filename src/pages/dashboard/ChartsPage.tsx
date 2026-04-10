@@ -178,6 +178,7 @@ export default function ChartsPage() {
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const resizeFrameRef = useRef<number | null>(null);
 
   /* ─── load broker label from profile ─── */
   const BROKER_LABELS: Record<string, string> = {
@@ -194,6 +195,33 @@ export default function ChartsPage() {
       setBrokerLabel(BROKER_LABELS[profile.broker] || profile.broker.toUpperCase());
     }
   }, [profile]);
+
+  const syncChartViewport = useCallback((fitContent = false) => {
+    if (!containerRef.current || !chartRef.current) return;
+
+    const width = containerRef.current.clientWidth;
+    const height = containerRef.current.clientHeight;
+
+    if (width <= 0 || height <= 0) return;
+
+    chartRef.current.applyOptions({ width, height });
+    if (fitContent) {
+      chartRef.current.timeScale().fitContent();
+    }
+  }, []);
+
+  const scheduleChartViewportSync = useCallback((fitContent = false) => {
+    if (resizeFrameRef.current !== null) {
+      cancelAnimationFrame(resizeFrameRef.current);
+    }
+
+    resizeFrameRef.current = requestAnimationFrame(() => {
+      resizeFrameRef.current = requestAnimationFrame(() => {
+        resizeFrameRef.current = null;
+        syncChartViewport(fitContent);
+      });
+    });
+  }, [syncChartViewport]);
 
   /* ─── per-instrument timeframe map ─── */
   const instrumentTfRef = useRef<Map<string, string>>(new Map());
@@ -806,6 +834,14 @@ export default function ChartsPage() {
   /* ─── create chart ─── */
   const buildChart = useCallback(async () => {
     if (!containerRef.current || !selected) return;
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
+    }
+    if (resizeFrameRef.current !== null) {
+      cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = null;
+    }
     if (chartRef.current) {
       // Save drawings before destroying
       await saveDrawings();
@@ -817,8 +853,8 @@ export default function ChartsPage() {
     drawingManagerRef.current = null;
 
     const chart = createChart(containerRef.current, {
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
+      width: Math.max(containerRef.current.clientWidth, 1),
+      height: Math.max(containerRef.current.clientHeight, 1),
       layout: {
         background: { color: "#080B12" },
         textColor: "#9CA3AF",
@@ -1063,26 +1099,17 @@ export default function ChartsPage() {
     });
 
     chart.timeScale().fitContent();
+    scheduleChartViewportSync(true);
 
     // ─── ResizeObserver for fullscreen / window resize ───
-    if (resizeObserverRef.current) {
-      resizeObserverRef.current.disconnect();
-      resizeObserverRef.current = null;
-    }
     const ro = new ResizeObserver(() => {
-      if (!containerRef.current || !chartRef.current) return;
-      const w = containerRef.current.clientWidth;
-      const h = containerRef.current.clientHeight;
-      if (w > 0 && h > 0) {
-        chartRef.current.applyOptions({ width: w, height: h });
-        chartRef.current.timeScale().fitContent();
-      }
+      scheduleChartViewportSync(true);
     });
     ro.observe(containerRef.current);
     resizeObserverRef.current = ro;
 
     startPricePolling();
-  }, [selected, timeframe, scanResult, activeIndicators, chartSignals, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
+  }, [selected, timeframe, scanResult, activeIndicators, chartSignals, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings, scheduleChartViewportSync]);
 
   /* rebuild chart on deps change (excluding chartType) */
   useEffect(() => {
@@ -1093,6 +1120,10 @@ export default function ChartsPage() {
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
         resizeObserverRef.current = null;
+      }
+      if (resizeFrameRef.current !== null) {
+        cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = null;
       }
       if (chartRef.current) {
         try { chartRef.current.remove(); } catch {}
@@ -1121,11 +1152,15 @@ export default function ChartsPage() {
       color: d.close >= d.open ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
     })));
 
-    chartRef.current.timeScale().fitContent();
+    scheduleChartViewportSync(true);
 
     // restart polling so tick updates use the new chartType
     startPricePolling();
-  }, [chartType, startPricePolling]);
+  }, [chartType, scheduleChartViewportSync, startPricePolling]);
+
+  useEffect(() => {
+    scheduleChartViewportSync(true);
+  }, [isFullscreen, scheduleChartViewportSync]);
 
   // Save drawings on unmount or symbol change
   useEffect(() => {
@@ -1172,7 +1207,7 @@ export default function ChartsPage() {
   const statusText = connectionStatus === "live" ? "Live" : connectionStatus === "connecting" ? "Connecting..." : connectionStatus === "demo" ? "Demo" : "Offline";
 
   return (
-    <div className={`flex flex-col w-full gap-2 ${isFullscreen ? "fixed inset-0 z-50 bg-[#080B12] p-2" : "h-full p-2 sm:p-4"}`}>
+    <div className={`flex flex-col w-full gap-2 ${isFullscreen ? "fixed inset-0 z-50 overflow-hidden bg-[#080B12] p-2" : "h-full p-2 sm:p-4"}`}>
       {/* Top controls */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Connection status */}
@@ -1288,7 +1323,7 @@ export default function ChartsPage() {
       </div>
 
       {/* Chart container with drawing toolbar */}
-      <div className="relative flex gap-1">
+      <div className={`relative flex gap-1 ${isFullscreen ? "flex-1 min-h-0" : ""}`}>
         {/* Drawing toolbar (left) */}
         <DrawingToolbar
           activeTool={activeDrawingTool}
@@ -1298,10 +1333,10 @@ export default function ChartsPage() {
         />
 
         {/* Chart */}
-        <div className="flex-1 relative">
+        <div className={`flex-1 relative ${isFullscreen ? "min-h-0" : ""}`}>
           <div
             ref={containerRef}
-            className={`rounded-lg overflow-hidden border border-white/[0.06] ${isFullscreen ? "flex-1" : "min-h-[55vh]"}`}
+            className={`rounded-lg overflow-hidden border border-white/[0.06] ${isFullscreen ? "h-full min-h-0" : "min-h-[55vh]"}`}
             style={{ cursor: activeDrawingTool ? "crosshair" : undefined }}
           />
           {/* Loading overlay */}
