@@ -299,7 +299,7 @@ export default function ChartsPage() {
     return () => { cancelled = true; };
   }, [userId]);
 
-  /* ─── load candles (real or mock) ─── */
+  /* ─── load candles (real or mock) — also fills gap to current time ─── */
   const loadCandles = useCallback(async (): Promise<OHLCData[]> => {
     const acctId = accountIdRef.current;
     if (acctId && connectionStatus === "live") {
@@ -307,22 +307,47 @@ export default function ChartsPage() {
         setLoadingMessage("Loading candles...");
         const variants = BROKER_SYMBOL_MAP[selected] ?? [selected];
         let candles: FormattedCandle[] = [];
+        let usedSymbol = variants[0];
 
         for (const sym of variants) {
           try {
             candles = await fetchCandles(acctId, sym, timeframe, 500);
-            if (candles.length > 0) break;
+            if (candles.length > 0) { usedSymbol = sym; break; }
           } catch { /* try next variant */ }
         }
 
-        setLoadingMessage("");
-
         if (candles.length > 0) {
+          // ── Fill gap between last historical candle and NOW ──
+          const lastTs = candles[candles.length - 1].time;
+          const nowTs = Math.floor(Date.now() / 1000);
+          const tfSeconds: Record<string, number> = {
+            "1m": 60, "5m": 300, "15m": 900, "1H": 3600, "4H": 14400, "1D": 86400,
+          };
+          const interval = tfSeconds[timeframe] || 900;
+          const gap = nowTs - lastTs;
+
+          if (gap > interval * 1.5) {
+            // Fetch missing candles from lastTs to now
+            try {
+              const gapStart = new Date(lastTs * 1000).toISOString();
+              const gapCandles = await fetchCandles(acctId, usedSymbol, timeframe, 200, Math.ceil(gap / 86400) + 1);
+              // Only keep candles AFTER our last historical candle
+              const newCandles = gapCandles.filter(c => c.time > lastTs);
+              if (newCandles.length > 0) {
+                candles = [...candles, ...newCandles];
+              }
+            } catch {
+              // Gap fill failed — acceptable, we just won't bridge with fake data
+            }
+          }
+
+          setLoadingMessage("");
           return candles.map(c => ({
             time: c.time, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
           }));
         }
 
+        setLoadingMessage("");
         toast.error(`No data for ${selected}. Showing simulated data.`);
       } catch (e: any) {
         setLoadingMessage("");
@@ -347,6 +372,12 @@ export default function ChartsPage() {
     const variants = BROKER_SYMBOL_MAP[selected] ?? [selected];
     const brokerSymbol = variants[0];
 
+    // Calculate the current candle period timestamp so updates stay within it
+    const tfSeconds: Record<string, number> = {
+      "1m": 60, "5m": 300, "15m": 900, "1H": 3600, "4H": 14400, "1D": 86400,
+    };
+    const interval = tfSeconds[timeframe] || 900;
+
     pricePollingRef.current = setInterval(async () => {
       try {
         const price = await fetchCurrentPrice(acctId, brokerSymbol);
@@ -356,22 +387,53 @@ export default function ChartsPage() {
         if (!last) return;
 
         const mid = (price.bid + price.ask) / 2;
-        const updated: OHLCData = {
-          ...last, close: mid, high: Math.max(last.high, mid), low: Math.min(last.low, mid),
-        };
-        rawDataRef.current[rawDataRef.current.length - 1] = updated;
+        const nowTs = Math.floor(Date.now() / 1000);
+        const currentPeriod = Math.floor(nowTs / interval) * interval;
 
-        const display = chartType === "Heiken Ashi"
-          ? toHeikenAshi(rawDataRef.current).pop()!
-          : updated;
+        // ── Guard: anomaly detection ──
+        // Compute avg range of last 20 candles
+        const recent = rawDataRef.current.slice(-20);
+        if (recent.length >= 5) {
+          const avgRange = recent.reduce((s, c) => s + (c.high - c.low), 0) / recent.length;
+          const proposedHigh = Math.max(last.time === currentPeriod ? last.high : mid, mid);
+          const proposedLow = Math.min(last.time === currentPeriod ? last.low : mid, mid);
+          const proposedRange = proposedHigh - proposedLow;
+          if (avgRange > 0 && proposedRange > avgRange * 5) {
+            console.warn(`Skipping anomalous tick: range ${proposedRange.toFixed(5)} > 5x avg ${avgRange.toFixed(5)}`);
+            return;
+          }
+        }
 
-        candleSeriesRef.current?.update({
-          time: display.time as Time,
-          open: display.open, high: display.high, low: display.low, close: display.close,
-        });
+        // If the live price belongs to a NEW candle period, start a new candle
+        if (currentPeriod > last.time) {
+          const newCandle: OHLCData = {
+            time: currentPeriod, open: mid, high: mid, low: mid, close: mid, volume: 0,
+          };
+          rawDataRef.current.push(newCandle);
+          const display = chartType === "Heiken Ashi"
+            ? toHeikenAshi(rawDataRef.current).pop()!
+            : newCandle;
+          candleSeriesRef.current?.update({
+            time: display.time as Time,
+            open: display.open, high: display.high, low: display.low, close: display.close,
+          });
+        } else {
+          // Update the current candle in-place
+          const updated: OHLCData = {
+            ...last, close: mid, high: Math.max(last.high, mid), low: Math.min(last.low, mid),
+          };
+          rawDataRef.current[rawDataRef.current.length - 1] = updated;
+          const display = chartType === "Heiken Ashi"
+            ? toHeikenAshi(rawDataRef.current).pop()!
+            : updated;
+          candleSeriesRef.current?.update({
+            time: display.time as Time,
+            open: display.open, high: display.high, low: display.low, close: display.close,
+          });
+        }
       } catch { /* ignore polling errors */ }
     }, 2000);
-  }, [selected, connectionStatus, chartType]);
+  }, [selected, connectionStatus, chartType, timeframe]);
 
   const startMockTicks = useCallback(() => {
     if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
@@ -873,7 +935,7 @@ export default function ChartsPage() {
           <ZoomIn className="w-3 h-3" /> Fit
         </button>
         <button
-          onClick={() => window.open(`/chart-popout?type=ron&symbol=${selected}`, "_blank", "noopener")}
+          onClick={() => window.open(`/chart-popout?type=falconer&symbol=${selected}`, "_blank", "noopener")}
           className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1"
         >
           <ExternalLink className="w-3 h-3" /> Pop Out ↗
@@ -946,7 +1008,7 @@ export default function ChartsPage() {
         />
       )}
 
-      {/* RON Analysis Panel */}
+      {/* Falconer AI Analysis Panel */}
       {!isFullscreen && scanResult && (() => {
         const fresh = signalFreshness(scanResult.scanned_at);
         const expired = fresh === "expired";
@@ -956,7 +1018,7 @@ export default function ChartsPage() {
             <div className="flex items-center gap-2 mb-2">
               <Activity className={`w-4 h-4 ${expired ? "text-amber-400" : "text-[#00CFA5]"}`} />
               <span className={`text-xs font-bold tracking-wider ${expired ? "text-amber-400" : "text-[#00CFA5]"}`}>
-                {expired ? `SIGNAL EXPIRED — last scan ${formatAge(scanResult.scanned_at)}` : `RON ANALYSIS — ${scanResult.symbol}`}
+                {expired ? `SIGNAL EXPIRED — last scan ${formatAge(scanResult.scanned_at)}` : `FALCONER AI ANALYSIS — ${scanResult.symbol}`}
               </span>
               {aging && <span className="text-[10px] text-amber-400 font-semibold ml-2">⏰ Expiring soon</span>}
             </div>
