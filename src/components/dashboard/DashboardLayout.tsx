@@ -198,6 +198,25 @@ export default function DashboardLayout() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", marginLeft: "auto" }}>
+            {/* Light/Dark background toggle */}
+            <button
+              onClick={() => {
+                const next = !lightBg;
+                setLightBg(next);
+                localStorage.setItem("gainedge_light_bg", next ? "1" : "0");
+              }}
+              title={lightBg ? "Switch to dark background" : "Switch to light background"}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                width: 34, height: 34, borderRadius: 10, cursor: "pointer",
+                background: lightBg ? "#F1F5F9" : C.card,
+                border: `1px solid ${lightBg ? "#CBD5E1" : C.border}`,
+                color: lightBg ? "#334155" : C.sec,
+                transition: "all 0.25s",
+              }}
+            >
+              {lightBg ? <Moon size={16} /> : <Sun size={16} />}
+            </button>
             <button
               onClick={() => setUserMenuOpen(o => !o)}
               style={{
