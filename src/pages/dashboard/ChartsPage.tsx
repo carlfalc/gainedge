@@ -1126,6 +1126,37 @@ export default function ChartsPage() {
         </div>
       </div>
 
+      {/* RON Pattern Detection Bar */}
+      {!isFullscreen && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/[0.06] bg-[#111724]">
+          <span className="text-[10px] font-bold text-[#00CFA5] tracking-wider shrink-0">RON PATTERN</span>
+          <div className="w-px h-4 bg-white/10" />
+          {detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance").length > 0 ? (() => {
+            const top = detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance")[0];
+            return (
+              <span className="text-[11px] text-white/80">
+                <span className={`font-bold ${top.direction === "bullish" ? "text-green-400" : "text-red-400"}`}>{top.pattern_name}</span>
+                {" detected on "}
+                <span className="text-white font-semibold">{selected}</span>
+                {" — "}
+                <span className={top.direction === "bullish" ? "text-green-400" : "text-red-400"}>{top.direction === "bullish" ? "Bullish" : "Bearish"}</span>
+                {top.key_prices.target && (
+                  <span className="text-white/60">{" | Target: "}<span className="text-white font-bold">{top.key_prices.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></span>
+                )}
+                <span className="text-white/60">{" | Confidence: "}<span className="text-white font-bold">{top.confidence}/10</span></span>
+              </span>
+            );
+          })() : (
+            <span className="text-[11px] text-white/40 italic">RON scanning for patterns...</span>
+          )}
+          {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length > 0 && (
+            <span className="ml-auto text-[10px] text-amber-400 font-medium">
+              {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length} S/R levels
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Trade Execution Panel */}
       {!isFullscreen && (
         <TradeExecutionPanel
