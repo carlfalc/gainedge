@@ -37,6 +37,7 @@ import {
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position } from "@/components/dashboard/TradeExecutionPanel";
+import { detectPatterns, type DetectedPattern } from "@/services/pattern-detection";
 
 /* ───── types ───── */
 interface ScanResult {
