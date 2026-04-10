@@ -947,7 +947,7 @@ export default function ChartsPage() {
 
       {/* OHLCV overlay + countdown + indicator legend */}
       <div className="flex items-center justify-between text-[11px] px-1">
-        <div className="flex items-center gap-3 font-mono">
+        <div className="flex items-center gap-3 font-mono bg-secondary">
           <span className="text-white/40">{selected}</span>
           {currentPrice && (
             <>
@@ -964,8 +964,8 @@ export default function ChartsPage() {
           ))}
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-white/40 text-lg">Next close:</span>
-          <span className="text-[#00CFA5] font-bold font-mono text-lg">{countdown}</span>
+          <span className="text-lg bg-background text-destructive-foreground">Next close:</span>
+          <span className="text-[#00CFA5] font-bold font-mono text-lg bg-background">{countdown}</span>
         </div>
       </div>
 
