@@ -563,7 +563,8 @@ export default function ChartsPage() {
         ...last, close: newClose, high: Math.max(last.high, newClose), low: Math.min(last.low, newClose),
       };
       rawDataRef.current[rawDataRef.current.length - 1] = updated;
-      const display = chartType === "Heiken Ashi"
+      const currentChartType = chartTypeRef.current;
+      const display = currentChartType === "Heiken Ashi"
         ? toHeikenAshi(rawDataRef.current).pop()!
         : updated;
       candleSeriesRef.current?.update({
@@ -571,7 +572,7 @@ export default function ChartsPage() {
         open: display.open, high: display.high, low: display.low, close: display.close,
       });
     }, 1500);
-  }, [selected, chartType]);
+  }, [selected]);
 
   /* ─── draw trade level lines ─── */
   const drawTradeLines = useCallback((candleSeries: ISeriesApi<"Candlestick">) => {
