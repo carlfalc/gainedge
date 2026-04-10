@@ -91,9 +91,9 @@ export default function TradingViewChartPage() {
   };
 
   return (
-    <div className="flex flex-col gap-2 h-[calc(100vh-104px)]">
+    <div className="flex flex-col h-[calc(100vh-104px)]">
       {/* Top bar */}
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center gap-1.5 flex-wrap px-1 py-1.5">
         {instruments.map((sym) => (
           <button
             key={sym}
@@ -133,13 +133,13 @@ export default function TradingViewChartPage() {
         </div>
       </div>
 
-      {/* TradingView iframe – 60% height */}
-      <div className="rounded-lg overflow-hidden border border-border" style={{ height: "60%" }}>
+      {/* TradingView iframe – 60% height, min 500px */}
+      <div className="overflow-hidden border-y border-border" style={{ height: "60%", minHeight: 500 }}>
         {selected && (
           <iframe
             key={`${selected}-${selectedBroker}`}
             src={buildIframeUrl(selected, selectedBroker)}
-            style={{ width: "100%", height: "100%", border: "none" }}
+            style={{ width: "100%", height: "100%", border: "none", display: "block" }}
             allowFullScreen
           />
         )}
@@ -152,6 +152,9 @@ export default function TradingViewChartPage() {
           accountId={accountId}
           connectionStatus={connectionStatus}
         />
+        <div className="text-center py-2 text-[10px] font-medium" style={{ color: "#00CFA5" }}>
+          Powered by Falconer AI
+        </div>
       </div>
     </div>
   );
