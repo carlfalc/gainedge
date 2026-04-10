@@ -56,6 +56,13 @@ interface SavedDrawing {
   drawing_data: any;
 }
 
+interface SignalRecord {
+  id: string; symbol: string; direction: string; confidence: number;
+  entry_price: number; stop_loss: number; take_profit: number;
+  result: string; pnl_pips: number | null; created_at: string;
+  resolved_at: string | null; closed_at: string | null;
+}
+
 const TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"];
 const CHART_TYPES = ["Candlestick", "Heiken Ashi"] as const;
 
