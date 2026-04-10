@@ -922,7 +922,7 @@ export default function ChartsPage() {
         {/* Broker badge */}
         <button
           onClick={() => setShowBrokerModal(true)}
-          className="px-3 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all border border-[#EAB308]/50 bg-[#EAB308]/10 text-white hover:bg-[#EAB308]/20 hover:border-[#EAB308] flex items-center gap-1.5"
+          className="px-3 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all border border-[#EAB308]/50 text-white hover:border-[#EAB308] flex items-center gap-1.5 bg-emerald-800"
         >
           <span className="text-[#EAB308] text-[10px]">●</span>
           {brokerLabel || "BROKER"}
