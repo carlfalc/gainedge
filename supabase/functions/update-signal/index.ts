@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // ─── Falconer Knowledge Base management actions ───
+    // ─── RON Knowledge Base management actions ───
     if (body.action === "toggle_rule" && body.rule_id) {
       const { error } = await supabase.from("falconer_knowledge")
         .update({ is_active: body.is_active }).eq("id", body.rule_id);
