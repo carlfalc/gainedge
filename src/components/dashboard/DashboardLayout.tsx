@@ -253,8 +253,10 @@ export default function DashboardLayout() {
         </header>
 
         {/* PAGE CONTENT */}
-        <main style={{ flex: 1, padding: 24, overflowY: "auto" }}>
-          <Outlet />
+        <main style={{ flex: 1, padding: 24, overflowY: "auto", background: lightBg ? "#F8FAFC" : "transparent", transition: "background 0.3s" }}>
+          <LightBgContext.Provider value={lightBg}>
+            <Outlet />
+          </LightBgContext.Provider>
         </main>
       </div>
       <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
