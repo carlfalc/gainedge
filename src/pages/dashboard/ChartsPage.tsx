@@ -1062,7 +1062,7 @@ export default function ChartsPage() {
 
     chart.timeScale().fitContent();
     startPricePolling();
-  }, [selected, timeframe, scanResult, activeIndicators, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
+  }, [selected, timeframe, scanResult, activeIndicators, chartSignals, loadCandles, startPricePolling, drawTradeLines, applyIndicators, initDrawingManager, saveDrawings]);
 
   /* rebuild chart on deps change (excluding chartType) */
   useEffect(() => {
