@@ -49,9 +49,9 @@ export default function ChartPopout() {
     setReady(true);
   }, [type, symbol]);
 
-  // For RON chart pop-out, redirect to the charts page in a clean window
+  // For Falconer AI chart pop-out
   useEffect(() => {
-    if (type === "ron") {
+    if (type === "falconer" || type === "ron") {
       setReady(true);
     }
   }, [type]);
@@ -67,7 +67,7 @@ export default function ChartPopout() {
             <span className="text-white">NEDGE</span>
           </span>
           <span className="text-white/40 text-[12px]">—</span>
-          <span className="text-white text-[12px] font-medium">{symbol} {type === "tradingview" ? "TradingView" : "RON"} Chart</span>
+          <span className="text-white text-[12px] font-medium">{symbol} {type === "tradingview" ? "TradingView" : "Falconer AI"} Chart</span>
           <span className="text-white/30 text-[11px] ml-2">Drag this tab to another screen</span>
         </div>
         <button
@@ -85,11 +85,11 @@ export default function ChartPopout() {
             <div style={{ height: "100%", width: "100%" }} />
           </div>
         )}
-        {type === "ron" && (
+        {(type === "falconer" || type === "ron") && (
           <iframe
             src={`/dashboard/charts?popout=1&symbol=${symbol}`}
             className="w-full h-full border-0"
-            title="RON Chart"
+            title="Falconer AI Chart"
           />
         )}
       </div>
