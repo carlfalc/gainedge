@@ -177,6 +177,7 @@ export default function ChartsPage() {
   const rawDataRef = useRef<OHLCData[]>([]);
   const tickIntervalRef = useRef<ReturnType<typeof setInterval>>();
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
   /* ─── load broker label from profile ─── */
   const BROKER_LABELS: Record<string, string> = {
