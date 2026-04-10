@@ -817,7 +817,8 @@ export default function ChartsPage() {
     drawingManagerRef.current = null;
 
     const chart = createChart(containerRef.current, {
-      autoSize: true,
+      width: containerRef.current.clientWidth,
+      height: containerRef.current.clientHeight,
       layout: {
         background: { color: "#080B12" },
         textColor: "#9CA3AF",
