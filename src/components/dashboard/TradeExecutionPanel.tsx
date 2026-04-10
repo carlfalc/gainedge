@@ -86,10 +86,14 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
   const [closingId, setClosingId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Intelligent Trader state
-  const [autoTradeEnabled, setAutoTradeEnabled] = useState(false);
+  // Intelligent Trader state – per-symbol so toggling one chart doesn't affect others
+  const [autoTradeMap, setAutoTradeMap] = useState<Record<string, boolean>>({});
+  const autoTradeEnabled = autoTradeMap[symbol] ?? false;
+  const setAutoTradeEnabled = (v: boolean) => setAutoTradeMap(prev => ({ ...prev, [symbol]: v }));
   const [autoLotSize, setAutoLotSize] = useState("0.01");
-  const [myTradesEnabled, setMyTradesEnabled] = useState(false);
+  const [myTradesMap, setMyTradesMap] = useState<Record<string, boolean>>({});
+  const myTradesEnabled = myTradesMap[symbol] ?? false;
+  const setMyTradesEnabled = (v: boolean) => setMyTradesMap(prev => ({ ...prev, [symbol]: v }));
 
   // Order mode
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
