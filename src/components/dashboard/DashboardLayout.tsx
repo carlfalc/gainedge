@@ -12,6 +12,8 @@ import { useSeedData } from "@/hooks/use-seed-data";
 export const LightBgContext = createContext<boolean>(false);
 import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 import BrokerModal from "./BrokerModal";
+import AskRonButton from "./AskRonButton";
+import AskRonModal from "./AskRonModal";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -37,6 +39,7 @@ export default function DashboardLayout() {
   const [sessionLabel, setSessionLabel] = useState("London Session");
   const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const [brokerOpen, setBrokerOpen] = useState(false);
+  const [ronOpen, setRonOpen] = useState(false);
   const [lightBg, setLightBg] = useState(() => localStorage.getItem("gainedge_light_bg") === "1");
   const navigate = useNavigate();
   const location = useLocation();
@@ -260,6 +263,15 @@ export default function DashboardLayout() {
         </main>
       </div>
       <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
+      <AskRonButton onClick={() => setRonOpen(true)} />
+      <AskRonModal
+        open={ronOpen}
+        onClose={() => setRonOpen(false)}
+        context={{
+          page: location.pathname,
+          sessionLabel,
+        }}
+      />
     </div>
   );
 }
