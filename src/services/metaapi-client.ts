@@ -9,8 +9,18 @@ const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const FUNCTION_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/metaapi-candles`;
 
 async function callEdge(body: Record<string, unknown>) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Not authenticated");
+  // Always refresh the session to avoid expired JWT errors
+  const { data: { session }, error } = await supabase.auth.refreshSession();
+  if (error || !session) {
+    // Fallback to existing session if refresh fails (e.g. token still valid)
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    if (!existing) throw new Error("Not authenticated");
+    return callEdgeWithToken(existing.access_token, body);
+  }
+  return callEdgeWithToken(session.access_token, body);
+}
+
+async function callEdgeWithToken(accessToken: string, body: Record<string, unknown>) {
 
   const res = await fetch(FUNCTION_URL, {
     method: "POST",
