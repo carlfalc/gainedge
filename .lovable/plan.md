@@ -1,36 +1,61 @@
 
 
-## Enhanced RON PATTERN Bar — Timestamp, Two-Pattern History, and Direction Hint
+## Add RON Pattern Historical Statistics to the Pattern Bar
 
-### Changes (all in `src/pages/dashboard/ChartsPage.tsx`)
+### What
+Below the current and previous pattern lines in the RON PATTERN bar, add a third line showing RON's historical intelligence for the detected pattern: how often this pattern historically reaches its target, and how frequently it appears for the user's selected instrument. This gives traders confidence data before entering.
 
-**1. Detection timestamp (browser local time)**
-- Add `patternDetectedAt` state (`string | null`).
-- When patterns are detected (~line 959), capture `new Date().toLocaleTimeString()` if any named patterns exist, otherwise clear it.
-- Display timestamp in the RON PATTERN bar after the confidence score: `| Detected: 14:20:05`.
-
-**2. Show the two most recent patterns (not just one)**
-- Add `patternHistory` state as an array of `{ pattern: DetectedPattern; detectedAt: string }[]`, capped at 2 entries.
-- Each time detection runs and finds named patterns, prepend the top-confidence pattern to the history (if it's different from the current first entry, or if its confidence changed). Keep max 2 items.
-- In the RON PATTERN bar, render the most recent pattern on the first line and the previous pattern on a second line (smaller, dimmer text). If only one pattern exists, just show that one.
-
-**3. Direction hint for less experienced traders**
-- Next to each pattern name, add a short plain-English label indicating the expected move:
-  - Bullish patterns: `"⬆ Potential bullish move"` (green text)
-  - Bearish patterns: `"⬇ Potential bearish move"` (red text)
-- This appears right after the pattern name so traders immediately understand what the pattern suggests, e.g.:
-  `Double Bottom — ⬆ Potential bullish move | Target: 2,450.00 | Confidence: 7/10 | Detected: 14:20:05`
-
-### UI Layout of RON PATTERN Bar
+### UI Layout
 
 ```text
-RON PATTERN | Double Bottom — ⬆ Potential bullish move | Target: 2,450 | 7/10 | 14:20:05  | 3 S/R levels | [Labels ON]
-              Prev: Bull Flag — ⬆ Potential bullish move | 6/10 | 14:15:32
+RON PATTERN | Double Top — ⬇ Potential bearish move | Target: 3,280 | 7/10 | 14:20:05 | 3 S/R | [Labels ON]
+              Prev: Head & Shoulders — ⬇ Bearish ✓ Confirmed | Moved 45 pips ↓ | 14:15:32
+              🧠 RON Stats: Double Top historically hits target 68% of the time | Appears ~4x per week on XAUUSD
 ```
 
-- Second line only appears if there's a previous pattern.
-- Second line is smaller text (`text-[9px]`) and dimmer (`text-white/50`).
+The third line uses a brain icon and is styled in cyan/teal (`text-[#00CFA5]/70`, `text-[9px]`) to associate it with RON's intelligence.
 
-### No other files affected
-All changes are in `ChartsPage.tsx` — the pattern detection logic, state, and the RON PATTERN bar JSX section.
+### How
+
+**`src/pages/dashboard/ChartsPage.tsx`** — all changes in this single file:
+
+1. **Add a pattern statistics map** — a local constant mapping each of the 8 named patterns to their known historical stats:
+   - `targetHitRate`: percentage the pattern historically reaches target (sourced from well-known technical analysis data)
+   - `avgFrequency`: typical weekly appearance description
+   - `avgPipMove`: average pip movement after pattern confirmation
+   
+   Example:
+   ```typescript
+   const PATTERN_STATS: Record<string, { targetHitRate: number; avgPipMove: string; direction: string }> = {
+     "Double Top": { targetHitRate: 65, avgPipMove: "40-80", direction: "bearish" },
+     "Double Bottom": { targetHitRate: 65, avgPipMove: "40-80", direction: "bullish" },
+     "Head & Shoulders": { targetHitRate: 70, avgPipMove: "60-120", direction: "bearish" },
+     "Ascending Triangle": { targetHitRate: 72, avgPipMove: "30-60", direction: "bullish" },
+     "Descending Triangle": { targetHitRate: 72, avgPipMove: "30-60", direction: "bearish" },
+     "Bull Flag": { targetHitRate: 67, avgPipMove: "25-50", direction: "bullish" },
+     "Bear Flag": { targetHitRate: 67, avgPipMove: "25-50", direction: "bearish" },
+   };
+   ```
+
+2. **Query insights table for user-specific pattern history** — when a new pattern is detected, query the `insights` table for `insight_type = 'pattern_outcome'` matching the pattern name and symbol. Calculate:
+   - How many times this pattern was previously detected for this instrument
+   - How many times it was confirmed vs invalidated (from the outcome tracking already planned)
+   - Display a personalized hit rate if enough data exists, otherwise fall back to the general stats
+
+3. **Add the stats line to the RON PATTERN bar JSX** — below the previous pattern line:
+   ```text
+   🧠 RON Stats: "Double Top" hits target ~65% historically | Avg move: 40-80 pips | [X seen on XAUUSD]
+   ```
+   - If user has personal history from insights: `"Your history: 3/5 confirmed (60%)"` appended
+   - Styled `text-[9px] text-[#00CFA5]/60` with brain emoji prefix
+
+4. **Persist pattern outcomes to insights** — when a pattern rotates from current to previous (already captured in `patternHistory` update logic), insert a row into `insights` table:
+   - `insight_type: "pattern_outcome"`
+   - `symbol`: current instrument
+   - `title`: pattern name
+   - `description`: confirmed/invalidated + pip move
+   - `data`: JSON with `{ pattern_name, direction, entryPrice, exitPrice, pipMove, confirmed }`
+
+### Files to modify
+- `src/pages/dashboard/ChartsPage.tsx` — pattern stats map, insights query, UI line, and outcome persistence
 
