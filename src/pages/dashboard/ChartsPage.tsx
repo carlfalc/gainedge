@@ -1257,6 +1257,53 @@ export default function ChartsPage() {
     });
   }, [detectedPatterns, userId, selected]);
 
+  // Persist pattern outcomes when a pattern gets an outcome
+  useEffect(() => {
+    if (!userId || patternHistory.length < 2) return;
+    const prev = patternHistory[1];
+    if (!prev.outcome || prev.pipMove === undefined) return;
+
+    supabase.from("insights").insert({
+      user_id: userId,
+      insight_type: "pattern_outcome",
+      symbol: selected,
+      title: prev.pattern.pattern_name,
+      description: `${prev.outcome === "confirmed" ? "✓ Confirmed" : "✗ Invalidated"} | Moved ${prev.pipMove.toFixed(1)} pips ${prev.pattern.direction === "bullish" ? "↑" : "↓"}`,
+      severity: prev.outcome === "confirmed" ? "positive" : "negative",
+      data: {
+        pattern_name: prev.pattern.pattern_name,
+        direction: prev.pattern.direction,
+        entryPrice: prev.entryPrice,
+        pipMove: prev.pipMove,
+        confirmed: prev.outcome === "confirmed",
+      },
+    }).then(({ error }) => {
+      if (error) console.error("Pattern outcome insert error:", error);
+    });
+  }, [patternHistory, userId, selected]);
+
+  // Query user-specific pattern stats from insights
+  useEffect(() => {
+    if (!userId || patternHistory.length === 0) return;
+    const currentName = patternHistory[0].pattern.pattern_name;
+
+    supabase.from("insights")
+      .select("data")
+      .eq("user_id", userId)
+      .eq("insight_type", "pattern_outcome")
+      .eq("symbol", selected)
+      .eq("title", currentName)
+      .then(({ data }) => {
+        if (!data || data.length === 0) {
+          setPatternUserStats(null);
+          return;
+        }
+        const total = data.length;
+        const confirmed = data.filter((r: any) => r.data?.confirmed === true).length;
+        setPatternUserStats({ total, confirmed });
+      });
+  }, [patternHistory, userId, selected]);
+
   /* ─── helpers ─── */
   const dirColor = (d: string) => d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
   const dirIcon = (d: string) =>
