@@ -116,6 +116,20 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const posRef = useRef<ReturnType<typeof setInterval>>();
   const isLive = connectionStatus === "live" && !!accountId;
 
+  // Expose imperative methods so parent (chart) can set prices when lines are dragged
+  useImperativeHandle(ref, () => ({
+    setMarketSL: (val: string) => setSl(val),
+    setMarketTP: (val: string) => setTp(val),
+    setLimitEntry: (val: string) => setLimitEntry(val),
+    setLimitSL: (val: string) => setLimitSl(val),
+    setLimitTP: (val: string) => setLimitTp(val),
+    getCurrentPrice: () => {
+      if (bid !== null && ask !== null) return (bid + ask) / 2;
+      if (chartPrice != null) return chartPrice;
+      return null;
+    },
+  }), [bid, ask, chartPrice]);
+
   // Sync external positions
   useEffect(() => {
     if (externalPositions) setPositions(externalPositions);

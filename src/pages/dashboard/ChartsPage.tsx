@@ -37,8 +37,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
-import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position } from "@/components/dashboard/TradeExecutionPanel";
+import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position, type TradeExecutionPanelRef } from "@/components/dashboard/TradeExecutionPanel";
 import { detectPatterns, type DetectedPattern } from "@/services/pattern-detection";
+import ChartOrderLines from "@/components/dashboard/ChartOrderLines";
 
 /* ───── types ───── */
 interface ScanResult {
@@ -180,6 +181,7 @@ export default function ChartsPage() {
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
+  const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
 
   /* ─── load broker label from profile ─── */
   const BROKER_LABELS: Record<string, string> = {
@@ -1202,6 +1204,7 @@ export default function ChartsPage() {
 
   const activeCount = activeIndicators.filter(i => i.enabled).length;
   const drawingCount = drawingManagerRef.current?.getAllDrawings?.()?.length ?? savedDrawings.length;
+  const priceDec = selected.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => selected.includes(s)) ? 2 : 5;
 
   const statusDot = connectionStatus === "live" ? "bg-green-400" : connectionStatus === "connecting" ? "bg-amber-400 animate-pulse" : connectionStatus === "demo" ? "bg-red-400" : "bg-gray-500";
   const statusText = connectionStatus === "live" ? "Live" : connectionStatus === "connecting" ? "Connecting..." : connectionStatus === "demo" ? "Demo" : "Offline";
@@ -1339,6 +1342,42 @@ export default function ChartsPage() {
             className={`rounded-lg overflow-hidden border border-white/[0.06] ${isFullscreen ? "h-full min-h-0" : "min-h-[55vh]"}`}
             style={{ cursor: activeDrawingTool ? "crosshair" : undefined }}
           />
+          {/* Interactive order lines overlay */}
+          <ChartOrderLines
+            visible={orderMode !== "market" || !!(limitPrices?.sl || limitPrices?.tp)}
+            orderMode={orderMode}
+            entry={orderMode !== "market" ? (limitPrices?.entry ?? null) : null}
+            sl={limitPrices?.sl ?? null}
+            tp={limitPrices?.tp ?? null}
+            priceDec={priceDec}
+            priceToY={(price) => {
+              if (!candleSeriesRef.current) return null;
+              const y = candleSeriesRef.current.priceToCoordinate(price);
+              return y ?? null;
+            }}
+            yToPrice={(y) => {
+              if (!candleSeriesRef.current) return null;
+              const p = candleSeriesRef.current.coordinateToPrice(y);
+              return p ?? null;
+            }}
+            onEntryDrag={(price) => tradePanelRef.current?.setLimitEntry(price.toFixed(priceDec))}
+            onSLDrag={(price) => {
+              if (orderMode === "market") tradePanelRef.current?.setMarketSL(price.toFixed(priceDec));
+              else tradePanelRef.current?.setLimitSL(price.toFixed(priceDec));
+            }}
+            onTPDrag={(price) => {
+              if (orderMode === "market") tradePanelRef.current?.setMarketTP(price.toFixed(priceDec));
+              else tradePanelRef.current?.setLimitTP(price.toFixed(priceDec));
+            }}
+            onSLRemove={() => {
+              if (orderMode === "market") tradePanelRef.current?.setMarketSL("");
+              else tradePanelRef.current?.setLimitSL("");
+            }}
+            onTPRemove={() => {
+              if (orderMode === "market") tradePanelRef.current?.setMarketTP("");
+              else tradePanelRef.current?.setLimitTP("");
+            }}
+          />
           {/* Loading overlay */}
           {(connectionStatus === "connecting" || loadingMessage) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#080B12]/80 rounded-lg z-10">
@@ -1383,6 +1422,7 @@ export default function ChartsPage() {
       {/* Trade Execution Panel */}
       {!isFullscreen && (
         <TradeExecutionPanel
+          ref={tradePanelRef}
           symbol={selected}
           accountId={accountIdRef.current}
           connectionStatus={connectionStatus}
