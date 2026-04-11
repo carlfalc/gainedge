@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-profile";
 import { provisionAccount } from "@/services/metaapi-client";
-import TradeExecutionPanel from "@/components/dashboard/TradeExecutionPanel";
+import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type TradeExecutionPanelRef } from "@/components/dashboard/TradeExecutionPanel";
+import ChartOrderLines from "@/components/dashboard/ChartOrderLines";
 import { ExternalLink } from "lucide-react";
 
 const BROKER_EXCHANGES: Record<string, string> = {
@@ -36,6 +37,14 @@ const TV_SYMBOL_MAP: Record<string, Record<string, string>> = {
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
 
+// Approximate price ranges for linear coordinate mapping
+const PRICE_RANGE_MAP: Record<string, number> = {
+  XAUUSD: 60, XAGUSD: 2, EURUSD: 0.015, GBPUSD: 0.015, USDJPY: 3,
+  AUDUSD: 0.01, NZDUSD: 0.01, USDCAD: 0.015, USDCHF: 0.015,
+  EURGBP: 0.01, EURJPY: 3, GBPJPY: 4, NAS100: 500, US30: 500,
+  SPX500: 100, UK100: 200, GER40: 300, BTCUSD: 5000, ETHUSD: 500,
+};
+
 function getTvSymbol(sym: string, broker: string): string {
   const exchange = BROKER_EXCHANGES[broker] || "";
   const map = TV_SYMBOL_MAP[sym];
@@ -56,6 +65,45 @@ export default function TradingViewChartPage() {
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "live" | "demo">("disconnected");
+  const [orderMode, setOrderMode] = useState<OrderMode>("market");
+  const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
+  const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+
+  const priceDec = selected.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => selected.includes(s)) ? 2 : 5;
+
+  // Estimated center price for coordinate mapping
+  const estimatedPrice = useCallback(() => {
+    return tradePanelRef.current?.getCurrentPrice() ?? null;
+  }, []);
+
+  // Linear price-to-Y mapping for overlay
+  const priceRange = PRICE_RANGE_MAP[selected] ?? 100;
+
+  const priceToY = useCallback((price: number): number | null => {
+    const center = estimatedPrice();
+    if (!center || !chartContainerRef.current) return null;
+    const h = chartContainerRef.current.clientHeight;
+    const topMargin = 40; // approximate TV top toolbar
+    const bottomMargin = 30; // approximate TV time axis
+    const usable = h - topMargin - bottomMargin;
+    // Map: center price -> middle of usable area
+    const mid = topMargin + usable / 2;
+    const pixelsPerUnit = usable / priceRange;
+    return mid - (price - center) * pixelsPerUnit;
+  }, [estimatedPrice, priceRange]);
+
+  const yToPrice = useCallback((y: number): number | null => {
+    const center = estimatedPrice();
+    if (!center || !chartContainerRef.current) return null;
+    const h = chartContainerRef.current.clientHeight;
+    const topMargin = 40;
+    const bottomMargin = 30;
+    const usable = h - topMargin - bottomMargin;
+    const mid = topMargin + usable / 2;
+    const pixelsPerUnit = usable / priceRange;
+    return center - (y - mid) / pixelsPerUnit;
+  }, [estimatedPrice, priceRange]);
 
   useEffect(() => {
     if (profile?.broker) {
@@ -133,8 +181,12 @@ export default function TradingViewChartPage() {
         </div>
       </div>
 
-      {/* TradingView iframe – 60% height, min 500px */}
-      <div className="overflow-hidden border-y border-border" style={{ height: "60%", minHeight: 500 }}>
+      {/* TradingView iframe with order lines overlay */}
+      <div
+        ref={chartContainerRef}
+        className="overflow-hidden border-y border-border relative"
+        style={{ height: "60%", minHeight: 500 }}
+      >
         {selected && (
           <iframe
             key={`${selected}-${selectedBroker}`}
@@ -143,14 +195,44 @@ export default function TradingViewChartPage() {
             allowFullScreen
           />
         )}
+        <ChartOrderLines
+          visible={orderMode !== "market" || !!(limitPrices?.sl || limitPrices?.tp)}
+          orderMode={orderMode}
+          entry={orderMode !== "market" ? (limitPrices?.entry ?? null) : null}
+          sl={limitPrices?.sl ?? null}
+          tp={limitPrices?.tp ?? null}
+          priceDec={priceDec}
+          priceToY={priceToY}
+          yToPrice={yToPrice}
+          onEntryDrag={(price) => tradePanelRef.current?.setLimitEntry(price.toFixed(priceDec))}
+          onSLDrag={(price) => {
+            if (orderMode === "market") tradePanelRef.current?.setMarketSL(price.toFixed(priceDec));
+            else tradePanelRef.current?.setLimitSL(price.toFixed(priceDec));
+          }}
+          onTPDrag={(price) => {
+            if (orderMode === "market") tradePanelRef.current?.setMarketTP(price.toFixed(priceDec));
+            else tradePanelRef.current?.setLimitTP(price.toFixed(priceDec));
+          }}
+          onSLRemove={() => {
+            if (orderMode === "market") tradePanelRef.current?.setMarketSL("");
+            else tradePanelRef.current?.setLimitSL("");
+          }}
+          onTPRemove={() => {
+            if (orderMode === "market") tradePanelRef.current?.setMarketTP("");
+            else tradePanelRef.current?.setLimitTP("");
+          }}
+        />
       </div>
 
       {/* Trade Execution Panel */}
       <div className="flex-1 overflow-auto">
         <TradeExecutionPanel
+          ref={tradePanelRef}
           symbol={selected}
           accountId={accountId}
           connectionStatus={connectionStatus}
+          onOrderModeChange={setOrderMode}
+          onLimitPricesChange={setLimitPrices}
         />
         <div className="text-center py-2 text-[10px] font-medium" style={{ color: "#00CFA5" }}>
           Powered by RON
