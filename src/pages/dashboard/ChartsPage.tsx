@@ -1421,43 +1421,55 @@ export default function ChartsPage() {
 
       {/* RON Pattern Detection Bar */}
       {!isFullscreen && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/[0.06] bg-[#111724]">
-          <span className="text-[10px] font-bold text-[#00CFA5] tracking-wider shrink-0">RON PATTERN</span>
-          <div className="w-px h-4 bg-white/10" />
-          {detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance").length > 0 ? (() => {
-            const top = detectedPatterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance")[0];
-            return (
-              <span className="text-[11px] text-white/80">
-                <span className={`font-bold ${top.direction === "bullish" ? "text-green-400" : "text-red-400"}`}>{top.pattern_name}</span>
-                {" detected on "}
-                <span className="text-white font-semibold">{selected}</span>
-                {" — "}
-                <span className={top.direction === "bullish" ? "text-green-400" : "text-red-400"}>{top.direction === "bullish" ? "Bullish" : "Bearish"}</span>
-                {top.key_prices.target && (
-                  <span className="text-white/60">{" | Target: "}<span className="text-white font-bold">{top.key_prices.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></span>
-                )}
-                <span className="text-white/60">{" | Confidence: "}<span className="text-white font-bold">{top.confidence}/10</span></span>
+        <div className="flex flex-col gap-0.5 px-3 py-2 rounded-lg border border-white/[0.06] bg-[#111724]">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold text-[#00CFA5] tracking-wider shrink-0">RON PATTERN</span>
+            <div className="w-px h-4 bg-white/10" />
+            {patternHistory.length > 0 ? (() => {
+              const { pattern: top, detectedAt } = patternHistory[0];
+              const dirHint = top.direction === "bullish" ? "⬆ Potential bullish move" : "⬇ Potential bearish move";
+              return (
+                <span className="text-[11px] text-white/80">
+                  <span className={`font-bold ${top.direction === "bullish" ? "text-green-400" : "text-red-400"}`}>{top.pattern_name}</span>
+                  {" — "}
+                  <span className={`font-semibold ${top.direction === "bullish" ? "text-green-400" : "text-red-400"}`}>{dirHint}</span>
+                  {top.key_prices.target && (
+                    <span className="text-white/60">{" | Target: "}<span className="text-white font-bold">{top.key_prices.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></span>
+                  )}
+                  <span className="text-white/60">{" | "}<span className="text-white font-bold">{top.confidence}/10</span></span>
+                  <span className="text-white/60">{" | "}<span className="text-white font-bold">{detectedAt}</span></span>
+                </span>
+              );
+            })() : (
+              <span className="text-[11px] text-white/40 italic">RON scanning for patterns...</span>
+            )}
+            {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length > 0 && (
+              <span className="text-[10px] text-amber-400 font-medium">
+                {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length} S/R levels
               </span>
+            )}
+            <div className="w-px h-4 bg-white/10 ml-auto" />
+            <button
+              onClick={() => setShowPatternLabels(v => !v)}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
+                showPatternLabels
+                  ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
+                  : "bg-[#111724] border-white/10 text-white/40"
+              }`}
+            >
+              {showPatternLabels ? "Labels ON" : "Labels OFF"}
+            </button>
+          </div>
+          {patternHistory.length > 1 && (() => {
+            const { pattern: prev, detectedAt: prevTime } = patternHistory[1];
+            const prevHint = prev.direction === "bullish" ? "⬆ Bullish" : "⬇ Bearish";
+            return (
+              <div className="text-[9px] text-white/50 pl-[90px]">
+                Prev: <span className={`font-semibold ${prev.direction === "bullish" ? "text-green-400/60" : "text-red-400/60"}`}>{prev.pattern_name}</span>
+                {" — "}{prevHint}{" | "}{prev.confidence}/10{" | "}{prevTime}
+              </div>
             );
-          })() : (
-            <span className="text-[11px] text-white/40 italic">RON scanning for patterns...</span>
-          )}
-          {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length > 0 && (
-            <span className="text-[10px] text-amber-400 font-medium">
-              {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length} S/R levels
-            </span>
-          )}
-          <div className="w-px h-4 bg-white/10 ml-auto" />
-          <button
-            onClick={() => setShowPatternLabels(v => !v)}
-            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
-              showPatternLabels
-                ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
-                : "bg-[#111724] border-white/10 text-white/40"
-            }`}
-          >
-            {showPatternLabels ? "Labels ON" : "Labels OFF"}
-          </button>
+          })()}
         </div>
       )}
 
