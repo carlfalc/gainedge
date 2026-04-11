@@ -980,15 +980,31 @@ export default function ChartsPage() {
     const patterns = detectPatterns(rawData.map(c => ({ time: c.time as number, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })));
     setDetectedPatterns(patterns);
 
-    // Track pattern history (two most recent named patterns with timestamps)
+    // Track pattern history (two most recent named patterns with timestamps + entry price + outcome)
     const namedPatterns = patterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance");
     if (namedPatterns.length > 0) {
       const topPattern = namedPatterns.reduce((a, b) => b.confidence > a.confidence ? b : a);
       const now = new Date().toLocaleTimeString();
+      const entryCandle = rawData[Math.min(topPattern.end_index, rawData.length - 1)];
+      const entryPrice = entryCandle?.close ?? rawData[rawData.length - 1]?.close ?? 0;
+      const currentClose = rawData[rawData.length - 1]?.close ?? 0;
+
       setPatternHistory(prev => {
         const isSame = prev.length > 0 && prev[0].pattern.pattern_name === topPattern.pattern_name && prev[0].pattern.confidence === topPattern.confidence;
         if (isSame) return prev;
-        return [{ pattern: topPattern, detectedAt: now }, ...prev].slice(0, 2);
+
+        // Calculate outcome for the pattern being rotated to "previous"
+        const updatedPrev = prev.length > 0 ? (() => {
+          const old = prev[0];
+          const priceDiff = currentClose - old.entryPrice;
+          const isBullish = old.pattern.direction === "bullish";
+          const movedRight = isBullish ? priceDiff > 0 : priceDiff < 0;
+          const pips = calculatePips(priceDiff, selected);
+          return { ...old, outcome: (movedRight ? "confirmed" : "invalidated") as "confirmed" | "invalidated", pipMove: pips };
+        })() : null;
+
+        const newEntry = { pattern: topPattern, detectedAt: now, entryPrice };
+        return updatedPrev ? [newEntry, updatedPrev].slice(0, 2) : [newEntry];
       });
     }
 
