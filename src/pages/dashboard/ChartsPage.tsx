@@ -151,6 +151,12 @@ export default function ChartsPage() {
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
   const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
+  const [showPatternLabels, setShowPatternLabels] = useState(true);
+
+  // Refs to break rebuild chain for order mode / limit prices
+  const orderModeRef = useRef<OrderMode>(orderMode);
+  const limitPricesRef = useRef<LimitOrderPrices | null>(limitPrices);
+  const showPatternLabelsRef = useRef(showPatternLabels);
   const [chartSignals, setChartSignals] = useState<SignalRecord[]>([]);
   // Indicators
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]);
