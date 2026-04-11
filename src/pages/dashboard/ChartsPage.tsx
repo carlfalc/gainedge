@@ -66,6 +66,26 @@ interface SignalRecord {
 }
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"];
+
+/* ───── RON Pattern Historical Stats ───── */
+const PATTERN_STATS: Record<string, { targetHitRate: number; avgPipMove: string; direction: string; avgFrequency: string }> = {
+  "Double Top": { targetHitRate: 65, avgPipMove: "40-80", direction: "bearish", avgFrequency: "~3x/week" },
+  "Double Bottom": { targetHitRate: 65, avgPipMove: "40-80", direction: "bullish", avgFrequency: "~3x/week" },
+  "Head & Shoulders": { targetHitRate: 70, avgPipMove: "60-120", direction: "bearish", avgFrequency: "~2x/week" },
+  "Ascending Triangle": { targetHitRate: 72, avgPipMove: "30-60", direction: "bullish", avgFrequency: "~4x/week" },
+  "Descending Triangle": { targetHitRate: 72, avgPipMove: "30-60", direction: "bearish", avgFrequency: "~4x/week" },
+  "Bull Flag": { targetHitRate: 67, avgPipMove: "25-50", direction: "bullish", avgFrequency: "~5x/week" },
+  "Bear Flag": { targetHitRate: 67, avgPipMove: "25-50", direction: "bearish", avgFrequency: "~5x/week" },
+};
+
+/* ───── Pip calculation helper ───── */
+const calculatePips = (priceDiff: number, symbol: string): number => {
+  if (symbol.includes("XAU")) return Math.abs(priceDiff) * 10;
+  if (symbol.includes("JPY") || symbol.includes("XAG")) return Math.abs(priceDiff) * 100;
+  if (["US30", "NAS100", "SPX500", "US500"].some(s => symbol.includes(s))) return Math.abs(priceDiff);
+  if (symbol.includes("BTC")) return Math.abs(priceDiff);
+  return Math.abs(priceDiff) * 10000; // forex default
+};
 const CHART_TYPES = ["Candlestick", "Heiken Ashi"] as const;
 
 type ConnectionStatus = "disconnected" | "connecting" | "live" | "demo";
