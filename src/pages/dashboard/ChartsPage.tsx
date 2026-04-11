@@ -1559,7 +1559,7 @@ export default function ChartsPage() {
             return (
               <div className="text-[9px] text-white/50 pl-[90px]">
                 Prev: <span className={`font-semibold ${prev.pattern.direction === "bullish" ? "text-green-400/60" : "text-red-400/60"}`}>{prev.pattern.pattern_name}</span>
-                {" — "}{prevDir}{" "}{outcomeLabel}{pipLabel}{" | "}{prev.confidence ?? prev.pattern.confidence}/10{" | "}{prev.detectedAt}
+                {" — "}{prevDir}{" "}{outcomeLabel}{pipLabel}{" | "}{prev.pattern.confidence}/10{" | "}{prev.detectedAt}
               </div>
             );
           })()}
