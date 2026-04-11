@@ -151,6 +151,12 @@ export default function ChartsPage() {
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
   const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
+  const [showPatternLabels, setShowPatternLabels] = useState(true);
+
+  // Refs to break rebuild chain for order mode / limit prices
+  const orderModeRef = useRef<OrderMode>(orderMode);
+  const limitPricesRef = useRef<LimitOrderPrices | null>(limitPrices);
+  const showPatternLabelsRef = useRef(showPatternLabels);
   const [chartSignals, setChartSignals] = useState<SignalRecord[]>([]);
   // Indicators
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>([]);
@@ -174,6 +180,7 @@ export default function ChartsPage() {
   const paneSeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
   const tradeLinesRef = useRef<any[]>([]);
   const patternSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const patternPriceLinesRef = useRef<Array<{ line: any; title: string }>>([]);
   const tradeConnectorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
   const chartTypeRef = useRef(chartType);
@@ -577,6 +584,11 @@ export default function ChartsPage() {
     }, 1500);
   }, [selected]);
 
+  /* ─── keep refs in sync (no rebuild) ─── */
+  useEffect(() => { orderModeRef.current = orderMode; }, [orderMode]);
+  useEffect(() => { limitPricesRef.current = limitPrices; }, [limitPrices]);
+  useEffect(() => { showPatternLabelsRef.current = showPatternLabels; }, [showPatternLabels]);
+
   /* ─── draw trade level lines ─── */
   const drawTradeLines = useCallback((candleSeries: ISeriesApi<"Candlestick">) => {
     tradeLinesRef.current.forEach(line => {
@@ -611,16 +623,29 @@ export default function ChartsPage() {
       if (p.takeProfit) addLine(p.takeProfit, "#22C55E", `Pos TP${label}`);
     });
 
-    if (limitPrices && (orderMode === "limit" || orderMode === "stop")) {
-      if (limitPrices.entry) addLine(limitPrices.entry, "#FFFFFF", orderMode === "limit" ? "Limit Entry" : "Stop Entry");
-      if (limitPrices.slEnabled && limitPrices.sl) addLine(limitPrices.sl, "#EF4444", "Pending SL");
-      if (limitPrices.tpEnabled && limitPrices.tp) addLine(limitPrices.tp, "#22C55E", "Pending TP");
+    // Read from refs to avoid triggering rebuild chain
+    const lp = limitPricesRef.current;
+    const om = orderModeRef.current;
+    if (lp && (om === "limit" || om === "stop")) {
+      if (lp.entry) addLine(lp.entry, "#FFFFFF", om === "limit" ? "Limit Entry" : "Stop Entry");
+      if (lp.slEnabled && lp.sl) addLine(lp.sl, "#EF4444", "Pending SL");
+      if (lp.tpEnabled && lp.tp) addLine(lp.tp, "#22C55E", "Pending TP");
     }
-  }, [scanResult, tradePositions, selected, limitPrices, orderMode]);
+  }, [scanResult, tradePositions, selected]);
 
+  /* ─── redraw trade lines when order mode / limit prices change (no rebuild) ─── */
   useEffect(() => {
     if (candleSeriesRef.current) drawTradeLines(candleSeriesRef.current);
-  }, [drawTradeLines]);
+  }, [drawTradeLines, orderMode, limitPrices]);
+
+  /* ─── toggle pattern labels without rebuild ─── */
+  useEffect(() => {
+    patternPriceLinesRef.current.forEach(({ line, title }) => {
+      try {
+        line.applyOptions({ title: showPatternLabels ? title : "" });
+      } catch {}
+    });
+  }, [showPatternLabels]);
 
   /* ─── indicator toggle handler ─── */
   const handleIndicatorToggle = useCallback((meta: IndicatorMeta, params?: Record<string, any>) => {
@@ -928,9 +953,17 @@ export default function ChartsPage() {
     // ─── RON Pattern Detection ───
     patternSeriesRef.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
     patternSeriesRef.current = [];
+    patternPriceLinesRef.current = [];
 
     const patterns = detectPatterns(rawData.map(c => ({ time: c.time as number, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })));
     setDetectedPatterns(patterns);
+
+    const labelsOn = showPatternLabelsRef.current;
+
+    const addPatternPriceLine = (series: ISeriesApi<"Candlestick">, opts: any, titleText: string) => {
+      const line = series.createPriceLine({ ...opts, title: labelsOn ? titleText : "" });
+      patternPriceLinesRef.current.push({ line, title: titleText });
+    };
 
     for (const pat of patterns) {
       const color = pat.direction === "bullish" ? "#22C55E" : "#EF4444";
@@ -940,19 +973,14 @@ export default function ChartsPage() {
       if (isSR) {
         const level = pat.key_prices.support ?? pat.key_prices.resistance;
         if (level) {
-          candleSeries.createPriceLine({
-            price: level,
-            color: "#F59E0B",
-            lineWidth: 1,
-            lineStyle: 1, // dashed
-            axisLabelVisible: true,
-            title: pat.pattern_name,
-          });
+          addPatternPriceLine(candleSeries, {
+            price: level, color: "#F59E0B", lineWidth: 1, lineStyle: 1, axisLabelVisible: true,
+          }, pat.pattern_name);
         }
         continue;
       }
 
-      // Draw trendlines for triangles, flags
+      // Draw trendlines for triangles, flags (these are line series, no title text)
       if (pat.key_prices.upper_line) {
         const ul = pat.key_prices.upper_line;
         const series = chart.addSeries(LineSeries, {
@@ -980,26 +1008,16 @@ export default function ChartsPage() {
 
       // Draw neckline for double top/bottom, H&S
       if (pat.key_prices.neckline) {
-        candleSeries.createPriceLine({
-          price: pat.key_prices.neckline,
-          color,
-          lineWidth: 1,
-          lineStyle: 1,
-          axisLabelVisible: true,
-          title: `${pat.pattern_name} Neckline`,
-        });
+        addPatternPriceLine(candleSeries, {
+          price: pat.key_prices.neckline, color, lineWidth: 1, lineStyle: 1, axisLabelVisible: true,
+        }, `${pat.pattern_name} Neckline`);
       }
 
       // Draw target
       if (pat.key_prices.target) {
-        candleSeries.createPriceLine({
-          price: pat.key_prices.target,
-          color,
-          lineWidth: 1,
-          lineStyle: 3, // dotted
-          axisLabelVisible: true,
-          title: `${pat.pattern_name} Target`,
-        });
+        addPatternPriceLine(candleSeries, {
+          price: pat.key_prices.target, color, lineWidth: 1, lineStyle: 3, axisLabelVisible: true,
+        }, `${pat.pattern_name} Target`);
       }
     }
 
@@ -1412,10 +1430,21 @@ export default function ChartsPage() {
             <span className="text-[11px] text-white/40 italic">RON scanning for patterns...</span>
           )}
           {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length > 0 && (
-            <span className="ml-auto text-[10px] text-amber-400 font-medium">
+            <span className="text-[10px] text-amber-400 font-medium">
               {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length} S/R levels
             </span>
           )}
+          <div className="w-px h-4 bg-white/10 ml-auto" />
+          <button
+            onClick={() => setShowPatternLabels(v => !v)}
+            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
+              showPatternLabels
+                ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
+                : "bg-[#111724] border-white/10 text-white/40"
+            }`}
+          >
+            {showPatternLabels ? "Labels ON" : "Labels OFF"}
+          </button>
         </div>
       )}
 
