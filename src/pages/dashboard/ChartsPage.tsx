@@ -1511,15 +1511,15 @@ export default function ChartsPage() {
             <div className="w-px h-4 bg-white/10" />
             {patternHistory.length > 0 ? (() => {
               const { pattern: top, detectedAt } = patternHistory[0];
-              const dirHint = top.direction === "bullish" ? "⬆ Potential bullish move" : "⬇ Potential bearish move";
+              const targetPrice = top.key_prices.target;
+              const dirHint = top.direction === "bullish"
+                ? `⬆ Potential bullish move${targetPrice ? ` to ${targetPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ""}`
+                : `⬇ Potential bearish move${targetPrice ? ` to ${targetPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ""}`;
               return (
                 <span className="text-[11px] text-white/80">
                   <span className={`font-bold ${top.direction === "bullish" ? "text-green-400" : "text-red-400"}`}>{top.pattern_name}</span>
                   {" — "}
                   <span className={`font-semibold ${top.direction === "bullish" ? "text-green-400" : "text-red-400"}`}>{dirHint}</span>
-                  {top.key_prices.target && (
-                    <span className="text-white/60">{" | Target: "}<span className="text-white font-bold">{top.key_prices.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></span>
-                  )}
                   <span className="text-white/60">{" | "}<span className="text-white font-bold">{top.confidence}/10</span></span>
                   <span className="text-white/60">{" | "}<span className="text-white font-bold">{detectedAt}</span></span>
                 </span>
@@ -1544,13 +1544,38 @@ export default function ChartsPage() {
               {showPatternLabels ? "Labels ON" : "Labels OFF"}
             </button>
           </div>
+          {/* Previous pattern with outcome */}
           {patternHistory.length > 1 && (() => {
-            const { pattern: prev, detectedAt: prevTime } = patternHistory[1];
-            const prevHint = prev.direction === "bullish" ? "⬆ Bullish" : "⬇ Bearish";
+            const prev = patternHistory[1];
+            const prevDir = prev.pattern.direction === "bullish" ? "⬆ Bullish" : "⬇ Bearish";
+            const outcomeLabel = prev.outcome === "confirmed"
+              ? <span className="text-green-400/70 font-bold">✓ Confirmed</span>
+              : prev.outcome === "invalidated"
+              ? <span className="text-red-400/70 font-bold">✗ Invalidated</span>
+              : null;
+            const pipLabel = prev.pipMove !== undefined
+              ? ` | Moved ${prev.pipMove.toFixed(1)} pips ${prev.pattern.direction === "bullish" ? "↑" : "↓"}`
+              : "";
             return (
               <div className="text-[9px] text-white/50 pl-[90px]">
-                Prev: <span className={`font-semibold ${prev.direction === "bullish" ? "text-green-400/60" : "text-red-400/60"}`}>{prev.pattern_name}</span>
-                {" — "}{prevHint}{" | "}{prev.confidence}/10{" | "}{prevTime}
+                Prev: <span className={`font-semibold ${prev.pattern.direction === "bullish" ? "text-green-400/60" : "text-red-400/60"}`}>{prev.pattern.pattern_name}</span>
+                {" — "}{prevDir}{" "}{outcomeLabel}{pipLabel}{" | "}{prev.confidence ?? prev.pattern.confidence}/10{" | "}{prev.detectedAt}
+              </div>
+            );
+          })()}
+          {/* RON Stats line */}
+          {patternHistory.length > 0 && (() => {
+            const currentName = patternHistory[0].pattern.pattern_name;
+            const stats = PATTERN_STATS[currentName];
+            if (!stats) return null;
+            return (
+              <div className="text-[9px] text-[#00CFA5]/60 pl-[90px]">
+                🧠 RON Stats: "{currentName}" hits target ~{stats.targetHitRate}% historically | Avg move: {stats.avgPipMove} pips | {stats.avgFrequency} on {selected}
+                {patternUserStats && patternUserStats.total > 0 && (
+                  <span className="text-[#00CFA5]/80 font-semibold">
+                    {" | Your history: "}{patternUserStats.confirmed}/{patternUserStats.total} confirmed ({Math.round((patternUserStats.confirmed / patternUserStats.total) * 100)}%)
+                  </span>
+                )}
               </div>
             );
           })()}
