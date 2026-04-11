@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchCurrentPrice } from "@/services/metaapi-client";
 import {
@@ -43,6 +43,15 @@ export interface LimitOrderPrices {
   tpEnabled: boolean;
 }
 
+export interface TradeExecutionPanelRef {
+  setMarketSL: (val: string) => void;
+  setMarketTP: (val: string) => void;
+  setLimitEntry: (val: string) => void;
+  setLimitSL: (val: string) => void;
+  setLimitTP: (val: string) => void;
+  getCurrentPrice: () => number | null;
+}
+
 interface TradeExecutionPanelProps {
   symbol: string;
   accountId: string | null;
@@ -70,7 +79,7 @@ async function callTrade(body: Record<string, unknown>) {
   return data;
 }
 
-export default function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, onOrderModeChange, onLimitPricesChange, positions: externalPositions }: TradeExecutionPanelProps) {
+const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPanelProps>(function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, onOrderModeChange, onLimitPricesChange, positions: externalPositions }, ref) {
   const [collapsed, setCollapsed] = useState(false);
   const [lotSize, setLotSize] = useState("0.01");
   const [sl, setSl] = useState("");
@@ -117,9 +126,17 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
     onOrderModeChange?.(orderMode);
   }, [orderMode, onOrderModeChange]);
 
-  // Notify parent of limit price changes
+  // Notify parent of price changes (all modes, for chart order lines)
   useEffect(() => {
-    if (orderMode !== "market") {
+    if (orderMode === "market") {
+      onLimitPricesChange?.({
+        entry: null,
+        sl: sl ? parseFloat(sl) : null,
+        tp: tp ? parseFloat(tp) : null,
+        slEnabled: true,
+        tpEnabled: true,
+      });
+    } else {
       onLimitPricesChange?.({
         entry: limitEntry ? parseFloat(limitEntry) : null,
         sl: limitSl ? parseFloat(limitSl) : null,
@@ -127,10 +144,8 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
         slEnabled,
         tpEnabled,
       });
-    } else {
-      onLimitPricesChange?.(null as any);
     }
-  }, [orderMode, limitEntry, limitSl, limitTp, slEnabled, tpEnabled, onLimitPricesChange]);
+  }, [orderMode, sl, tp, limitEntry, limitSl, limitTp, slEnabled, tpEnabled, onLimitPricesChange]);
 
   // Poll bid/ask
   useEffect(() => {
@@ -795,3 +810,6 @@ export default function TradeExecutionPanel({ symbol, accountId, connectionStatu
     </>
   );
 }
+);
+
+export default TradeExecutionPanel;
