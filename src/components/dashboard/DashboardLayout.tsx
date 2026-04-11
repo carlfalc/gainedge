@@ -263,6 +263,15 @@ export default function DashboardLayout() {
         </main>
       </div>
       <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
+      <AskRonButton onClick={() => setRonOpen(true)} />
+      <AskRonModal
+        open={ronOpen}
+        onClose={() => setRonOpen(false)}
+        context={{
+          page: location.pathname,
+          sessionLabel,
+        }}
+      />
     </div>
   );
 }
