@@ -959,6 +959,18 @@ export default function ChartsPage() {
     const patterns = detectPatterns(rawData.map(c => ({ time: c.time as number, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })));
     setDetectedPatterns(patterns);
 
+    // Track pattern history (two most recent named patterns with timestamps)
+    const namedPatterns = patterns.filter(p => p.pattern_name !== "Support" && p.pattern_name !== "Resistance");
+    if (namedPatterns.length > 0) {
+      const topPattern = namedPatterns.reduce((a, b) => b.confidence > a.confidence ? b : a);
+      const now = new Date().toLocaleTimeString();
+      setPatternHistory(prev => {
+        const isSame = prev.length > 0 && prev[0].pattern.pattern_name === topPattern.pattern_name && prev[0].pattern.confidence === topPattern.confidence;
+        if (isSame) return prev;
+        return [{ pattern: topPattern, detectedAt: now }, ...prev].slice(0, 2);
+      });
+    }
+
     const labelsOn = showPatternLabelsRef.current;
 
     const addPatternPriceLine = (series: ISeriesApi<"Candlestick">, opts: any, titleText: string) => {
