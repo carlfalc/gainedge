@@ -1,36 +1,41 @@
 
 
-## Remaining Edits for Interactive Order Lines
+## Fix: Chart Rebuild on Order Mode Toggle + Add Pattern Label Toggle
 
-### What's Already Done
-- `ChartOrderLines.tsx` — Created. HTML overlay component with draggable Entry/SL/TP lines.
-- `TradeExecutionPanel.tsx` — Converted to `forwardRef`, added `TradeExecutionPanelRef` interface, `OrderMode`/`LimitOrderPrices` exports, and `onOrderModeChange`/`onLimitPricesChange` callbacks. However, `useImperativeHandle` is imported but never called (the failed edit).
-- `ChartsPage.tsx` — Already has `orderMode`/`limitPrices` state and draws static price lines for limit orders, but does NOT use `ChartOrderLines` overlay or support dragging/two-way sync.
+### Problem 1: Chart goes blank when switching Market / Limit / Stop
+The `drawTradeLines` callback has `orderMode` and `limitPrices` in its dependency array. Since `buildChart` depends on `drawTradeLines`, changing order mode triggers a full chart rebuild (destroy + recreate), causing the blank flash.
 
-### Remaining Work
+**Fix**: Remove `limitPrices` and `orderMode` from `drawTradeLines` dependencies by reading them via refs instead. This breaks the chain: orderMode change → drawTradeLines change → buildChart change → rebuild.
 
-**1. TradeExecutionPanel.tsx — Add `useImperativeHandle` block**
-- Wire up the ref so parent components can call `setMarketSL`, `setMarketTP`, `setLimitEntry`, `setLimitSL`, `setLimitTP`, `getCurrentPrice` to programmatically update fields when chart lines are dragged.
+- Add `orderModeRef` and `limitPricesRef` refs, kept in sync via useEffect
+- `drawTradeLines` reads from the refs, so its useCallback dependencies no longer include `orderMode`/`limitPrices`
+- A separate useEffect watches `orderMode`/`limitPrices` and calls `drawTradeLines` directly (no rebuild)
 
-**2. ChartsPage.tsx — Integrate `ChartOrderLines` overlay + two-way sync**
-- Import `ChartOrderLines` and `TradeExecutionPanelRef`.
-- Add a ref to `TradeExecutionPanel`.
-- Implement `priceToY` / `yToPrice` helpers using `series.priceToCoordinate()` and `series.coordinateToPrice()` from Lightweight Charts.
-- Render `<ChartOrderLines>` as an overlay inside the chart container div.
-- Pass drag callbacks that call the panel ref methods (`ref.current.setLimitEntry(...)`, etc.).
-- Pass remove callbacks that clear the corresponding fields.
-- Auto-initialize line positions when order mode changes (entry at current price, TP/SL offset by a default amount).
-- When `limitPrices` change from the panel (user typing), update the overlay line positions.
+### Problem 2: Add "Show Patterns" toggle
+The pattern detection draws lines and labels on the chart. The labels (title text like "Double Top Neckline", "Target", "Support", "Resistance") clutter the chart, especially when dragging order lines.
 
-**3. TradingViewChartPage.tsx — Integrate `ChartOrderLines` overlay**
-- Add `orderMode`, `limitPrices` state and a `TradeExecutionPanelRef`.
-- Add a ref to `TradeExecutionPanel` and pass the sync callbacks.
-- Wrap the iframe in a relatively-positioned container and render `<ChartOrderLines>` over it.
-- Implement estimated `priceToY` / `yToPrice` using a linear scale derived from the selected symbol's approximate price range (since we can't query the iframe's internal scale).
-- Wire drag and remove callbacks identically to the Charts page.
+**Solution**: Add a `showPatternLabels` toggle state. When OFF, pattern illustration lines (trendlines for triangles, flags, etc.) still render, but the `title` property on all pattern-related price lines and series is set to empty string. The RON PATTERN bar below the chart still shows the detection info.
 
-### Technical Notes
-- `priceToY`/`yToPrice` on the Lightweight Charts page will use the chart API directly, which is precise.
-- On TradingView, the mapping will be approximate (linear interpolation from current price ± a range), which is acceptable since the panel fields show the exact numeric value.
-- The `ChartOrderLines` component already handles all visual rendering, dragging, and remove buttons — it just needs the coordinate converters and callbacks from each page.
+- Add a toggle button next to the "Powered by RON" / RON PATTERN bar area
+- When toggled OFF: pattern lines still draw but `title: ""` on all pattern price lines (S/R, neckline, target)
+- When toggled ON: titles show as they do now
+- Since patterns are drawn inside `buildChart`, we need to either re-draw just the pattern section or use a ref. Simplest: store `showPatternLabels` in a ref and read it during buildChart. For toggling without rebuild, iterate existing pattern price lines and update their title.
+
+### Files to modify
+
+**`src/pages/dashboard/ChartsPage.tsx`**:
+1. Add `orderModeRef` and `limitPricesRef` refs; sync them with useEffect
+2. Update `drawTradeLines` to read from refs, removing `orderMode`/`limitPrices` from deps
+3. Add `showPatternLabels` state (default: true)
+4. Store pattern price lines in a separate ref so we can toggle titles without rebuild
+5. In the pattern drawing section of `buildChart`, conditionally set `title` based on `showPatternLabels`
+6. Add a toggle button in the RON PATTERN bar or near the attribution line
+7. When toggle changes, iterate stored pattern price lines and set/clear titles
+
+**`src/pages/dashboard/TradingViewChartPage.tsx`**:
+- No pattern drawing happens here (no Lightweight Charts), so the toggle is not needed on TradingView page
+- The order mode issue doesn't apply here since TradingView uses an iframe (no buildChart)
+
+### Visual placement of toggle
+Below the RON PATTERN bar, next to the "Powered by RON" text or integrated into the RON PATTERN bar itself as a small switch: `Show Labels [toggle]`
 
