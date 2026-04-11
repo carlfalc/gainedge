@@ -1,49 +1,36 @@
 
-Goal
-- Fix the Charts page bug where toggling Candlestick and Heiken Ashi while the chart is maximized makes the candles collapse into a flat line.
 
-What I found
-- The Heiken Ashi helper in `src/lib/chart-indicators.ts` already uses the correct formula.
-- The main issue is in `src/pages/dashboard/ChartsPage.tsx`: `buildChart` is meant to ignore `chartType`, but it still rebuilds on every toggle because it depends on `startPricePolling`, and `startPricePolling` / `startMockTicks` both depend on `chartType`.
-- So when the chart is maximized, a mode switch can destroy and recreate the chart during the fullscreen layout cycle, which is the most likely cause of the flattened rendering.
+## Remaining Edits for Interactive Order Lines
 
-Plan
-1. Decouple chart-type switching from chart rebuilds
-   - Remove `chartType` from the polling callback dependency chain.
-   - Use `chartTypeRef.current` inside live/mock tick updates so polling respects the current mode without forcing `buildChart` to change.
+### What's Already Done
+- `ChartOrderLines.tsx` — Created. HTML overlay component with draggable Entry/SL/TP lines.
+- `TradeExecutionPanel.tsx` — Converted to `forwardRef`, added `TradeExecutionPanelRef` interface, `OrderMode`/`LimitOrderPrices` exports, and `onOrderModeChange`/`onLimitPricesChange` callbacks. However, `useImperativeHandle` is imported but never called (the failed edit).
+- `ChartsPage.tsx` — Already has `orderMode`/`limitPrices` state and draws static price lines for limit orders, but does NOT use `ChartOrderLines` overlay or support dragging/two-way sync.
 
-2. Centralize the displayed candle transformation
-   - Add one helper in `ChartsPage.tsx` to derive the displayed candles from `rawDataRef.current`:
-     - Candlestick: raw OHLC
-     - Heiken Ashi: `toHeikenAshi(raw)`
-   - Reuse that helper everywhere candles are written to the chart:
-     - initial load
-     - chart-type toggle
-     - live polling update
-     - mock tick update
+### Remaining Work
 
-3. Keep the chart instance stable in fullscreen
-   - Ensure maximize + mode switch only calls `setData(...)` on the existing `CandlestickSeries`, instead of rebuilding the whole chart.
-   - Keep the existing deferred resize flow, and after each mode switch run the scheduled viewport sync so `applyOptions({ width, height })` and `timeScale().fitContent()` happen after layout settles.
+**1. TradeExecutionPanel.tsx — Add `useImperativeHandle` block**
+- Wire up the ref so parent components can call `setMarketSL`, `setMarketTP`, `setLimitEntry`, `setLimitSL`, `setLimitTP`, `getCurrentPrice` to programmatically update fields when chart lines are dragged.
 
-4. Restore both directions cleanly
-   - On Heiken Ashi: recompute full HA OHLC data and push it to the candlestick series.
-   - On Candlestick: restore the original raw OHLC data from `rawDataRef.current`.
-   - Keep volume updates aligned with whichever dataset is currently displayed.
+**2. ChartsPage.tsx — Integrate `ChartOrderLines` overlay + two-way sync**
+- Import `ChartOrderLines` and `TradeExecutionPanelRef`.
+- Add a ref to `TradeExecutionPanel`.
+- Implement `priceToY` / `yToPrice` helpers using `series.priceToCoordinate()` and `series.coordinateToPrice()` from Lightweight Charts.
+- Render `<ChartOrderLines>` as an overlay inside the chart container div.
+- Pass drag callbacks that call the panel ref methods (`ref.current.setLimitEntry(...)`, etc.).
+- Pass remove callbacks that clear the corresponding fields.
+- Auto-initialize line positions when order mode changes (entry at current price, TP/SL offset by a default amount).
+- When `limitPrices` change from the panel (user typing), update the overlay line positions.
 
-5. Verify the exact repro
-   - Test the specific flow you described:
-     - maximize chart
-     - Candlestick -> Heiken Ashi
-     - Heiken Ashi -> Candlestick
-     - repeat several times
-   - Also verify while live polling is active, since that is part of the current failure path.
+**3. TradingViewChartPage.tsx — Integrate `ChartOrderLines` overlay**
+- Add `orderMode`, `limitPrices` state and a `TradeExecutionPanelRef`.
+- Add a ref to `TradeExecutionPanel` and pass the sync callbacks.
+- Wrap the iframe in a relatively-positioned container and render `<ChartOrderLines>` over it.
+- Implement estimated `priceToY` / `yToPrice` using a linear scale derived from the selected symbol's approximate price range (since we can't query the iframe's internal scale).
+- Wire drag and remove callbacks identically to the Charts page.
 
-Technical details
-- Primary file to update: `src/pages/dashboard/ChartsPage.tsx`
-- Likely no math change needed in `src/lib/chart-indicators.ts`, because the HA formula there already matches the correct calculation.
+### Technical Notes
+- `priceToY`/`yToPrice` on the Lightweight Charts page will use the chart API directly, which is precise.
+- On TradingView, the mapping will be approximate (linear interpolation from current price ± a range), which is acceptable since the panel fields show the exact numeric value.
+- The `ChartOrderLines` component already handles all visual rendering, dragging, and remove buttons — it just needs the coordinate converters and callbacks from each page.
 
-Expected result
-- No chart rebuild on mode toggle.
-- No flat-line collapse while maximized.
-- Clean switching both ways between Candlestick and Heiken Ashi.
