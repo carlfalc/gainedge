@@ -1,61 +1,48 @@
 
 
-## Add RON Pattern Historical Statistics to the Pattern Bar
+## Ensure All Data is Live Broker Data — Remove Mock Fallbacks
 
-### What
-Below the current and previous pattern lines in the RON PATTERN bar, add a third line showing RON's historical intelligence for the detected pattern: how often this pattern historically reaches its target, and how frequently it appears for the user's selected instrument. This gives traders confidence data before entering.
+### Problem
+The RON PATTERN bar shows wrong targets (e.g. "bearish move to 2289" for Gold at 3300+) because:
+1. The client-side mock data generator (`src/lib/mock-candles.ts`) has base prices from 2024 (XAUUSD: 2340)
+2. The edge function returns mock candles with a `fallback: true` flag, but the client ignores this flag and treats mock data as real
+3. When the connection is "demo", mock tick updates with random noise run instead of live polling
 
-### UI Layout
+Since you have a live Eightcap demo account connected, the system should always use real broker data and never silently substitute fake data.
 
-```text
-RON PATTERN | Double Top — ⬇ Potential bearish move | Target: 3,280 | 7/10 | 14:20:05 | 3 S/R | [Labels ON]
-              Prev: Head & Shoulders — ⬇ Bearish ✓ Confirmed | Moved 45 pips ↓ | 14:15:32
-              🧠 RON Stats: Double Top historically hits target 68% of the time | Appears ~4x per week on XAUUSD
-```
+### Changes
 
-The third line uses a brain icon and is styled in cyan/teal (`text-[#00CFA5]/70`, `text-[9px]`) to associate it with RON's intelligence.
+**`src/services/metaapi-client.ts`** — Detect and reject mock fallback data:
+- In `fetchCandles()`, check if the edge function response contains `fallback: true`
+- If so, return an empty array instead of fake candles, forcing the UI to show a clear "no data" state rather than misleading mock data
+- Same for `fetchCurrentPrice()` — check for `fallback: true` and return `null`
 
-### How
+**`src/pages/dashboard/ChartsPage.tsx`** — Remove silent mock fallback:
+- Remove the `generateMockCandles` import and the fallback at line 489 that silently shows fake data when live fetch fails
+- Instead, show a clear error message: "Unable to load live data for [symbol]. Check broker connection."
+- Remove `startMockTicks()` — when live price polling fails, show the last known state instead of generating random noise
+- Keep the connection status indicator (Green/Orange/Red) but make "demo" mode show stale data clearly rather than fake data
 
-**`src/pages/dashboard/ChartsPage.tsx`** — all changes in this single file:
+**`src/lib/mock-candles.ts`** — Update base prices as a safety net:
+- Even though we're removing mock fallback usage, update `BASE_PRICES` to current levels as a safety net for any remaining references:
+  - XAUUSD: 2340 → 3300
+  - US30: 39800 → 42500
+  - NAS100: 18500 → 20200
+  - BTCUSD: 67500 → 83000
+  - ETHUSD: 3450 → 1600
+  - USDJPY: 157.50 → 143.50
+  - SPX500/US500: 5280 → 5500
+  - XAGUSD: 29.50 → 33.00
 
-1. **Add a pattern statistics map** — a local constant mapping each of the 8 named patterns to their known historical stats:
-   - `targetHitRate`: percentage the pattern historically reaches target (sourced from well-known technical analysis data)
-   - `avgFrequency`: typical weekly appearance description
-   - `avgPipMove`: average pip movement after pattern confirmation
-   
-   Example:
-   ```typescript
-   const PATTERN_STATS: Record<string, { targetHitRate: number; avgPipMove: string; direction: string }> = {
-     "Double Top": { targetHitRate: 65, avgPipMove: "40-80", direction: "bearish" },
-     "Double Bottom": { targetHitRate: 65, avgPipMove: "40-80", direction: "bullish" },
-     "Head & Shoulders": { targetHitRate: 70, avgPipMove: "60-120", direction: "bearish" },
-     "Ascending Triangle": { targetHitRate: 72, avgPipMove: "30-60", direction: "bullish" },
-     "Descending Triangle": { targetHitRate: 72, avgPipMove: "30-60", direction: "bearish" },
-     "Bull Flag": { targetHitRate: 67, avgPipMove: "25-50", direction: "bullish" },
-     "Bear Flag": { targetHitRate: 67, avgPipMove: "25-50", direction: "bearish" },
-   };
-   ```
+**`supabase/functions/metaapi-candles/index.ts`** — No changes needed (edge function mock prices are already current at XAUUSD: 4720, and the `fallback: true` flag is already set)
 
-2. **Query insights table for user-specific pattern history** — when a new pattern is detected, query the `insights` table for `insight_type = 'pattern_outcome'` matching the pattern name and symbol. Calculate:
-   - How many times this pattern was previously detected for this instrument
-   - How many times it was confirmed vs invalidated (from the outcome tracking already planned)
-   - Display a personalized hit rate if enough data exists, otherwise fall back to the general stats
-
-3. **Add the stats line to the RON PATTERN bar JSX** — below the previous pattern line:
-   ```text
-   🧠 RON Stats: "Double Top" hits target ~65% historically | Avg move: 40-80 pips | [X seen on XAUUSD]
-   ```
-   - If user has personal history from insights: `"Your history: 3/5 confirmed (60%)"` appended
-   - Styled `text-[9px] text-[#00CFA5]/60` with brain emoji prefix
-
-4. **Persist pattern outcomes to insights** — when a pattern rotates from current to previous (already captured in `patternHistory` update logic), insert a row into `insights` table:
-   - `insight_type: "pattern_outcome"`
-   - `symbol`: current instrument
-   - `title`: pattern name
-   - `description`: confirmed/invalidated + pip move
-   - `data`: JSON with `{ pattern_name, direction, entryPrice, exitPrice, pipMove, confirmed }`
+### Impact on RON Pattern Detection & Insights
+- Pattern detection runs on the candle data it receives — with real broker data, all targets, entry prices, pip calculations, and RON Stats will be accurate
+- The insights persistence (pattern outcomes) will record real market moves, building genuine intelligence over time
+- No changes needed to the pattern detection logic itself
 
 ### Files to modify
-- `src/pages/dashboard/ChartsPage.tsx` — pattern stats map, insights query, UI line, and outcome persistence
+- `src/services/metaapi-client.ts` — reject fallback responses
+- `src/pages/dashboard/ChartsPage.tsx` — remove mock fallback, show clear errors
+- `src/lib/mock-candles.ts` — update base prices as safety net
 
