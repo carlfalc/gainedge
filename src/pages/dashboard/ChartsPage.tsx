@@ -953,9 +953,17 @@ export default function ChartsPage() {
     // ─── RON Pattern Detection ───
     patternSeriesRef.current.forEach(s => { try { chart.removeSeries(s); } catch {} });
     patternSeriesRef.current = [];
+    patternPriceLinesRef.current = [];
 
     const patterns = detectPatterns(rawData.map(c => ({ time: c.time as number, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })));
     setDetectedPatterns(patterns);
+
+    const labelsOn = showPatternLabelsRef.current;
+
+    const addPatternPriceLine = (series: ISeriesApi<"Candlestick">, opts: any, titleText: string) => {
+      const line = series.createPriceLine({ ...opts, title: labelsOn ? titleText : "" });
+      patternPriceLinesRef.current.push({ line, title: titleText });
+    };
 
     for (const pat of patterns) {
       const color = pat.direction === "bullish" ? "#22C55E" : "#EF4444";
@@ -965,19 +973,14 @@ export default function ChartsPage() {
       if (isSR) {
         const level = pat.key_prices.support ?? pat.key_prices.resistance;
         if (level) {
-          candleSeries.createPriceLine({
-            price: level,
-            color: "#F59E0B",
-            lineWidth: 1,
-            lineStyle: 1, // dashed
-            axisLabelVisible: true,
-            title: pat.pattern_name,
-          });
+          addPatternPriceLine(candleSeries, {
+            price: level, color: "#F59E0B", lineWidth: 1, lineStyle: 1, axisLabelVisible: true,
+          }, pat.pattern_name);
         }
         continue;
       }
 
-      // Draw trendlines for triangles, flags
+      // Draw trendlines for triangles, flags (these are line series, no title text)
       if (pat.key_prices.upper_line) {
         const ul = pat.key_prices.upper_line;
         const series = chart.addSeries(LineSeries, {
@@ -1005,26 +1008,16 @@ export default function ChartsPage() {
 
       // Draw neckline for double top/bottom, H&S
       if (pat.key_prices.neckline) {
-        candleSeries.createPriceLine({
-          price: pat.key_prices.neckline,
-          color,
-          lineWidth: 1,
-          lineStyle: 1,
-          axisLabelVisible: true,
-          title: `${pat.pattern_name} Neckline`,
-        });
+        addPatternPriceLine(candleSeries, {
+          price: pat.key_prices.neckline, color, lineWidth: 1, lineStyle: 1, axisLabelVisible: true,
+        }, `${pat.pattern_name} Neckline`);
       }
 
       // Draw target
       if (pat.key_prices.target) {
-        candleSeries.createPriceLine({
-          price: pat.key_prices.target,
-          color,
-          lineWidth: 1,
-          lineStyle: 3, // dotted
-          axisLabelVisible: true,
-          title: `${pat.pattern_name} Target`,
-        });
+        addPatternPriceLine(candleSeries, {
+          price: pat.key_prices.target, color, lineWidth: 1, lineStyle: 3, axisLabelVisible: true,
+        }, `${pat.pattern_name} Target`);
       }
     }
 
