@@ -1430,10 +1430,21 @@ export default function ChartsPage() {
             <span className="text-[11px] text-white/40 italic">RON scanning for patterns...</span>
           )}
           {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length > 0 && (
-            <span className="ml-auto text-[10px] text-amber-400 font-medium">
+            <span className="text-[10px] text-amber-400 font-medium">
               {detectedPatterns.filter(p => p.pattern_name === "Support" || p.pattern_name === "Resistance").length} S/R levels
             </span>
           )}
+          <div className="w-px h-4 bg-white/10 ml-auto" />
+          <button
+            onClick={() => setShowPatternLabels(v => !v)}
+            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all border ${
+              showPatternLabels
+                ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
+                : "bg-[#111724] border-white/10 text-white/40"
+            }`}
+          >
+            {showPatternLabels ? "Labels ON" : "Labels OFF"}
+          </button>
         </div>
       )}
 
