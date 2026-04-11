@@ -1204,6 +1204,7 @@ export default function ChartsPage() {
 
   const activeCount = activeIndicators.filter(i => i.enabled).length;
   const drawingCount = drawingManagerRef.current?.getAllDrawings?.()?.length ?? savedDrawings.length;
+  const priceDec = selected.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => selected.includes(s)) ? 2 : 5;
 
   const statusDot = connectionStatus === "live" ? "bg-green-400" : connectionStatus === "connecting" ? "bg-amber-400 animate-pulse" : connectionStatus === "demo" ? "bg-red-400" : "bg-gray-500";
   const statusText = connectionStatus === "live" ? "Live" : connectionStatus === "connecting" ? "Connecting..." : connectionStatus === "demo" ? "Demo" : "Offline";
