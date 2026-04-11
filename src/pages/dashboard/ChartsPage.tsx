@@ -172,7 +172,8 @@ export default function ChartsPage() {
   const [tradePositions, setTradePositions] = useState<Position[]>([]);
   const [detectedPatterns, setDetectedPatterns] = useState<DetectedPattern[]>([]);
   const [showPatternLabels, setShowPatternLabels] = useState(true);
-  const [patternHistory, setPatternHistory] = useState<Array<{ pattern: DetectedPattern; detectedAt: string }>>([]);
+  const [patternHistory, setPatternHistory] = useState<Array<{ pattern: DetectedPattern; detectedAt: string; entryPrice: number; outcome?: "confirmed" | "invalidated"; pipMove?: number }>>([]);
+  const [patternUserStats, setPatternUserStats] = useState<{ total: number; confirmed: number } | null>(null);
 
   // Refs to break rebuild chain for order mode / limit prices
   const orderModeRef = useRef<OrderMode>(orderMode);
