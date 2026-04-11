@@ -584,6 +584,11 @@ export default function ChartsPage() {
     }, 1500);
   }, [selected]);
 
+  /* ─── keep refs in sync (no rebuild) ─── */
+  useEffect(() => { orderModeRef.current = orderMode; }, [orderMode]);
+  useEffect(() => { limitPricesRef.current = limitPrices; }, [limitPrices]);
+  useEffect(() => { showPatternLabelsRef.current = showPatternLabels; }, [showPatternLabels]);
+
   /* ─── draw trade level lines ─── */
   const drawTradeLines = useCallback((candleSeries: ISeriesApi<"Candlestick">) => {
     tradeLinesRef.current.forEach(line => {
@@ -618,16 +623,29 @@ export default function ChartsPage() {
       if (p.takeProfit) addLine(p.takeProfit, "#22C55E", `Pos TP${label}`);
     });
 
-    if (limitPrices && (orderMode === "limit" || orderMode === "stop")) {
-      if (limitPrices.entry) addLine(limitPrices.entry, "#FFFFFF", orderMode === "limit" ? "Limit Entry" : "Stop Entry");
-      if (limitPrices.slEnabled && limitPrices.sl) addLine(limitPrices.sl, "#EF4444", "Pending SL");
-      if (limitPrices.tpEnabled && limitPrices.tp) addLine(limitPrices.tp, "#22C55E", "Pending TP");
+    // Read from refs to avoid triggering rebuild chain
+    const lp = limitPricesRef.current;
+    const om = orderModeRef.current;
+    if (lp && (om === "limit" || om === "stop")) {
+      if (lp.entry) addLine(lp.entry, "#FFFFFF", om === "limit" ? "Limit Entry" : "Stop Entry");
+      if (lp.slEnabled && lp.sl) addLine(lp.sl, "#EF4444", "Pending SL");
+      if (lp.tpEnabled && lp.tp) addLine(lp.tp, "#22C55E", "Pending TP");
     }
-  }, [scanResult, tradePositions, selected, limitPrices, orderMode]);
+  }, [scanResult, tradePositions, selected]);
 
+  /* ─── redraw trade lines when order mode / limit prices change (no rebuild) ─── */
   useEffect(() => {
     if (candleSeriesRef.current) drawTradeLines(candleSeriesRef.current);
-  }, [drawTradeLines]);
+  }, [drawTradeLines, orderMode, limitPrices]);
+
+  /* ─── toggle pattern labels without rebuild ─── */
+  useEffect(() => {
+    patternPriceLinesRef.current.forEach(({ line, title }) => {
+      try {
+        line.applyOptions({ title: showPatternLabels ? title : "" });
+      } catch {}
+    });
+  }, [showPatternLabels]);
 
   /* ─── indicator toggle handler ─── */
   const handleIndicatorToggle = useCallback((meta: IndicatorMeta, params?: Record<string, any>) => {
