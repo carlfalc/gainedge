@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, ChevronLeft, ChevronRight, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon
+  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
@@ -32,7 +32,8 @@ const NAV_ITEMS = [
 ] as const;
 
 export default function DashboardLayout() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+  const [hovered, setHovered] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [userId, setUserId] = useState<string>();
@@ -45,6 +46,8 @@ export default function DashboardLayout() {
   const location = useLocation();
 
   useSeedData(userId);
+
+  const sidebarWidth = collapsed && !hovered ? 0 : 240;
 
   const handleSessionChange = useCallback((label: string) => {
     setSessionLabel(label);
@@ -89,26 +92,43 @@ export default function DashboardLayout() {
     return location.pathname.startsWith(path);
   };
 
+  const handleNavClick = (path: string) => {
+    navigate(path);
+    setCollapsed(true);
+    setHovered(false);
+  };
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg }}>
+      {/* Hover trigger zone — always visible at left edge */}
+      {collapsed && !hovered && (
+        <div
+          onMouseEnter={() => setHovered(true)}
+          style={{
+            position: "fixed", left: 0, top: 0, width: 12, height: "100vh",
+            zIndex: 50, background: "transparent", cursor: "default",
+          }}
+        />
+      )}
+
       {/* SIDEBAR */}
-      <aside style={{
-        width: collapsed ? 64 : 240, transition: "width 0.25s ease",
-        background: C.bg2, borderRight: `1px solid ${C.border}`,
-        display: "flex", flexDirection: "column", flexShrink: 0,
-        position: "sticky", top: 0, height: "100vh", overflow: "hidden",
-      }}>
+      <aside
+        onMouseLeave={() => { if (collapsed) setHovered(false); }}
+        style={{
+          width: sidebarWidth, transition: "width 0.25s ease",
+          background: C.bg2, borderRight: sidebarWidth > 0 ? `1px solid ${C.border}` : "none",
+          display: "flex", flexDirection: "column", flexShrink: 0,
+          position: "fixed", top: 0, left: 0, height: "100vh", overflow: "hidden",
+          zIndex: 40,
+        }}
+      >
         {/* Logo */}
-        <div style={{ padding: collapsed ? "20px 12px" : "20px 20px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${C.border}` }}>
-          {!collapsed ? (
-            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.5 }}>
-              <span style={{ color: C.text }}>G</span>
-              <span style={{ color: C.jade }}>AI</span>
-              <span style={{ color: C.text }}>NEDGE</span>
-            </span>
-          ) : (
-            <span style={{ fontSize: 18, fontWeight: 800, color: C.jade }}>G</span>
-          )}
+        <div style={{ padding: "20px 20px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: -0.5 }}>
+            <span style={{ color: C.text }}>G</span>
+            <span style={{ color: C.jade }}>AI</span>
+            <span style={{ color: C.text }}>NEDGE</span>
+          </span>
         </div>
 
         {/* Nav */}
@@ -123,11 +143,11 @@ export default function DashboardLayout() {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => handleNavClick(item.path)}
                 style={{
                   display: "flex", alignItems: "center", gap: 12,
-                  padding: collapsed ? "10px 0" : "10px 12px",
-                  justifyContent: collapsed ? "center" : "flex-start",
+                  padding: "10px 12px",
+                  justifyContent: "flex-start",
                   borderRadius: 10, border: "none", cursor: "pointer",
                   background: isActive(item.path) ? activeColor + "14" : "transparent",
                   color: isActive(item.path) ? activeColor : defaultColor,
@@ -135,12 +155,13 @@ export default function DashboardLayout() {
                   fontFamily: "'DM Sans', sans-serif",
                   transition: "all 0.2s",
                   borderLeft: isActive(item.path) ? `2px solid ${activeColor}` : "2px solid transparent",
+                  whiteSpace: "nowrap",
                 }}
                 onMouseEnter={e => { if (!isActive(item.path)) { e.currentTarget.style.color = hoverColor; e.currentTarget.style.background = hoverBg; } }}
                 onMouseLeave={e => { if (!isActive(item.path)) { e.currentTarget.style.color = defaultColor; e.currentTarget.style.background = "transparent"; } }}
               >
                 <item.icon size={18} strokeWidth={1.8} />
-                {!collapsed && <span>{item.label}</span>}
+                <span>{item.label}</span>
               </button>
             );
           })}
@@ -148,13 +169,13 @@ export default function DashboardLayout() {
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Broker button — always at bottom */}
+          {/* Broker button */}
           <button
             onClick={() => setBrokerOpen(true)}
             style={{
               display: "flex", alignItems: "center", gap: 12,
-              padding: collapsed ? "10px 0" : "10px 12px",
-              justifyContent: collapsed ? "center" : "flex-start",
+              padding: "10px 12px",
+              justifyContent: "flex-start",
               borderRadius: 10, border: "none", cursor: "pointer",
               background: "transparent",
               color: "#F59E0B",
@@ -162,26 +183,15 @@ export default function DashboardLayout() {
               fontFamily: "'DM Sans', sans-serif",
               transition: "all 0.2s",
               borderLeft: "2px solid transparent",
+              whiteSpace: "nowrap",
             }}
             onMouseEnter={e => { e.currentTarget.style.background = "rgba(245,158,11,0.08)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
           >
             <DollarSign size={18} strokeWidth={1.8} />
-            {!collapsed && <span>Broker</span>}
+            <span>Broker</span>
           </button>
         </nav>
-
-        {/* Collapse toggle */}
-        <button
-          onClick={() => setCollapsed(c => !c)}
-          style={{
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 12, borderTop: `1px solid ${C.border}`,
-            background: "none", border: "none", cursor: "pointer", color: C.muted,
-          }}
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
       </aside>
 
       {/* MAIN */}
