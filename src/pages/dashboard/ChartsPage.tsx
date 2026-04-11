@@ -14,7 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { signalFreshness, formatAge } from "@/lib/expiry";
 import { useProfile } from "@/hooks/use-profile";
-import { generateMockCandles } from "@/lib/mock-candles";
+// mock-candles removed — all data must come from live broker
 import {
   provisionAccount,
   fetchCandles,
@@ -478,15 +478,16 @@ export default function ChartsPage() {
         }
 
         setLoadingMessage("");
-        toast.error(`No data for ${selected}. Showing simulated data.`);
+        toast.error(`No candle data returned for ${selected}. Check broker connection.`);
       } catch (e: any) {
         setLoadingMessage("");
         console.warn("Failed to fetch candles:", e.message);
+        toast.error(`Unable to load live data for ${selected}. Check broker connection.`);
       }
     }
 
     if (connectionStatus === "live") setConnectionStatus("demo");
-    return generateMockCandles(selected, timeframe, 500);
+    return []; // Return empty — never substitute mock data
   }, [selected, timeframe, connectionStatus]);
 
   /* ─── start price polling ─── */
@@ -495,7 +496,7 @@ export default function ChartsPage() {
 
     const acctId = accountIdRef.current;
     if (!acctId || connectionStatus !== "live") {
-      startMockTicks();
+      // No mock ticks — just do nothing, show last known state
       return;
     }
 
@@ -583,28 +584,7 @@ export default function ChartsPage() {
     }, 2000);
   }, [selected, connectionStatus, timeframe]);
 
-  const startMockTicks = useCallback(() => {
-    if (tickIntervalRef.current) clearInterval(tickIntervalRef.current);
-    tickIntervalRef.current = setInterval(() => {
-      const last = rawDataRef.current[rawDataRef.current.length - 1];
-      if (!last) return;
-      const vol = VOLATILITY_MAP[selected] ?? last.close * 0.0003;
-      const change = (Math.random() - 0.5) * vol;
-      const newClose = +(last.close + change).toFixed(5);
-      const updated: OHLCData = {
-        ...last, close: newClose, high: Math.max(last.high, newClose), low: Math.min(last.low, newClose),
-      };
-      rawDataRef.current[rawDataRef.current.length - 1] = updated;
-      const currentChartType = chartTypeRef.current;
-      const display = currentChartType === "Heiken Ashi"
-        ? toHeikenAshi(rawDataRef.current).pop()!
-        : updated;
-      candleSeriesRef.current?.update({
-        time: display.time as Time,
-        open: display.open, high: display.high, low: display.low, close: display.close,
-      });
-    }, 1500);
-  }, [selected]);
+  // startMockTicks removed — no fake tick generation
 
   /* ─── keep refs in sync (no rebuild) ─── */
   useEffect(() => { orderModeRef.current = orderMode; }, [orderMode]);
@@ -1662,12 +1642,7 @@ export default function ChartsPage() {
   );
 }
 
-const VOLATILITY_MAP: Record<string, number> = {
-  XAUUSD: 0.5, US30: 5, NAS100: 3, NZDUSD: 0.0002, AUDUSD: 0.0002,
-  EURUSD: 0.0002, GBPUSD: 0.0003, USDJPY: 0.03, USDCAD: 0.0002,
-  USDCHF: 0.0002, GBPJPY: 0.04, EURJPY: 0.03, XAGUSD: 0.02,
-  BTCUSD: 30, ETHUSD: 3, US500: 1, SPX500: 1,
-};
+// VOLATILITY_MAP removed — no mock tick generation
 
 function getDefaultColor(index: number): string {
   const colors = [
