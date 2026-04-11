@@ -37,8 +37,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
-import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position } from "@/components/dashboard/TradeExecutionPanel";
+import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position, type TradeExecutionPanelRef } from "@/components/dashboard/TradeExecutionPanel";
 import { detectPatterns, type DetectedPattern } from "@/services/pattern-detection";
+import ChartOrderLines from "@/components/dashboard/ChartOrderLines";
 
 /* ───── types ───── */
 interface ScanResult {
@@ -180,6 +181,7 @@ export default function ChartsPage() {
   const pricePollingRef = useRef<ReturnType<typeof setInterval>>();
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const resizeFrameRef = useRef<number | null>(null);
+  const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
 
   /* ─── load broker label from profile ─── */
   const BROKER_LABELS: Record<string, string> = {
