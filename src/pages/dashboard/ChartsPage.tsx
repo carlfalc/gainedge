@@ -180,6 +180,7 @@ export default function ChartsPage() {
   const paneSeriesRefs = useRef<ISeriesApi<"Line">[]>([]);
   const tradeLinesRef = useRef<any[]>([]);
   const patternSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const patternPriceLinesRef = useRef<Array<{ line: any; title: string }>>([]);
   const tradeConnectorSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const rawDataRef = useRef<OHLCData[]>([]);
   const chartTypeRef = useRef(chartType);
