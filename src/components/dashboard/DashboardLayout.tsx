@@ -39,6 +39,7 @@ export default function DashboardLayout() {
   const [sessionLabel, setSessionLabel] = useState("London Session");
   const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const [brokerOpen, setBrokerOpen] = useState(false);
+  const [ronOpen, setRonOpen] = useState(false);
   const [lightBg, setLightBg] = useState(() => localStorage.getItem("gainedge_light_bg") === "1");
   const navigate = useNavigate();
   const location = useLocation();
