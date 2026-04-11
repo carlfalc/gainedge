@@ -26,6 +26,10 @@ async function callEdge(body: Record<string, unknown>) {
   if (!res.ok || data.error) {
     throw new Error(data.error || `Edge function error (${res.status})`);
   }
+  // Reject mock/fallback data from the edge function so the UI never shows fake prices
+  if (data.fallback === true) {
+    throw new Error("FALLBACK_DATA");
+  }
   return data;
 }
 
