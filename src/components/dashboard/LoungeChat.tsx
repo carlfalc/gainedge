@@ -36,33 +36,42 @@ const MOCK_MESSAGES: ChatMessage[] = [
   },
 ];
 
+const LOUNGE_PROFILE_GATE_VERSION = "v2";
+
+const getLoungeProfileGateKey = (uid: string) =>
+  `lounge-profile-ready:${LOUNGE_PROFILE_GATE_VERSION}:${uid}`;
+
 export default function LoungeChat() {
   const { profile, loading, userId, updateProfile, refetch } = useProfile();
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
   const [input, setInput] = useState("");
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasCompletedLoungeProfile, setHasCompletedLoungeProfile] = useState(false);
+  const [gateLoaded, setGateLoaded] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (loading) return;
+
     if (!userId) {
       setHasCompletedLoungeProfile(false);
+      setGateLoaded(true);
       return;
     }
 
-    const savedState = window.localStorage.getItem(`lounge-profile-ready:${userId}`) === "1";
+    const savedState = window.localStorage.getItem(getLoungeProfileGateKey(userId)) === "1";
     setHasCompletedLoungeProfile(savedState);
-  }, [userId]);
+    setGateLoaded(true);
+  }, [loading, userId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const hasNickname = Boolean(profile?.nickname?.trim());
-  const isProfileComplete = hasCompletedLoungeProfile || hasNickname;
-  const isChatLocked = loading || !userId || !isProfileComplete;
+  const isProfileComplete = hasCompletedLoungeProfile;
+  const isChatLocked = loading || !gateLoaded || !userId || !isProfileComplete;
   const displayName = profile?.nickname?.trim() || profile?.full_name?.trim() || "You";
-  const showPrompt = !loading && Boolean(userId) && !isProfileComplete && !showProfileDialog;
+  const showPrompt = gateLoaded && !showProfileDialog && !isProfileComplete;
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -92,7 +101,7 @@ export default function LoungeChat() {
     await updateProfile({ full_name: fullName, nickname: nickname || null });
 
     if (userId) {
-      window.localStorage.setItem(`lounge-profile-ready:${userId}`, "1");
+      window.localStorage.setItem(getLoungeProfileGateKey(userId), "1");
     }
 
     setHasCompletedLoungeProfile(true);
@@ -219,7 +228,7 @@ export default function LoungeChat() {
             position: "relative",
           }}
         >
-          {!loading && !isProfileComplete && (
+          {gateLoaded && !isProfileComplete && (
             <div
               onClick={() => setShowProfileDialog(true)}
               style={{
