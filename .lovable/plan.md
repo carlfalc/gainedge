@@ -1,38 +1,42 @@
 
 
-## Plan: Candlestick Color Settings & Chart Background Toggle
+## Set Up Your Own Google OAuth for gainedge.ai
 
-### What Changes
+Your understanding is correct:
+- Users visit `https://gainedge.ai` → click Login → `https://gainedge.ai/login`
+- Google OAuth completes → lands on `https://gainedge.ai/dashboard`
 
-1. **Candlestick color customization** — A settings popover (gear icon) on the chart toolbar lets the user pick custom colors for bullish (up) and bearish (down) candles using color input pickers. Changes apply immediately to the chart.
+### What You Need to Do
 
-2. **Chart background toggle** — A black/white toggle switch in the same settings popover to flip the chart area background between dark (`#080B12`) and white (`#FFFFFF`), with appropriate text/grid color adjustments.
+**Step 1 — Google Cloud Console setup**
 
-3. **Persistence** — Store preferences in `localStorage` so they survive page reloads.
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
+2. Create (or edit) an **OAuth 2.0 Client ID** (Web application type)
+3. Under **Authorized JavaScript origins**, add:
+   - `https://gainedge.ai`
+   - `https://www.gainedge.ai` (if you use www)
+4. Under **Authorized redirect URIs**, add the callback URL shown in your Lovable Cloud Authentication Settings (Cloud → Users → Auth Settings → Google). This is the URI that handles the OAuth callback.
+5. On the **Consent Screen** page, add `gainedge.ai` under Authorized domains
 
-### Technical Details
+**Step 2 — Enter credentials in Lovable Cloud**
 
-**File: `src/pages/dashboard/ChartsPage.tsx`**
+1. Open Cloud → Users → Auth Settings → Google
+2. Switch from managed to custom credentials
+3. Paste your **Client ID** and **Client Secret** from Google Cloud Console
 
-1. **New state variables**:
-   - `candleUpColor` (default `#22C55E`)
-   - `candleDownColor` (default `#EF4444`)
-   - `chartBgMode` (`"black"` | `"white"`, default `"black"`)
-   - `showChartSettings` (boolean for popover visibility)
+**Step 3 — Fix the auth redirect race condition (code change)**
 
-2. **Load/save from localStorage** on mount: key `"ge_chart_colors"` storing `{ up, down, bg }`.
+The current code has a bug where `DashboardLayout.tsx` redirects to `/` before the session finishes loading. This is why Google login bounces back to the landing page. The fix:
 
-3. **Apply colors**: When colors change, call `candleSeriesRef.current.applyOptions({ upColor, downColor, borderUpColor, borderDownColor, wickUpColor, wickDownColor })` and `chartRef.current.applyOptions({ layout: { background: { color }, textColor } })` — no chart rebuild needed.
+- **`DashboardLayout.tsx`**: Add an `authLoading` state — wait for `getSession()` to resolve before redirecting unauthenticated users to `/`
+- **`Login.tsx`**: Keep the current `onAuthStateChange` listener (it correctly catches OAuth returns and navigates to `/dashboard`)
+- **`Index.tsx`**: Remove or guard the broad auth redirect that competes with the login page
 
-4. **Settings button**: Add a gear icon button in the top controls bar (after Fit button). Clicking it toggles a small absolute-positioned popover with:
-   - "Bullish" color input + label
-   - "Bearish" color input + label  
-   - "Chart Background" toggle (Black / White)
-   - "Reset" button to restore defaults
+This is a small code change (3 files) that fixes the "bouncing back to landing page" problem for both Google login and preview navigation.
 
-5. **Update `createChart` call** (line ~888-920): Use the stored color values instead of hardcoded values.
+### Expected Result
 
-**Imports needed**: `Settings` from lucide-react. Native `<input type="color">` for color pickers — no new dependencies.
-
-Single file change.
+- `https://gainedge.ai/login` → Google sign-in → `https://gainedge.ai/dashboard` ✓
+- Preview page selection stays on the selected route ✓
+- Users see your own brand name on the Google consent screen ✓
 
