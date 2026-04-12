@@ -12,6 +12,15 @@ import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
 import { useLiveMarketData, triggerMarketDataCompute, type LiveMarketRow } from "@/services/broker-data";
 
+const adxLabel = (v: number) =>
+  v < 20 ? "weak / no trend" : v < 25 ? "trend waking up" : v < 40 ? "stronger trend" : "very strong trend";
+
+const rsiLabel = (v: number) =>
+  v > 70 ? "overbought, sell maybe coming" : v < 30 ? "oversold, buy maybe coming" : v >= 45 && v <= 55 ? "neutral" : v < 45 ? "slightly weak" : "slightly strong";
+
+const stochLabel = (v: number) =>
+  v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
+
 interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
@@ -258,10 +267,10 @@ export default function DashboardHome() {
 
               {/* Live indicators — always bright since they're real-time */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
-                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span></span>
-                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span></span>
+                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span>{liveAdx != null && <span style={{ color: C.muted, fontSize: 10 }}> - {adxLabel(liveAdx)}</span>}</span>
+                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span>{liveRsi != null && <span style={{ color: C.muted, fontSize: 10 }}> - {rsiLabel(liveRsi)}</span>}</span>
                 <span>MACD <span style={{ color: liveMacd === "Bullish" ? C.green : liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{liveMacd ?? "—"}</span></span>
-                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span></span>
+                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(liveStoch)}</span>}</span>
               </div>
 
               {/* AI scan data — dimmed when expired */}
