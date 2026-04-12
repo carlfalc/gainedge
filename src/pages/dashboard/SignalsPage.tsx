@@ -284,7 +284,7 @@ export default function SignalsPage() {
         padding: "10px 14px", background: C.card, border: `1px solid ${C.border}`, borderRadius: 10,
       }}>
         <DollarSign size={14} color={C.jade} />
-        <span style={{ fontSize: 11, fontWeight: 600, color: C.sec, textTransform: "uppercase", letterSpacing: 0.8 }}>P&L Settings</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 0.8 }}>P&L Settings</span>
         <select
           value={currency}
           onChange={e => { setCurrency(e.target.value); savePrefs(e.target.value, lotSize); }}
@@ -292,7 +292,7 @@ export default function SignalsPage() {
         >
           {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <label style={{ fontSize: 11, color: C.sec, fontWeight: 600 }}>Lot Size:</label>
+        <label style={{ fontSize: 11, color: "#FFFFFF", fontWeight: 600 }}>Lot Size:</label>
         <input
           type="number"
           value={lotSize}
