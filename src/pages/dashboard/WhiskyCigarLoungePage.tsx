@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { Wine, ExternalLink, Volume2, VolumeX } from "lucide-react";
+import LoungeChat from "@/components/dashboard/LoungeChat";
 
 export default function WhiskyCigarLoungePage() {
   const isPopout = new URLSearchParams(window.location.search).get("popout") === "1";
@@ -73,6 +74,9 @@ export default function WhiskyCigarLoungePage() {
           playsInline
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
+
+        {/* Chat overlay */}
+        <LoungeChat />
 
         {/* Unmute button — only shows if browser blocked audio */}
         {showUnmute && muted && (
