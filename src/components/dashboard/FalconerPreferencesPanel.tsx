@@ -159,6 +159,35 @@ export default function FalconerPreferencesPanel() {
         </div>
       </div>
 
+      {/* Signal Engine Toggle */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: C.sec, fontWeight: 600, marginBottom: 6 }}>Signal Engine</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[
+            { value: "v1", label: "V1 (Legacy)", desc: "EMA crossovers, RSI, ATR", icon: <Cpu size={12} /> },
+            { value: "v2", label: "V2 (Knowledge)", desc: "SMC, CHOCH, Order Blocks", icon: <BookOpen size={12} /> },
+            { value: "v1v2", label: "V1 + V2 Combined", desc: "Both engines active", icon: null },
+          ].map(opt => {
+            const active = signalEngine === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setSignalEngine(opt.value)}
+                style={{
+                  flex: 1, padding: "8px 6px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: active ? C.jade + "20" : C.bg,
+                  color: active ? C.jade : C.sec,
+                  fontSize: 11, fontWeight: 600, transition: "all 0.2s",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>{opt.icon}{opt.label}</div>
+                <div style={{ fontSize: 9, fontWeight: 400, marginTop: 2, opacity: 0.8 }}>{opt.desc}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Minimum Confidence Slider */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
