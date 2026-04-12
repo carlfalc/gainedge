@@ -8,6 +8,7 @@ import {
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
 import LanguageSelector, { LanguageProvider } from "./LanguageSelector";
+import ronAvatar from "@/assets/ron-avatar.png";
 
 /** Light background context — consumed by any page that wants to adapt */
 export const LightBgContext = createContext<boolean>(false);
@@ -226,6 +227,7 @@ export default function DashboardLayout() {
               onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.boxShadow = "0 0 20px rgba(0,207,165,0.5)"; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 0 12px rgba(0,207,165,0.3)"; }}
             >
+              <img src={ronAvatar} alt="RON" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover" }} />
               <span>Ask RON</span>
               <Mic size={12} style={{ opacity: 0.8 }} />
             </button>
