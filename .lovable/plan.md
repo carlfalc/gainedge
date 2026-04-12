@@ -1,48 +1,72 @@
 
 
-## Enhance Lounge Chat with "My Profile" Link and First-Visit Profile Prompt
+## Enhanced "My Profile" Dialog for Whisky & Cigar Lounge
 
 ### What We'll Build
 
-1. **"My Profile" clickable text** next to "Lounge Chat" header — clicking it will open a profile dialog (placeholder for now, full UI design coming later)
+Rebuild the `LoungeProfileDialog` with a richer form that includes:
 
-2. **First-visit profile completion popup** — when the page loads, if the user's `full_name` is empty/null (meaning they haven't completed their profile), a styled modal appears in the gold/amber lounge theme telling them they must complete their profile before chatting
+1. **Name / Nickname toggle** — Pre-filled from profile. A toggle switch lets the user choose whether their name or nickname is shown in chat. Only one can be active at a time.
 
-3. **Chat locked until profile is complete** — the input area is disabled/overlaid with a message until `full_name` (and optionally `nickname`) is filled in. Once saved, chat unlocks immediately
+2. **Country selector** — A dropdown to select their country (full list of countries).
 
-4. **Basic "My Profile" dialog** — a simple form with name and nickname fields styled in the lounge theme. This is the placeholder that will be enhanced later with a full UI design
+3. **Trading preferences** — Checkboxes for: Stocks, Forex Majors, Forex Minors, Commodities, Futures, Cryptocurrency, Indices, Gold.
 
-### Changes
+4. **Favourite trading sessions** — Checkboxes for: Asia, London, Europe, New York.
 
-**`src/components/dashboard/LoungeChat.tsx`**
-- Add `useProfile` hook to check if the user has completed their profile
-- Add "My Profile" text (smaller, clickable) next to the "Lounge Chat" heading
-- Add state for showing the profile dialog and the first-visit prompt
-- On first load: if `profile.full_name` is null/empty, show the welcome prompt modal automatically
-- When chat is locked: disable input, show overlay message "Complete your profile to start chatting"
-- Clicking "My Profile" opens the profile dialog at any time
+5. **Save** persists all fields to the `profiles` table and controls what name appears in chat.
 
-**`src/components/dashboard/LoungeProfileDialog.tsx`** (new)
-- A styled dialog/modal matching the lounge gold/black theme
-- Fields: Full Name (required), Nickname (optional)
-- Save button calls `updateProfile` from `useProfile`
-- On save success: close dialog, chat unlocks, refetch profile
+### Database Changes
 
-**`src/components/dashboard/LoungeProfilePrompt.tsx`** (new)
-- The first-visit overlay/modal in gold theme
-- Message: "Welcome to the Lounge. Please complete your profile to start chatting."
-- Single button: "Complete My Profile" → opens the profile dialog
-- Only appears once (when `full_name` is empty)
+Add new columns to the `profiles` table via migration:
 
-### How Profile Completion Is Tracked
+```sql
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS country text,
+  ADD COLUMN IF NOT EXISTS trading_preferences jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS favourite_sessions jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS show_nickname boolean DEFAULT false;
+```
 
-We use the existing `profiles.full_name` field — if it's null or empty, the user hasn't completed their lounge profile. No new database tables or columns needed. The `nickname` field is already in the profiles table and will be used as the display name in chat when present, falling back to `full_name`.
+- `country` — stores selected country code/name
+- `trading_preferences` — JSON array of selected categories (e.g. `["forex_majors","gold","indices"]`)
+- `favourite_sessions` — JSON array (e.g. `["asia","london"]`)
+- `show_nickname` — when true, chat displays nickname instead of full name
 
-### Files
+### File Changes
 
 | File | Action |
 |------|--------|
-| `src/components/dashboard/LoungeChat.tsx` | Modify — add profile check, "My Profile" link, locked state |
-| `src/components/dashboard/LoungeProfileDialog.tsx` | Create — profile edit form dialog |
-| `src/components/dashboard/LoungeProfilePrompt.tsx` | Create — first-visit welcome prompt |
+| `profiles` table | Migration — add 4 columns |
+| `src/components/dashboard/LoungeProfileDialog.tsx` | Rewrite — expanded form with all sections, scrollable, same gold/black theme |
+| `src/components/dashboard/LoungeChat.tsx` | Minor update — use `show_nickname` flag to determine display name |
+| `src/hooks/use-profile.ts` | Update `Profile` interface to include new fields |
+
+### UI Layout (inside the dialog)
+
+```text
+┌─────────────────────────────────┐
+│  MY PROFILE                  ×  │
+│  ─────────────────────────────  │
+│  Full Name    [prefilled     ]  │
+│  Nickname     [prefilled     ]  │
+│  Show in chat: ○ Name ○ Nick   │
+│  ─────────────────────────────  │
+│  Country      [▼ Select      ]  │
+│  ─────────────────────────────  │
+│  I Trade:                       │
+│  ☑ Stocks  ☑ Forex Majors      │
+│  ☐ Forex Minors  ☑ Commodities │
+│  ☐ Futures  ☐ Cryptocurrency   │
+│  ☑ Indices  ☑ Gold             │
+│  ─────────────────────────────  │
+│  Favourite Sessions:            │
+│  ☑ Asia  ☐ London              │
+│  ☑ Europe  ☐ New York          │
+│  ─────────────────────────────  │
+│  [ Save Profile ]               │
+└─────────────────────────────────┘
+```
+
+The dialog will be scrollable if content overflows. Same gold/black aesthetic as current design.
 
