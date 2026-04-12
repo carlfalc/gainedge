@@ -70,14 +70,6 @@ export default function FalconerRulesPanel() {
     setLoading(false);
   };
 
-  const loadVersion = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
-    if (profile && (profile as any).falconer_version) {
-      setAiVersion((profile as any).falconer_version);
-    }
-  };
 
   const toggleRule = async (rule: KnowledgeRule) => {
     // Use service-role via edge function since RLS blocks client mutations
