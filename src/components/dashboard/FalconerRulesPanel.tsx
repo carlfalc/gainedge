@@ -37,18 +37,32 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function FalconerRulesPanel() {
+  const loadSavedUiState = () => {
+    try {
+      const raw = localStorage.getItem("ge_ron_rules_ui");
+      if (raw) return JSON.parse(raw) as { filter: string; versionFilter: string; aiVersion: "v1" | "v2" };
+    } catch {}
+    return { filter: "all", versionFilter: "all", aiVersion: "v2" as const };
+  };
+  const savedUi = loadSavedUiState();
+
   const [rules, setRules] = useState<KnowledgeRule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-  const [versionFilter, setVersionFilter] = useState("all");
+  const [filter, setFilter] = useState(savedUi.filter);
+  const [versionFilter, setVersionFilter] = useState(savedUi.versionFilter);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [editPriority, setEditPriority] = useState(5);
   const [showAdd, setShowAdd] = useState(false);
   const [newRule, setNewRule] = useState({ category: "entry_rules", rule_name: "", rule_text: "", priority: 7 });
-  const [aiVersion, setAiVersion] = useState<"v1" | "v2">("v2");
+  const [aiVersion, setAiVersion] = useState<"v1" | "v2">(savedUi.aiVersion);
 
-  useEffect(() => { loadRules(); loadVersion(); }, []);
+  // Persist UI state
+  useEffect(() => {
+    localStorage.setItem("ge_ron_rules_ui", JSON.stringify({ filter, versionFilter, aiVersion }));
+  }, [filter, versionFilter, aiVersion]);
+
+  useEffect(() => { loadRules(); }, []);
 
   const loadRules = async () => {
     const { data } = await supabase.from("falconer_knowledge").select("*").order("priority", { ascending: false });
@@ -56,14 +70,6 @@ export default function FalconerRulesPanel() {
     setLoading(false);
   };
 
-  const loadVersion = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
-    if (profile && (profile as any).falconer_version) {
-      setAiVersion((profile as any).falconer_version);
-    }
-  };
 
   const toggleRule = async (rule: KnowledgeRule) => {
     // Use service-role via edge function since RLS blocks client mutations
@@ -106,12 +112,8 @@ export default function FalconerRulesPanel() {
     }
   };
 
-  const switchVersion = async (ver: "v1" | "v2") => {
+  const switchVersion = (ver: "v1" | "v2") => {
     setAiVersion(ver);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.from("profiles").update({ falconer_version: ver } as any).eq("id", session.user.id);
-    }
     toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
   };
 
