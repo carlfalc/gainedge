@@ -95,7 +95,7 @@ export default function SettingsPage() {
   const statusLabel = profile?.subscription_status === "active" ? "ACTIVE" : profile?.subscription_status === "trial" ? "TRIAL" : profile?.subscription_status?.toUpperCase();
 
   return (
-    <div style={{ maxWidth: 700 }}>
+    <div style={{ width: "100%" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 24 }}>Settings</h1>
 
       <Section icon={<User size={16} color={C.jade} />} title="Profile">

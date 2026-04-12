@@ -234,7 +234,7 @@ export default function NewsSettingsPage() {
   };
 
   return (
-    <div style={{ maxWidth: 700 }}>
+    <div style={{ width: "100%" }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: C.jade, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>
           GAIN MORE EDGE

@@ -41,7 +41,7 @@ export default function ClockSettingsPage() {
   };
 
   return (
-    <div style={{ maxWidth: 700 }}>
+    <div style={{ width: "100%" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 8 }}>World Clock Preferences</h1>
       <p style={{ fontSize: 13, color: C.sec, marginBottom: 24 }}>Customize the 6 world market clocks shown in your dashboard header.</p>
 

@@ -61,7 +61,7 @@ export default function CalendarPage() {
   const selectedData = selectedDay ? calendarData[selectedDay] : null;
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div style={{ width: "100%" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 20 }}>P&L Calendar</h1>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>

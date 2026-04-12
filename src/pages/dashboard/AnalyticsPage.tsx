@@ -67,7 +67,7 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div style={{ maxWidth: 1200 }}>
+    <div style={{ width: "100%" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 20 }}>Analytics</h1>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>

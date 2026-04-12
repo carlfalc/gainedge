@@ -88,7 +88,7 @@ export default function BacktestingPage() {
   const r = selectedResult;
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ width: "100%" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 20 }}>Backtesting</h1>
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>

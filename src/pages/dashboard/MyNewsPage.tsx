@@ -88,7 +88,7 @@ export default function MyNewsPage() {
   });
 
   return (
-    <div style={{ maxWidth: 800 }}>
+    <div style={{ width: "100%" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
