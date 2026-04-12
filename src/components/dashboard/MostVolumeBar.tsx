@@ -208,7 +208,7 @@ export function MostVolumeBar() {
               <div key={row.session.key}>
                 <div
                   style={{
-                    display: "flex", alignItems: "center", gap: 10,
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                     padding: "6px 10px", borderRadius: 8,
                     background: row.status === "active" ? color + "10" : "transparent",
                     borderLeft: `3px solid ${color}${hasData || row.status === "active" ? "" : "40"}`,
@@ -261,28 +261,23 @@ export function MostVolumeBar() {
                   ) : (
                     <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>Upcoming</span>
                   )}
-                </div>
 
-                {/* Buy/Sell insight line */}
-                {showInsight && (
-                  <div style={{ paddingLeft: 22, marginTop: 2, marginBottom: 4, display: "flex", flexWrap: "wrap", gap: 12 }}>
-                    {ins.bestBuySymbol && ins.bestBuyPct > 50 && (
-                      <span style={{ fontSize: 10, color: "#22C55E", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3 }}>
-                        ▲ Best BUY: {ins.bestBuySymbol}
-                        {ins.bestBuyTime && <> @ {ins.bestBuyTime}</>}
-                        {" "}({ins.bestBuyPct}% avg bias)
-                      </span>
-                    )}
-                    {ins.bestSellSymbol && ins.bestSellPct > 50 && (
-                      <span style={{ fontSize: 10, color: "#EF4444", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3 }}>
-                        ▼ Best SHORT: {ins.bestSellSymbol}
-                        {ins.bestSellTime && <> @ {ins.bestSellTime}</>}
-                        {" "}({ins.bestSellPct}% avg bias)
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
+                  {/* Inline Buy/Sell insights */}
+                  {showInsight && ins.bestBuySymbol && ins.bestBuyPct > 50 && (
+                    <span style={{ fontSize: 10, color: "#22C55E", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+                      ▲ BUY: {ins.bestBuySymbol}
+                      {ins.bestBuyTime && <> @ {ins.bestBuyTime}</>}
+                      {" "}({ins.bestBuyPct}%)
+                    </span>
+                  )}
+                  {showInsight && ins.bestSellSymbol && ins.bestSellPct > 50 && (
+                    <span style={{ fontSize: 10, color: "#EF4444", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+                      ▼ SHORT: {ins.bestSellSymbol}
+                      {ins.bestSellTime && <> @ {ins.bestSellTime}</>}
+                      {" "}({ins.bestSellPct}%)
+                    </span>
+                  )}
+                </div>
             );
           })}
         </div>
