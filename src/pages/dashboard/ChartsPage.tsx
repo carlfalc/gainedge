@@ -1211,7 +1211,9 @@ export default function ChartsPage() {
     const ro = new ResizeObserver(() => {
       scheduleChartViewportSync(true);
     });
-    ro.observe(containerRef.current);
+    if (containerRef.current) {
+      try { ro.observe(containerRef.current); } catch {}
+    }
     resizeObserverRef.current = ro;
 
     startPricePolling();
