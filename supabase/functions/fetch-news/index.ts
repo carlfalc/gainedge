@@ -2,7 +2,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 
 // ─── HARD DENYLIST ───
-// If title, URL or source contains any of these, reject immediately.
 const HARD_DENYLIST = [
   "login", "sign in", "signin", "captcha", "bot check", "making sure you",
   "register", "cookie policy", "privacy policy", "terms of service",
@@ -14,7 +13,6 @@ const HARD_DENYLIST = [
 ];
 
 // ─── SOFT ALLOWLIST ───
-// Keywords that strongly indicate market-relevant content.
 const SOFT_ALLOWLIST = [
   "fed", "fomc", "powell", "ecb", "lagarde", "boj", "ueda", "rbnz", "rba",
   "pboc", "boe", "inflation", "cpi", "ppi", "nfp", "payrolls", "non-farm",
@@ -44,9 +42,12 @@ const INSTRUMENT_KEYWORDS: Record<string, string[]> = {
   HK50: ["hk50", "hang seng", "hong kong", "hsi"],
   BTCUSD: ["btc", "bitcoin"],
   ETHUSD: ["eth", "ethereum"],
+  USDCAD: ["cad", "canadian", "loonie", "bank of canada", "usdcad"],
+  USDCHF: ["chf", "swiss", "snb", "usdchf", "franc"],
+  XAGUSD: ["silver", "xagusd", "xag"],
+  SPX500: ["spx", "s&p 500", "s&p500", "sp500"],
 };
 
-// Multi-instrument keyword clusters
 const MULTI_INSTRUMENT_KEYWORDS: Record<string, string[]> = {
   "tariff,trade war,china,sanctions": ["NAS100", "AUDUSD", "XAUUSD", "HK50"],
   "geopolitical,war,conflict,bomb,attack,iran,missile": ["XAUUSD", "OIL"],
@@ -59,7 +60,6 @@ const USD_KEYWORDS = [
   "payrolls", "non-farm",
 ];
 
-// ─── HIGH / MEDIUM keyword lists ───
 const HIGH_KEYWORDS = [
   "central bank", "rate decision", "rate cut", "rate hike",
   "geopolitical", "war", "attack", "emergency", "crash", "crisis",
@@ -73,7 +73,6 @@ const MEDIUM_KEYWORDS = [
   "opec", "recession", "yields", "treasury",
 ];
 
-// ─── SENTIMENT KEYWORDS ───
 const BULLISH_KEYWORDS = [
   "surge", "rally", "soar", "jump", "rise", "gain", "boost",
   "beat", "exceed", "strong", "bullish", "dovish", "stimulus",
@@ -85,7 +84,6 @@ const BEARISH_KEYWORDS = [
   "sell-off", "selloff", "recession", "contraction", "war", "sanctions",
 ];
 
-// Specific sentiment overrides for certain instrument-keyword combos
 const INSTRUMENT_SENTIMENT_OVERRIDES: Record<string, { bullish: string[]; bearish: string[] }> = {
   XAUUSD: {
     bullish: ["risk-off", "war", "conflict", "geopolitical", "dovish", "rate cut", "weak dollar", "inflation rise", "crisis"],
@@ -102,7 +100,7 @@ const INSTRUMENT_SENTIMENT_OVERRIDES: Record<string, { bullish: string[]; bearis
 };
 
 // ═══════════════════════════════════════════
-//  HELPER FUNCTIONS
+//  TYPES
 // ═══════════════════════════════════════════
 
 interface RawArticle {
@@ -119,75 +117,55 @@ interface ProcessedArticle {
   published_at: string;
   instruments_affected: string[];
   impact: string;
-  sentiment_direction: string; // "bullish" | "bearish" | "neutral"
+  sentiment_direction: string;
+  ai_reason_short: string | null;
 }
 
-/** Clean and normalize an article's text fields */
+// ═══════════════════════════════════════════
+//  HELPER FUNCTIONS
+// ═══════════════════════════════════════════
+
 function normalizeArticle(raw: {
-  title?: string;
-  summary?: string;
-  source?: string;
-  url?: string;
-  publishedAt?: string;
+  title?: string; summary?: string; source?: string; url?: string; publishedAt?: string;
 }): RawArticle | null {
   let title = (raw.title || "").replace(/<[^>]*>/g, "").trim();
   let summary = (raw.summary || "").replace(/<[^>]*>/g, "").trim();
   const source = (raw.source || "Unknown").trim();
   const url = (raw.url || "").trim();
   const publishedAt = raw.publishedAt || new Date().toISOString();
-
-  // Reject missing/useless titles
   if (!title || title.length < 10) return null;
   if (/^(home|index|page|untitled|null|undefined)$/i.test(title)) return null;
-
-  // Truncate
   title = title.slice(0, 500);
   summary = summary.slice(0, 1000);
-
   return { title, summary, source, url, publishedAt };
 }
 
-/** Hard denylist check — returns TRUE if article should be REJECTED */
 function isOnDenylist(article: RawArticle): boolean {
   const text = `${article.title} ${article.summary} ${article.url} ${article.source}`.toLowerCase();
   return HARD_DENYLIST.some(term => text.includes(term));
 }
 
-/** Returns true if the article passes the relevance gate */
 function isRelevantMarketNews(article: RawArticle): boolean {
   if (isOnDenylist(article)) return false;
-
   const text = `${article.title} ${article.summary}`.toLowerCase();
-
-  // Check for soft allowlist hits
   const allowlistHits = SOFT_ALLOWLIST.filter(k => text.includes(k));
   if (allowlistHits.length >= 1) return true;
-
-  // Check for any instrument keyword
   for (const keywords of Object.values(INSTRUMENT_KEYWORDS)) {
     if (keywords.some(k => text.includes(k))) return true;
   }
-
-  // No finance signal at all — reject
   return false;
 }
 
-/** Score market relevance and classify impact */
 function scoreMarketRelevance(article: RawArticle): "irrelevant" | "low" | "medium" | "high" {
   const text = `${article.title} ${article.summary}`.toLowerCase();
-
   if (HIGH_KEYWORDS.some(k => text.includes(k))) return "high";
   if (MEDIUM_KEYWORDS.some(k => text.includes(k))) return "medium";
-
-  // Count allowlist hits as a proxy for relevance depth
   const hits = SOFT_ALLOWLIST.filter(k => text.includes(k)).length;
   if (hits >= 3) return "medium";
   if (hits >= 1) return "low";
-
   return "irrelevant";
 }
 
-/** Detect which instruments are affected */
 function detectAffectedInstruments(article: RawArticle, subscriberInstruments?: string[]): string[] {
   const text = `${article.title} ${article.summary}`.toLowerCase();
   const instruments = new Set<string>();
@@ -195,34 +173,25 @@ function detectAffectedInstruments(article: RawArticle, subscriberInstruments?: 
   for (const [symbol, keywords] of Object.entries(INSTRUMENT_KEYWORDS)) {
     if (keywords.some(k => text.includes(k))) instruments.add(symbol);
   }
-
   for (const [keyStr, syms] of Object.entries(MULTI_INSTRUMENT_KEYWORDS)) {
     if (keyStr.split(",").some(k => text.includes(k))) {
       syms.forEach(s => instruments.add(s));
     }
   }
-
   if (USD_KEYWORDS.some(k => text.includes(k))) {
     ["XAUUSD", "AUDUSD", "NZDUSD", "US30", "NAS100", "EURUSD", "GBPUSD", "USDJPY"].forEach(s => instruments.add(s));
   }
 
   const result = Array.from(instruments);
-
-  // If subscriber instruments provided, filter to only those they have
   if (subscriberInstruments && subscriberInstruments.length > 0) {
     const filtered = result.filter(s => subscriberInstruments.includes(s));
-    // Return filtered if any match, otherwise return all (for broad macro stories)
     return filtered.length > 0 ? filtered : result;
   }
-
   return result;
 }
 
-/** Classify sentiment direction for the overall article */
 function classifyArticleSentiment(article: RawArticle, instruments: string[]): string {
   const text = `${article.title} ${article.summary}`.toLowerCase();
-
-  // Check instrument-specific overrides first
   for (const instr of instruments) {
     const overrides = INSTRUMENT_SENTIMENT_OVERRIDES[instr];
     if (overrides) {
@@ -230,17 +199,13 @@ function classifyArticleSentiment(article: RawArticle, instruments: string[]): s
       if (overrides.bearish.some(k => text.includes(k))) return "bearish";
     }
   }
-
-  // General sentiment
   const bullishHits = BULLISH_KEYWORDS.filter(k => text.includes(k)).length;
   const bearishHits = BEARISH_KEYWORDS.filter(k => text.includes(k)).length;
-
   if (bullishHits > bearishHits) return "bullish";
   if (bearishHits > bullishHits) return "bearish";
   return "neutral";
 }
 
-/** Final gate: should this item be inserted? */
 function shouldInsertNewsItem(item: ProcessedArticle): boolean {
   if (item.impact === "irrelevant") return false;
   if (item.instruments_affected.length > 0) return true;
@@ -248,25 +213,16 @@ function shouldInsertNewsItem(item: ProcessedArticle): boolean {
   return false;
 }
 
-/** Process a raw article through the full pipeline */
 function processArticle(raw: {
-  title?: string;
-  summary?: string;
-  source?: string;
-  url?: string;
-  publishedAt?: string;
+  title?: string; summary?: string; source?: string; url?: string; publishedAt?: string;
 }): ProcessedArticle | null {
   const normalized = normalizeArticle(raw);
   if (!normalized) return null;
-
   if (!isRelevantMarketNews(normalized)) return null;
-
   const impact = scoreMarketRelevance(normalized);
   if (impact === "irrelevant") return null;
-
   const instruments = detectAffectedInstruments(normalized);
   const sentiment = classifyArticleSentiment(normalized, instruments);
-
   const processed: ProcessedArticle = {
     headline: normalized.title,
     source: normalized.source,
@@ -274,11 +230,79 @@ function processArticle(raw: {
     instruments_affected: instruments,
     impact,
     sentiment_direction: sentiment,
+    ai_reason_short: null,
   };
-
   if (!shouldInsertNewsItem(processed)) return null;
-
   return processed;
+}
+
+// ═══════════════════════════════════════════
+//  AI REASONING GENERATION
+// ═══════════════════════════════════════════
+
+async function generateAIReasons(articles: ProcessedArticle[]): Promise<void> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey || articles.length === 0) return;
+
+  // Build a single batch prompt for efficiency
+  const articleSummaries = articles.map((a, i) => 
+    `[${i}] Headline: "${a.headline}" | Instruments: ${a.instruments_affected.join(", ")} | Sentiment: ${a.sentiment_direction} | Impact: ${a.impact}`
+  ).join("\n");
+
+  const systemPrompt = `You are a concise market analyst for a trading terminal. For each numbered article below, write ONE short explanation (max 25 words) of WHY the news affects the listed instruments. 
+
+Rules:
+- Use cautious language: "may support", "could pressure", "may weigh on", "may lift"
+- Never say "will definitely", "guaranteed", "confirmed buy/sell"
+- Explain the macro transmission mechanism (e.g. inflation → rates → USD → gold)
+- Be beginner-friendly and plain English
+- If multiple instruments: explain the shared macro driver first, then the effect
+- Do NOT just restate the headline
+
+Respond with ONLY a JSON array of strings, one per article, in the same order. Example:
+["Softer inflation may revive rate-cut hopes, supporting equities and weighing on the US dollar.", "Geopolitical tension may boost safe-haven gold demand and pressure risk assets."]`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: articleSummaries },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("AI gateway error:", response.status, await response.text());
+      return;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    
+    // Extract JSON array from response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error("AI response not parseable as JSON array:", content.slice(0, 200));
+      return;
+    }
+
+    const reasons: string[] = JSON.parse(jsonMatch[0]);
+    
+    for (let i = 0; i < Math.min(reasons.length, articles.length); i++) {
+      if (reasons[i] && typeof reasons[i] === "string") {
+        articles[i].ai_reason_short = reasons[i].slice(0, 300);
+      }
+    }
+  } catch (e) {
+    console.error("AI reasoning generation error:", e);
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -319,7 +343,6 @@ async function fetchAlphaVantage(apiKey: string): Promise<ProcessedArticle[]> {
       const publishedAt = item.time_published
         ? `${item.time_published.slice(0,4)}-${item.time_published.slice(4,6)}-${item.time_published.slice(6,8)}T${item.time_published.slice(9,11)}:${item.time_published.slice(11,13)}:00Z`
         : new Date().toISOString();
-
       const processed = processArticle({
         title: item.title,
         summary: item.summary || "",
@@ -369,7 +392,6 @@ function deduplicateNews(items: ProcessedArticle[]): ProcessedArticle[] {
 }
 
 async function cleanupIrrelevantNews(supabase: ReturnType<typeof createClient>) {
-  // Delete junk: items older than 1 hour with no instruments and low impact
   const cutoff1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   await supabase
     .from("news_items")
@@ -378,7 +400,6 @@ async function cleanupIrrelevantNews(supabase: ReturnType<typeof createClient>) 
     .or("instruments_affected.is.null,instruments_affected.eq.{}")
     .eq("impact", "low");
 
-  // Delete old news (> 48h)
   const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   await supabase.from("news_items").delete().lt("published_at", cutoff48h);
 }
@@ -397,7 +418,6 @@ Deno.serve(async (req) => {
     const alphaKey = Deno.env.get("ALPHA_VANTAGE_API_KEY") || "";
     const marketauxKey = Deno.env.get("MARKETAUX_API_KEY") || "";
 
-    // Fetch from all sources in parallel — each source runs through the full pipeline
     const [finnhubNews, alphaNews, marketauxNews] = await Promise.all([
       fetchFinnhub(finnhubKey),
       fetchAlphaVantage(alphaKey),
@@ -426,6 +446,11 @@ Deno.serve(async (req) => {
       !existingHeadlines.has(n.headline.toLowerCase().replace(/[^a-z0-9 ]/g, "").slice(0, 60).trim())
     );
 
+    // Generate AI explanations for new items
+    if (newItems.length > 0) {
+      await generateAIReasons(newItems);
+    }
+
     let inserted = 0;
     if (newItems.length > 0) {
       const rows = newItems.map(n => ({
@@ -434,6 +459,8 @@ Deno.serve(async (req) => {
         impact: n.impact,
         instruments_affected: n.instruments_affected,
         published_at: n.published_at,
+        sentiment_direction: n.sentiment_direction,
+        ai_reason_short: n.ai_reason_short,
       }));
 
       const { error } = await supabase.from("news_items").insert(rows);
@@ -441,7 +468,6 @@ Deno.serve(async (req) => {
       else inserted = rows.length;
     }
 
-    // Cleanup junk and old data
     await cleanupIrrelevantNews(supabase);
 
     return new Response(
@@ -456,7 +482,7 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error("fetch-news error:", err);
     return new Response(
-      JSON.stringify({ error: String(err) }),
+      JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
