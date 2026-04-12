@@ -142,6 +142,28 @@ export default function DashboardHome() {
       const avgWin = wins.length ? wins.reduce((s: number, w: any) => s + (w.pnl || 0), 0) / wins.length : 0;
       const avgLoss = losses.length ? Math.abs(losses.reduce((s: number, l: any) => s + (l.pnl || 0), 0) / losses.length) : 1;
 
+      // Compute current win streak
+      const sortedDesc = [...closed].sort((a: any, b: any) => new Date(b.closed_at || b.resolved_at || b.created_at).getTime() - new Date(a.closed_at || a.resolved_at || a.created_at).getTime());
+      let currentStreak = 0;
+      for (const sig of sortedDesc) {
+        if ((sig as any).result === "win") currentStreak++;
+        else break;
+      }
+
+      // Compute best/worst session by win rate
+      const sessionMap: Record<string, { wins: number; total: number }> = { Asian: { wins: 0, total: 0 }, London: { wins: 0, total: 0 }, "New York": { wins: 0, total: 0 } };
+      for (const sig of closed) {
+        const ts = (sig as any).closed_at || (sig as any).resolved_at || (sig as any).created_at;
+        if (!ts) continue;
+        const h = new Date(ts).getUTCHours();
+        const sess = h < 8 ? "Asian" : h < 16 ? "London" : "New York";
+        sessionMap[sess].total++;
+        if ((sig as any).result === "win") sessionMap[sess].wins++;
+      }
+      const sessEntries = Object.entries(sessionMap).filter(([, v]) => v.total > 0);
+      const bestSession = sessEntries.length ? sessEntries.reduce((a, b) => (a[1].wins / a[1].total) >= (b[1].wins / b[1].total) ? a : b)[0] : "—";
+      const worstSession = sessEntries.length ? sessEntries.reduce((a, b) => (a[1].wins / a[1].total) <= (b[1].wins / b[1].total) ? a : b)[0] : "—";
+
       setStats({
         netPnl: totalPnl,
         wins: wins.length,
@@ -151,6 +173,9 @@ export default function DashboardHome() {
           const rr = c.risk_reward ? parseFloat(c.risk_reward.split(":")[0]) : 0;
           return s + rr;
         }, 0) / closed.length).toFixed(1)) : 0,
+        currentStreak,
+        bestSession,
+        worstSession,
       });
 
       const sorted = [...closed].sort((a: any, b: any) => new Date(a.closed_at).getTime() - new Date(b.closed_at).getTime());
