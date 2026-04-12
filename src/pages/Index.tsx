@@ -408,7 +408,7 @@ export default function Index() {
             </div>
 
             <button onClick={async () => {
-              const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+              const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/login" });
               if (result.error) toast.error("Google sign-in failed");
               if (!result.redirected && !result.error) navigate("/dashboard");
             }} style={{
