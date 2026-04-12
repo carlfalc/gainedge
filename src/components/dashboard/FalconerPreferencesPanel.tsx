@@ -110,6 +110,8 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
     setSaving(false);
   };
 
+  useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
+
   const enabledCount = Object.values(prefs.instrument_filters).filter(Boolean).length;
 
   return (
