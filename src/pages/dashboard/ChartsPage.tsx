@@ -33,7 +33,7 @@ import IndicatorModal, { type ActiveIndicator } from "@/components/dashboard/Ind
 import DrawingToolbar from "@/components/dashboard/DrawingToolbar";
 import {
   Activity, ArrowUpRight, ArrowDownRight, Minus,
-  Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff, ExternalLink,
+  Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff, ExternalLink, Settings, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
