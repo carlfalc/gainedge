@@ -14,7 +14,7 @@ export interface SessionDef {
 export const SESSION_COLORS = {
   asian: "#A78BFA",
   london: "#3B82F6",
-  new_york: "#F97316",
+  new_york: "#FACC15",
 } as const;
 
 export const SESSIONS: SessionDef[] = [
