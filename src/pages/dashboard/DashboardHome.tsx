@@ -5,7 +5,7 @@ import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
 import { AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { signalFreshness, formatAge, type SignalFreshness } from "@/lib/expiry";
+import { signalFreshness, formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, type SignalFreshness } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
