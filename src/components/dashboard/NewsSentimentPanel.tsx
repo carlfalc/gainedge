@@ -27,11 +27,16 @@ export function NewsSentimentPanel() {
 
   useEffect(() => {
     loadNews();
+    // 10-minute polling for sentiment refresh
+    const sentimentInterval = setInterval(loadNews, 10 * 60 * 1000);
     const channel = supabase
       .channel("sentiment-news")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "news_items" }, () => loadNews())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      clearInterval(sentimentInterval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadNews = async () => {
