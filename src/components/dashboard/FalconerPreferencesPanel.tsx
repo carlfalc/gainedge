@@ -18,7 +18,11 @@ const SIGNAL_STYLES = [
   { value: "aggressive", label: "Aggressive", desc: "All signals (confidence ≥ 4)", minConf: 4 },
 ];
 
-export default function FalconerPreferencesPanel() {
+export interface FalconerPreferencesPanelRef {
+  save: () => Promise<void>;
+}
+
+const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(function FalconerPreferencesPanel(_, ref) {
   const [prefs, setPrefs] = useState<SignalPrefs>({ min_confidence: 6, instrument_filters: {}, currency: "NZD", lot_size: 0.01 });
   const [instruments, setInstruments] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(true);
