@@ -3,7 +3,7 @@ import { SpinCard } from "@/components/dashboard/SpinCard";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, Clock, ArrowUp, ArrowDown, Circle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMarketClosed, secondsUntilMarketOpen } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
@@ -227,6 +227,15 @@ export default function DashboardHome() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {expired ? (
+                      <Circle size={16} color="#555F73" fill="#555F73" />
+                    ) : inst.direction === "BUY" ? (
+                      <ArrowUp size={16} color="#22C55E" strokeWidth={3} />
+                    ) : inst.direction === "SELL" ? (
+                      <ArrowDown size={16} color="#EF4444" strokeWidth={3} />
+                    ) : (
+                      <Circle size={16} color="#555F73" fill="#555F73" />
+                    )}
                     <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
                     <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                       {instrumentTfs.get(inst.symbol) || "15m"}
