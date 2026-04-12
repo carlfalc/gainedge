@@ -319,12 +319,7 @@ export default function Index() {
   const [authLoading, setAuthLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Check if already logged in
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/dashboard");
-    });
-  }, [navigate]);
+  // No auto-redirect — let users browse the landing page even when logged in
 
   const handleAuth = async () => {
     if (!authEmail || !authPassword) { toast.error("Please fill all fields"); return; }
