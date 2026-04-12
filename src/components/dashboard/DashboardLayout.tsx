@@ -38,6 +38,8 @@ export default function DashboardLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [userId, setUserId] = useState<string>();
+  const [userName, setUserName] = useState("");
+  const [userNickname, setUserNickname] = useState("");
   const [sessionLabel, setSessionLabel] = useState("London Session");
   const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const [brokerOpen, setBrokerOpen] = useState(false);
@@ -76,10 +78,12 @@ export default function DashboardLayout() {
   // Load clock preferences from profile
   useEffect(() => {
     if (!userId) return;
-    supabase.from("profiles").select("clock_timezones").eq("id", userId).single().then(({ data }) => {
+    supabase.from("profiles").select("clock_timezones, full_name, nickname").eq("id", userId).single().then(({ data }) => {
       if (data?.clock_timezones && Array.isArray(data.clock_timezones) && data.clock_timezones.length > 0) {
         setClockConfigs(data.clock_timezones as unknown as ClockConfig[]);
       }
+      if (data?.full_name) setUserName(data.full_name);
+      if ((data as any)?.nickname) setUserNickname((data as any).nickname);
     });
   }, [userId]);
 
@@ -227,6 +231,14 @@ export default function DashboardLayout() {
               <span>Ask RON</span>
               <Mic size={12} style={{ opacity: 0.8 }} />
             </button>
+            {(userNickname || userName) && (
+              <>
+                <span style={{ color: C.muted, fontSize: 12 }}>•</span>
+                <span style={{ color: "#FFFFFF", fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                  {userNickname || userName}
+                </span>
+              </>
+            )}
           </div>
 
           <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
