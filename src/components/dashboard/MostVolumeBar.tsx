@@ -151,7 +151,7 @@ export function MostVolumeBar() {
                   opacity: row.status === "upcoming" ? 0.4 : 1,
                 }}
               >
-                <span style={{ fontSize: 11, fontWeight: 700, color, minWidth: 70, whiteSpace: "nowrap" }}>
+                <span className="text-sm font-medium" style={{ fontSize: 11, fontWeight: 700, color, minWidth: 70, whiteSpace: "nowrap" }}>
                   {row.session.label}
                 </span>
 
