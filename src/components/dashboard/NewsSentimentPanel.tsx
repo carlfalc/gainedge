@@ -68,7 +68,13 @@ export function NewsSentimentPanel() {
     }
   };
 
-  const display = items.slice(0, 3);
+  // Safety-net: never show low-impact items with no instruments
+  const relevant = items.filter(item =>
+    (item.impacts.length > 0 && item.impacts[0].symbol !== "MARKET") ||
+    item.severity === "medium" ||
+    item.severity === "high"
+  );
+  const display = relevant.slice(0, 3);
 
   return (
     <div style={{
