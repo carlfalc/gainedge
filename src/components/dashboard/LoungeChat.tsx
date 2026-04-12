@@ -221,9 +221,8 @@ export default function LoungeChat() {
 
       {/* First-visit prompt */}
       <LoungeProfilePrompt
-        open={showPrompt && !isProfileComplete}
+        open={showPrompt}
         onComplete={() => {
-          setShowPrompt(false);
           setPromptDismissed(true);
           setShowProfileDialog(true);
         }}
