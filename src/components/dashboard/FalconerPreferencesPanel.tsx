@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Brain, Zap } from "lucide-react";
+import { Brain, Zap, Cpu, BookOpen } from "lucide-react";
 
 interface SignalPrefs {
   id?: string;
@@ -25,6 +25,7 @@ export default function FalconerPreferencesPanel() {
   const [style, setStyle] = useState("balanced");
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [signalEngine, setSignalEngine] = useState("v1v2");
 
   useEffect(() => {
     load();
@@ -50,6 +51,7 @@ export default function FalconerPreferencesPanel() {
       const p = prefRes.data;
       const filters = (typeof p.instrument_filters === "object" && p.instrument_filters !== null ? p.instrument_filters : {}) as Record<string, boolean>;
       setPrefs({ id: p.id, min_confidence: p.min_confidence, instrument_filters: filters, currency: p.currency, lot_size: p.lot_size });
+      setSignalEngine((p as any).signal_engine || "v1v2");
       // Determine style from min_confidence
       const matched = SIGNAL_STYLES.find(s => s.minConf === p.min_confidence);
       setStyle(matched?.value || "balanced");
@@ -79,12 +81,13 @@ export default function FalconerPreferencesPanel() {
     setSaving(true);
     try {
       // Save signal preferences
-      const payload = {
+      const payload: any = {
         user_id: userId,
         min_confidence: prefs.min_confidence,
         instrument_filters: prefs.instrument_filters,
         currency: prefs.currency,
         lot_size: prefs.lot_size,
+        signal_engine: signalEngine,
       };
 
       if (prefs.id) {
