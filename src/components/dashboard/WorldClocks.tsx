@@ -128,7 +128,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
               transition: "border-color 0.3s",
             }}
           >
-            <span style={{ fontSize: 9, color: C.muted, fontWeight: 600, letterSpacing: 0.5, lineHeight: 1 }}>
+            <span className="text-white" style={{ fontSize: 9, color: C.muted, fontWeight: 600, letterSpacing: 0.5, lineHeight: 1 }}>
               {clock.abbr}
             </span>
             <span
