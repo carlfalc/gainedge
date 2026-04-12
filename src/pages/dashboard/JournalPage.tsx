@@ -99,7 +99,7 @@ export default function JournalPage() {
   };
 
   return (
-    <div style={{ maxWidth: 800 }}>
+    <div style={{ width: "100%" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 20 }}>Trade Journal</h1>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>

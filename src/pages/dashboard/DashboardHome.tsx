@@ -154,7 +154,7 @@ export default function DashboardHome() {
   };
 
   return (
-    <div style={{ maxWidth: 1200 }}>
+    <div style={{ width: "100%" }}>
       <LiveTradeAlert />
       <BreakingNewsTicker />
       <NewsSentimentPanel />
