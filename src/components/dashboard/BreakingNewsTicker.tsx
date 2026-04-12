@@ -95,7 +95,7 @@ export function BreakingNewsTicker() {
       <span style={{
         fontSize: 11,
         fontWeight: 700,
-        color: C.accent,
+        color: C.jade,
         whiteSpace: "nowrap",
         letterSpacing: 1,
         flexShrink: 0,
