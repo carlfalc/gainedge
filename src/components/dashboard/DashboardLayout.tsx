@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic
+  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic, Wine
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
@@ -31,6 +31,7 @@ const NAV_ITEMS = [
   { label: "Clock Settings", icon: Clock, path: "/dashboard/clock-settings" },
   { label: "News Settings", icon: Newspaper, path: "/dashboard/news-settings" },
   { label: "My News", icon: Globe, path: "/dashboard/my-news" },
+  { label: "Whisky & Cigar Lounge", icon: Wine, path: "/dashboard/whisky-cigar-lounge", gold: true },
 ] as const;
 
 export default function DashboardLayout() {

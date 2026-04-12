@@ -22,6 +22,7 @@ import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
 import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
 import ChartsPage from "./pages/dashboard/ChartsPage.tsx";
 import TradingViewChartPage from "./pages/dashboard/TradingViewChartPage.tsx";
+import WhiskyCigarLoungePage from "./pages/dashboard/WhiskyCigarLoungePage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
             <Route path="my-news" element={<MyNewsPage />} />
             <Route path="charts" element={<ChartsPage />} />
             <Route path="tradingview-chart" element={<TradingViewChartPage />} />
+            <Route path="whisky-cigar-lounge" element={<WhiskyCigarLoungePage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
