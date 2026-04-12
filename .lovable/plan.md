@@ -1,42 +1,29 @@
 
 
-## Set Up Your Own Google OAuth for gainedge.ai
+## Embed Auto-Playing Video on Whisky & Cigar Lounge Page
 
-Your understanding is correct:
-- Users visit `https://gainedge.ai` → click Login → `https://gainedge.ai/login`
-- Google OAuth completes → lands on `https://gainedge.ai/dashboard`
+### What We'll Do
+Copy the uploaded video into the project's `public/` folder and update the Whisky & Cigar Lounge page to auto-play it as a full-width background video beneath the title header. The video will:
+- Auto-play on page load with audio enabled
+- Show no controls, no play button, no title overlays
+- Fill the full width in widescreen format
+- Play once and stop (no loop)
 
-### What You Need to Do
+### Changes
 
-**Step 1 — Google Cloud Console setup**
+**1. Copy the video file**
+- Copy `user-uploads://hf_...mp4` → `public/videos/lounge-intro.mp4`
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
-2. Create (or edit) an **OAuth 2.0 Client ID** (Web application type)
-3. Under **Authorized JavaScript origins**, add:
-   - `https://gainedge.ai`
-   - `https://www.gainedge.ai` (if you use www)
-4. Under **Authorized redirect URIs**, add the callback URL shown in your Lovable Cloud Authentication Settings (Cloud → Users → Auth Settings → Google). This is the URI that handles the OAuth callback.
-5. On the **Consent Screen** page, add `gainedge.ai` under Authorized domains
+**2. Update `src/pages/dashboard/WhiskyCigarLoungePage.tsx`**
+- Remove the "Coming soon" placeholder text
+- Add a `<video>` element below the header with:
+  - `autoPlay`, `muted={false}` (browsers may block unmuted autoplay — we'll start muted and unmute via JS as fallback)
+  - `playsInline`, no `controls` attribute, no `loop`
+  - `style` to fill full width with `width: 100%`, `objectFit: cover`
+  - Hide the video's default poster/UI with a black background
+- Use a `ref` + `useEffect` to attempt unmuted autoplay first; if blocked by browser policy, fall back to muted autoplay (browsers require user interaction for unmuted autoplay)
+- On video end, optionally show a subtle overlay or just hold on the last frame
 
-**Step 2 — Enter credentials in Lovable Cloud**
-
-1. Open Cloud → Users → Auth Settings → Google
-2. Switch from managed to custom credentials
-3. Paste your **Client ID** and **Client Secret** from Google Cloud Console
-
-**Step 3 — Fix the auth redirect race condition (code change)**
-
-The current code has a bug where `DashboardLayout.tsx` redirects to `/` before the session finishes loading. This is why Google login bounces back to the landing page. The fix:
-
-- **`DashboardLayout.tsx`**: Add an `authLoading` state — wait for `getSession()` to resolve before redirecting unauthenticated users to `/`
-- **`Login.tsx`**: Keep the current `onAuthStateChange` listener (it correctly catches OAuth returns and navigates to `/dashboard`)
-- **`Index.tsx`**: Remove or guard the broad auth redirect that competes with the login page
-
-This is a small code change (3 files) that fixes the "bouncing back to landing page" problem for both Google login and preview navigation.
-
-### Expected Result
-
-- `https://gainedge.ai/login` → Google sign-in → `https://gainedge.ai/dashboard` ✓
-- Preview page selection stays on the selected route ✓
-- Users see your own brand name on the Google consent screen ✓
+### Technical Note on Audio
+Browsers block unmuted autoplay by default. The code will try to play with audio first. If that fails, it will start muted and show a small "Click to unmute" icon so the user can enable sound with one click. This is the standard approach used by all major video platforms.
 
