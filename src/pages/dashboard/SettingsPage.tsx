@@ -15,6 +15,7 @@ const ADMIN_EMAIL = "falconercarlandrew@gmail.com";
 export default function SettingsPage() {
   const { profile, loading, updateProfile, userId } = useProfile();
   const [name, setName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [timeframe, setTimeframe] = useState("15");
   const [candle, setCandle] = useState("heiken_ashi");
@@ -32,6 +33,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (profile) {
       setName(profile.full_name || "");
+      setNickname((profile as any).nickname || "");
       setTimeframe(profile.default_timeframe);
       setCandle(profile.default_candle_type);
       setEmaFast(String(profile.ema_fast));
@@ -78,6 +80,8 @@ export default function SettingsPage() {
       sms_alerts: smsAlerts,
       broker,
     });
+    // Save nickname separately (not in typed Profile interface)
+    await supabase.from("profiles").update({ nickname: nickname || null } as any).eq("id", userId);
     // Save clock preferences separately (column not in typed Profile)
     await supabase.from("profiles").update({ clock_timezones: clockSlots as any }).eq("id", userId);
     toast.success("Settings saved");
@@ -99,8 +103,11 @@ export default function SettingsPage() {
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 24 }}>Settings</h1>
 
       <Section icon={<User size={16} color={C.jade} />} title="Profile">
-        <Field label="Full Name">
-          <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+        <Field label="Full Name *">
+          <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} placeholder="Required — RON will greet you by name" />
+        </Field>
+        <Field label="Nickname (optional)">
+          <input value={nickname} onChange={e => setNickname(e.target.value)} style={inputStyle} placeholder="Displayed in header if set" />
         </Field>
         <Field label="Email">
           <input value={email} disabled style={{ ...inputStyle, opacity: 0.5 }} />
