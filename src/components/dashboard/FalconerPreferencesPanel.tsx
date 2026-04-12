@@ -108,7 +108,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
       toast.error("Failed to save preferences");
     }
     setSaving(false);
-  };
+  }, [userId, prefs, signalEngine, notifications]);
 
   useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
 
