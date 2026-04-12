@@ -207,6 +207,24 @@ export default function DashboardLayout() {
             <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>{sessionLabel}</span>
             <span style={{ color: C.muted, fontSize: 12 }}>•</span>
             <span style={{ color: C.muted, fontSize: 12 }}>Last scan: 2 min ago</span>
+            <span style={{ color: C.muted, fontSize: 12 }}>•</span>
+            <button
+              onClick={() => setRonOpen(true)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "4px 12px", borderRadius: 20, border: "none", cursor: "pointer",
+                background: "linear-gradient(135deg, #00CFA5 0%, #0EA5E9 100%)",
+                color: "#fff", fontSize: 11, fontWeight: 700,
+                fontFamily: "'DM Sans', sans-serif",
+                boxShadow: "0 0 12px rgba(0,207,165,0.3)",
+                transition: "all 0.3s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.boxShadow = "0 0 20px rgba(0,207,165,0.5)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 0 12px rgba(0,207,165,0.3)"; }}
+            >
+              <span>Ask RON</span>
+              <Mic size={12} style={{ opacity: 0.8 }} />
+            </button>
           </div>
 
           <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
@@ -276,7 +294,7 @@ export default function DashboardLayout() {
         </main>
       </div>
       <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
-      <AskRonButton onClick={() => setRonOpen(true)} />
+      
       <AskRonModal
         open={ronOpen}
         onClose={() => setRonOpen(false)}
