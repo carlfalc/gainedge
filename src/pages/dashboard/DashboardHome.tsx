@@ -158,7 +158,7 @@ export default function DashboardHome() {
 
 
   // Highest conviction: only from last 20 minutes
-  const recentScans = scans.filter(s => signalFreshness(s.scanned_at) !== "expired");
+  const recentScans = scans.filter(s => !isDynamicallyExpired(s.scanned_at, instrumentTfs.get(s.symbol) || "15m"));
   const best = recentScans.length ? recentScans.reduce((a, b) => a.confidence > b.confidence ? a : b) : null;
   const totalTrades = stats.wins + stats.losses;
   const winRate = totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 100) : 0;
@@ -217,8 +217,9 @@ export default function DashboardHome() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {scans.map(inst => {
-          const fresh = signalFreshness(inst.scanned_at);
-          const expired = fresh === "expired";
+          const tf = instrumentTfs.get(inst.symbol) || "15m";
+          const expired = isDynamicallyExpired(inst.scanned_at, tf);
+          const countdown = nextScanSeconds(tf);
           const live = liveData.get(inst.symbol);
           const sparkData = live?.sparkline_data?.length ? live.sparkline_data : generateSparkData(inst.direction, inst.confidence);
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
