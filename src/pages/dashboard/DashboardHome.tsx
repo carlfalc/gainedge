@@ -12,7 +12,15 @@ import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
 import { useLiveMarketData, triggerMarketDataCompute, type LiveMarketRow } from "@/services/broker-data";
 
-interface ScanResult {
+const adxLabel = (v: number) =>
+  v < 20 ? "weak / no trend" : v < 25 ? "trend waking up" : v < 40 ? "stronger trend" : "very strong trend";
+
+const rsiLabel = (v: number) =>
+  v > 70 ? "overbought, sell maybe coming" : v < 30 ? "oversold, buy maybe coming" : v >= 45 && v <= 55 ? "neutral" : v < 45 ? "slightly weak" : "slightly strong";
+
+const stochLabel = (v: number) =>
+  v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
+
   id: string; symbol: string; direction: string; confidence: number;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
