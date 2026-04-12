@@ -57,12 +57,19 @@ export default function DashboardHome() {
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0 });
   const [equityCurve, setEquityCurve] = useState<number[]>([]);
   const [userId, setUserId] = useState<string>();
+  const [tick, setTick] = useState(0);
   const { data: liveData } = useLiveMarketData(userId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setUserId(session.user.id);
     });
+  }, []);
+
+  // 1-second tick for live countdowns
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
