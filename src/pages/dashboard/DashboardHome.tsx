@@ -3,7 +3,7 @@ import { SpinCard } from "@/components/dashboard/SpinCard";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
-import { AlertTriangle, Play, Loader2, Clock, Wifi } from "lucide-react";
+import { AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signalFreshness, formatAge, type SignalFreshness } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
@@ -43,7 +43,6 @@ function generateSparkData(direction: string, confidence: number): number[] {
 }
 
 export default function DashboardHome() {
-  const [scanning, setScanning] = useState(false);
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(new Map());
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0 });
@@ -69,6 +68,11 @@ export default function DashboardHome() {
     fetchNews();
     const newsInterval = setInterval(fetchNews, 2 * 60 * 1000);
 
+    // 30-second polling fallback for market data compute
+    const computeInterval = setInterval(() => {
+      triggerMarketDataCompute();
+    }, 30 * 1000);
+
     const channel = supabase.channel('dashboard-scans')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scan_results' }, () => loadData())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'signals' }, () => loadData())
@@ -76,6 +80,7 @@ export default function DashboardHome() {
       .subscribe();
     return () => {
       clearInterval(newsInterval);
+      clearInterval(computeInterval);
       supabase.removeChannel(channel);
     };
   }, []);
@@ -135,10 +140,6 @@ export default function DashboardHome() {
     }
   };
 
-  const handleScan = () => {
-    setScanning(true);
-    setTimeout(() => { setScanning(false); loadData(); }, 3000);
-  };
 
   // Highest conviction: only from last 20 minutes
   const recentScans = scans.filter(s => signalFreshness(s.scanned_at) !== "expired");
@@ -314,17 +315,6 @@ export default function DashboardHome() {
         </div>
       )}
 
-      <button onClick={handleScan} disabled={scanning} style={{
-        display: "flex", alignItems: "center", gap: 10, padding: "14px 32px",
-        borderRadius: 12, border: "none", cursor: scanning ? "wait" : "pointer",
-        background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`,
-        color: C.bg, fontSize: 15, fontWeight: 700, fontFamily: "'DM Sans', sans-serif",
-        boxShadow: `0 4px 20px ${C.jade}30`,
-        opacity: scanning ? 0.7 : 1, transition: "all 0.2s",
-      }}>
-        {scanning ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-        {scanning ? "Scanning..." : "Run Scan"}
-      </button>
     </div>
   );
 }

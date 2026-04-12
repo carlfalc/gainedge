@@ -742,22 +742,38 @@ serve(async (req) => {
       });
     }
 
-    // Group by user, preserving timeframe per instrument
+    // Timeframe ranking for shortest-wins resolution
+    const TF_MINUTES: Record<string, number> = {
+      "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "1H": 60, "4h": 240, "4H": 240, "1d": 1440, "1D": 1440,
+    };
+    const tfToMinutes = (tf: string) => TF_MINUTES[tf] ?? 15;
+
+    // Group by user, preserving timeframe per instrument — keep SHORTEST timeframe per symbol
     interface UserInstrument { symbol: string; timeframe: string; }
     const userInstruments = new Map<string, UserInstrument[]>();
     for (const row of instruments) {
       const list = userInstruments.get(row.user_id) || [];
-      if (!list.some(i => i.symbol === row.symbol)) {
-        list.push({ symbol: row.symbol, timeframe: row.timeframe || "15m" });
+      const existing = list.find(i => i.symbol === row.symbol);
+      const rowTf = row.timeframe || "15m";
+      if (existing) {
+        // Keep the shortest timeframe
+        if (tfToMinutes(rowTf) < tfToMinutes(existing.timeframe)) {
+          existing.timeframe = rowTf;
+        }
+      } else {
+        list.push({ symbol: row.symbol, timeframe: rowTf });
       }
       userInstruments.set(row.user_id, list);
     }
 
-    // Unique symbol+timeframe combos to fetch
+    // Unique symbol+timeframe combos to fetch — resolve to shortest across all users
     const symbolTfSet = new Map<string, string>();
     for (const list of userInstruments.values()) {
       for (const inst of list) {
-        if (!symbolTfSet.has(inst.symbol)) symbolTfSet.set(inst.symbol, inst.timeframe);
+        const existing = symbolTfSet.get(inst.symbol);
+        if (!existing || tfToMinutes(inst.timeframe) < tfToMinutes(existing)) {
+          symbolTfSet.set(inst.symbol, inst.timeframe);
+        }
       }
     }
 
