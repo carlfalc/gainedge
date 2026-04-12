@@ -194,10 +194,6 @@ function PremiumDash() {
         ))}
       </div>
 
-      {/* Correlation warning */}
-      <div style={{ marginTop: 12, padding: "8px 12px", borderRadius: 8, background: C.amber + "10", border: `1px solid ${C.amber}20`, fontSize: 10, color: C.amber, lineHeight: 1.5 }}>
-        ⚠ NAS100 + US30 correlated — max 1 position. AUDUSD + NZDUSD correlated — pick one.
-      </div>
     </div>
   );
 }
