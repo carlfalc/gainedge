@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -321,7 +321,7 @@ export default function Index() {
 
   // Detect OAuth callback — redirect to dashboard when a new sign-in occurs
   // Already-logged-in users who navigate here won't be redirected (initial session doesn't trigger SIGNED_IN)
-  const initialLoadRef = React.useRef(true);
+  const initialLoadRef = useRef(true);
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session && !initialLoadRef.current) {
