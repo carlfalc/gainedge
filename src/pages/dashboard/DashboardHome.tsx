@@ -5,7 +5,7 @@ import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
 import { AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { signalFreshness, formatAge, type SignalFreshness } from "@/lib/expiry";
+import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
@@ -57,12 +57,19 @@ export default function DashboardHome() {
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0 });
   const [equityCurve, setEquityCurve] = useState<number[]>([]);
   const [userId, setUserId] = useState<string>();
+  const [tick, setTick] = useState(0);
   const { data: liveData } = useLiveMarketData(userId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setUserId(session.user.id);
     });
+  }, []);
+
+  // 1-second tick for live countdowns
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -151,17 +158,11 @@ export default function DashboardHome() {
 
 
   // Highest conviction: only from last 20 minutes
-  const recentScans = scans.filter(s => signalFreshness(s.scanned_at) !== "expired");
+  const recentScans = scans.filter(s => !isDynamicallyExpired(s.scanned_at, instrumentTfs.get(s.symbol) || "15m"));
   const best = recentScans.length ? recentScans.reduce((a, b) => a.confidence > b.confidence ? a : b) : null;
   const totalTrades = stats.wins + stats.losses;
   const winRate = totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 100) : 0;
 
-  const freshnessStyle = (f: SignalFreshness) => {
-    if (f === "fresh") return { opacity: 1, dirOpacity: 1, pulse: true };
-    if (f === "recent") return { opacity: 1, dirOpacity: 1, pulse: false };
-    if (f === "aging") return { opacity: 0.8, dirOpacity: 0.7, pulse: false };
-    return { opacity: 0.4, dirOpacity: 0.4, pulse: false };
-  };
 
   return (
     <div style={{ width: "100%" }}>
@@ -210,8 +211,9 @@ export default function DashboardHome() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {scans.map(inst => {
-          const fresh = signalFreshness(inst.scanned_at);
-          const expired = fresh === "expired";
+          const tf = instrumentTfs.get(inst.symbol) || "15m";
+          const expired = isDynamicallyExpired(inst.scanned_at, tf);
+          const countdown = nextScanSeconds(tf);
           const live = liveData.get(inst.symbol);
           const sparkData = live?.sparkline_data?.length ? live.sparkline_data : generateSparkData(inst.direction, inst.confidence);
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
@@ -252,11 +254,9 @@ export default function DashboardHome() {
                   }}>
                     {inst.direction}
                   </div>
-                  {fresh === "aging" && (
-                    <span style={{ fontSize: 9, color: "#F59E0B", fontWeight: 600, display: "flex", alignItems: "center", gap: 2 }}>
-                      ⏰ Expiring soon
-                    </span>
-                  )}
+                  <span style={{ fontSize: 9, color: C.sec, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
+                    <Clock size={9} /> Next scan: {formatCountdown(countdown)}
+                  </span>
                 </div>
               </div>
 
@@ -291,8 +291,8 @@ export default function DashboardHome() {
               </div>
 
               {expired && (
-                <div style={{ fontSize: 10, color: "#F59E0B", fontStyle: "italic", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                  <Clock size={10} /> Awaiting next scan...
+                <div style={{ fontSize: 10, color: C.sec, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <Clock size={10} /> Next scan: {formatCountdown(countdown)}
                 </div>
               )}
             </div>

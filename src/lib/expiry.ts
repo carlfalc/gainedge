@@ -13,6 +13,24 @@ export function ageMinutes(timestamp: string | Date): number {
 export type SignalFreshness = "fresh" | "recent" | "aging" | "expired";
 export type NewsFreshness = "fresh" | "recent" | "old" | "expired";
 
+const TF_MINUTES: Record<string, number> = {
+  "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1H": 60, "4H": 240, "1D": 1440,
+};
+
+/** Dynamic expiry lifetime per timeframe (minutes) */
+export function dynamicExpiryMinutes(tf: string): number {
+  switch (tf) {
+    case "1m": return 60;
+    case "5m": return 240;
+    case "15m": return 720;
+    case "30m": return 720;
+    case "1H": return 1440;
+    case "4H": return 2880;
+    case "1D": return 7200;
+    default: return 720;
+  }
+}
+
 /** Signal freshness: fresh <5m, recent 5-15m, aging 15-20m, expired >20m */
 export function signalFreshness(timestamp: string | Date): SignalFreshness {
   const age = ageMinutes(timestamp);
@@ -22,6 +40,11 @@ export function signalFreshness(timestamp: string | Date): SignalFreshness {
   return "expired";
 }
 
+/** Check if a signal is expired based on its timeframe's dynamic lifetime */
+export function isDynamicallyExpired(timestamp: string | Date, timeframe: string): boolean {
+  return ageMinutes(timestamp) > dynamicExpiryMinutes(timeframe);
+}
+
 /** News freshness: fresh <1h, recent 1-6h, old 6-12h, expired >12h */
 export function newsFreshness(timestamp: string | Date): NewsFreshness {
   const age = ageMinutes(timestamp);
@@ -29,6 +52,33 @@ export function newsFreshness(timestamp: string | Date): NewsFreshness {
   if (age < 360) return "recent";
   if (age < 720) return "old";
   return "expired";
+}
+
+/** Seconds until next candle close for a given timeframe */
+export function nextScanSeconds(timeframe: string): number {
+  const mins = TF_MINUTES[timeframe] || 15;
+  if (mins >= 1440) {
+    // Daily: next UTC midnight
+    const now = new Date();
+    const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    return Math.max(1, Math.ceil((tomorrow.getTime() - now.getTime()) / 1000));
+  }
+  const now = new Date();
+  const totalSecsIntoDay = now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
+  const cycleSecs = mins * 60;
+  const remaining = cycleSecs - (totalSecsIntoDay % cycleSecs);
+  return remaining === 0 ? cycleSecs : remaining;
+}
+
+/** Format seconds as countdown string e.g. "8m 32s", "1h 03m" */
+export function formatCountdown(seconds: number): string {
+  if (seconds <= 0) return "now";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+  if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+  return `${s}s`;
 }
 
 export function formatAge(timestamp: string | Date): string {
