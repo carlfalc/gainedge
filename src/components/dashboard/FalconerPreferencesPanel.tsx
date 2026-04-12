@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -18,7 +18,11 @@ const SIGNAL_STYLES = [
   { value: "aggressive", label: "Aggressive", desc: "All signals (confidence ≥ 4)", minConf: 4 },
 ];
 
-export default function FalconerPreferencesPanel() {
+export interface FalconerPreferencesPanelRef {
+  save: () => Promise<void>;
+}
+
+const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(function FalconerPreferencesPanel(_, ref) {
   const [prefs, setPrefs] = useState<SignalPrefs>({ min_confidence: 6, instrument_filters: {}, currency: "NZD", lot_size: 0.01 });
   const [instruments, setInstruments] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(true);
@@ -76,7 +80,7 @@ export default function FalconerPreferencesPanel() {
     }));
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!userId) return;
     setSaving(true);
     try {
@@ -104,7 +108,9 @@ export default function FalconerPreferencesPanel() {
       toast.error("Failed to save preferences");
     }
     setSaving(false);
-  };
+  }, [userId, prefs, signalEngine, notifications]);
+
+  useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
 
   const enabledCount = Object.values(prefs.instrument_filters).filter(Boolean).length;
 
@@ -248,4 +254,6 @@ export default function FalconerPreferencesPanel() {
       </button>
     </div>
   );
-}
+});
+
+export default FalconerPreferencesPanel;

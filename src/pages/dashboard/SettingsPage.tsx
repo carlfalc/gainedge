@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
 import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock } from "lucide-react";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
-import FalconerPreferencesPanel from "@/components/dashboard/FalconerPreferencesPanel";
+import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
 import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
 import { useProfile } from "@/hooks/use-profile";
@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const [showAddInstrument, setShowAddInstrument] = useState(false);
+  const falconerPrefsRef = useRef<FalconerPreferencesPanelRef>(null);
 
   useEffect(() => {
     if (profile) {
@@ -83,6 +84,8 @@ export default function SettingsPage() {
     } as any);
     // Save clock preferences separately (column not in typed Profile)
     await supabase.from("profiles").update({ clock_timezones: clockSlots as any }).eq("id", userId);
+    // Also save RON/AI preferences
+    await falconerPrefsRef.current?.save();
     toast.success("Settings saved");
   };
 
@@ -184,7 +187,7 @@ export default function SettingsPage() {
       </button>
 
       {/* All users see AI Preferences */}
-      <FalconerPreferencesPanel />
+      <FalconerPreferencesPanel ref={falconerPrefsRef} />
 
       {/* Admin-only sections */}
       {isAdmin && <FalconerRulesPanel />}
