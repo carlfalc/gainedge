@@ -21,6 +21,7 @@ const rsiLabel = (v: number) =>
 const stochLabel = (v: number) =>
   v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
 
+interface ScanResult {
   id: string; symbol: string; direction: string; confidence: number;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
