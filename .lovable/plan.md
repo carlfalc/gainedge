@@ -1,46 +1,27 @@
 
 
-## Plan: Session Buy/Sell Insight Lines in Most Volume Today
+## Plan: Move Buy/Sell Insights Inline with Session Row
 
-### What You'll See
-Each session row (Asian, London, New York) in the "Most Volume Today" panel will show a second line with:
-- **Green text**: Best BUY opportunity — instrument, precise timeframe, and rolling average bias %
-- **Red text**: Best SHORT opportunity — instrument, precise timeframe, and rolling average bias %
+### What Changes
+Move the green "Best BUY" and red "Best SHORT" insight text from a separate line underneath each session to be **inline on the same row**, appearing after the volume/LIVE badge data. This applies consistently to Asian, London, and New York sessions.
 
-These update automatically as more data accumulates each session/day, so the best time and percentage evolve over time rather than being locked to a fixed hour.
+### Layout Change
+```text
+BEFORE:
+│ Asian  [NAS100] ⏰ 11:00 AM – 12:00 PM  164,221 vol  LIVE │
+│   ▲ Best BUY: NAS100 @ 1:00 PM (55%)  ▼ Best SHORT: ...   │
+
+AFTER:
+│ Asian  [NAS100] ⏰ 11:00 AM – 12:00 PM  164,221 vol  LIVE  ▲ Best BUY: NAS100 @ 1:00 PM (55%)  ▼ Best SHORT: ... │
+```
 
 ### Technical Details
 
-#### 1. Enhance analytics to store precise peak times (`session-volume-analytics.ts`)
-- Currently `peakHourUtc` is a whole hour (e.g., 11). Enhance `buildInstrumentAnalytics` to also compute a **weighted midpoint within that hour** using candle timestamps, producing a more precise time like "11:20 AM" instead of just "11:00 AM".
-- Add `bestBuyHourUtc` and `bestSellHourUtc` fields to `SessionPattern` — the hour with the highest buy bias and highest sell bias respectively (currently only overall `buyPct`/`sellPct` exist, not per-hour direction bias).
+**File: `src/components/dashboard/MostVolumeBar.tsx`**
 
-#### 2. Store richer insight data (`VolumeHistoryModal.tsx`)
-- Include the new precise time and per-hour buy/sell bias data in the `insights` table `data` JSONB, so `MostVolumeBar` can read it without re-computing.
-- Each time the History modal runs or a session ends, insights are upserted — the rolling average naturally updates as more candle data is included over time.
+1. Remove the separate `{/* Buy/Sell insight line */}` block (lines 266-284) that renders below each session row.
+2. Move the buy/sell insight spans **inside** the main session row `<div>` (the flex row at line 209-264), placing them after the LIVE badge (for active) or after volume (for completed). The insight spans keep their existing green/red styling and font size.
+3. Add `flexWrap: "wrap"` to the main row div so that on narrow screens the insights can wrap to a second line gracefully within the same bordered row.
 
-#### 3. Fetch and display insights in `MostVolumeBar.tsx`
-- In the `load()` function, also fetch `session_volume_pattern` insights from the `insights` table for the current user.
-- Add a `SessionInsight` interface with `bestBuySymbol`, `bestBuyTime` (precise, e.g. "11:20 AM"), `bestBuyPct`, `bestSellSymbol`, `bestSellTime`, `bestSellPct`.
-- For each completed or active session, find the instrument with the highest `buyPct` for that session (best buy) and highest `sellPct` (best short) from stored insights across all user instruments.
-- Render a compact second line below each session row:
-  - Green: `▲ Best BUY: NAS100 @ 11:20 AM (62% avg bias)`
-  - Red: `▼ Best SHORT: XAUUSD @ 3:45 AM (58% avg bias)`
-- Only shown when insight data exists for that session.
-
-#### 4. Auto-trigger insight refresh at session end
-- In `MostVolumeBar`, when a session transitions to "completed" and no insights exist for today, trigger a lightweight background analytics run (fetch hourly candles → `buildInstrumentAnalytics` → store insights). This ensures insights stay fresh without requiring the user to open History.
-
-### Key User Clarification Addressed
-- Times will be **precise** (e.g., 11:20 AM), not rounded to full hours — computed from weighted candle timestamps within the peak hour bucket.
-- Percentages are **rolling averages** that update each session as new data accumulates — not static snapshots. Each day's new candles shift the average.
-
-### Files Modified
-| File | Change |
-|------|--------|
-| `src/lib/session-volume-analytics.ts` | Add precise peak time calculation, per-hour buy/sell direction tracking |
-| `src/components/dashboard/MostVolumeBar.tsx` | Fetch insights, render buy/sell insight line per session, auto-trigger refresh |
-| `src/components/dashboard/VolumeHistoryModal.tsx` | Store enriched data (precise times, per-hour bias) in insights |
-
-No database changes required — the existing `insights` table JSONB `data` column handles the richer payload.
+Single file edit, purely a layout restructure — no logic or data changes.
 
