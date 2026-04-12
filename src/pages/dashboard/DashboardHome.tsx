@@ -16,7 +16,7 @@ const adxLabel = (v: number) =>
   v < 20 ? "weak / no trend" : v < 25 ? "trend waking up" : v < 40 ? "stronger trend" : "very strong trend";
 
 const rsiLabel = (v: number) =>
-  v > 70 ? "overbought, sell maybe coming" : v < 30 ? "oversold, buy maybe coming" : v >= 45 && v <= 55 ? "neutral" : v < 45 ? "slightly weak" : "slightly strong";
+  v > 70 ? <>overbought, <span style={{ color: C.red }}>sell</span> maybe coming</> : v < 30 ? <>oversold, <span style={{ color: C.green }}>buy</span> maybe coming</> : v >= 45 && v <= 55 ? "neutral" : v < 45 ? "slightly weak" : "slightly strong";
 
 const stochLabel = (v: number) =>
   v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
