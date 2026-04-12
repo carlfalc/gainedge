@@ -80,7 +80,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
     }));
   };
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!userId) return;
     setSaving(true);
     try {
