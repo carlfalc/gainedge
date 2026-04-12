@@ -784,6 +784,7 @@ export type Database = {
           instrument_filters: Json
           lot_size: number
           min_confidence: number
+          signal_engine: string
           updated_at: string
           user_id: string
         }
@@ -794,6 +795,7 @@ export type Database = {
           instrument_filters?: Json
           lot_size?: number
           min_confidence?: number
+          signal_engine?: string
           updated_at?: string
           user_id: string
         }
@@ -804,6 +806,7 @@ export type Database = {
           instrument_filters?: Json
           lot_size?: number
           min_confidence?: number
+          signal_engine?: string
           updated_at?: string
           user_id?: string
         }

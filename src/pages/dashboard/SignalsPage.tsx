@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { C } from "@/lib/mock-data";
-import { ChevronDown, ChevronUp, Filter, Settings, TrendingUp, TrendingDown, Target, BarChart3, Award, DollarSign } from "lucide-react";
+import { ChevronDown, ChevronUp, Filter, Settings, TrendingUp, TrendingDown, Target, BarChart3, Award, DollarSign, Cpu, BookOpen } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, startOfWeek, startOfDay } from "date-fns";
 import { SignalAlertSettingsModal } from "@/components/dashboard/SignalAlertSettingsModal";
@@ -64,6 +64,7 @@ export default function SignalsPage() {
   const [lotSize, setLotSize] = useState(0.01);
   const [prefsSaving, setPrefsSaving] = useState(false);
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
+  const [signalEngine, setSignalEngine] = useState<string>("v1v2");
 
   useEffect(() => {
     loadSignals();
@@ -118,12 +119,13 @@ export default function SignalsPage() {
     if (!session) return;
     const { data } = await supabase
       .from("user_signal_preferences")
-      .select("currency, lot_size")
+      .select("currency, lot_size, signal_engine")
       .eq("user_id", session.user.id)
       .maybeSingle();
     if (data) {
       setCurrency((data as any).currency || "NZD");
       setLotSize((data as any).lot_size ?? 0.01);
+      setSignalEngine((data as any).signal_engine || "v1v2");
     }
   };
 
@@ -236,8 +238,48 @@ export default function SignalsPage() {
 
   return (
     <div style={{ width: "100%", maxWidth: 1200, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 4 }}>Signal History</h1>
-      <p style={{ fontSize: 11, color: C.muted, marginBottom: 20, letterSpacing: 0.5 }}>Signals powered by <span style={{ color: C.jade, fontWeight: 600 }}>RON</span></p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 4 }}>Signal History</h1>
+          <p style={{ fontSize: 11, color: C.muted, letterSpacing: 0.5 }}>Signals powered by <span style={{ color: C.jade, fontWeight: 600 }}>RON</span></p>
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {[
+            { value: "v1", label: "V1 (Legacy)", icon: <Cpu size={13} /> },
+            { value: "v2", label: "V2 (Knowledge)", icon: <BookOpen size={13} /> },
+            { value: "v1v2", label: "V1 + V2", icon: null },
+          ].map(opt => {
+            const active = signalEngine === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={async () => {
+                  setSignalEngine(opt.value);
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return;
+                  await supabase.from("user_signal_preferences").upsert({
+                    user_id: session.user.id,
+                    signal_engine: opt.value,
+                    updated_at: new Date().toISOString(),
+                  } as any, { onConflict: "user_id" });
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: active ? C.jade + "20" : C.bg2,
+                  color: active ? C.jade : C.sec,
+                  fontSize: 11, fontWeight: 600, transition: "all 0.2s",
+                  outline: active ? `1px solid ${C.jade}50` : "none",
+                }}
+              >
+                {opt.icon}
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ marginBottom: 20 }} />
 
       {/* Performance Tiles */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 20 }}>
