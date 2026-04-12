@@ -95,14 +95,28 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const [closingId, setClosingId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Intelligent Trader state – per-symbol so toggling one chart doesn't affect others
-  const [autoTradeMap, setAutoTradeMap] = useState<Record<string, boolean>>({});
+  // Intelligent Trader state – persisted to localStorage so settings survive navigation
+  const loadPersistedTraderState = () => {
+    try {
+      const raw = localStorage.getItem("ge_intelligent_trader");
+      if (raw) return JSON.parse(raw) as { autoTradeMap: Record<string, boolean>; myTradesMap: Record<string, boolean>; autoLotSize: string };
+    } catch {}
+    return { autoTradeMap: {}, myTradesMap: {}, autoLotSize: "0.01" };
+  };
+
+  const savedTraderState = useRef(loadPersistedTraderState());
+  const [autoTradeMap, setAutoTradeMap] = useState<Record<string, boolean>>(savedTraderState.current.autoTradeMap);
   const autoTradeEnabled = autoTradeMap[symbol] ?? false;
   const setAutoTradeEnabled = (v: boolean) => setAutoTradeMap(prev => ({ ...prev, [symbol]: v }));
-  const [autoLotSize, setAutoLotSize] = useState("0.01");
-  const [myTradesMap, setMyTradesMap] = useState<Record<string, boolean>>({});
+  const [autoLotSize, setAutoLotSize] = useState(savedTraderState.current.autoLotSize);
+  const [myTradesMap, setMyTradesMap] = useState<Record<string, boolean>>(savedTraderState.current.myTradesMap);
   const myTradesEnabled = myTradesMap[symbol] ?? false;
   const setMyTradesEnabled = (v: boolean) => setMyTradesMap(prev => ({ ...prev, [symbol]: v }));
+
+  // Persist intelligent trader state whenever it changes
+  useEffect(() => {
+    localStorage.setItem("ge_intelligent_trader", JSON.stringify({ autoTradeMap, myTradesMap, autoLotSize }));
+  }, [autoTradeMap, myTradesMap, autoLotSize]);
 
   // Order mode
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
