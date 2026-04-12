@@ -254,4 +254,6 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
       </button>
     </div>
   );
-}
+});
+
+export default FalconerPreferencesPanel;
