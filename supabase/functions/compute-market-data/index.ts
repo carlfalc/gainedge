@@ -721,10 +721,38 @@ async function fetchHourlyCandles(token: string, accountId: string, symbol: stri
   return [];
 }
 
+// Market hours gate: skip scanning during closed hours, but allow 2hr pre-open warmup
+// Forex/Commodities/Indices all share the same weekend window:
+//   Closed: Friday 21:00 UTC → Sunday 19:00 UTC (2hrs before Sunday 21:00 open)
+// The ~1hr daily break for commodities/indices is intentionally scanned through.
+function isMarketClosed(): boolean {
+  const now = new Date();
+  const dayUTC = now.getUTCDay(); // 0=Sun, 5=Fri, 6=Sat
+  const hourUTC = now.getUTCHours();
+
+  // Saturday: always closed
+  if (dayUTC === 6) return true;
+
+  // Friday after 21:00 UTC: closed
+  if (dayUTC === 5 && hourUTC >= 21) return true;
+
+  // Sunday before 19:00 UTC: closed (markets open ~21:00, but we start scanning 2hrs early)
+  if (dayUTC === 0 && hourUTC < 19) return true;
+
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    // Check market hours — skip chart/signal scanning when markets are closed
+    if (isMarketClosed()) {
+      return new Response(JSON.stringify({ success: true, message: "Markets closed — skipping scan" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
