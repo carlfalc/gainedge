@@ -23,19 +23,14 @@ export default function LoungeChat() {
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
   const [input, setInput] = useState("");
   const [showProfileDialog, setShowProfileDialog] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(false);
   const [promptDismissed, setPromptDismissed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const isProfileComplete = !!profile?.full_name && profile.full_name !== "Trader";
   const displayName = profile?.nickname || profile?.full_name || "You";
 
-  // Show first-visit prompt if profile incomplete
-  useEffect(() => {
-    if (!loading && !isProfileComplete && !promptDismissed) {
-      setShowPrompt(true);
-    }
-  }, [loading, isProfileComplete, promptDismissed]);
+  // Show prompt automatically when not loading, profile incomplete, and not dismissed
+  const showPrompt = !loading && !isProfileComplete && !promptDismissed;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
