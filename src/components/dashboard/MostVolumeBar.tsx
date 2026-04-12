@@ -111,8 +111,8 @@ export function MostVolumeBar() {
     <>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", marginBottom: 10, gap: 8 }}>
-            <BarChart3 size={16} color={C.text} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+            <BarChart3 size={16} color="#34D399" />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#34D399" }}>
               Most Volume Today
               {currentSession && (
                 <span style={{ color: currentSession.color, marginLeft: 6 }}>— {currentSession.label} Session</span>
