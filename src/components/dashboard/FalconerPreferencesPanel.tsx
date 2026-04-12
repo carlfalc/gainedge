@@ -1,4 +1,4 @@
-import { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
