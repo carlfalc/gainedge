@@ -58,6 +58,14 @@ export default function DashboardHome() {
   const [equityCurve, setEquityCurve] = useState<number[]>([]);
   const [userId, setUserId] = useState<string>();
   const [tick, setTick] = useState(0);
+  const [hiddenPanes, setHiddenPanes] = useState<Set<string>>(() => {
+    try { const s = localStorage.getItem("hidden-panes"); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); }
+  });
+  const [cardOrder, setCardOrder] = useState<string[]>(() => {
+    try { const s = localStorage.getItem("card-order"); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { data: liveData } = useLiveMarketData(userId);
 
   useEffect(() => {
