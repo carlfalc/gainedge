@@ -258,24 +258,38 @@ export default function DashboardHome() {
 
       {/* CURRENT INSTRUMENT TRACKING header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
-          CURRENT INSTRUMENT TRACKING
-          <span style={{ color: C.sec, fontWeight: 400, fontSize: 10, marginLeft: 10, letterSpacing: 0, textTransform: "none" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <span style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
+            CURRENT INSTRUMENT TRACKING
+          </span>
+          <span style={{ color: C.sec, fontWeight: 400, fontSize: 10 }}>
             {visibleScans.length}/{scans.length} visible
           </span>
         </div>
-        {hiddenPanes.size > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            style={{
+              display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text,
+              background: "transparent", border: "none", cursor: "grab",
+              fontWeight: 500, opacity: 0.7,
+            }}
+            title="Drag cards to reorder"
+          >
+            <Move size={13} color={C.text} /> Move
+          </button>
           <button
             onClick={showAllPanes}
             style={{
               display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.jade,
-              background: C.jade + "15", border: `1px solid ${C.jade}30`, borderRadius: 6,
-              padding: "3px 10px", cursor: "pointer", fontWeight: 600,
+              background: hiddenPanes.size > 0 ? C.jade + "15" : "transparent",
+              border: hiddenPanes.size > 0 ? `1px solid ${C.jade}30` : "1px solid transparent",
+              borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontWeight: 600,
+              opacity: hiddenPanes.size > 0 ? 1 : 0.5,
             }}
           >
             <Eye size={12} /> Show All
           </button>
-        )}
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
