@@ -393,30 +393,36 @@ export type Database = {
       }
       news_items: {
         Row: {
+          ai_reason_short: string | null
           created_at: string
           headline: string
           id: string
           impact: string | null
           instruments_affected: string[] | null
           published_at: string
+          sentiment_direction: string | null
           source: string | null
         }
         Insert: {
+          ai_reason_short?: string | null
           created_at?: string
           headline: string
           id?: string
           impact?: string | null
           instruments_affected?: string[] | null
           published_at?: string
+          sentiment_direction?: string | null
           source?: string | null
         }
         Update: {
+          ai_reason_short?: string | null
           created_at?: string
           headline?: string
           id?: string
           impact?: string | null
           instruments_affected?: string[] | null
           published_at?: string
+          sentiment_direction?: string | null
           source?: string | null
         }
         Relationships: []
