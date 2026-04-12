@@ -205,8 +205,8 @@ export function MostVolumeBar() {
             const showInsight = ins && row.status !== "upcoming";
 
             return (
-              <div key={row.session.key}>
                 <div
+                  key={row.session.key}
                   style={{
                     display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
                     padding: "6px 10px", borderRadius: 8,
@@ -262,7 +262,6 @@ export function MostVolumeBar() {
                     <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>Upcoming</span>
                   )}
 
-                  {/* Inline Buy/Sell insights */}
                   {showInsight && ins.bestBuySymbol && ins.bestBuyPct > 50 && (
                     <span style={{ fontSize: 10, color: "#22C55E", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
                       ▲ BUY: {ins.bestBuySymbol}
