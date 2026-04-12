@@ -112,12 +112,8 @@ export default function FalconerRulesPanel() {
     }
   };
 
-  const switchVersion = async (ver: "v1" | "v2") => {
+  const switchVersion = (ver: "v1" | "v2") => {
     setAiVersion(ver);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.from("profiles").update({ falconer_version: ver } as any).eq("id", session.user.id);
-    }
     toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
   };
 
