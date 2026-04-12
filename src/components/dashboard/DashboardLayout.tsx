@@ -116,6 +116,15 @@ export default function DashboardLayout() {
     setHovered(false);
   };
 
+  // Don't render anything until auth check completes
+  if (!authReady) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: C.jade, fontSize: 16 }}>Loading…</div>
+      </div>
+    );
+  }
+
   return (
     <LanguageProvider>
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg }}>
