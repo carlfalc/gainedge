@@ -331,6 +331,7 @@ export default function DashboardLayout() {
         context={{
           page: location.pathname,
           sessionLabel,
+          userName: userName || undefined,
         }}
       />
       <TradeNotificationPopup />

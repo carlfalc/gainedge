@@ -13,6 +13,7 @@ interface AskRonModalProps {
     pattern?: string;
     price?: string;
     sessionLabel?: string;
+    userName?: string;
   };
 }
 
