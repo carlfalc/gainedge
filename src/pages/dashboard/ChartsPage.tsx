@@ -1433,6 +1433,52 @@ export default function ChartsPage() {
         <button onClick={() => chartRef.current?.timeScale().fitContent()} className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1">
           <ZoomIn className="w-3 h-3" /> Fit
         </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowChartSettings(s => !s)}
+            className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1"
+          >
+            <Settings className="w-3 h-3" /> Colors
+          </button>
+          {showChartSettings && (
+            <div className="absolute top-full left-0 mt-1 z-50 bg-[#111724] border border-white/10 rounded-lg p-3 min-w-[200px] shadow-xl">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-bold text-white/80">Chart Colors</span>
+                <button
+                  onClick={() => { setCandleUpColor(DEFAULT_UP); setCandleDownColor(DEFAULT_DOWN); setChartBgMode(DEFAULT_BG); }}
+                  className="text-[10px] text-[#00CFA5] hover:text-white flex items-center gap-1"
+                >
+                  <RotateCcw className="w-3 h-3" /> Reset
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <input type="color" value={candleUpColor} onChange={e => setCandleUpColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent" />
+                <span className="text-[11px] text-white/70">Bullish</span>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <input type="color" value={candleDownColor} onChange={e => setCandleDownColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent" />
+                <span className="text-[11px] text-white/70">Bearish</span>
+              </div>
+              <div className="border-t border-white/10 pt-2">
+                <span className="text-[10px] text-white/50 mb-1.5 block">Chart Background</span>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setChartBgMode("black")}
+                    className={`flex-1 py-1 rounded text-[11px] font-semibold transition-all ${chartBgMode === "black" ? "bg-white/15 text-white border border-white/30" : "bg-white/5 text-white/50 border border-white/10 hover:text-white/80"}`}
+                  >
+                    Black
+                  </button>
+                  <button
+                    onClick={() => setChartBgMode("white")}
+                    className={`flex-1 py-1 rounded text-[11px] font-semibold transition-all ${chartBgMode === "white" ? "bg-white/15 text-white border border-white/30" : "bg-white/5 text-white/50 border border-white/10 hover:text-white/80"}`}
+                  >
+                    White
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
         <button
           onClick={() => window.open(`/chart-popout?type=falconer&symbol=${selected}`, "_blank", "noopener")}
           className="px-2.5 py-1 rounded text-[11px] font-semibold bg-[#111724] border border-white/10 text-[#8892A4] hover:text-white transition-all flex items-center gap-1"
