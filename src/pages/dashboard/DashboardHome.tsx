@@ -258,10 +258,10 @@ export default function DashboardHome() {
 
               {/* Live indicators — always bright since they're real-time */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
-                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span></span>
-                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span></span>
+                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span>{liveAdx != null && <span style={{ color: C.muted, fontSize: 10 }}> - {adxLabel(liveAdx)}</span>}</span>
+                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span>{liveRsi != null && <span style={{ color: C.muted, fontSize: 10 }}> - {rsiLabel(liveRsi)}</span>}</span>
                 <span>MACD <span style={{ color: liveMacd === "Bullish" ? C.green : liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{liveMacd ?? "—"}</span></span>
-                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span></span>
+                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(liveStoch)}</span>}</span>
               </div>
 
               {/* AI scan data — dimmed when expired */}
