@@ -33,7 +33,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (profile) {
       setName(profile.full_name || "");
-      setNickname((profile as any).nickname || "");
+      setNickname(profile.nickname || "");
       setTimeframe(profile.default_timeframe);
       setCandle(profile.default_candle_type);
       setEmaFast(String(profile.ema_fast));
@@ -71,6 +71,7 @@ export default function SettingsPage() {
     // Save standard profile fields
     await updateProfile({
       full_name: name,
+      nickname: nickname || null,
       default_timeframe: timeframe,
       default_candle_type: candle,
       ema_fast: parseInt(emaFast),
@@ -79,9 +80,7 @@ export default function SettingsPage() {
       push_notifications: pushAlerts,
       sms_alerts: smsAlerts,
       broker,
-    });
-    // Save nickname separately (not in typed Profile interface)
-    await supabase.from("profiles").update({ nickname: nickname || null } as any).eq("id", userId);
+    } as any);
     // Save clock preferences separately (column not in typed Profile)
     await supabase.from("profiles").update({ clock_timezones: clockSlots as any }).eq("id", userId);
     toast.success("Settings saved");

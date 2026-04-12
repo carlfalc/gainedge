@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface Profile {
   id: string;
   full_name: string | null;
+  nickname: string | null;
   avatar_url: string | null;
   subscription_tier: string;
   subscription_status: string;
