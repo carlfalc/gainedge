@@ -13,6 +13,7 @@ export const LightBgContext = createContext<boolean>(false);
 import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 import BrokerModal from "./BrokerModal";
 import AskRonModal from "./AskRonModal";
+import TradeNotificationPopup from "./TradeNotificationPopup";
 
 const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -302,6 +303,7 @@ export default function DashboardLayout() {
           sessionLabel,
         }}
       />
+      <TradeNotificationPopup />
     </div>
   );
 }
