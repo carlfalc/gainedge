@@ -1,22 +1,24 @@
 
 
-# Fix Signals Page Layout — Stretch Table & P&L Column
+# Remove Low-Impact News from Market Sentiment
 
 ## Problem
-The signal table uses fixed pixel-width columns totalling ~810px, leaving large amounts of unused space on wider screens. The P&L column (100px) is too narrow, causing the currency amounts to wrap awkwardly.
+Low-impact news items with no matched instruments are still being stored and displayed in the Market Sentiment panel. These add noise without value.
 
 ## Changes
 
-### 1. Update table grid columns (`SignalsPage.tsx`)
-- Change the grid template from fixed pixels (`140px 90px 60px 50px 80px 80px 80px 50px 80px 100px`) to a mix of fixed minimums and flexible columns
-- Use `minmax()` for the P&L column so it gets the remaining space — e.g. `140px 90px 60px 50px 90px 90px 90px 50px 80px 1fr`
-- Apply this to both the header row (line 354) and the data rows (line 373)
+### 1. Tighten insert filter (`supabase/functions/fetch-news/index.ts`)
+Update `shouldInsertNewsItem()` (~line 209) to explicitly reject items where `impact === "low"` and `instruments_affected` is empty. The current logic already does this implicitly but we make it explicit and also reject `impact === "low"` entirely — low-impact items should never be stored.
 
-### 2. Ensure stat tiles remain full-width
-- The stat tiles already use `repeat(5, 1fr)` which stretches correctly — no change needed there
+### 2. Tighten display filter (`src/components/dashboard/NewsSentimentPanel.tsx`)
+Update the safety-net filter (~line 120) to exclude any item with `severity === "low"`. Only show medium and high impact items in the panel.
+
+### 3. Add cleanup for existing low-impact items
+The existing cleanup block in the edge function should also delete any items with `impact = 'low'` regardless of age, to purge existing low-impact noise from the database.
 
 ## Files Modified
 | File | Change |
 |------|--------|
-| `src/pages/dashboard/SignalsPage.tsx` | Change grid template columns to use `1fr` for P&L column so table fills available width |
+| `supabase/functions/fetch-news/index.ts` | Reject all low-impact items in `shouldInsertNewsItem()`; extend cleanup to delete low-impact rows |
+| `src/components/dashboard/NewsSentimentPanel.tsx` | Filter out `severity === "low"` items from display |
 
