@@ -1,157 +1,391 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2.95.0/cors";
 
+// ─── HARD DENYLIST ───
+// If title, URL or source contains any of these, reject immediately.
+const HARD_DENYLIST = [
+  "login", "sign in", "signin", "captcha", "bot check", "making sure you",
+  "register", "cookie policy", "privacy policy", "terms of service",
+  "careers", "contact us", "about us", "forum", "community",
+  "template", "inspiration", "design thinking", "ux design",
+  "startup lessons", "account settings", "subscribe now",
+  "unsubscribe", "404", "page not found", "access denied",
+  "forbidden", "verify your email", "reset password",
+];
+
+// ─── SOFT ALLOWLIST ───
+// Keywords that strongly indicate market-relevant content.
+const SOFT_ALLOWLIST = [
+  "fed", "fomc", "powell", "ecb", "lagarde", "boj", "ueda", "rbnz", "rba",
+  "pboc", "boe", "inflation", "cpi", "ppi", "nfp", "payrolls", "non-farm",
+  "rates", "rate decision", "rate cut", "rate hike", "yields", "treasury",
+  "gold", "xauusd", "bullion", "xau",
+  "nasdaq", "nas100", "us30", "dow", "s&p", "spx", "hk50", "hang seng",
+  "crude", "oil", "wti", "brent", "opec",
+  "btc", "bitcoin", "eth", "ethereum",
+  "sanctions", "war", "conflict", "geopolitical", "tariff", "trade war",
+  "gdp", "pmi", "unemployment", "retail sales", "earnings",
+  "recession", "dxy", "dollar index",
+  "usd", "eur", "gbp", "jpy", "aud", "nzd", "cad", "chf",
+  "eurusd", "gbpusd", "usdjpy", "audusd", "nzdusd",
+];
+
+// ─── INSTRUMENT KEYWORD MAP ───
 const INSTRUMENT_KEYWORDS: Record<string, string[]> = {
-  XAUUSD: ["gold", "xauusd", "precious metal", "safe haven", "bullion"],
-  OIL: ["oil", "crude", "opec", "wti", "brent", "petroleum"],
-  NAS100: ["nas100", "nasdaq", "tech stock", "s&p", "tech earning", "silicon valley"],
-  US30: ["us30", "dow jones", "dow", "industrial"],
-  AUDUSD: ["aud", "australian", "rba", "iron ore", "china pmi", "aussie"],
-  NZDUSD: ["nzd", "new zealand", "rbnz", "dairy", "kiwi"],
+  XAUUSD: ["gold", "xauusd", "xau", "precious metal", "safe haven", "bullion", "gold price"],
+  OIL: ["oil", "crude", "opec", "wti", "brent", "petroleum", "energy"],
+  NAS100: ["nas100", "nasdaq", "tech stock", "tech sector", "silicon valley", "ai stock", "chip"],
+  US30: ["us30", "dow jones", "dow", "industrial", "blue chip"],
+  AUDUSD: ["aud", "australian", "rba", "iron ore", "china pmi", "aussie", "audusd"],
+  NZDUSD: ["nzd", "new zealand", "rbnz", "dairy", "kiwi", "nzdusd"],
+  EURUSD: ["eur", "euro", "ecb", "lagarde", "eurozone", "eurusd"],
+  GBPUSD: ["gbp", "pound", "sterling", "boe", "bank of england", "gbpusd"],
+  USDJPY: ["jpy", "yen", "boj", "japan", "usdjpy"],
+  HK50: ["hk50", "hang seng", "hong kong", "hsi"],
+  BTCUSD: ["btc", "bitcoin"],
+  ETHUSD: ["eth", "ethereum"],
 };
 
+// Multi-instrument keyword clusters
 const MULTI_INSTRUMENT_KEYWORDS: Record<string, string[]> = {
-  "tariff,trade war,china": ["NAS100", "AUDUSD", "XAUUSD"],
-  "geopolitical,war,conflict,bomb,attack,iran": ["XAUUSD", "OIL"],
+  "tariff,trade war,china,sanctions": ["NAS100", "AUDUSD", "XAUUSD", "HK50"],
+  "geopolitical,war,conflict,bomb,attack,iran,missile": ["XAUUSD", "OIL"],
+  "recession,financial crisis,credit crunch": ["XAUUSD", "US30", "NAS100"],
 };
 
-const USD_KEYWORDS = ["usd", "fed", "federal reserve", "inflation", "cpi", "nfp", "jobs", "fomc", "interest rate"];
+const USD_KEYWORDS = [
+  "usd", "fed", "federal reserve", "inflation", "cpi", "nfp", "fomc",
+  "interest rate", "rate decision", "powell", "treasury", "dxy", "dollar index",
+  "payrolls", "non-farm",
+];
 
-const HIGH_KEYWORDS = ["central bank", "rate decision", "geopolitical", "war", "attack", "emergency", "crash", "crisis", "fed", "rba", "rbnz", "boe", "ecb", "boj", "cpi", "nfp", "jobs report"];
-const MEDIUM_KEYWORDS = ["earnings", "pmi", "gdp", "trade balance", "retail sales", "housing"];
+// ─── HIGH / MEDIUM keyword lists ───
+const HIGH_KEYWORDS = [
+  "central bank", "rate decision", "rate cut", "rate hike",
+  "geopolitical", "war", "attack", "emergency", "crash", "crisis",
+  "fed", "rba", "rbnz", "boe", "ecb", "boj", "pboc",
+  "cpi", "nfp", "non-farm", "jobs report", "fomc",
+  "sanctions", "tariff",
+];
+const MEDIUM_KEYWORDS = [
+  "earnings", "pmi", "gdp", "trade balance", "retail sales",
+  "housing", "unemployment", "consumer confidence", "manufacturing",
+  "opec", "recession", "yields", "treasury",
+];
 
-function detectInstruments(text: string): string[] {
-  const lower = text.toLowerCase();
-  const instruments = new Set<string>();
+// ─── SENTIMENT KEYWORDS ───
+const BULLISH_KEYWORDS = [
+  "surge", "rally", "soar", "jump", "rise", "gain", "boost",
+  "beat", "exceed", "strong", "bullish", "dovish", "stimulus",
+  "rate cut", "easing", "recovery", "rebound",
+];
+const BEARISH_KEYWORDS = [
+  "fall", "drop", "plunge", "crash", "decline", "slide", "slump",
+  "miss", "weak", "bearish", "hawkish", "tighten", "rate hike",
+  "sell-off", "selloff", "recession", "contraction", "war", "sanctions",
+];
 
-  for (const [symbol, keywords] of Object.entries(INSTRUMENT_KEYWORDS)) {
-    if (keywords.some(k => lower.includes(k))) instruments.add(symbol);
-  }
+// Specific sentiment overrides for certain instrument-keyword combos
+const INSTRUMENT_SENTIMENT_OVERRIDES: Record<string, { bullish: string[]; bearish: string[] }> = {
+  XAUUSD: {
+    bullish: ["risk-off", "war", "conflict", "geopolitical", "dovish", "rate cut", "weak dollar", "inflation rise", "crisis"],
+    bearish: ["hawkish", "rate hike", "strong dollar", "risk-on", "yields rise"],
+  },
+  NAS100: {
+    bullish: ["rate cut", "dovish", "stimulus", "ai", "tech rally", "beat earnings"],
+    bearish: ["rate hike", "hawkish", "war", "tariff", "sanctions", "regulation"],
+  },
+  US30: {
+    bullish: ["rate cut", "infrastructure", "stimulus", "jobs beat"],
+    bearish: ["rate hike", "tariff", "trade war", "recession"],
+  },
+};
 
-  for (const [keyStr, syms] of Object.entries(MULTI_INSTRUMENT_KEYWORDS)) {
-    if (keyStr.split(",").some(k => lower.includes(k))) {
-      syms.forEach(s => instruments.add(s));
-    }
-  }
+// ═══════════════════════════════════════════
+//  HELPER FUNCTIONS
+// ═══════════════════════════════════════════
 
-  if (USD_KEYWORDS.some(k => lower.includes(k))) {
-    ["XAUUSD", "AUDUSD", "NZDUSD", "US30", "NAS100"].forEach(s => instruments.add(s));
-  }
-
-  return Array.from(instruments);
+interface RawArticle {
+  title: string;
+  summary: string;
+  source: string;
+  url: string;
+  publishedAt: string;
 }
 
-function detectImpact(text: string): string {
-  const lower = text.toLowerCase();
-  if (HIGH_KEYWORDS.some(k => lower.includes(k))) return "high";
-  if (MEDIUM_KEYWORDS.some(k => lower.includes(k))) return "medium";
-  return "low";
-}
-
-interface NewsCandidate {
+interface ProcessedArticle {
   headline: string;
   source: string;
   published_at: string;
   instruments_affected: string[];
   impact: string;
+  sentiment_direction: string; // "bullish" | "bearish" | "neutral"
 }
 
-async function fetchFinnhub(apiKey: string): Promise<NewsCandidate[]> {
-  const results: NewsCandidate[] = [];
+/** Clean and normalize an article's text fields */
+function normalizeArticle(raw: {
+  title?: string;
+  summary?: string;
+  source?: string;
+  url?: string;
+  publishedAt?: string;
+}): RawArticle | null {
+  let title = (raw.title || "").replace(/<[^>]*>/g, "").trim();
+  let summary = (raw.summary || "").replace(/<[^>]*>/g, "").trim();
+  const source = (raw.source || "Unknown").trim();
+  const url = (raw.url || "").trim();
+  const publishedAt = raw.publishedAt || new Date().toISOString();
+
+  // Reject missing/useless titles
+  if (!title || title.length < 10) return null;
+  if (/^(home|index|page|untitled|null|undefined)$/i.test(title)) return null;
+
+  // Truncate
+  title = title.slice(0, 500);
+  summary = summary.slice(0, 1000);
+
+  return { title, summary, source, url, publishedAt };
+}
+
+/** Hard denylist check — returns TRUE if article should be REJECTED */
+function isOnDenylist(article: RawArticle): boolean {
+  const text = `${article.title} ${article.summary} ${article.url} ${article.source}`.toLowerCase();
+  return HARD_DENYLIST.some(term => text.includes(term));
+}
+
+/** Returns true if the article passes the relevance gate */
+function isRelevantMarketNews(article: RawArticle): boolean {
+  if (isOnDenylist(article)) return false;
+
+  const text = `${article.title} ${article.summary}`.toLowerCase();
+
+  // Check for soft allowlist hits
+  const allowlistHits = SOFT_ALLOWLIST.filter(k => text.includes(k));
+  if (allowlistHits.length >= 1) return true;
+
+  // Check for any instrument keyword
+  for (const keywords of Object.values(INSTRUMENT_KEYWORDS)) {
+    if (keywords.some(k => text.includes(k))) return true;
+  }
+
+  // No finance signal at all — reject
+  return false;
+}
+
+/** Score market relevance and classify impact */
+function scoreMarketRelevance(article: RawArticle): "irrelevant" | "low" | "medium" | "high" {
+  const text = `${article.title} ${article.summary}`.toLowerCase();
+
+  if (HIGH_KEYWORDS.some(k => text.includes(k))) return "high";
+  if (MEDIUM_KEYWORDS.some(k => text.includes(k))) return "medium";
+
+  // Count allowlist hits as a proxy for relevance depth
+  const hits = SOFT_ALLOWLIST.filter(k => text.includes(k)).length;
+  if (hits >= 3) return "medium";
+  if (hits >= 1) return "low";
+
+  return "irrelevant";
+}
+
+/** Detect which instruments are affected */
+function detectAffectedInstruments(article: RawArticle, subscriberInstruments?: string[]): string[] {
+  const text = `${article.title} ${article.summary}`.toLowerCase();
+  const instruments = new Set<string>();
+
+  for (const [symbol, keywords] of Object.entries(INSTRUMENT_KEYWORDS)) {
+    if (keywords.some(k => text.includes(k))) instruments.add(symbol);
+  }
+
+  for (const [keyStr, syms] of Object.entries(MULTI_INSTRUMENT_KEYWORDS)) {
+    if (keyStr.split(",").some(k => text.includes(k))) {
+      syms.forEach(s => instruments.add(s));
+    }
+  }
+
+  if (USD_KEYWORDS.some(k => text.includes(k))) {
+    ["XAUUSD", "AUDUSD", "NZDUSD", "US30", "NAS100", "EURUSD", "GBPUSD", "USDJPY"].forEach(s => instruments.add(s));
+  }
+
+  const result = Array.from(instruments);
+
+  // If subscriber instruments provided, filter to only those they have
+  if (subscriberInstruments && subscriberInstruments.length > 0) {
+    const filtered = result.filter(s => subscriberInstruments.includes(s));
+    // Return filtered if any match, otherwise return all (for broad macro stories)
+    return filtered.length > 0 ? filtered : result;
+  }
+
+  return result;
+}
+
+/** Classify sentiment direction for the overall article */
+function classifyArticleSentiment(article: RawArticle, instruments: string[]): string {
+  const text = `${article.title} ${article.summary}`.toLowerCase();
+
+  // Check instrument-specific overrides first
+  for (const instr of instruments) {
+    const overrides = INSTRUMENT_SENTIMENT_OVERRIDES[instr];
+    if (overrides) {
+      if (overrides.bullish.some(k => text.includes(k))) return "bullish";
+      if (overrides.bearish.some(k => text.includes(k))) return "bearish";
+    }
+  }
+
+  // General sentiment
+  const bullishHits = BULLISH_KEYWORDS.filter(k => text.includes(k)).length;
+  const bearishHits = BEARISH_KEYWORDS.filter(k => text.includes(k)).length;
+
+  if (bullishHits > bearishHits) return "bullish";
+  if (bearishHits > bullishHits) return "bearish";
+  return "neutral";
+}
+
+/** Final gate: should this item be inserted? */
+function shouldInsertNewsItem(item: ProcessedArticle): boolean {
+  if (item.impact === "irrelevant") return false;
+  if (item.instruments_affected.length > 0) return true;
+  if (item.impact === "medium" || item.impact === "high") return true;
+  return false;
+}
+
+/** Process a raw article through the full pipeline */
+function processArticle(raw: {
+  title?: string;
+  summary?: string;
+  source?: string;
+  url?: string;
+  publishedAt?: string;
+}): ProcessedArticle | null {
+  const normalized = normalizeArticle(raw);
+  if (!normalized) return null;
+
+  if (!isRelevantMarketNews(normalized)) return null;
+
+  const impact = scoreMarketRelevance(normalized);
+  if (impact === "irrelevant") return null;
+
+  const instruments = detectAffectedInstruments(normalized);
+  const sentiment = classifyArticleSentiment(normalized, instruments);
+
+  const processed: ProcessedArticle = {
+    headline: normalized.title,
+    source: normalized.source,
+    published_at: normalized.publishedAt,
+    instruments_affected: instruments,
+    impact,
+    sentiment_direction: sentiment,
+  };
+
+  if (!shouldInsertNewsItem(processed)) return null;
+
+  return processed;
+}
+
+// ═══════════════════════════════════════════
+//  API FETCHERS
+// ═══════════════════════════════════════════
+
+async function fetchFinnhub(apiKey: string): Promise<ProcessedArticle[]> {
+  if (!apiKey) return [];
+  const results: ProcessedArticle[] = [];
   try {
     for (const category of ["general", "forex"]) {
       const res = await fetch(`https://finnhub.io/api/v1/news?category=${category}&token=${apiKey}`);
       if (!res.ok) { await res.text(); continue; }
       const data = await res.json();
       for (const item of (data || []).slice(0, 15)) {
-        const text = `${item.headline} ${item.summary || ""}`;
-        results.push({
-          headline: item.headline,
+        const processed = processArticle({
+          title: item.headline,
+          summary: item.summary || "",
           source: item.source || "Finnhub",
-          published_at: new Date(item.datetime * 1000).toISOString(),
-          instruments_affected: detectInstruments(text),
-          impact: detectImpact(text),
+          url: item.url || "",
+          publishedAt: new Date(item.datetime * 1000).toISOString(),
         });
+        if (processed) results.push(processed);
       }
     }
   } catch (e) { console.error("Finnhub error:", e); }
   return results;
 }
 
-async function fetchAlphaVantage(apiKey: string): Promise<NewsCandidate[]> {
-  const results: NewsCandidate[] = [];
+async function fetchAlphaVantage(apiKey: string): Promise<ProcessedArticle[]> {
+  if (!apiKey) return [];
+  const results: ProcessedArticle[] = [];
   try {
     const res = await fetch(`https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=FOREX:AUD,FOREX:NZD,FOREX:USD,COMMODITY:GOLD&apikey=${apiKey}`);
     if (!res.ok) { await res.text(); return results; }
     const data = await res.json();
     for (const item of (data.feed || []).slice(0, 10)) {
-      const text = `${item.title} ${item.summary || ""}`;
-      const instruments = detectInstruments(text);
+      const publishedAt = item.time_published
+        ? `${item.time_published.slice(0,4)}-${item.time_published.slice(4,6)}-${item.time_published.slice(6,8)}T${item.time_published.slice(9,11)}:${item.time_published.slice(11,13)}:00Z`
+        : new Date().toISOString();
 
-      // Use ticker sentiment to enrich
-      if (item.ticker_sentiment) {
-        for (const ts of item.ticker_sentiment) {
-          const ticker = ts.ticker || "";
-          if (ticker.includes("XAU") || ticker.includes("GOLD")) instruments.push("XAUUSD");
-          if (ticker.includes("AUD")) instruments.push("AUDUSD");
-          if (ticker.includes("NZD")) instruments.push("NZDUSD");
-        }
-      }
-
-      results.push({
-        headline: item.title,
+      const processed = processArticle({
+        title: item.title,
+        summary: item.summary || "",
         source: item.source || "Alpha Vantage",
-        published_at: item.time_published
-          ? `${item.time_published.slice(0,4)}-${item.time_published.slice(4,6)}-${item.time_published.slice(6,8)}T${item.time_published.slice(9,11)}:${item.time_published.slice(11,13)}:00Z`
-          : new Date().toISOString(),
-        instruments_affected: [...new Set(instruments)],
-        impact: detectImpact(text),
+        url: item.url || "",
+        publishedAt,
       });
+      if (processed) results.push(processed);
     }
   } catch (e) { console.error("AlphaVantage error:", e); }
   return results;
 }
 
-async function fetchMarketaux(apiKey: string): Promise<NewsCandidate[]> {
-  const results: NewsCandidate[] = [];
+async function fetchMarketaux(apiKey: string): Promise<ProcessedArticle[]> {
+  if (!apiKey) return [];
+  const results: ProcessedArticle[] = [];
   try {
     const res = await fetch(`https://api.marketaux.com/v1/news/all?filter_entities=true&language=en&api_token=${apiKey}`);
     if (!res.ok) { await res.text(); return results; }
     const data = await res.json();
     for (const item of (data.data || []).slice(0, 10)) {
-      const text = `${item.title} ${item.description || ""}`;
-      const instruments = detectInstruments(text);
-
-      if (item.entities) {
-        for (const entity of item.entities) {
-          const sym = (entity.symbol || "").toUpperCase();
-          if (sym.includes("XAU") || sym.includes("GLD")) instruments.push("XAUUSD");
-          if (sym.includes("AUD")) instruments.push("AUDUSD");
-        }
-      }
-
-      results.push({
-        headline: item.title,
+      const processed = processArticle({
+        title: item.title,
+        summary: item.description || "",
         source: item.source || "Marketaux",
-        published_at: item.published_at || new Date().toISOString(),
-        instruments_affected: [...new Set(instruments)],
-        impact: detectImpact(text),
+        url: item.url || "",
+        publishedAt: item.published_at || new Date().toISOString(),
       });
+      if (processed) results.push(processed);
     }
   } catch (e) { console.error("Marketaux error:", e); }
   return results;
 }
 
-function deduplicateNews(items: NewsCandidate[]): NewsCandidate[] {
+// ═══════════════════════════════════════════
+//  DEDUP & CLEANUP
+// ═══════════════════════════════════════════
+
+function deduplicateNews(items: ProcessedArticle[]): ProcessedArticle[] {
   const seen = new Set<string>();
   return items.filter(item => {
-    // Normalize: lowercase, remove punctuation, take first 60 chars
     const key = item.headline.toLowerCase().replace(/[^a-z0-9 ]/g, "").slice(0, 60).trim();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
+
+async function cleanupIrrelevantNews(supabase: ReturnType<typeof createClient>) {
+  // Delete junk: items older than 1 hour with no instruments and low impact
+  const cutoff1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  await supabase
+    .from("news_items")
+    .delete()
+    .lt("published_at", cutoff1h)
+    .or("instruments_affected.is.null,instruments_affected.eq.{}")
+    .eq("impact", "low");
+
+  // Delete old news (> 48h)
+  const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  await supabase.from("news_items").delete().lt("published_at", cutoff48h);
+}
+
+// ═══════════════════════════════════════════
+//  MAIN HANDLER
+// ═══════════════════════════════════════════
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -163,7 +397,7 @@ Deno.serve(async (req) => {
     const alphaKey = Deno.env.get("ALPHA_VANTAGE_API_KEY") || "";
     const marketauxKey = Deno.env.get("MARKETAUX_API_KEY") || "";
 
-    // Fetch from all sources in parallel
+    // Fetch from all sources in parallel — each source runs through the full pipeline
     const [finnhubNews, alphaNews, marketauxNews] = await Promise.all([
       fetchFinnhub(finnhubKey),
       fetchAlphaVantage(alphaKey),
@@ -172,7 +406,6 @@ Deno.serve(async (req) => {
 
     const allNews = deduplicateNews([...finnhubNews, ...alphaNews, ...marketauxNews]);
 
-    // Insert into Supabase using service role
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -186,11 +419,11 @@ Deno.serve(async (req) => {
       .gte("published_at", since);
 
     const existingHeadlines = new Set((existing || []).map((e: { headline: string }) =>
-      e.headline.toLowerCase().slice(0, 60)
+      e.headline.toLowerCase().replace(/[^a-z0-9 ]/g, "").slice(0, 60).trim()
     ));
 
     const newItems = allNews.filter(n =>
-      !existingHeadlines.has(n.headline.toLowerCase().slice(0, 60))
+      !existingHeadlines.has(n.headline.toLowerCase().replace(/[^a-z0-9 ]/g, "").slice(0, 60).trim())
     );
 
     let inserted = 0;
@@ -208,9 +441,8 @@ Deno.serve(async (req) => {
       else inserted = rows.length;
     }
 
-    // Clean up old news (older than 48h)
-    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    await supabase.from("news_items").delete().lt("published_at", cutoff);
+    // Cleanup junk and old data
+    await cleanupIrrelevantNews(supabase);
 
     return new Response(
       JSON.stringify({
