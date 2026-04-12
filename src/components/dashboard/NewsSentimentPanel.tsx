@@ -116,11 +116,13 @@ export function NewsSentimentPanel() {
     }
   };
 
-  // Safety-net filter
+  // Safety-net filter: only medium/high impact
   const relevant = items.filter(item =>
-    (item.impacts.length > 0 && item.impacts[0].symbol !== "MARKET") ||
-    item.severity === "medium" ||
-    item.severity === "high"
+    item.severity !== "low" && (
+      (item.impacts.length > 0 && item.impacts[0].symbol !== "MARKET") ||
+      item.severity === "medium" ||
+      item.severity === "high"
+    )
   );
   const display = relevant.slice(0, 5);
 
