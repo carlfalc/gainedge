@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
 import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock } from "lucide-react";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
-import FalconerPreferencesPanel from "@/components/dashboard/FalconerPreferencesPanel";
+import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
 import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
 import { useProfile } from "@/hooks/use-profile";
