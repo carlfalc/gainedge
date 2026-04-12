@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
+import LanguageSelector, { LanguageProvider } from "./LanguageSelector";
 
 /** Light background context — consumed by any page that wants to adapt */
 export const LightBgContext = createContext<boolean>(false);
@@ -99,6 +100,7 @@ export default function DashboardLayout() {
   };
 
   return (
+    <LanguageProvider>
     <div style={{ display: "flex", minHeight: "100vh", background: C.bg }}>
       {/* Hover trigger zone — always visible at left edge */}
       {collapsed && !hovered && (
@@ -247,6 +249,7 @@ export default function DashboardLayout() {
             >
               <LayoutDashboard size={15} /> Dashboard
             </button>
+            <LanguageSelector />
             {/* Light/Dark background toggle */}
             <button
               onClick={() => {
@@ -320,5 +323,6 @@ export default function DashboardLayout() {
       />
       <TradeNotificationPopup />
     </div>
+    </LanguageProvider>
   );
 }
