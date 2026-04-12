@@ -319,16 +319,13 @@ export default function Index() {
   const [authLoading, setAuthLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Detect OAuth callback — redirect to dashboard when a new sign-in occurs
-  // Already-logged-in users who navigate here won't be redirected (initial session doesn't trigger SIGNED_IN)
-  const initialLoadRef = useRef(true);
+  // Only redirect to dashboard after an intentional sign-in on this page
+  // (not on page load with an existing session — let logged-in users view the landing page)
+  const justSignedInRef = useRef(false);
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session && !initialLoadRef.current) {
+      if (event === "SIGNED_IN" && session && justSignedInRef.current) {
         navigate("/dashboard");
-      }
-      if (event === "INITIAL_SESSION") {
-        initialLoadRef.current = false;
       }
     });
     return () => subscription.unsubscribe();

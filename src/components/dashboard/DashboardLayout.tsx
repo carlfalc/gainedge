@@ -46,6 +46,7 @@ export default function DashboardLayout() {
   const [brokerOpen, setBrokerOpen] = useState(false);
   const [ronOpen, setRonOpen] = useState(false);
   const [lightBg, setLightBg] = useState(() => localStorage.getItem("gainedge_light_bg") === "1");
+  const [authReady, setAuthReady] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -58,22 +59,33 @@ export default function DashboardLayout() {
   }, []);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    let mounted = true;
+    // First, check the existing session before subscribing to changes
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
       if (!session) {
-        navigate("/");
+        navigate("/login", { replace: true });
       } else {
         setUserEmail(session.user.email || "");
         setUserId(session.user.id);
       }
+      setAuthReady(true);
     });
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) navigate("/");
-      else {
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === "SIGNED_OUT") {
+        navigate("/", { replace: true });
+      } else if (session) {
         setUserEmail(session.user.email || "");
         setUserId(session.user.id);
       }
     });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   // Load clock preferences from profile
