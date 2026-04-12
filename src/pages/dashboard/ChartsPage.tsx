@@ -932,17 +932,18 @@ export default function ChartsPage() {
     paneSeriesRefs.current = [];
     drawingManagerRef.current = null;
 
+    const isWhiteBg = chartBgMode === "white";
     const chart = createChart(containerRef.current, {
       width: Math.max(containerRef.current.clientWidth, 1),
       height: Math.max(containerRef.current.clientHeight, 1),
       layout: {
-        background: { color: "#080B12" },
-        textColor: "#9CA3AF",
+        background: { color: isWhiteBg ? "#FFFFFF" : "#080B12" },
+        textColor: isWhiteBg ? "#333333" : "#9CA3AF",
         fontFamily: "'DM Sans', sans-serif",
       },
       grid: {
-        vertLines: { color: "rgba(255,255,255,0.04)" },
-        horzLines: { color: "rgba(255,255,255,0.04)" },
+        vertLines: { color: isWhiteBg ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)" },
+        horzLines: { color: isWhiteBg ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)" },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
@@ -961,9 +962,9 @@ export default function ChartsPage() {
     chartRef.current = chart;
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#22C55E", downColor: "#EF4444",
-      borderUpColor: "#22C55E", borderDownColor: "#EF4444",
-      wickUpColor: "#22C55E", wickDownColor: "#EF4444",
+      upColor: candleUpColor, downColor: candleDownColor,
+      borderUpColor: candleUpColor, borderDownColor: candleDownColor,
+      wickUpColor: candleUpColor, wickDownColor: candleDownColor,
     });
     candleSeriesRef.current = candleSeries;
 
