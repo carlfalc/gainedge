@@ -319,7 +319,15 @@ export default function Index() {
   const [authLoading, setAuthLoading] = useState(false);
   const navigate = useNavigate();
 
-  // No auto-redirect — let users browse the landing page even when logged in
+  // Detect OAuth callback — if user just signed in via Google, redirect to dashboard
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        navigate("/dashboard");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleAuth = async () => {
     if (!authEmail || !authPassword) { toast.error("Please fill all fields"); return; }
