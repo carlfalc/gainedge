@@ -132,42 +132,42 @@ export function LiveTradeAlert() {
         )}
       </div>
 
-      <span style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: "nowrap" }}>Live Trade</span>
-      <span style={{ color: C.border, fontSize: 13 }}>|</span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF", whiteSpace: "nowrap" }}>Live Trade</span>
+      <span style={{ color: "#FFFFFF", fontSize: 13 }}>|</span>
 
       {showTrade ? (
-        <div style={{ fontSize: 12, color: C.sec, fontFamily: "'JetBrains Mono', monospace", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-          <span style={{ color: C.muted }}>{time}</span>
+        <div style={{ fontSize: 12, color: "#FFFFFF", fontFamily: "'JetBrains Mono', monospace", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          <span style={{ color: "#FFFFFF" }}>{time}</span>
           {isAging && (
-            <span style={{ color: "#F59E0B", fontSize: 10, fontWeight: 700 }}>⏰ Expiring soon</span>
+            <span style={{ color: "#FFFFFF", fontSize: 10, fontWeight: 700 }}>⏰ Expiring soon</span>
           )}
-          <span style={{ color: C.border }}>|</span>
+          <span style={{ color: "#FFFFFF" }}>|</span>
           <span style={{ color: isBuy ? C.jade : C.red, fontWeight: 700 }}>{trade!.symbol} {trade!.direction}</span>
-          <span style={{ color: C.border }}>|</span>
-          <span>Entry: <span style={{ color: C.text }}>{trade!.entry_price ?? "—"}</span></span>
+          <span style={{ color: "#FFFFFF" }}>|</span>
+          <span>Entry: <span style={{ color: "#FFFFFF" }}>{trade!.entry_price ?? "—"}</span></span>
           {livePrice && (
             <>
-              <span style={{ color: C.border }}>|</span>
-              <span>Current: <span style={{ color: C.text, fontWeight: 700 }}>{livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</span></span>
+              <span style={{ color: "#FFFFFF" }}>|</span>
+              <span>Current: <span style={{ color: "#FFFFFF", fontWeight: 700 }}>{livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}</span></span>
             </>
           )}
           {livePnl !== null && (
             <>
-              <span style={{ color: C.border }}>|</span>
+              <span style={{ color: "#FFFFFF" }}>|</span>
               <span>P&L: <span style={{ color: livePnl >= 0 ? C.jade : C.red, fontWeight: 700 }}>
                 {livePnl >= 0 ? "+" : ""}{livePnl.toFixed(2)}
               </span></span>
             </>
           )}
-          <span style={{ color: C.border }}>|</span>
+          <span style={{ color: "#FFFFFF" }}>|</span>
           <span>TP: <span style={{ color: C.jade }}>{trade!.take_profit ?? "—"}</span></span>
-          <span style={{ color: C.border }}>|</span>
+          <span style={{ color: "#FFFFFF" }}>|</span>
           <span>SL: <span style={{ color: C.red }}>{trade!.stop_loss ?? "—"}</span></span>
         </div>
       ) : (
-        <span style={{ fontSize: 12, color: C.muted, fontStyle: "italic" }}>
+        <span style={{ fontSize: 12, color: "#FFFFFF", fontStyle: "italic" }}>
           🔴 Monitoring... waiting for high-conviction setup
-          {trade && isExpired && <span style={{ marginLeft: 8, color: "#F59E0B", fontSize: 10 }}>Last signal {formatAge(trade.scanned_at)}</span>}
+          {trade && isExpired && <span style={{ marginLeft: 8, color: "#FFFFFF", fontSize: 10 }}>Last signal {formatAge(trade.scanned_at)}</span>}
         </span>
       )}
 
