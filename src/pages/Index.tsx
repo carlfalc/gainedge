@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -319,7 +319,20 @@ export default function Index() {
   const [authLoading, setAuthLoading] = useState(false);
   const navigate = useNavigate();
 
-  // No auto-redirect — let users browse the landing page even when logged in
+  // Detect OAuth callback — redirect to dashboard when a new sign-in occurs
+  // Already-logged-in users who navigate here won't be redirected (initial session doesn't trigger SIGNED_IN)
+  const initialLoadRef = useRef(true);
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session && !initialLoadRef.current) {
+        navigate("/dashboard");
+      }
+      if (event === "INITIAL_SESSION") {
+        initialLoadRef.current = false;
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleAuth = async () => {
     if (!authEmail || !authPassword) { toast.error("Please fill all fields"); return; }
@@ -395,7 +408,7 @@ export default function Index() {
             </div>
 
             <button onClick={async () => {
-              const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+              const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/login" });
               if (result.error) toast.error("Google sign-in failed");
               if (!result.redirected && !result.error) navigate("/dashboard");
             }} style={{
