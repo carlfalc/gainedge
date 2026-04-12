@@ -212,6 +212,53 @@ export default function ChartsPage() {
   const resizeFrameRef = useRef<number | null>(null);
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
 
+  /* ─── Chart color settings (persisted) ─── */
+  const DEFAULT_UP = "#22C55E";
+  const DEFAULT_DOWN = "#EF4444";
+  const DEFAULT_BG = "black" as const;
+
+  const loadChartColors = () => {
+    try {
+      const raw = localStorage.getItem("ge_chart_colors");
+      if (raw) return JSON.parse(raw) as { up: string; down: string; bg: "black" | "white" };
+    } catch {}
+    return { up: DEFAULT_UP, down: DEFAULT_DOWN, bg: DEFAULT_BG };
+  };
+
+  const savedColors = loadChartColors();
+  const [candleUpColor, setCandleUpColor] = useState(savedColors.up);
+  const [candleDownColor, setCandleDownColor] = useState(savedColors.down);
+  const [chartBgMode, setChartBgMode] = useState<"black" | "white">(savedColors.bg);
+  const [showChartSettings, setShowChartSettings] = useState(false);
+
+  // Persist color settings
+  useEffect(() => {
+    localStorage.setItem("ge_chart_colors", JSON.stringify({ up: candleUpColor, down: candleDownColor, bg: chartBgMode }));
+  }, [candleUpColor, candleDownColor, chartBgMode]);
+
+  // Apply colors live without rebuilding chart
+  useEffect(() => {
+    if (candleSeriesRef.current) {
+      candleSeriesRef.current.applyOptions({
+        upColor: candleUpColor, downColor: candleDownColor,
+        borderUpColor: candleUpColor, borderDownColor: candleDownColor,
+        wickUpColor: candleUpColor, wickDownColor: candleDownColor,
+      });
+    }
+    if (chartRef.current) {
+      const isWhite = chartBgMode === "white";
+      chartRef.current.applyOptions({
+        layout: {
+          background: { color: isWhite ? "#FFFFFF" : "#080B12" },
+          textColor: isWhite ? "#333333" : "#9CA3AF",
+        },
+        grid: {
+          vertLines: { color: isWhite ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)" },
+          horzLines: { color: isWhite ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.04)" },
+        },
+      });
+    }
+  }, [candleUpColor, candleDownColor, chartBgMode]);
   /* ─── load broker label from profile ─── */
   const BROKER_LABELS: Record<string, string> = {
     eightcap: "EIGHTCAP", ic_markets: "IC MARKETS", pepperstone: "PEPPERSTONE",
