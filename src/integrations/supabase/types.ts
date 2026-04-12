@@ -460,6 +460,7 @@ export type Database = {
           id: string
           metaapi_account_id: string | null
           news_preferences: Json | null
+          nickname: string | null
           push_notifications: boolean
           sms_alerts: boolean
           subscription_status: string
@@ -481,6 +482,7 @@ export type Database = {
           id: string
           metaapi_account_id?: string | null
           news_preferences?: Json | null
+          nickname?: string | null
           push_notifications?: boolean
           sms_alerts?: boolean
           subscription_status?: string
@@ -502,6 +504,7 @@ export type Database = {
           id?: string
           metaapi_account_id?: string | null
           news_preferences?: Json | null
+          nickname?: string | null
           push_notifications?: boolean
           sms_alerts?: boolean
           subscription_status?: string

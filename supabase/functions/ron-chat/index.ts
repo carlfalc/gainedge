@@ -62,6 +62,11 @@ serve(async (req) => {
     let systemPrompt = RON_SYSTEM_PROMPT;
     if (context) {
       systemPrompt += `\n\n## Current User Context\n`;
+      if (context.userName) {
+        // Time-appropriate greeting instruction
+        systemPrompt += `- User's name: ${context.userName}\n`;
+        systemPrompt += `- IMPORTANT: When starting a NEW conversation (first message), greet the user by name with a time-appropriate greeting. User's local hour is ${context.localHour ?? "unknown"} (24h). Use "Good morning" (5-11), "Good afternoon" (12-16), "Good evening" (17-20), or just "Hey" (21-4). For follow-up messages in the same conversation, don't repeat the greeting — just answer naturally.\n`;
+      }
       if (context.page) systemPrompt += `- Current page: ${context.page}\n`;
       if (context.instrument) systemPrompt += `- Active instrument: ${context.instrument}\n`;
       if (context.timeframe) systemPrompt += `- Timeframe: ${context.timeframe}\n`;

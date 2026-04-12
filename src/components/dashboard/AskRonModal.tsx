@@ -13,6 +13,7 @@ interface AskRonModalProps {
     pattern?: string;
     price?: string;
     sessionLabel?: string;
+    userName?: string;
   };
 }
 
@@ -32,7 +33,7 @@ async function streamChat(
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages, context }),
+    body: JSON.stringify({ messages, context: { ...context, localHour: new Date().getHours() } }),
     signal,
   });
 
