@@ -5,7 +5,7 @@ import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
 import { AlertTriangle, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown } from "@/lib/expiry";
+import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMarketClosed, secondsUntilMarketOpen } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
@@ -254,9 +254,9 @@ export default function DashboardHome() {
                   }}>
                     {inst.direction}
                   </div>
-                  <span style={{ fontSize: 9, color: C.sec, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
-                    <Clock size={9} /> Next scan: {formatCountdown(countdown)}
-                  </span>
+                   <span style={{ fontSize: 9, color: countdown === -1 ? "#F59E0B" : C.sec, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
+                     <Clock size={9} /> {countdown === -1 ? "Market closed" : `Next scan: ${formatCountdown(countdown)}`}
+                   </span>
                 </div>
               </div>
 
@@ -291,8 +291,8 @@ export default function DashboardHome() {
               </div>
 
               {expired && (
-                <div style={{ fontSize: 10, color: C.sec, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
-                  <Clock size={10} /> Next scan: {formatCountdown(countdown)}
+                <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.sec, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
                 </div>
               )}
             </div>

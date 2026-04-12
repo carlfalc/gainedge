@@ -54,11 +54,45 @@ export function newsFreshness(timestamp: string | Date): NewsFreshness {
   return "expired";
 }
 
-/** Seconds until next candle close for a given timeframe */
+/** Check if forex market is currently closed (Fri 21:00 UTC – Sun 19:00 UTC) */
+export function isMarketClosed(now?: Date): boolean {
+  const d = now || new Date();
+  const day = d.getUTCDay(); // 0=Sun, 5=Fri, 6=Sat
+  const h = d.getUTCHours();
+  if (day === 6) return true; // all Saturday
+  if (day === 5 && h >= 21) return true; // Friday after 21:00
+  if (day === 0 && h < 19) return true; // Sunday before 19:00
+  return false;
+}
+
+/** Seconds until market opens (Sunday 19:00 UTC) — returns 0 if market is open */
+export function secondsUntilMarketOpen(now?: Date): number {
+  const d = now || new Date();
+  if (!isMarketClosed(d)) return 0;
+  // Find next Sunday 19:00 UTC
+  const target = new Date(d);
+  const day = d.getUTCDay();
+  if (day === 0) {
+    // It's Sunday before 19:00
+    target.setUTCHours(19, 0, 0, 0);
+  } else {
+    // Friday after 21:00 or Saturday — advance to Sunday
+    const daysUntilSun = (7 - day) % 7 || 7;
+    target.setUTCDate(d.getUTCDate() + daysUntilSun);
+    target.setUTCHours(19, 0, 0, 0);
+    // If we're on Friday and added 7, correct to +2
+    if (day === 5) target.setUTCDate(d.getUTCDate() + 2);
+    if (day === 6) target.setUTCDate(d.getUTCDate() + 1);
+  }
+  target.setUTCHours(19, 0, 0, 0);
+  return Math.max(1, Math.ceil((target.getTime() - d.getTime()) / 1000));
+}
+
+/** Seconds until next candle close for a given timeframe (returns -1 if market closed) */
 export function nextScanSeconds(timeframe: string): number {
+  if (isMarketClosed()) return -1;
   const mins = TF_MINUTES[timeframe] || 15;
   if (mins >= 1440) {
-    // Daily: next UTC midnight
     const now = new Date();
     const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
     return Math.max(1, Math.ceil((tomorrow.getTime() - now.getTime()) / 1000));
