@@ -3,7 +3,7 @@ import { SpinCard } from "@/components/dashboard/SpinCard";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
-import { AlertTriangle, Clock, ArrowUp, ArrowDown, Circle, X, Eye, GripVertical } from "lucide-react";
+import { AlertTriangle, Clock, ArrowUp, ArrowDown, Circle, X, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMarketClosed, secondsUntilMarketOpen } from "@/lib/expiry";
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
@@ -82,17 +82,14 @@ export default function DashboardHome() {
 
   useEffect(() => {
     loadData();
-    // Trigger compute on load
     triggerMarketDataCompute();
 
-    // Trigger initial news fetch & poll every 2 minutes
     const fetchNews = () => {
       supabase.functions.invoke("fetch-news", { method: "POST" }).catch(console.error);
     };
     fetchNews();
     const newsInterval = setInterval(fetchNews, 2 * 60 * 1000);
 
-    // 30-second polling fallback for market data compute
     const computeInterval = setInterval(() => {
       triggerMarketDataCompute();
     }, 30 * 1000);
@@ -114,7 +111,6 @@ export default function DashboardHome() {
     if (!session) return;
     const uid = session.user.id;
 
-    // Load instrument timeframes
     const { data: instData } = await supabase
       .from("user_instruments")
       .select("symbol, timeframe")
@@ -164,6 +160,19 @@ export default function DashboardHome() {
     }
   };
 
+  const hidePane = (symbol: string) => {
+    setHiddenPanes(prev => {
+      const next = new Set(prev);
+      next.add(symbol);
+      localStorage.setItem("hidden-panes", JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  const showAllPanes = () => {
+    setHiddenPanes(new Set());
+    localStorage.removeItem("hidden-panes");
+  };
 
   // Highest conviction: only from last 20 minutes
   const recentScans = scans.filter(s => !isDynamicallyExpired(s.scanned_at, instrumentTfs.get(s.symbol) || "15m"));
@@ -171,6 +180,36 @@ export default function DashboardHome() {
   const totalTrades = stats.wins + stats.losses;
   const winRate = totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 100) : 0;
 
+  // Filter hidden and sort by custom order
+  const visibleScans = scans
+    .filter(s => !hiddenPanes.has(s.symbol))
+    .sort((a, b) => {
+      const ai = cardOrder.indexOf(a.symbol);
+      const bi = cardOrder.indexOf(b.symbol);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    setDragIndex(idx);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); setDragOverIndex(idx); };
+  const handleDragEnd = () => { setDragIndex(null); setDragOverIndex(null); };
+  const handleDrop = (e: React.DragEvent, dropIdx: number) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === dropIdx) { setDragIndex(null); setDragOverIndex(null); return; }
+    const ordered = visibleScans.map(s => s.symbol);
+    const [moved] = ordered.splice(dragIndex, 1);
+    ordered.splice(dropIdx, 0, moved);
+    const allSymbols = [...ordered, ...scans.map(s => s.symbol).filter(s => !ordered.includes(s))];
+    setCardOrder(allSymbols);
+    localStorage.setItem("card-order", JSON.stringify(allSymbols));
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
 
   return (
     <div style={{ width: "100%" }}>
@@ -217,8 +256,30 @@ export default function DashboardHome() {
         </div>
       )}
 
+      {/* CURRENT INSTRUMENT TRACKING header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
+          CURRENT INSTRUMENT TRACKING
+          <span style={{ color: C.sec, fontWeight: 400, fontSize: 10, marginLeft: 10, letterSpacing: 0, textTransform: "none" }}>
+            {visibleScans.length}/{scans.length} visible
+          </span>
+        </div>
+        {hiddenPanes.size > 0 && (
+          <button
+            onClick={showAllPanes}
+            style={{
+              display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.jade,
+              background: C.jade + "15", border: `1px solid ${C.jade}30`, borderRadius: 6,
+              padding: "3px 10px", cursor: "pointer", fontWeight: 600,
+            }}
+          >
+            <Eye size={12} /> Show All
+          </button>
+        )}
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
-        {scans.map(inst => {
+        {visibleScans.map((inst, idx) => {
           const tf = instrumentTfs.get(inst.symbol) || "15m";
           const expired = isDynamicallyExpired(inst.scanned_at, tf);
           const countdown = nextScanSeconds(tf);
@@ -230,8 +291,24 @@ export default function DashboardHome() {
           const liveAdx = live?.adx ?? inst.adx;
           const liveMacd = live?.macd_status ?? inst.macd_status;
           const liveStoch = live?.stoch_rsi ?? inst.stoch_rsi;
+          const isDragOver = dragOverIndex === idx && dragIndex !== idx;
           return (
-            <div key={inst.symbol} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, opacity: expired ? 0.9 : 1, transition: "opacity 0.3s" }}>
+            <div
+              key={inst.symbol}
+              draggable
+              onDragStart={(e) => handleDragStart(e, idx)}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDrop={(e) => handleDrop(e, idx)}
+              onDragEnd={handleDragEnd}
+              style={{
+                background: C.card,
+                border: `1px solid ${isDragOver ? C.jade : C.border}`,
+                borderRadius: 14, padding: 18,
+                opacity: dragIndex === idx ? 0.5 : expired ? 0.9 : 1,
+                transition: "opacity 0.3s, border-color 0.2s",
+                cursor: "grab",
+              }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -264,12 +341,27 @@ export default function DashboardHome() {
                   </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <div style={{
-                    fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-                    background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
-                    color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
-                  }}>
-                    {inst.direction}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{
+                      fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
+                      background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
+                      color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
+                    }}>
+                      {inst.direction}
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); hidePane(inst.symbol); }}
+                      style={{
+                        background: "transparent", border: "none", cursor: "pointer",
+                        padding: 2, display: "flex", alignItems: "center", justifyContent: "center",
+                        borderRadius: 4, opacity: 0.4, transition: "opacity 0.2s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                      onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.4")}
+                      title="Hide this card"
+                    >
+                      <X size={14} color={C.sec} />
+                    </button>
                   </div>
                    <span style={{ fontSize: 9, color: countdown === -1 ? "#F59E0B" : C.sec, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
                      <Clock size={9} /> {countdown === -1 ? "Market closed" : `Next scan: ${formatCountdown(countdown)}`}
@@ -282,7 +374,6 @@ export default function DashboardHome() {
                 <Sparkline data={sparkData} color={live ? sparkColor : color} w={120} h={32} />
               </div>
 
-              {/* Live indicators — always bright since they're real-time */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
                 <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span>{liveAdx != null && <span style={{ color: C.muted, fontSize: 10 }}> - {adxLabel(liveAdx)}</span>}</span>
                 <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span>{liveRsi != null && <span style={{ color: C.muted, fontSize: 10 }}> - {rsiLabel(liveRsi)}</span>}</span>
@@ -290,7 +381,6 @@ export default function DashboardHome() {
                 <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(liveStoch)}</span>}</span>
               </div>
 
-              {/* AI scan data — dimmed when expired */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
                 <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
                 <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
