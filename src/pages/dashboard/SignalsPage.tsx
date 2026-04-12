@@ -235,7 +235,7 @@ export default function SignalsPage() {
   };
 
   return (
-    <div style={{ width: "100%" }}>
+    <div style={{ width: "100%", maxWidth: 1200, margin: "0 auto" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 4 }}>Signal History</h1>
       <p style={{ fontSize: 11, color: C.muted, marginBottom: 20, letterSpacing: 0.5 }}>Signals powered by <span style={{ color: C.jade, fontWeight: 600 }}>RON</span></p>
 
