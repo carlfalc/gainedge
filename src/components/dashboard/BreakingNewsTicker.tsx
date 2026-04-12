@@ -3,6 +3,8 @@ import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { isExpired } from "@/lib/expiry";
 
+const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
 interface NewsItem {
   id: string;
   headline: string;
@@ -13,7 +15,12 @@ interface NewsItem {
 export function BreakingNewsTicker() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [paused, setPaused] = useState(false);
+  const [currentDay, setCurrentDay] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCurrentDay(DAYS[new Date().getDay()]);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -81,7 +88,20 @@ export function BreakingNewsTicker() {
         >
           <span style={{ color: C.sec }}>{tickerContent}</span>
           <span style={{ color: C.sec }}>&nbsp;&nbsp;&nbsp;•••&nbsp;&nbsp;&nbsp;{tickerContent}</span>
-        </div>
+      </div>
+
+      <div style={{ width: 1, height: 18, background: C.border, flexShrink: 0 }} />
+
+      <span style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.jade,
+        whiteSpace: "nowrap",
+        letterSpacing: 1,
+        flexShrink: 0,
+      }}>
+        {currentDay}
+      </span>
       </div>
 
       <style>{`
