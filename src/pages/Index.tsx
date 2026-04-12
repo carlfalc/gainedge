@@ -319,16 +319,13 @@ export default function Index() {
   const [authLoading, setAuthLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Detect OAuth callback — redirect to dashboard when a new sign-in occurs
-  // Already-logged-in users who navigate here won't be redirected (initial session doesn't trigger SIGNED_IN)
-  const initialLoadRef = useRef(true);
+  // Only redirect to dashboard after an intentional sign-in on this page
+  // (not on page load with an existing session — let logged-in users view the landing page)
+  const justSignedInRef = useRef(false);
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session && !initialLoadRef.current) {
+      if (event === "SIGNED_IN" && session && justSignedInRef.current) {
         navigate("/dashboard");
-      }
-      if (event === "INITIAL_SESSION") {
-        initialLoadRef.current = false;
       }
     });
     return () => subscription.unsubscribe();
@@ -350,6 +347,7 @@ export default function Index() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
         if (error) throw error;
+        justSignedInRef.current = true;
         navigate("/dashboard");
       }
     } catch (err: any) {
@@ -408,8 +406,9 @@ export default function Index() {
             </div>
 
             <button onClick={async () => {
+              justSignedInRef.current = true;
               const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/login" });
-              if (result.error) toast.error("Google sign-in failed");
+              if (result.error) { justSignedInRef.current = false; toast.error("Google sign-in failed"); }
               if (!result.redirected && !result.error) navigate("/dashboard");
             }} style={{
               width: "100%", padding: "11px 0", borderRadius: 10, cursor: "pointer",
