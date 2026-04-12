@@ -1,28 +1,32 @@
 
 
-## Auto-Hide Sidebar on Navigation
+## Make Dashboard Pages Fill Full Width
 
-### What it does
-When the user clicks any menu item, the sidebar fully collapses (hidden off-screen). It reappears when the user hovers over the left edge of the screen, and hides again when the mouse leaves.
+### Problem
+Every dashboard page has a hard-coded `maxWidth` (700–1200px), leaving unused space on wider screens. The chart page works fine because it doesn't have this constraint.
 
-### Technical approach
+### Solution
+Remove or increase the `maxWidth` on all affected pages so content stretches to fill the available space.
 
-**File: `src/components/dashboard/DashboardLayout.tsx`**
+### Files to modify
 
-1. **Auto-collapse on navigation**: In each nav button's `onClick`, after calling `navigate(item.path)`, set `collapsed` to `true`.
+| File | Current maxWidth | Change |
+|------|-----------------|--------|
+| `src/pages/dashboard/DashboardHome.tsx` | 1200 | Remove maxWidth |
+| `src/pages/dashboard/AnalyticsPage.tsx` | 1200 | Remove maxWidth |
+| `src/pages/dashboard/SignalsPage.tsx` | 1200 | Remove maxWidth |
+| `src/pages/dashboard/BacktestingPage.tsx` | 1000 | Remove maxWidth |
+| `src/pages/dashboard/CalendarPage.tsx` | 900 | Remove maxWidth |
+| `src/pages/dashboard/JournalPage.tsx` | 800 | Remove maxWidth |
+| `src/pages/dashboard/MyNewsPage.tsx` | 800 | Remove maxWidth |
+| `src/pages/dashboard/SettingsPage.tsx` | 700 | Remove maxWidth |
+| `src/pages/dashboard/ClockSettingsPage.tsx` | 700 | Remove maxWidth |
+| `src/pages/dashboard/NewsSettingsPage.tsx` | 700 | Remove maxWidth |
 
-2. **Replace fixed collapsed width (64px) with fully hidden (0px)**: When collapsed, the sidebar width becomes `0` instead of `64`, making it invisible.
+Each page's root `<div>` will have its `maxWidth` removed entirely, replaced with `width: "100%"` so content fills the full available area.
 
-3. **Add a hover trigger zone**: Render a thin invisible `<div>` (about 12px wide) fixed to the left edge. On `mouseEnter`, temporarily expand the sidebar to full 240px width. On `mouseLeave` from the sidebar, collapse it back to 0.
-
-4. **Use a `hovered` state** separate from `collapsed`: `collapsed` tracks the persistent state (always true after nav click). `hovered` is transient — set true on hover, false on leave. Sidebar width = `hovered ? 240 : 0`.
-
-5. **Remove the collapse toggle button** at the bottom (or repurpose it as a pin/unpin toggle if desired).
-
-6. **Apply `overflow: hidden`** on the sidebar so content doesn't leak when width is 0.
-
-### Result
-- Click any menu item → sidebar slides away
-- Hover left edge → sidebar slides out as an overlay
-- Move mouse away → sidebar slides back off-screen
+### What stays the same
+- Charts page — already full width
+- All internal component layouts, grid structures, and card designs remain unchanged
+- Sidebar auto-hide behavior unchanged
 
