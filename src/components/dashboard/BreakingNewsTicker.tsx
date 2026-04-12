@@ -3,7 +3,7 @@ import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { isExpired } from "@/lib/expiry";
 
-const DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 interface NewsItem {
   id: string;
@@ -66,14 +66,24 @@ export function BreakingNewsTicker() {
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.red }} />
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.text, whiteSpace: "nowrap", letterSpacing: 0.5 }}>
-          Breaking News
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.red }} />
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.text, whiteSpace: "nowrap", letterSpacing: 0.5 }}>
+            Breaking News
+          </span>
+        </div>
+        <span style={{
+          fontSize: 10,
+          fontWeight: 600,
+          color: C.text,
+          whiteSpace: "nowrap",
+          letterSpacing: 0.5,
+          paddingLeft: 16,
+        }}>
+          {currentDay}
         </span>
       </div>
-
-      <div style={{ width: 1, height: 18, background: C.border, flexShrink: 0 }} />
 
       <div style={{ overflow: "hidden", flex: 1, position: "relative" }} ref={scrollRef}>
         <div
@@ -88,20 +98,7 @@ export function BreakingNewsTicker() {
         >
           <span style={{ color: C.sec }}>{tickerContent}</span>
           <span style={{ color: C.sec }}>&nbsp;&nbsp;&nbsp;•••&nbsp;&nbsp;&nbsp;{tickerContent}</span>
-      </div>
-
-      <div style={{ width: 1, height: 18, background: C.border, flexShrink: 0 }} />
-
-      <span style={{
-        fontSize: 11,
-        fontWeight: 700,
-        color: C.jade,
-        whiteSpace: "nowrap",
-        letterSpacing: 1,
-        flexShrink: 0,
-      }}>
-        {currentDay}
-      </span>
+        </div>
       </div>
 
       <style>{`
