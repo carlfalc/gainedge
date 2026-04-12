@@ -18,9 +18,12 @@ const Signup = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/dashboard");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        navigate("/dashboard");
+      }
     });
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -44,7 +47,7 @@ const Signup = () => {
 
   const handleGoogleSignup = async () => {
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+      redirect_uri: window.location.origin + "/login",
     });
     if (result.error) toast.error("Google sign-in failed");
     if (!result.redirected && !result.error) navigate("/dashboard");
