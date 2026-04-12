@@ -1,30 +1,24 @@
 
 
-## Plan: Add Win Streak and Trade Details to Win Rate Card
+## Plan: Add RON Character Avatar to Ask RON Button
 
 ### What Changes
-Enhance the **Win Rate** SpinCard's back (hover) side to show:
-1. **Current win streak** (e.g., "🔥 5 consecutive wins") computed from actual signal history
-2. **Session detail** (best/worst session based on real closed signal data)
-3. **Trade breakdown** showing wins/losses count tied to the percentage on the front
+Add the uploaded RON character image as a small circular avatar (~24px) inside the "Ask RON" button in the dashboard header, positioned to the left of the "Ask RON" text.
+
+### Space Assessment
+The header is 56px tall. The button currently has `padding: 4px 12px` and contains text + a mic icon. A 24px circular avatar fits comfortably — it's the same height as the text line. The left section has plenty of horizontal room before it reaches the centered world clocks.
 
 ### Technical Details
 
-**File: `src/pages/dashboard/DashboardHome.tsx`**
+**File: `src/components/dashboard/DashboardLayout.tsx`**
 
-1. **Compute streak in `loadData`**: After loading signals, calculate the current consecutive win streak from chronologically sorted closed signals. Also determine best/worst session by grouping closed signals by the hour they were closed and mapping to Asian/London/NY sessions.
-
-2. **Add to state**: Extend `stats` to include `currentStreak: number` and `bestSession: string` / `worstSession: string`.
-
-3. **Update Win Rate SpinCard back value**: Change from hardcoded "Best session: London overlap | Worst: Asian on indices" to use computed data:
+1. **Copy the uploaded image** to `src/assets/ron-avatar.png`
+2. **Import** the image at the top of DashboardLayout: `import ronAvatar from "@/assets/ron-avatar.png"`
+3. **Add an `<img>` tag** inside the Ask RON button, before the "Ask RON" text span:
+   ```tsx
+   <img src={ronAvatar} alt="RON" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover" }} />
    ```
-   "🔥 3 consecutive wins | Best: London | Worst: Asian | 11/16 trades (69%)"
-   ```
+4. The button layout order becomes: **RON avatar → "Ask RON" text → Mic icon**
 
-4. **Streak calculation logic**:
-   - Sort closed signals by `closed_at` descending
-   - Count consecutive "win" results from most recent backward
-   - If current streak is losses, show "Current streak: 0 wins" or similar
-
-Single file change. No new components or dependencies.
+Single file change + one asset copy. No new dependencies.
 
