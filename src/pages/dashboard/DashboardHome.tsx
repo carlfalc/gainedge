@@ -222,39 +222,6 @@ export default function DashboardHome() {
       <LiveTradeAlert />
       <BreakingNewsTicker />
       <NewsSentimentPanel />
-      <MostVolumeBar />
-
-      {best ? (
-        <div style={{
-          background: C.card, border: `1px solid ${C.jade}30`, borderRadius: 14,
-          padding: "16px 20px", marginBottom: 20,
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          boxShadow: `0 0 30px ${C.jade}10`,
-        }}>
-          <div>
-            <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>HIGHEST CONVICTION</div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
-              {best.symbol} {best.direction} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> Entry {best.entry_price ?? "N/A"} → TP {best.take_profit ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> SL {best.stop_loss ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> R:R {best.risk_reward ?? "N/A"}
-            </div>
-          </div>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12, background: C.jade + "18",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: C.jade,
-          }}>
-            {best.confidence}
-          </div>
-        </div>
-      ) : (
-        <div style={{
-          background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
-          padding: "16px 20px", marginBottom: 20,
-          display: "flex", alignItems: "center", gap: 10,
-        }}>
-          <Clock size={16} color={C.sec} />
-          <span style={{ fontSize: 12, color: C.sec }}>No active signals — waiting for next scan</span>
-        </div>
-      )}
 
       {/* CURRENT INSTRUMENT TRACKING header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -420,6 +387,41 @@ export default function DashboardHome() {
           );
         })}
       </div>
+
+      <MostVolumeBar />
+
+      {best ? (
+        <div style={{
+          background: C.card, border: `1px solid ${C.jade}30`, borderRadius: 14,
+          padding: "16px 20px", marginBottom: 20,
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          boxShadow: `0 0 30px ${C.jade}10`,
+        }}>
+          <div>
+            <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>HIGHEST CONVICTION</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+              {best.symbol} {best.direction} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> Entry {best.entry_price ?? "N/A"} → TP {best.take_profit ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> SL {best.stop_loss ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> R:R {best.risk_reward ?? "N/A"}
+            </div>
+          </div>
+          <div style={{
+            width: 48, height: 48, borderRadius: 12, background: C.jade + "18",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 18, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: C.jade,
+          }}>
+            {best.confidence}
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
+          padding: "16px 20px", marginBottom: 20,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <Clock size={16} color={C.sec} />
+          <span style={{ fontSize: 12, color: C.sec }}>No active signals — waiting for next scan</span>
+        </div>
+      )}
+
 
       {equityCurve.length > 1 && (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
