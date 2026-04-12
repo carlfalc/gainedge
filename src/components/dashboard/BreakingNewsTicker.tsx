@@ -88,7 +88,20 @@ export function BreakingNewsTicker() {
         >
           <span style={{ color: C.sec }}>{tickerContent}</span>
           <span style={{ color: C.sec }}>&nbsp;&nbsp;&nbsp;•••&nbsp;&nbsp;&nbsp;{tickerContent}</span>
-        </div>
+      </div>
+
+      <div style={{ width: 1, height: 18, background: C.border, flexShrink: 0 }} />
+
+      <span style={{
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.accent,
+        whiteSpace: "nowrap",
+        letterSpacing: 1,
+        flexShrink: 0,
+      }}>
+        {currentDay}
+      </span>
       </div>
 
       <style>{`
