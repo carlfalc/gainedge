@@ -110,8 +110,7 @@ export function MostVolumeBar() {
   return (
     <>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: 10, gap: 8 }}>
             <BarChart3 size={16} color={C.text} />
             <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
               Most Volume Today
@@ -119,20 +118,19 @@ export function MostVolumeBar() {
                 <span style={{ color: currentSession.color, marginLeft: 6 }}>— {currentSession.label} Session</span>
               )}
             </span>
-          </div>
-          <button
-            onClick={() => setHistoryOpen(true)}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              fontSize: 11, fontWeight: 700, color: "#34D399",
-              padding: "2px 8px", borderRadius: 6,
-              transition: "background 0.15s",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#34D39920")}
-            onMouseLeave={e => (e.currentTarget.style.background = "none")}
-          >
-            History
-          </button>
+            <button
+              onClick={() => setHistoryOpen(true)}
+              style={{
+                background: "#34D39915", border: `1px solid #34D39940`, cursor: "pointer",
+                fontSize: 10, fontWeight: 700, color: "#34D399",
+                padding: "3px 12px", borderRadius: 20,
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = "#34D39930")}
+              onMouseLeave={e => (e.currentTarget.style.background = "#34D39915")}
+            >
+              History
+            </button>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
