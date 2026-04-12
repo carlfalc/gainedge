@@ -319,11 +319,16 @@ export default function Index() {
   const [authLoading, setAuthLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Detect OAuth callback — if user just signed in via Google, redirect to dashboard
+  // Detect OAuth callback — if user just signed in via Google redirect, go to dashboard
+  // (Only fires on SIGNED_IN event so already-logged-in visitors can still browse landing)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) {
-        navigate("/dashboard");
+      if ((event === "SIGNED_IN" || event === "TOKEN_REFRESHED") && session) {
+        // Check URL hash for OAuth callback indicators
+        const hash = window.location.hash;
+        if (hash.includes("access_token") || hash.includes("type=recovery")) {
+          navigate("/dashboard");
+        }
       }
     });
     return () => subscription.unsubscribe();
