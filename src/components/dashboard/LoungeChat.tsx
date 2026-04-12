@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
+import { useProfile } from "@/hooks/use-profile";
+import LoungeProfileDialog from "./LoungeProfileDialog";
+import LoungeProfilePrompt from "./LoungeProfilePrompt";
 
 interface ChatMessage {
   id: string;
@@ -16,9 +19,23 @@ const MOCK_MESSAGES: ChatMessage[] = [
 ];
 
 export default function LoungeChat() {
+  const { profile, loading, updateProfile, refetch } = useProfile();
   const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
   const [input, setInput] = useState("");
+  const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [promptDismissed, setPromptDismissed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const isProfileComplete = !!profile?.full_name && profile.full_name !== "Trader";
+  const displayName = profile?.nickname || profile?.full_name || "You";
+
+  // Show first-visit prompt if profile incomplete
+  useEffect(() => {
+    if (!loading && !isProfileComplete && !promptDismissed) {
+      setShowPrompt(true);
+    }
+  }, [loading, isProfileComplete, promptDismissed]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,10 +43,10 @@ export default function LoungeChat() {
 
   const handleSend = () => {
     const trimmed = input.trim();
-    if (!trimmed) return;
+    if (!trimmed || !isProfileComplete) return;
     setMessages(prev => [
       ...prev,
-      { id: crypto.randomUUID(), sender: "You", text: trimmed, timestamp: new Date(), isOwn: true },
+      { id: crypto.randomUUID(), sender: displayName, text: trimmed, timestamp: new Date(), isOwn: true },
     ]);
     setInput("");
   };
@@ -41,123 +58,190 @@ export default function LoungeChat() {
     }
   };
 
+  const handleProfileSave = async (fullName: string, nickname: string) => {
+    await updateProfile({ full_name: fullName, nickname: nickname || null });
+    refetch();
+  };
+
   const formatTime = (d: Date) =>
     d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        right: 0,
-        top: 0,
-        bottom: 0,
-        width: 340,
-        display: "flex",
-        flexDirection: "column",
-        background: "rgba(0,0,0,0.55)",
-        backdropFilter: "blur(6px)",
-        borderLeft: "1px solid rgba(255,255,255,0.08)",
-      }}
-    >
-      {/* Chat header */}
+    <>
       <div
         style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          color: "#D4A574",
-          fontSize: 13,
-          fontWeight: 700,
-          letterSpacing: 1,
-          textTransform: "uppercase",
-        }}
-      >
-        Lounge Chat
-      </div>
-
-      {/* Messages */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "12px 14px",
+          position: "absolute",
+          right: 0,
+          top: 0,
+          bottom: 0,
+          width: 340,
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          background: "rgba(0,0,0,0.55)",
+          backdropFilter: "blur(6px)",
+          borderLeft: "1px solid rgba(255,255,255,0.08)",
         }}
       >
-        {messages.map((msg) => (
-          <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.isOwn ? "flex-end" : "flex-start" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: msg.isOwn ? "#D4A574" : "rgba(255,255,255,0.6)", marginBottom: 2 }}>
-              {msg.sender}
-            </span>
-            <div
-              style={{
-                maxWidth: "85%",
-                padding: "8px 12px",
-                borderRadius: 10,
-                fontSize: 13,
-                lineHeight: 1.45,
-                color: "#fff",
-                background: msg.isOwn ? "rgba(212,165,116,0.2)" : "rgba(255,255,255,0.08)",
-                border: msg.isOwn ? "1px solid rgba(212,165,116,0.25)" : "1px solid rgba(255,255,255,0.06)",
-              }}
-            >
-              {msg.text}
-            </div>
-            <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
-              {formatTime(msg.timestamp)}
-            </span>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input area */}
-      <div
-        style={{
-          padding: "10px 12px",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message…"
+        {/* Chat header */}
+        <div
           style={{
-            flex: 1,
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 8,
-            padding: "9px 14px",
-            color: "#fff",
-            fontSize: 13,
-            outline: "none",
-            fontFamily: "'DM Sans', sans-serif",
-          }}
-        />
-        <button
-          onClick={handleSend}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 8,
-            background: input.trim() ? "rgba(212,165,116,0.25)" : "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(212,165,116,0.3)",
-            color: input.trim() ? "#D4A574" : "rgba(255,255,255,0.3)",
+            padding: "12px 16px",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            cursor: input.trim() ? "pointer" : "default",
-            transition: "all 0.2s",
+            justifyContent: "space-between",
           }}
         >
-          <Send size={16} />
-        </button>
+          <span style={{ color: "#D4A574", fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+            Lounge Chat
+          </span>
+          <button
+            onClick={() => setShowProfileDialog(true)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(212,165,116,0.7)",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              padding: "2px 6px",
+              borderRadius: 4,
+              transition: "color 0.2s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#D4A574"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(212,165,116,0.7)"; }}
+          >
+            My Profile
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "12px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          {messages.map((msg) => (
+            <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.isOwn ? "flex-end" : "flex-start" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: msg.isOwn ? "#D4A574" : "rgba(255,255,255,0.6)", marginBottom: 2 }}>
+                {msg.sender}
+              </span>
+              <div
+                style={{
+                  maxWidth: "85%",
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                  color: "#fff",
+                  background: msg.isOwn ? "rgba(212,165,116,0.2)" : "rgba(255,255,255,0.08)",
+                  border: msg.isOwn ? "1px solid rgba(212,165,116,0.25)" : "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                {msg.text}
+              </div>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                {formatTime(msg.timestamp)}
+              </span>
+            </div>
+          ))}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input area */}
+        <div
+          style={{
+            padding: "10px 12px",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+            position: "relative",
+          }}
+        >
+          {!isProfileComplete && !loading && (
+            <div
+              onClick={() => setShowProfileDialog(true)}
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(0,0,0,0.7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                zIndex: 2,
+                borderTop: "1px solid rgba(212,165,116,0.2)",
+              }}
+            >
+              <span style={{ color: "#D4A574", fontSize: 12, fontWeight: 600 }}>
+                Complete your profile to start chatting
+              </span>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message…"
+              disabled={!isProfileComplete}
+              style={{
+                flex: 1,
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 8,
+                padding: "9px 14px",
+                color: "#fff",
+                fontSize: 13,
+                outline: "none",
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={!isProfileComplete}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 8,
+                background: input.trim() && isProfileComplete ? "rgba(212,165,116,0.25)" : "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(212,165,116,0.3)",
+                color: input.trim() && isProfileComplete ? "#D4A574" : "rgba(255,255,255,0.3)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: input.trim() && isProfileComplete ? "pointer" : "default",
+                transition: "all 0.2s",
+              }}
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
       </div>
-    </div>
+
+      {/* First-visit prompt */}
+      <LoungeProfilePrompt
+        open={showPrompt && !isProfileComplete}
+        onComplete={() => {
+          setShowPrompt(false);
+          setPromptDismissed(true);
+          setShowProfileDialog(true);
+        }}
+      />
+
+      {/* Profile dialog */}
+      <LoungeProfileDialog
+        open={showProfileDialog}
+        onClose={() => setShowProfileDialog(false)}
+        currentName={profile?.full_name || null}
+        currentNickname={profile?.nickname || null}
+        onSave={handleProfileSave}
+      />
+    </>
   );
 }
