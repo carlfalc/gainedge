@@ -165,12 +165,12 @@ export function MostVolumeBar() {
                       {row.topSymbol}
                     </span>
                     {row.peakHourLabel && (
-                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                         <Clock size={9} />{row.peakHourLabel}
                       </span>
                     )}
                     {row.volume > 0 && (
-                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span style={{ fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                         {row.volume.toLocaleString()} vol
                       </span>
                     )}
@@ -184,12 +184,12 @@ export function MostVolumeBar() {
                       {row.topSymbol}
                     </span>
                     {row.peakHourLabel && (
-                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                         <Clock size={9} />{row.peakHourLabel}
                       </span>
                     )}
                     {row.volume > 0 && (
-                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span style={{ fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                         {row.volume.toLocaleString()} vol
                       </span>
                     )}
