@@ -187,7 +187,7 @@ export default function SettingsPage() {
       </button>
 
       {/* All users see AI Preferences */}
-      <FalconerPreferencesPanel />
+      <FalconerPreferencesPanel ref={falconerPrefsRef} />
 
       {/* Admin-only sections */}
       {isAdmin && <FalconerRulesPanel />}
