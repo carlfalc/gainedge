@@ -208,6 +208,7 @@ function classifyArticleSentiment(article: RawArticle, instruments: string[]): s
 
 function shouldInsertNewsItem(item: ProcessedArticle): boolean {
   if (item.impact === "irrelevant") return false;
+  if (item.impact === "low") return false;
   if (item.instruments_affected.length > 0) return true;
   if (item.impact === "medium" || item.impact === "high") return true;
   return false;
@@ -392,13 +393,8 @@ function deduplicateNews(items: ProcessedArticle[]): ProcessedArticle[] {
 }
 
 async function cleanupIrrelevantNews(supabase: ReturnType<typeof createClient>) {
-  const cutoff1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  await supabase
-    .from("news_items")
-    .delete()
-    .lt("published_at", cutoff1h)
-    .or("instruments_affected.is.null,instruments_affected.eq.{}")
-    .eq("impact", "low");
+  // Purge ALL low-impact items regardless of age
+  await supabase.from("news_items").delete().eq("impact", "low");
 
   const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   await supabase.from("news_items").delete().lt("published_at", cutoff48h);
