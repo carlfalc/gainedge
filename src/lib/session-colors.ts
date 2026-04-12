@@ -12,9 +12,9 @@ export interface SessionDef {
 }
 
 export const SESSION_COLORS = {
-  asian: "#A78BFA",
+  asian: "#34D399",
   london: "#3B82F6",
-  new_york: "#FACC15",
+  new_york: "#FDE047",
 } as const;
 
 export const SESSIONS: SessionDef[] = [
