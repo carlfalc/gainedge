@@ -351,7 +351,7 @@ export default function SignalsPage() {
 
       {/* Signal Table */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "140px 90px 60px 50px 80px 80px 80px 50px 80px 100px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "140px 90px 60px 50px 90px 90px 90px 50px 80px 1fr", borderBottom: `1px solid ${C.border}` }}>
           <div style={hdr} onClick={() => toggleSort("date")}>Date <SortIcon k="date" /></div>
           <div style={hdr} onClick={() => toggleSort("instrument")}>Instrument <SortIcon k="instrument" /></div>
           <div style={hdr}>Dir</div>
@@ -370,7 +370,7 @@ export default function SignalsPage() {
               <div
                 onClick={() => setExpanded(expanded === s.id ? null : s.id)}
                 style={{
-                  display: "grid", gridTemplateColumns: "140px 90px 60px 50px 80px 80px 80px 50px 80px 100px",
+                  display: "grid", gridTemplateColumns: "140px 90px 60px 50px 90px 90px 90px 50px 80px 1fr",
                   padding: 0, cursor: "pointer", borderBottom: `1px solid ${C.border}`,
                   transition: "background 0.15s",
                 }}
