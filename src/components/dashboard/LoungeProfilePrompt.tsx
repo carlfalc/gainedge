@@ -1,4 +1,3 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Wine } from "lucide-react";
 
 interface Props {
@@ -7,50 +6,81 @@ interface Props {
 }
 
 export default function LoungeProfilePrompt({ open, onComplete }: Props) {
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 80,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        background: "hsl(0 0% 0% / 0.18)",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      <div
         style={{
-          background: "linear-gradient(145deg, #1a1208, #0d0a04)",
-          border: "1px solid rgba(212,165,116,0.35)",
-          color: "#fff",
-          maxWidth: 400,
-          textAlign: "center",
-          padding: "32px 28px",
+          width: "min(440px, calc(100vw - 32px))",
+          borderRadius: 20,
+          border: "1px solid hsl(32 52% 64% / 0.32)",
+          background: "linear-gradient(145deg, hsl(30 40% 10% / 0.9), hsl(0 0% 4% / 0.86))",
+          boxShadow: "0 24px 80px hsl(0 0% 0% / 0.45)",
+          padding: "28px 28px 24px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 16,
         }}
-        // hide the X button — user must complete profile
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-          <Wine size={36} style={{ color: "#D4A574" }} />
-          <h2 style={{ color: "#D4A574", fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>
-            WELCOME TO THE LOUNGE
-          </h2>
-          <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 14, lineHeight: 1.6 }}>
-            Before you can chat with other traders, please complete your profile so everyone knows who you are.
-          </p>
-          <button
-            onClick={onComplete}
+        <Wine size={34} style={{ color: "hsl(32 52% 64%)" }} />
+
+        <div style={{ textAlign: "center" }}>
+          <h2
             style={{
-              marginTop: 8,
-              padding: "12px 28px",
-              borderRadius: 8,
-              border: "1px solid rgba(212,165,116,0.4)",
-              background: "rgba(212,165,116,0.2)",
-              color: "#D4A574",
-              fontSize: 14,
+              margin: 0,
+              color: "hsl(32 52% 64%)",
+              fontSize: 18,
               fontWeight: 700,
-              letterSpacing: 0.5,
-              cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif",
-              transition: "all 0.2s",
+              letterSpacing: 1,
             }}
           >
-            Complete My Profile
-          </button>
+            WELCOME TO THE LOUNGE
+          </h2>
+          <p
+            style={{
+              margin: "12px 0 0",
+              color: "hsl(0 0% 100% / 0.72)",
+              fontSize: 14,
+              lineHeight: 1.6,
+            }}
+          >
+            Before you can join the lounge chat, please complete your profile.
+          </p>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <button
+          onClick={onComplete}
+          style={{
+            marginTop: 8,
+            padding: "12px 24px",
+            borderRadius: 10,
+            border: "1px solid hsl(32 52% 64% / 0.38)",
+            background: "hsl(32 52% 64% / 0.16)",
+            color: "hsl(32 52% 64%)",
+            fontSize: 14,
+            fontWeight: 700,
+            letterSpacing: 0.3,
+            cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          Complete My Profile
+        </button>
+      </div>
+    </div>
   );
 }
