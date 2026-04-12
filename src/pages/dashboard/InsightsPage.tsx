@@ -12,7 +12,7 @@ const cardStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase" as const,
+  color: C.text, fontSize: 11, fontWeight: 600, textTransform: "uppercase" as const,
   letterSpacing: 1, marginBottom: 8,
 };
 
@@ -83,7 +83,7 @@ export default function InsightsPage() {
           <Brain size={28} style={{ color: C.jade }} />
           <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>Artificial Intelligence Insights</h1>
         </div>
-        <p style={{ color: C.sec, fontSize: 14 }}>Compiled from your trading data and market analysis</p>
+        <p style={{ color: C.text, fontSize: 14 }}>Compiled from your trading data and market analysis</p>
       </div>
 
       {/* Key Discoveries */}
@@ -104,7 +104,7 @@ export default function InsightsPage() {
                 {items.map(item => (
                   <div key={item.id} style={{ padding: "10px 12px", borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
                     {item.symbol && <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, fontFamily: "'JetBrains Mono', monospace", color }}>{item.symbol}</div>}
-                    <div style={{ fontSize: 12, color: C.sec }}>{item.description}</div>
+                    <div style={{ fontSize: 12, color: C.text }}>{item.description}</div>
                   </div>
                 ))}
               </div>
@@ -124,18 +124,18 @@ export default function InsightsPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ width: 10, height: 10, borderRadius: "50%", background: inst.color }} />
                   <span style={{ fontWeight: 700, fontSize: 15, fontFamily: "'JetBrains Mono', monospace" }}>{inst.symbol}</span>
-                  <span style={{ color: C.sec, fontSize: 13 }}>— {inst.bestSession}</span>
+                  <span style={{ color: C.text, fontSize: 13 }}>— {inst.bestSession}</span>
                 </div>
-                {open ? <ChevronUp size={18} style={{ color: C.muted }} /> : <ChevronDown size={18} style={{ color: C.muted }} />}
+                {open ? <ChevronUp size={18} style={{ color: C.text }} /> : <ChevronDown size={18} style={{ color: C.text }} />}
               </button>
               {open && (
                 <div style={{ padding: "0 20px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
                   <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.muted, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>OPTIMAL EMA</div>
+                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>OPTIMAL EMA</div>
                     <div style={{ fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>{inst.optimalEMA}</div>
                   </div>
                   <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.muted, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>AVG MOVE BY SESSION</div>
+                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>AVG MOVE BY SESSION</div>
                     <div style={{ fontSize: 12, display: "flex", gap: 12, fontFamily: "'JetBrains Mono', monospace" }}>
                       <span>LDN: {inst.avgMove.london}</span>
                       <span>NY: {inst.avgMove.ny}</span>
@@ -143,7 +143,7 @@ export default function InsightsPage() {
                     </div>
                   </div>
                   <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.muted, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>WIN RATE BY DAY</div>
+                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>WIN RATE BY DAY</div>
                     <div style={{ fontSize: 12, display: "flex", gap: 8, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace" }}>
                       {Object.entries(inst.winByDay).map(([day, rate]) => (
                         <span key={day} style={{ color: parseInt(rate) >= 70 ? C.green : parseInt(rate) >= 60 ? C.text : C.red }}>{day}: {rate}</span>
@@ -151,8 +151,8 @@ export default function InsightsPage() {
                     </div>
                   </div>
                   <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.muted, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>CORRELATIONS</div>
-                    <div style={{ fontSize: 12, color: C.sec }}>{inst.correlations}</div>
+                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>CORRELATIONS</div>
+                    <div style={{ fontSize: 12, color: C.text }}>{inst.correlations}</div>
                   </div>
                   <div style={{ padding: 14, borderRadius: 10, background: C.jade + "10", border: `1px solid ${C.jade}30`, gridColumn: "1 / -1" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -179,14 +179,14 @@ export default function InsightsPage() {
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>Weekly Summary</div>
-                <div style={{ fontSize: 12, color: C.sec }}>AI-generated summary</div>
+                <div style={{ fontSize: 12, color: C.text }}>AI-generated summary</div>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {weeklyDigest.map(item => (
                 <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
                   <TrendingUp size={16} style={{ color: C.jade, marginTop: 2, flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: C.sec, lineHeight: 1.5 }}>{item.description}</span>
+                  <span style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{item.description}</span>
                 </div>
               ))}
             </div>
@@ -211,7 +211,7 @@ export default function InsightsPage() {
                   </div>
                   <span style={{ fontWeight: 700, fontSize: 14 }}>{p.title}</span>
                 </div>
-                <p style={{ fontSize: 13, color: C.sec, lineHeight: 1.6, marginBottom: 12 }}>{p.description}</p>
+                <p style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 12 }}>{p.description}</p>
                 {p.estimated_impact && (
                   <div style={{ fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: p.severity === "critical" ? C.red : C.amber }}>
                     Estimated cost: ${p.estimated_impact.toLocaleString()}/month
@@ -231,7 +231,7 @@ export default function InsightsPage() {
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                 {["Instrument", "Regime", "Direction", "Volatility vs 30d", "Forecast", "Upcoming News"].map(h => (
-                  <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: C.muted, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
+                  <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: C.text, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -249,9 +249,9 @@ export default function InsightsPage() {
                   <td style={{ padding: "12px 16px", color: m.direction === "Bullish" ? C.green : m.direction === "Mixed" ? C.amber : C.sec }}>{m.direction}</td>
                   <td style={{ padding: "12px 16px", fontFamily: "'JetBrains Mono', monospace" }}>
                     <span style={{ color: m.volatility.startsWith("+") ? C.amber : C.green }}>{m.volatility}</span>
-                    <span style={{ color: C.muted, fontSize: 11, marginLeft: 6 }}>{m.volLabel}</span>
+                    <span style={{ color: C.text, fontSize: 11, marginLeft: 6 }}>{m.volLabel}</span>
                   </td>
-                  <td style={{ padding: "12px 16px", color: C.sec }}>{m.forecast}</td>
+                  <td style={{ padding: "12px 16px", color: C.text }}>{m.forecast}</td>
                   <td style={{ padding: "12px 16px", color: C.amber, fontSize: 12 }}>{m.news}</td>
                 </tr>
               ))}
