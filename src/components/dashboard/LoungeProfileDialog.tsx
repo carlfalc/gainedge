@@ -46,12 +46,12 @@ export default function LoungeProfileDialog({
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 90,
+        zIndex: 170,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 24,
-        background: "hsl(0 0% 0% / 0.26)",
+        background: "hsl(0 0% 0% / 0.3)",
         backdropFilter: "blur(8px)",
       }}
       onClick={onClose}

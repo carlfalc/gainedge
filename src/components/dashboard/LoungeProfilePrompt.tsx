@@ -13,12 +13,12 @@ export default function LoungeProfilePrompt({ open, onComplete }: Props) {
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 80,
+        zIndex: 160,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 24,
-        background: "hsl(0 0% 0% / 0.18)",
+        background: "hsl(0 0% 0% / 0.28)",
         backdropFilter: "blur(6px)",
       }}
     >
