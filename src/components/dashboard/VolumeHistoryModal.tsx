@@ -127,9 +127,9 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
             hourlyBias: sp.hourlyBias,
           })),
           totalDays: inst.totalDays,
-        },
+        } as any,
         severity: "info",
-      });
+      } as any);
     }
   };
 
