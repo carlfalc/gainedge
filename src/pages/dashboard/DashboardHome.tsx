@@ -260,11 +260,9 @@ export default function DashboardHome() {
                   }}>
                     {inst.direction}
                   </div>
-                  {fresh === "aging" && (
-                    <span style={{ fontSize: 9, color: "#F59E0B", fontWeight: 600, display: "flex", alignItems: "center", gap: 2 }}>
-                      ⏰ Expiring soon
-                    </span>
-                  )}
+                  <span style={{ fontSize: 9, color: C.sec, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
+                    <Clock size={9} /> Next scan: {formatCountdown(countdown)}
+                  </span>
                 </div>
               </div>
 
@@ -299,8 +297,8 @@ export default function DashboardHome() {
               </div>
 
               {expired && (
-                <div style={{ fontSize: 10, color: "#F59E0B", fontStyle: "italic", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                  <Clock size={10} /> Awaiting next scan...
+                <div style={{ fontSize: 10, color: C.sec, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <Clock size={10} /> Next scan: {formatCountdown(countdown)}
                 </div>
               )}
             </div>
