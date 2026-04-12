@@ -6,6 +6,17 @@ import { SESSIONS, formatLocalHour, type SessionDef } from "@/lib/session-colors
 
 export const HISTORY_PERIOD_OPTIONS = [7, 14, 30] as const;
 
+export interface HourBias {
+  hourUtc: number;
+  buyCount: number;
+  sellCount: number;
+  buyPct: number;
+  sellPct: number;
+  avgVolume: number;
+  /** Weighted average minute within the hour (0-59) for precise timing */
+  weightedMinute: number;
+}
+
 export interface SessionPattern {
   session: SessionDef;
   peakHourUtc: number | null;
@@ -16,6 +27,16 @@ export interface SessionPattern {
   sellPct: number;
   tip: string;
   dataPoints: number;
+  /** Per-hour buy/sell direction bias within this session */
+  hourlyBias: HourBias[];
+  /** Hour with the highest buy percentage */
+  bestBuyHourUtc: number | null;
+  bestBuyPct: number;
+  bestBuyMinute: number;
+  /** Hour with the highest sell percentage */
+  bestSellHourUtc: number | null;
+  bestSellPct: number;
+  bestSellMinute: number;
 }
 
 export interface InstrumentAnalytics {
@@ -30,6 +51,15 @@ function sessionForHour(h: number): SessionDef | null {
 }
 
 /**
+ * Format a UTC hour + minute as a local time string (e.g. "11:20 AM").
+ */
+export function formatLocalHourMinute(utcHour: number, minute: number): string {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour, Math.round(minute)));
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+/**
  * Build analytics for one instrument from hourly candles.
  */
 export function buildInstrumentAnalytics(
@@ -38,22 +68,24 @@ export function buildInstrumentAnalytics(
   requestedDays: number
 ): InstrumentAnalytics {
   // Group candles by session and by UTC hour
-  const hourBuckets: Record<string, { volumes: number[]; buys: number; sells: number }> = {};
+  const hourBuckets: Record<string, { volumes: number[]; buys: number; sells: number; minutes: number[] }> = {};
 
   for (const sess of SESSIONS) {
     for (let h = sess.startUtcHour; h < sess.endUtcHour; h++) {
-      hourBuckets[`${sess.key}:${h}`] = { volumes: [], buys: 0, sells: 0 };
+      hourBuckets[`${sess.key}:${h}`] = { volumes: [], buys: 0, sells: 0, minutes: [] };
     }
   }
 
   for (const c of candles) {
     const d = new Date(c.time * 1000);
     const h = d.getUTCHours();
+    const m = d.getUTCMinutes();
     const sess = sessionForHour(h);
     if (!sess) continue;
     const key = `${sess.key}:${h}`;
     if (!hourBuckets[key]) continue;
     hourBuckets[key].volumes.push(c.volume);
+    hourBuckets[key].minutes.push(m);
     if (c.close > c.open) hourBuckets[key].buys++;
     else if (c.close < c.open) hourBuckets[key].sells++;
   }
@@ -71,6 +103,8 @@ export function buildInstrumentAnalytics(
     let totalSells = 0;
     let dataPoints = 0;
 
+    const hourlyBias: HourBias[] = [];
+
     for (let h = sess.startUtcHour; h < sess.endUtcHour; h++) {
       const b = hourBuckets[`${sess.key}:${h}`];
       if (!b || b.volumes.length === 0) continue;
@@ -87,6 +121,26 @@ export function buildInstrumentAnalytics(
         lowestAvgVolume = Math.round(avg);
         lowestHourUtc = h;
       }
+
+      // Per-hour direction bias
+      const hTotal = b.buys + b.sells || 1;
+      const hBuyPct = Math.round((b.buys / hTotal) * 100);
+      const hSellPct = 100 - hBuyPct;
+
+      // Weighted average minute within the hour for precise timing
+      const weightedMinute = b.minutes.length > 0
+        ? b.minutes.reduce((sum, m, i) => sum + m * (b.volumes[i] || 1), 0) / b.minutes.reduce((sum, _, i) => sum + (b.volumes[i] || 1), 0)
+        : 30;
+
+      hourlyBias.push({
+        hourUtc: h,
+        buyCount: b.buys,
+        sellCount: b.sells,
+        buyPct: hBuyPct,
+        sellPct: hSellPct,
+        avgVolume: Math.round(avg),
+        weightedMinute: Math.round(weightedMinute),
+      });
     }
 
     if (lowestAvgVolume === Infinity) { lowestAvgVolume = 0; lowestHourUtc = null; }
@@ -94,6 +148,27 @@ export function buildInstrumentAnalytics(
     const total = totalBuys + totalSells || 1;
     const buyPct = Math.round((totalBuys / total) * 100);
     const sellPct = 100 - buyPct;
+
+    // Find best buy hour (highest buyPct) and best sell hour (highest sellPct)
+    let bestBuyHourUtc: number | null = null;
+    let bestBuyPct = 0;
+    let bestBuyMinute = 0;
+    let bestSellHourUtc: number | null = null;
+    let bestSellPct = 0;
+    let bestSellMinute = 0;
+
+    for (const hb of hourlyBias) {
+      if (hb.buyPct > bestBuyPct) {
+        bestBuyPct = hb.buyPct;
+        bestBuyHourUtc = hb.hourUtc;
+        bestBuyMinute = hb.weightedMinute;
+      }
+      if (hb.sellPct > bestSellPct) {
+        bestSellPct = hb.sellPct;
+        bestSellHourUtc = hb.hourUtc;
+        bestSellMinute = hb.weightedMinute;
+      }
+    }
 
     // Generate tip
     let tip = "Insufficient data for pattern detection";
@@ -106,7 +181,12 @@ export function buildInstrumentAnalytics(
       }
     }
 
-    return { session: sess, peakHourUtc, peakAvgVolume, lowestHourUtc, lowestAvgVolume, buyPct, sellPct, tip, dataPoints };
+    return {
+      session: sess, peakHourUtc, peakAvgVolume, lowestHourUtc, lowestAvgVolume,
+      buyPct, sellPct, tip, dataPoints, hourlyBias,
+      bestBuyHourUtc, bestBuyPct, bestBuyMinute,
+      bestSellHourUtc, bestSellPct, bestSellMinute,
+    };
   });
 
   // Overall note

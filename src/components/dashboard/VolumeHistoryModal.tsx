@@ -118,11 +118,18 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
             peakAvgVolume: sp.peakAvgVolume,
             buyPct: sp.buyPct,
             sellPct: sp.sellPct,
+            bestBuyHourUtc: sp.bestBuyHourUtc,
+            bestBuyPct: sp.bestBuyPct,
+            bestBuyMinute: sp.bestBuyMinute,
+            bestSellHourUtc: sp.bestSellHourUtc,
+            bestSellPct: sp.bestSellPct,
+            bestSellMinute: sp.bestSellMinute,
+            hourlyBias: sp.hourlyBias,
           })),
           totalDays: inst.totalDays,
-        },
+        } as any,
         severity: "info",
-      });
+      } as any);
     }
   };
 
