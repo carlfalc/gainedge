@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const [showAddInstrument, setShowAddInstrument] = useState(false);
+  const falconerPrefsRef = useRef<FalconerPreferencesPanelRef>(null);
 
   useEffect(() => {
     if (profile) {
