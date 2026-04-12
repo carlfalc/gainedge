@@ -283,9 +283,13 @@ export default function ChartsPage() {
 
     if (width <= 0 || height <= 0) return;
 
-    chartRef.current.applyOptions({ width, height });
-    if (fitContent) {
-      chartRef.current.timeScale().fitContent();
+    try {
+      chartRef.current.applyOptions({ width, height });
+      if (fitContent) {
+        chartRef.current.timeScale().fitContent();
+      }
+    } catch (e) {
+      // Chart may be disposed during symbol switch — ignore
     }
   }, []);
 
