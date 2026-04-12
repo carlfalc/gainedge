@@ -17,6 +17,10 @@ export interface Profile {
   email_alerts: boolean;
   push_notifications: boolean;
   sms_alerts: boolean;
+  country: string | null;
+  trading_preferences: string[];
+  favourite_sessions: string[];
+  show_nickname: boolean;
 }
 
 export function useProfile() {
@@ -41,13 +45,20 @@ export function useProfile() {
       .select("*")
       .eq("id", uid)
       .single();
-    if (data) setProfile(data as Profile);
+    if (data) {
+      setProfile({
+        ...data,
+        trading_preferences: (data.trading_preferences as string[] | null) ?? [],
+        favourite_sessions: (data.favourite_sessions as string[] | null) ?? [],
+        show_nickname: data.show_nickname ?? false,
+      } as Profile);
+    }
     setLoading(false);
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!userId) return;
-    await supabase.from("profiles").update(updates).eq("id", userId);
+    await supabase.from("profiles").update(updates as any).eq("id", userId);
     setProfile(prev => prev ? { ...prev, ...updates } : null);
   };
 

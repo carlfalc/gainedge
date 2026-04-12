@@ -450,21 +450,25 @@ export type Database = {
           avatar_url: string | null
           broker: string
           clock_timezones: Json | null
+          country: string | null
           created_at: string
           default_candle_type: string
           default_timeframe: string
           ema_fast: number
           ema_slow: number
           email_alerts: boolean
+          favourite_sessions: Json | null
           full_name: string | null
           id: string
           metaapi_account_id: string | null
           news_preferences: Json | null
           nickname: string | null
           push_notifications: boolean
+          show_nickname: boolean | null
           sms_alerts: boolean
           subscription_status: string
           subscription_tier: string
+          trading_preferences: Json | null
           trial_ends_at: string | null
           updated_at: string
         }
@@ -472,21 +476,25 @@ export type Database = {
           avatar_url?: string | null
           broker?: string
           clock_timezones?: Json | null
+          country?: string | null
           created_at?: string
           default_candle_type?: string
           default_timeframe?: string
           ema_fast?: number
           ema_slow?: number
           email_alerts?: boolean
+          favourite_sessions?: Json | null
           full_name?: string | null
           id: string
           metaapi_account_id?: string | null
           news_preferences?: Json | null
           nickname?: string | null
           push_notifications?: boolean
+          show_nickname?: boolean | null
           sms_alerts?: boolean
           subscription_status?: string
           subscription_tier?: string
+          trading_preferences?: Json | null
           trial_ends_at?: string | null
           updated_at?: string
         }
@@ -494,21 +502,25 @@ export type Database = {
           avatar_url?: string | null
           broker?: string
           clock_timezones?: Json | null
+          country?: string | null
           created_at?: string
           default_candle_type?: string
           default_timeframe?: string
           ema_fast?: number
           ema_slow?: number
           email_alerts?: boolean
+          favourite_sessions?: Json | null
           full_name?: string | null
           id?: string
           metaapi_account_id?: string | null
           news_preferences?: Json | null
           nickname?: string | null
           push_notifications?: boolean
+          show_nickname?: boolean | null
           sms_alerts?: boolean
           subscription_status?: string
           subscription_tier?: string
+          trading_preferences?: Json | null
           trial_ends_at?: string | null
           updated_at?: string
         }
