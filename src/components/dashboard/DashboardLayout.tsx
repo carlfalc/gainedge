@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, createContext, useContext } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
   Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic, Wine
@@ -18,23 +19,24 @@ import AskRonModal from "./AskRonModal";
 import TradeNotificationPopup from "./TradeNotificationPopup";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
-  { label: "TradingView Chart", icon: ExternalLink, path: "/dashboard/tradingview-chart", white: true },
-  { label: "Signals", icon: Zap, path: "/dashboard/signals" },
-  { label: "Trade Journal", icon: BookOpen, path: "/dashboard/journal" },
-  { label: "Analytics", icon: BarChart3, path: "/dashboard/analytics" },
-  { label: "Insights", icon: Lightbulb, path: "/dashboard/insights" },
-  { label: "Backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
-  { label: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
-  { label: "Settings", icon: Settings, path: "/dashboard/settings" },
-  { label: "Clock Settings", icon: Clock, path: "/dashboard/clock-settings" },
-  { label: "News Settings", icon: Newspaper, path: "/dashboard/news-settings" },
-  { label: "My News", icon: Globe, path: "/dashboard/my-news" },
-  { label: "Whisky & Cigar Lounge", icon: Wine, path: "/dashboard/whisky-cigar-lounge", gold: true },
+  { labelKey: "nav.dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { labelKey: "nav.charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
+  { labelKey: "nav.tradingviewChart", icon: ExternalLink, path: "/dashboard/tradingview-chart", white: true },
+  { labelKey: "nav.signals", icon: Zap, path: "/dashboard/signals" },
+  { labelKey: "nav.journal", icon: BookOpen, path: "/dashboard/journal" },
+  { labelKey: "nav.analytics", icon: BarChart3, path: "/dashboard/analytics" },
+  { labelKey: "nav.insights", icon: Lightbulb, path: "/dashboard/insights" },
+  { labelKey: "nav.backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
+  { labelKey: "nav.calendar", icon: Calendar, path: "/dashboard/calendar" },
+  { labelKey: "nav.settings", icon: Settings, path: "/dashboard/settings" },
+  { labelKey: "nav.clockSettings", icon: Clock, path: "/dashboard/clock-settings" },
+  { labelKey: "nav.newsSettings", icon: Newspaper, path: "/dashboard/news-settings" },
+  { labelKey: "nav.myNews", icon: Globe, path: "/dashboard/my-news" },
+  { labelKey: "nav.lounge", icon: Wine, path: "/dashboard/whisky-cigar-lounge", gold: true },
 ] as const;
 
 export default function DashboardLayout() {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(true);
   const [hovered, setHovered] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -126,7 +128,7 @@ export default function DashboardLayout() {
   if (!authReady) {
     return (
       <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: C.jade, fontSize: 16 }}>Loading…</div>
+        <div style={{ color: C.jade, fontSize: 16 }}>{t("dashboard.loading")}</div>
       </div>
     );
   }
@@ -195,7 +197,7 @@ export default function DashboardLayout() {
                 onMouseLeave={e => { if (!isActive(item.path)) { e.currentTarget.style.color = defaultColor; e.currentTarget.style.background = "transparent"; } }}
               >
                 <item.icon size={18} strokeWidth={1.8} />
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </button>
             );
           })}
@@ -223,7 +225,7 @@ export default function DashboardLayout() {
             onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
           >
             <DollarSign size={18} strokeWidth={1.8} />
-            <span>Broker</span>
+            <span>{t("nav.broker")}</span>
           </button>
         </nav>
       </aside>
@@ -255,7 +257,7 @@ export default function DashboardLayout() {
               onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 0 12px rgba(0,207,165,0.3)"; }}
             >
               <img src={ronAvatar} alt="RON" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover" }} />
-              <span>Ask RON</span>
+              <span>{t("nav.askRon")}</span>
               <Mic size={12} style={{ opacity: 0.8 }} />
             </button>
             {(userNickname || userName) && (
@@ -286,7 +288,7 @@ export default function DashboardLayout() {
               onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
               onMouseLeave={e => e.currentTarget.style.opacity = "1"}
             >
-              <LayoutDashboard size={15} /> Dashboard
+              <LayoutDashboard size={15} /> {t("nav.dashboard")}
             </button>
             <LanguageSelector />
             {/* Light/Dark background toggle */}
@@ -336,7 +338,7 @@ export default function DashboardLayout() {
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
                   onMouseLeave={e => e.currentTarget.style.background = "none"}
                 >
-                  <LogOut size={15} /> Sign Out
+                  <LogOut size={15} /> {t("nav.signOut")}
                 </button>
               </div>
             )}

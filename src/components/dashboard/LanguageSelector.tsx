@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, createContext, useContext } from "react";
 import { Globe } from "lucide-react";
 import { C } from "@/lib/mock-data";
+import { useTranslation } from "react-i18next";
 
 export interface Language {
   code: string;
@@ -36,12 +37,22 @@ const LanguageContext = createContext<LanguageContextValue>({
 export const useLanguage = () => useContext(LanguageContext);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const { i18n } = useTranslation();
   const [language, setLang] = useState(() => localStorage.getItem("gainedge_language") || "en");
 
   const setLanguage = (code: string) => {
     setLang(code);
     localStorage.setItem("gainedge_language", code);
+    i18n.changeLanguage(code);
+    // RTL support for Arabic
+    document.documentElement.dir = code === "ar" ? "rtl" : "ltr";
   };
+
+  // Sync on mount
+  useEffect(() => {
+    i18n.changeLanguage(language);
+    document.documentElement.dir = language === "ar" ? "rtl" : "ltr";
+  }, []);
 
   const currentLanguage = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
 

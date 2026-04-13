@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { toast } from "sonner";
 import { Mail, Lock, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const C = {
   bg: "#080B12", card: "#111724", border: "rgba(255,255,255,0.06)",
@@ -11,6 +12,7 @@ const C = {
 };
 
 const Signup = () => {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -70,23 +72,23 @@ const Signup = () => {
           </span>
         </Link>
 
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, textAlign: "center", marginBottom: 4 }}>Get started free</h1>
-        <p style={{ fontSize: 13, color: C.sec, textAlign: "center", marginBottom: 24 }}>14-day free trial. No card required.</p>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, textAlign: "center", marginBottom: 4 }}>{t("auth.getStarted")}</h1>
+        <p style={{ fontSize: 13, color: C.sec, textAlign: "center", marginBottom: 24 }}>{t("auth.signupSubtitle")}</p>
 
         <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ position: "relative" }}>
             <User size={16} color={C.muted} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-            <input type="text" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} required style={inputStyle}
+            <input type="text" placeholder={t("auth.yourName")} value={name} onChange={e => setName(e.target.value)} required style={inputStyle}
               onFocus={e => e.target.style.borderColor = C.jade + "60"} onBlur={e => e.target.style.borderColor = C.border} />
           </div>
           <div style={{ position: "relative" }}>
             <Mail size={16} color={C.muted} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-            <input type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required style={inputStyle}
+            <input type="email" placeholder={t("auth.emailPlaceholder")} value={email} onChange={e => setEmail(e.target.value)} required style={inputStyle}
               onFocus={e => e.target.style.borderColor = C.jade + "60"} onBlur={e => e.target.style.borderColor = C.border} />
           </div>
           <div style={{ position: "relative" }}>
             <Lock size={16} color={C.muted} style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
-            <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} style={inputStyle}
+            <input type="password" placeholder={t("auth.passwordPlaceholder")} value={password} onChange={e => setPassword(e.target.value)} required minLength={6} style={inputStyle}
               onFocus={e => e.target.style.borderColor = C.jade + "60"} onBlur={e => e.target.style.borderColor = C.border} />
           </div>
 
@@ -95,12 +97,12 @@ const Signup = () => {
             background: C.jade, color: "#080B12", fontSize: 14, fontWeight: 700,
             fontFamily: "'DM Sans', sans-serif", opacity: loading ? 0.7 : 1,
           }}>
-            {loading ? "Creating account..." : "Start Free Trial →"}
+            {loading ? t("auth.creatingAccount") : t("auth.startTrial")}
           </button>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0" }}>
             <div style={{ flex: 1, height: 1, background: C.border }} />
-            <span style={{ fontSize: 12, color: C.muted }}>or continue with</span>
+            <span style={{ fontSize: 12, color: C.muted }}>{t("auth.orContinueWith")}</span>
             <div style={{ flex: 1, height: 1, background: C.border }} />
           </div>
 
@@ -121,8 +123,8 @@ const Signup = () => {
         </form>
 
         <p style={{ textAlign: "center", fontSize: 13, color: C.sec, marginTop: 20 }}>
-          Already have an account?{" "}
-          <Link to="/login" style={{ color: C.jade, fontWeight: 600, textDecoration: "none" }}>Sign in</Link>
+          {t("auth.hasAccount")}{" "}
+          <Link to="/login" style={{ color: C.jade, fontWeight: 600, textDecoration: "none" }}>{t("auth.signIn")}</Link>
         </p>
       </div>
     </div>
