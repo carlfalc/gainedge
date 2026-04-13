@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import {
   Clock, TrendingUp, Target, AlertTriangle, ChevronDown, ChevronUp,
-  Brain, Zap, Calendar, Activity
+  Brain, Zap, Calendar, Activity, AlignCenterVertical
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -80,8 +80,8 @@ export default function InsightsPage() {
     <div style={{ fontFamily: "'DM Sans', sans-serif", color: C.text }}>
       <div style={{ marginBottom: 32 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-          <Brain size={28} style={{ color: C.jade }} />
-          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>Artificial Intelligence Insights</h1>
+          <AlignCenterVertical size={28} className="text-destructive" />
+          <h1 className="text-3xl font-sans font-semibold text-white">RONS Insights</h1>
         </div>
         <p style={{ color: C.text, fontSize: 14 }}>Compiled from your trading data and market analysis</p>
       </div>
