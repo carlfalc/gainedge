@@ -1,56 +1,76 @@
 
 
-## Authentication / Random Logout Analysis
+## Notification System — How It Works & What We Can Build
 
-### What's Happening
+### What You Already Have
 
-Your suspicion is correct — **the random logouts in the preview are caused by having the published site (gainedge.ai) open in another tab**. This is a known Lovable Cloud preview environment quirk, not a bug in your code.
+**On-Screen Notifications (Working)**: `TradeNotificationPopup` already listens via Supabase Realtime for new signals and high-confidence scans. It shows toast-style popups in the top-right corner with auto-dismiss after 15 seconds. This works on whichever tab/page you're currently viewing.
 
-The preview environment's fetch proxy can interfere with Supabase auth token refresh requests. When both tabs are open, the preview session can get invalidated or confused, causing `onAuthStateChange` to fire a `SIGNED_OUT` event, which redirects you to the login page.
+**Settings Toggles (Saved but not wired)**: The profile stores `email_alerts`, `push_notifications`, and `sms_alerts` booleans — but no actual sending logic is connected to them yet.
 
-### Is This a Problem for Real Users?
+---
 
-**No.** On the published URL (gainedge.ai), users will only have one session in one origin. The Supabase client is correctly configured with `autoRefreshToken: true` and `persistSession: true`, so tokens will refresh automatically in production.
+### Channel Breakdown
 
-### Minor Hardening (Recommended)
+#### 1. On-Screen Notifications (Already Working)
+- These are the popups you see — powered by Supabase Realtime subscriptions
+- They only appear on the tab that's actively open and subscribed
+- **"Push notifications" on your settings page currently refers to this** — it's an in-app notification, not a browser push notification
+- No changes needed here unless you want to enhance the UI
 
-Even though production should be fine, there are two small improvements worth making to make the session more resilient:
+#### 2. Email Alerts (Can Build Now)
+**What it does**: When RON fires a signal or live trade, send an email to the user's registered email address with the trade details (symbol, direction, entry, TP, SL, confidence).
 
-1. **Ignore transient auth events during token refresh** — In `DashboardLayout.tsx`, the `onAuthStateChange` handler immediately redirects on `SIGNED_OUT`. If a token refresh briefly fails but then succeeds, the user gets kicked out unnecessarily. We should add a short delay and re-check the session before redirecting.
+**What's needed**:
+- Your project has a custom domain (`www.gainedge.ai`) that can be used for email sending
+- An email domain needs to be set up (currently one exists for a different domain but is pending DNS)
+- We'd set up the `gainedge.ai` domain for email, scaffold the email infrastructure, create a "signal-alert" email template, then wire the `push-scan` and `update-signal` edge functions to also invoke `send-transactional-email` when `email_alerts = true` on the user's profile
 
-2. **Handle `TOKEN_REFRESHED` errors gracefully** — Currently, if `refreshSession()` fails in `metaapi-client.ts`, it falls back to `getSession()`. This is good. But the dashboard layout doesn't have similar resilience.
+**Requirements**: Set up email domain for `gainedge.ai` via the built-in email system — no third-party connectors needed.
 
-### Plan
+#### 3. Browser Push Notifications (Can Build)
+**What it does**: Native browser notification popups (the ones that appear even when the browser tab isn't focused, with the OS notification sound). These work across all open tabs and even when the tab is in the background.
+
+**What's needed**:
+- Use the Web Notifications API (`Notification.requestPermission()` + `new Notification(...)`)
+- When the Supabase Realtime subscription fires a new signal/trade, trigger a browser notification if the user has granted permission and `push_notifications = true`
+- This is purely client-side — no third-party service needed
+- The user gets a browser permission prompt the first time
+
+**Important distinction**: This is NOT the same as mobile push notifications (which require Firebase/APNs). This is browser-only push notifications that work on desktop and mobile browsers.
+
+#### 4. SMS Alerts (Parked)
+As you said, we won't wire this now. Would require a third-party SMS provider (e.g. Twilio connector).
+
+---
+
+### Implementation Plan
+
+| Step | What | Details |
+|------|------|---------|
+| 1 | **Set up email domain** | Configure `gainedge.ai` for email sending via built-in email system |
+| 2 | **Create signal alert email template** | React Email template showing symbol, direction, confidence, entry/TP/SL |
+| 3 | **Wire email sending in edge functions** | When `push-scan` creates a signal with confidence >= threshold, check user's `email_alerts` preference and send email |
+| 4 | **Add browser push notifications** | In `TradeNotificationPopup`, request notification permission and fire `new Notification()` alongside the on-screen popup when `push_notifications = true` |
+| 5 | **Add permission request UI** | When user enables "Push Notifications" toggle in settings, prompt for browser notification permission |
+
+### Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| `src/components/dashboard/DashboardLayout.tsx` | On `SIGNED_OUT` event, re-verify session with `getSession()` before redirecting — prevents false logouts from transient refresh failures |
+| `supabase/functions/_shared/transactional-email-templates/signal-alert.tsx` | New email template for signal/trade alerts |
+| `supabase/functions/_shared/transactional-email-templates/registry.ts` | Register the new template |
+| `supabase/functions/push-scan/index.ts` | After inserting scan/signal, check user prefs and send email if enabled |
+| `src/components/dashboard/TradeNotificationPopup.tsx` | Add browser `Notification` API calls alongside existing popups |
+| `src/pages/dashboard/SettingsPage.tsx` | Add permission request when push toggle is enabled |
 
-### The Fix (Single File Change)
+### No Third-Party Connectors Needed
 
-In the `onAuthStateChange` handler, instead of immediately navigating on `SIGNED_OUT`:
+- **Email**: Built-in Lovable email system (just needs domain setup)
+- **Browser push**: Native Web API, zero dependencies
+- **SMS**: Would need Twilio or similar (parked for now)
 
-```typescript
-// Before (current)
-if (event === "SIGNED_OUT") {
-  navigate("/", { replace: true });
-}
+### First Step
 
-// After (hardened)
-if (event === "SIGNED_OUT") {
-  // Double-check — transient refresh failures can emit SIGNED_OUT briefly
-  const { data: { session: recheck } } = await supabase.auth.getSession();
-  if (!recheck) {
-    navigate("/", { replace: true });
-  }
-}
-```
-
-This single change ensures that even if a token refresh hiccup fires `SIGNED_OUT`, the app confirms there's truly no session before kicking the user out.
-
-### Summary
-
-- **Preview logouts with gainedge.ai open in another tab** = expected behavior, not a code bug
-- **Production users** will not experience random logouts — the auth config is correct
-- **One small hardening change** to double-check session before redirecting on sign-out events, adding extra protection against edge cases
+We need to set up the email domain for `gainedge.ai` before we can build the email alerts. I'll present the setup dialog when you approve this plan.
 
