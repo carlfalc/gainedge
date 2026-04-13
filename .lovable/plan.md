@@ -1,76 +1,76 @@
 
 
-## Notification System — How It Works & What We Can Build
+## Language / Internationalization (i18n) Plan
 
-### What You Already Have
+### Current State
+The `LanguageSelector` component saves a language code (e.g. `"de"`, `"fr"`) to localStorage and exposes it via `useLanguage()`. However, `useLanguage` is only imported inside `LanguageSelector.tsx` itself — no other component reads the language to translate UI text. The selector works, but the platform stays in English regardless of selection.
 
-**On-Screen Notifications (Working)**: `TradeNotificationPopup` already listens via Supabase Realtime for new signals and high-confidence scans. It shows toast-style popups in the top-right corner with auto-dismiss after 15 seconds. This works on whichever tab/page you're currently viewing.
+### Options for Real Translation
 
-**Settings Toggles (Saved but not wired)**: The profile stores `email_alerts`, `push_notifications`, and `sms_alerts` booleans — but no actual sending logic is connected to them yet.
+There are two practical approaches:
 
----
+#### Option A: Static Translation Files (i18next) — Recommended
+Use `react-i18next`, the standard React internationalization library. Every UI string gets a translation key, and JSON files provide translations per language.
 
-### Channel Breakdown
+- **Pros**: Fast, no API costs, works offline, industry standard
+- **Cons**: We must provide/generate translation JSON files for all 10 languages (~200-400 UI strings). We can use AI to generate initial translations, then refine.
+- **How it works**: `t("settings.title")` → looks up the current language's JSON → returns `"Einstellungen"` (German) or `"Settings"` (English)
 
-#### 1. On-Screen Notifications (Already Working)
-- These are the popups you see — powered by Supabase Realtime subscriptions
-- They only appear on the tab that's actively open and subscribed
-- **"Push notifications" on your settings page currently refers to this** — it's an in-app notification, not a browser push notification
-- No changes needed here unless you want to enhance the UI
+#### Option B: Live AI Translation (Runtime)
+Call a translation API on-the-fly when language changes, caching results.
 
-#### 2. Email Alerts (Can Build Now)
-**What it does**: When RON fires a signal or live trade, send an email to the user's registered email address with the trade details (symbol, direction, entry, TP, SL, confidence).
+- **Pros**: Zero manual translation files, always up to date
+- **Cons**: Adds latency on every language switch, API costs, requires network, harder to QA
 
-**What's needed**:
-- Your project has a custom domain (`www.gainedge.ai`) that can be used for email sending
-- An email domain needs to be set up (currently one exists for a different domain but is pending DNS)
-- We'd set up the `gainedge.ai` domain for email, scaffold the email infrastructure, create a "signal-alert" email template, then wire the `push-scan` and `update-signal` edge functions to also invoke `send-transactional-email` when `email_alerts = true` on the user's profile
+### Recommended Approach: Option A (i18next)
 
-**Requirements**: Set up email domain for `gainedge.ai` via the built-in email system — no third-party connectors needed.
+**Step 1 — Install & configure i18next**
+- Add `react-i18next` and `i18next` packages
+- Create `src/i18n/index.ts` with language detection from localStorage
+- Wire `LanguageProvider` to sync with i18next's language
 
-#### 3. Browser Push Notifications (Can Build)
-**What it does**: Native browser notification popups (the ones that appear even when the browser tab isn't focused, with the OS notification sound). These work across all open tabs and even when the tab is in the background.
+**Step 2 — Create translation files**
+- `src/i18n/locales/en.json` (English — the baseline, extracted from current hardcoded strings)
+- One JSON file per language: `es.json`, `fr.json`, `de.json`, `pt.json`, `ja.json`, `zh.json`, `ar.json`, `hi.json`, `ko.json`
+- Use AI to generate initial translations from the English file
 
-**What's needed**:
-- Use the Web Notifications API (`Notification.requestPermission()` + `new Notification(...)`)
-- When the Supabase Realtime subscription fires a new signal/trade, trigger a browser notification if the user has granted permission and `push_notifications = true`
-- This is purely client-side — no third-party service needed
-- The user gets a browser permission prompt the first time
+**Step 3 — Replace hardcoded strings in key pages**
+Priority pages to translate first:
+1. **DashboardHome** — welcome text, card labels
+2. **SettingsPage** — all section headers, toggle labels, button text
+3. **SignalsPage** — table headers, status labels
+4. **Sidebar/Navigation** — menu items
+5. **Login/Signup** — form labels, buttons
 
-**Important distinction**: This is NOT the same as mobile push notifications (which require Firebase/APNs). This is browser-only push notifications that work on desktop and mobile browsers.
+Each hardcoded string like `"Settings"` becomes `t("nav.settings")`.
 
-#### 4. SMS Alerts (Parked)
-As you said, we won't wire this now. Would require a third-party SMS provider (e.g. Twilio connector).
+**Step 4 — RTL support for Arabic**
+- Add `dir="rtl"` to the root element when Arabic is selected
+- Tailwind has built-in RTL utilities
 
----
+### Scope & Effort
+- ~300-400 translatable strings across the app
+- Initial implementation: sidebar + settings + dashboard home + login/signup
+- Remaining pages can be translated incrementally
 
-### Implementation Plan
+### Files to Create
+| File | Purpose |
+|------|---------|
+| `src/i18n/index.ts` | i18next configuration |
+| `src/i18n/locales/en.json` | English strings (baseline) |
+| `src/i18n/locales/{lang}.json` × 9 | Translated strings per language |
 
-| Step | What | Details |
-|------|------|---------|
-| 1 | **Set up email domain** | Configure `gainedge.ai` for email sending via built-in email system |
-| 2 | **Create signal alert email template** | React Email template showing symbol, direction, confidence, entry/TP/SL |
-| 3 | **Wire email sending in edge functions** | When `push-scan` creates a signal with confidence >= threshold, check user's `email_alerts` preference and send email |
-| 4 | **Add browser push notifications** | In `TradeNotificationPopup`, request notification permission and fire `new Notification()` alongside the on-screen popup when `push_notifications = true` |
-| 5 | **Add permission request UI** | When user enables "Push Notifications" toggle in settings, prompt for browser notification permission |
-
-### Files to Create/Modify
-
+### Files to Modify
 | File | Change |
 |------|--------|
-| `supabase/functions/_shared/transactional-email-templates/signal-alert.tsx` | New email template for signal/trade alerts |
-| `supabase/functions/_shared/transactional-email-templates/registry.ts` | Register the new template |
-| `supabase/functions/push-scan/index.ts` | After inserting scan/signal, check user prefs and send email if enabled |
-| `src/components/dashboard/TradeNotificationPopup.tsx` | Add browser `Notification` API calls alongside existing popups |
-| `src/pages/dashboard/SettingsPage.tsx` | Add permission request when push toggle is enabled |
+| `src/main.tsx` | Import i18n init |
+| `src/components/dashboard/LanguageSelector.tsx` | Sync language change with `i18next.changeLanguage()` |
+| `src/components/dashboard/DashboardLayout.tsx` | Replace hardcoded nav labels with `t()` |
+| `src/pages/dashboard/SettingsPage.tsx` | Replace hardcoded labels with `t()` |
+| `src/pages/dashboard/DashboardHome.tsx` | Replace hardcoded text with `t()` |
+| `src/pages/Login.tsx` / `src/pages/Signup.tsx` | Replace form labels with `t()` |
+| Additional dashboard pages | Incremental translation |
 
-### No Third-Party Connectors Needed
-
-- **Email**: Built-in Lovable email system (just needs domain setup)
-- **Browser push**: Native Web API, zero dependencies
-- **SMS**: Would need Twilio or similar (parked for now)
-
-### First Step
-
-We need to set up the email domain for `gainedge.ai` before we can build the email alerts. I'll present the setup dialog when you approve this plan.
+### Summary
+Install `react-i18next`, create translation JSON files (AI-generated for the 9 non-English languages), and progressively replace hardcoded strings with `t()` calls starting from the most visible pages.
 
