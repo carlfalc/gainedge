@@ -128,6 +128,43 @@ Deno.serve(async (req) => {
             result: "pending",
           }).select("id");
           totalSignalsCreated += sigs?.length || 0;
+
+          // Send email alert if user has email_alerts enabled
+          if (sigs && sigs.length > 0) {
+            const { data: prof } = await supabase
+              .from("profiles")
+              .select("email_alerts")
+              .eq("id", r.user_id)
+              .single();
+
+            if (prof?.email_alerts) {
+              // Get user email from auth
+              const { data: { user: authUser } } = await supabase.auth.admin.getUserById(r.user_id);
+              if (authUser?.email) {
+                try {
+                  await supabase.functions.invoke("send-transactional-email", {
+                    body: {
+                      templateName: "signal-alert",
+                      recipientEmail: authUser.email,
+                      idempotencyKey: `signal-alert-${sigs[0].id}`,
+                      templateData: {
+                        symbol: r.symbol,
+                        direction: r.direction,
+                        confidence: s.confidence,
+                        entry_price: r.entry_price,
+                        take_profit: r.take_profit,
+                        stop_loss: r.stop_loss,
+                        risk_reward: r.risk_reward || "1:1",
+                        type: "signal",
+                      },
+                    },
+                  });
+                } catch (emailErr) {
+                  console.error("Email alert failed:", emailErr);
+                }
+              }
+            }
+          }
         }
       }
     }
