@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
 import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
@@ -13,6 +14,7 @@ import { DEFAULT_CLOCKS, AVAILABLE_CITIES, type ClockConfig } from "@/components
 const ADMIN_EMAIL = "falconercarlandrew@gmail.com";
 
 export default function SettingsPage() {
+  const { t } = useTranslation();
   const { profile, loading, updateProfile, userId } = useProfile();
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
@@ -102,57 +104,57 @@ export default function SettingsPage() {
 
   return (
     <div style={{ width: "100%" }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 24 }}>Settings</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 24 }}>{t("settings.title")}</h1>
 
-      <Section icon={<User size={16} color={C.jade} />} title="Profile">
-        <Field label="Full Name *">
+      <Section icon={<User size={16} color={C.jade} />} title={t("settings.profile")}>
+        <Field label={t("settings.fullName") + " *"}>
           <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} placeholder="Required — RON will greet you by name" />
         </Field>
-        <Field label="Nickname (optional)">
+        <Field label={t("settings.nickname")}>
           <input value={nickname} onChange={e => setNickname(e.target.value)} style={inputStyle} placeholder="Displayed in header if set" />
         </Field>
-        <Field label="Email">
+        <Field label={t("settings.email")}>
           <input value={email} disabled style={{ ...inputStyle, opacity: 0.5 }} />
         </Field>
       </Section>
 
-      <Section icon={<Sliders size={16} color={C.blue} />} title="Instruments">
-        <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>Current watchlist ({instruments.length}/10 — {tierLabel} tier):</div>
+      <Section icon={<Sliders size={16} color={C.blue} />} title={t("settings.instruments")}>
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>{t("settings.currentWatchlist")} ({instruments.length}/10 — {tierLabel} {t("common.tier")}):</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
           {instruments.map(i => (
             <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: C.jade + "18", color: C.jade }}>{i}</span>
           ))}
         </div>
-        <button onClick={() => setShowAddInstrument(true)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>+ Add Instrument</button>
+        <button onClick={() => setShowAddInstrument(true)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>{t("settings.addInstrument")}</button>
       </Section>
 
-      <Section icon={<Sliders size={16} color={C.purple} />} title="Preferences">
+      <Section icon={<Sliders size={16} color={C.purple} />} title={t("settings.preferences")}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label="Default Timeframe">
+          <Field label={t("settings.defaultTimeframe")}>
             <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={inputStyle}>
               {["1", "5", "15", "30", "60", "240", "1440"].map(t => <option key={t} value={t}>{t === "60" ? "1h" : t === "240" ? "4h" : t === "1440" ? "1D" : t + "m"}</option>)}
             </select>
           </Field>
-          <Field label="Candle Type">
+          <Field label={t("settings.candleType")}>
             <select value={candle} onChange={e => setCandle(e.target.value)} style={inputStyle}>
               <option value="heiken_ashi">Heiken Ashi</option>
               <option value="standard">Standard</option>
               <option value="renko">Renko</option>
             </select>
           </Field>
-          <Field label="EMA Fast Period">
+          <Field label={t("settings.emaFast")}>
             <input value={emaFast} onChange={e => setEmaFast(e.target.value)} style={inputStyle} type="number" />
           </Field>
-          <Field label="EMA Slow Period">
+          <Field label={t("settings.emaSlow")}>
             <input value={emaSlow} onChange={e => setEmaSlow(e.target.value)} style={inputStyle} type="number" />
           </Field>
         </div>
       </Section>
 
 
-      <Section icon={<Bell size={16} color={C.amber} />} title="Notifications">
-        <Toggle label="Email Alerts" checked={emailAlerts} onChange={setEmailAlerts} />
-        <Toggle label="Push Notifications (Browser)" checked={pushAlerts} onChange={async (val) => {
+      <Section icon={<Bell size={16} color={C.amber} />} title={t("settings.notifications")}>
+        <Toggle label={t("settings.emailAlerts")} checked={emailAlerts} onChange={setEmailAlerts} />
+        <Toggle label={t("settings.pushNotifications")} checked={pushAlerts} onChange={async (val) => {
           if (val && "Notification" in window) {
             const permission = await Notification.requestPermission();
             if (permission !== "granted") {
@@ -167,11 +169,11 @@ export default function SettingsPage() {
             ⚠ Browser notifications not permitted — toggle off and on to re-request
           </div>
         )}
-        <Toggle label="SMS Alerts" checked={smsAlerts} onChange={setSmsAlerts} />
+        <Toggle label={t("settings.smsAlerts")} checked={smsAlerts} onChange={setSmsAlerts} />
       </Section>
 
-      <Section icon={<Sliders size={16} color={C.orange} />} title="Broker">
-        <Field label="Select Broker">
+      <Section icon={<Sliders size={16} color={C.orange} />} title={t("settings.brokerSection")}>
+        <Field label={t("settings.selectBroker")}>
           <select value={broker} onChange={e => setBroker(e.target.value)} style={inputStyle}>
             <option value="eightcap">Eightcap</option>
             <option value="icmarkets">IC Markets</option>
@@ -179,10 +181,10 @@ export default function SettingsPage() {
             <option value="oanda">OANDA</option>
           </select>
         </Field>
-        <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>Used for correct symbol mapping.</div>
+        <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{t("settings.brokerHint")}</div>
       </Section>
 
-      <Section icon={<CreditCard size={16} color={C.jade} />} title="Subscription">
+      <Section icon={<CreditCard size={16} color={C.jade} />} title={t("settings.subscription")}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{tierLabel} Plan</span>
           <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: C.jade + "20", color: C.jade }}>{statusLabel}</span>
@@ -191,13 +193,13 @@ export default function SettingsPage() {
           {profile?.subscription_tier === "trader" ? "$59/mo • 10 instruments • Real-time signals" : profile?.subscription_tier === "elite" ? "$129/mo • Unlimited instruments • Priority AI" : "Free • 3 instruments • Daily signals"}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`, color: C.bg }}>Upgrade to Elite</button>
-          <button style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>Downgrade</button>
+          <button style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`, color: C.bg }}>{t("settings.upgrade")}</button>
+          <button style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>{t("settings.downgrade")}</button>
         </div>
       </Section>
 
       <button onClick={handleSave} style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`, color: C.bg, padding: "12px 32px", fontSize: 14, marginBottom: 16 }}>
-        Save All Settings
+        {t("settings.saveAll")}
       </button>
 
       {/* All users see AI Preferences */}
@@ -208,9 +210,9 @@ export default function SettingsPage() {
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
 
-      <Section icon={<AlertTriangle size={16} color={C.red} />} title="Danger Zone">
-        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>This action cannot be undone. All data will be permanently deleted.</div>
-        <button style={{ ...btnStyle, background: C.red + "20", color: C.red, border: `1px solid ${C.red}30` }}>Delete Account</button>
+      <Section icon={<AlertTriangle size={16} color={C.red} />} title={t("settings.dangerZone")}>
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>{t("settings.deleteWarning")}</div>
+        <button style={{ ...btnStyle, background: C.red + "20", color: C.red, border: `1px solid ${C.red}30` }}>{t("settings.deleteAccount")}</button>
       </Section>
 
       {userId && (
