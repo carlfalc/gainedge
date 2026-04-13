@@ -73,10 +73,15 @@ export default function DashboardLayout() {
       setAuthReady(true);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       if (event === "SIGNED_OUT") {
-        navigate("/", { replace: true });
+        // Double-check — transient refresh failures can emit SIGNED_OUT briefly
+        const { data: { session: recheck } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        if (!recheck) {
+          navigate("/", { replace: true });
+        }
       } else if (session) {
         setUserEmail(session.user.email || "");
         setUserId(session.user.id);
