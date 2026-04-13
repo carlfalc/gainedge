@@ -1,7 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
+
+function fireBrowserNotification(title: string, body: string) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, { body, icon: "/favicon.ico" });
+    } catch (_) { /* mobile browsers may throw */ }
+  }
+}
 
 interface Notification {
   id: string;
@@ -17,6 +25,18 @@ interface Notification {
 
 export default function TradeNotificationPopup() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const pushEnabledRef = useRef(false);
+
+  // Load user's push notification preference
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      supabase.from("profiles").select("push_notifications").eq("id", session.user.id).single().then(({ data }) => {
+        if (data) pushEnabledRef.current = data.push_notifications;
+      });
+    });
+  }, []);
 
   const dismiss = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -63,6 +83,12 @@ export default function TradeNotificationPopup() {
               timestamp: row.scanned_at,
             };
             setNotifications((prev) => [notif, ...prev].slice(0, 5));
+            if (pushEnabledRef.current) {
+              fireBrowserNotification(
+                `🔴 LIVE TRADE: ${row.symbol} ${row.direction}`,
+                `Confidence: ${row.confidence}/10${row.entry_price ? ` | Entry: ${row.entry_price}` : ""}`
+              );
+            }
           }
         }
       )
@@ -88,6 +114,12 @@ export default function TradeNotificationPopup() {
             timestamp: row.created_at,
           };
           setNotifications((prev) => [notif, ...prev].slice(0, 5));
+            if (pushEnabledRef.current) {
+              fireBrowserNotification(
+                `⚡ NEW SIGNAL: ${row.symbol} ${row.direction}`,
+                `Confidence: ${row.confidence}/10${row.entry_price ? ` | Entry: ${row.entry_price}` : ""}`
+              );
+            }
         }
       )
       .subscribe();
