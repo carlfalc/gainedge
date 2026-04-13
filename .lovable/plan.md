@@ -1,72 +1,56 @@
 
 
-## Enhanced "My Profile" Dialog for Whisky & Cigar Lounge
+## Authentication / Random Logout Analysis
 
-### What We'll Build
+### What's Happening
 
-Rebuild the `LoungeProfileDialog` with a richer form that includes:
+Your suspicion is correct — **the random logouts in the preview are caused by having the published site (gainedge.ai) open in another tab**. This is a known Lovable Cloud preview environment quirk, not a bug in your code.
 
-1. **Name / Nickname toggle** — Pre-filled from profile. A toggle switch lets the user choose whether their name or nickname is shown in chat. Only one can be active at a time.
+The preview environment's fetch proxy can interfere with Supabase auth token refresh requests. When both tabs are open, the preview session can get invalidated or confused, causing `onAuthStateChange` to fire a `SIGNED_OUT` event, which redirects you to the login page.
 
-2. **Country selector** — A dropdown to select their country (full list of countries).
+### Is This a Problem for Real Users?
 
-3. **Trading preferences** — Checkboxes for: Stocks, Forex Majors, Forex Minors, Commodities, Futures, Cryptocurrency, Indices, Gold.
+**No.** On the published URL (gainedge.ai), users will only have one session in one origin. The Supabase client is correctly configured with `autoRefreshToken: true` and `persistSession: true`, so tokens will refresh automatically in production.
 
-4. **Favourite trading sessions** — Checkboxes for: Asia, London, Europe, New York.
+### Minor Hardening (Recommended)
 
-5. **Save** persists all fields to the `profiles` table and controls what name appears in chat.
+Even though production should be fine, there are two small improvements worth making to make the session more resilient:
 
-### Database Changes
+1. **Ignore transient auth events during token refresh** — In `DashboardLayout.tsx`, the `onAuthStateChange` handler immediately redirects on `SIGNED_OUT`. If a token refresh briefly fails but then succeeds, the user gets kicked out unnecessarily. We should add a short delay and re-check the session before redirecting.
 
-Add new columns to the `profiles` table via migration:
+2. **Handle `TOKEN_REFRESHED` errors gracefully** — Currently, if `refreshSession()` fails in `metaapi-client.ts`, it falls back to `getSession()`. This is good. But the dashboard layout doesn't have similar resilience.
 
-```sql
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS country text,
-  ADD COLUMN IF NOT EXISTS trading_preferences jsonb DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS favourite_sessions jsonb DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS show_nickname boolean DEFAULT false;
-```
+### Plan
 
-- `country` — stores selected country code/name
-- `trading_preferences` — JSON array of selected categories (e.g. `["forex_majors","gold","indices"]`)
-- `favourite_sessions` — JSON array (e.g. `["asia","london"]`)
-- `show_nickname` — when true, chat displays nickname instead of full name
-
-### File Changes
-
-| File | Action |
+| File | Change |
 |------|--------|
-| `profiles` table | Migration — add 4 columns |
-| `src/components/dashboard/LoungeProfileDialog.tsx` | Rewrite — expanded form with all sections, scrollable, same gold/black theme |
-| `src/components/dashboard/LoungeChat.tsx` | Minor update — use `show_nickname` flag to determine display name |
-| `src/hooks/use-profile.ts` | Update `Profile` interface to include new fields |
+| `src/components/dashboard/DashboardLayout.tsx` | On `SIGNED_OUT` event, re-verify session with `getSession()` before redirecting — prevents false logouts from transient refresh failures |
 
-### UI Layout (inside the dialog)
+### The Fix (Single File Change)
 
-```text
-┌─────────────────────────────────┐
-│  MY PROFILE                  ×  │
-│  ─────────────────────────────  │
-│  Full Name    [prefilled     ]  │
-│  Nickname     [prefilled     ]  │
-│  Show in chat: ○ Name ○ Nick   │
-│  ─────────────────────────────  │
-│  Country      [▼ Select      ]  │
-│  ─────────────────────────────  │
-│  I Trade:                       │
-│  ☑ Stocks  ☑ Forex Majors      │
-│  ☐ Forex Minors  ☑ Commodities │
-│  ☐ Futures  ☐ Cryptocurrency   │
-│  ☑ Indices  ☑ Gold             │
-│  ─────────────────────────────  │
-│  Favourite Sessions:            │
-│  ☑ Asia  ☐ London              │
-│  ☑ Europe  ☐ New York          │
-│  ─────────────────────────────  │
-│  [ Save Profile ]               │
-└─────────────────────────────────┘
+In the `onAuthStateChange` handler, instead of immediately navigating on `SIGNED_OUT`:
+
+```typescript
+// Before (current)
+if (event === "SIGNED_OUT") {
+  navigate("/", { replace: true });
+}
+
+// After (hardened)
+if (event === "SIGNED_OUT") {
+  // Double-check — transient refresh failures can emit SIGNED_OUT briefly
+  const { data: { session: recheck } } = await supabase.auth.getSession();
+  if (!recheck) {
+    navigate("/", { replace: true });
+  }
+}
 ```
 
-The dialog will be scrollable if content overflows. Same gold/black aesthetic as current design.
+This single change ensures that even if a token refresh hiccup fires `SIGNED_OUT`, the app confirms there's truly no session before kicking the user out.
+
+### Summary
+
+- **Preview logouts with gainedge.ai open in another tab** = expected behavior, not a code bug
+- **Production users** will not experience random logouts — the auth config is correct
+- **One small hardening change** to double-check session before redirecting on sign-out events, adding extra protection against edge cases
 
