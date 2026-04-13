@@ -114,6 +114,12 @@ export default function TradeNotificationPopup() {
             timestamp: row.created_at,
           };
           setNotifications((prev) => [notif, ...prev].slice(0, 5));
+            if (pushEnabledRef.current) {
+              fireBrowserNotification(
+                `⚡ NEW SIGNAL: ${row.symbol} ${row.direction}`,
+                `Confidence: ${row.confidence}/10${row.entry_price ? ` | Entry: ${row.entry_price}` : ""}`
+              );
+            }
         }
       )
       .subscribe();
