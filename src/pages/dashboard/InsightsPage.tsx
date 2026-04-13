@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import {
   Clock, TrendingUp, Target, AlertTriangle, ChevronDown, ChevronUp,
-  Brain, Zap, Calendar, Activity
+  Brain, Zap, Calendar, Activity, AlignCenterVertical
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
