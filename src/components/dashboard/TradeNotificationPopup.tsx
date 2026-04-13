@@ -26,6 +26,18 @@ interface Notification {
 export default function TradeNotificationPopup() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
+  const pushEnabledRef = useRef(false);
+
+  // Load user's push notification preference
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      supabase.from("profiles").select("push_notifications").eq("id", session.user.id).single().then(({ data }) => {
+        if (data) pushEnabledRef.current = data.push_notifications;
+      });
+    });
+  }, []);
+
   const dismiss = useCallback((id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
