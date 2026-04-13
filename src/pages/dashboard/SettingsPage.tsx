@@ -152,7 +152,21 @@ export default function SettingsPage() {
 
       <Section icon={<Bell size={16} color={C.amber} />} title="Notifications">
         <Toggle label="Email Alerts" checked={emailAlerts} onChange={setEmailAlerts} />
-        <Toggle label="Push Notifications" checked={pushAlerts} onChange={setPushAlerts} />
+        <Toggle label="Push Notifications (Browser)" checked={pushAlerts} onChange={async (val) => {
+          if (val && "Notification" in window) {
+            const permission = await Notification.requestPermission();
+            if (permission !== "granted") {
+              toast.error("Browser notification permission denied. Please enable it in your browser settings.");
+              return;
+            }
+          }
+          setPushAlerts(val);
+        }} />
+        {pushAlerts && "Notification" in window && Notification.permission !== "granted" && (
+          <div style={{ fontSize: 11, color: C.amber, marginTop: -4, marginBottom: 8, paddingLeft: 4 }}>
+            ⚠ Browser notifications not permitted — toggle off and on to re-request
+          </div>
+        )}
         <Toggle label="SMS Alerts" checked={smsAlerts} onChange={setSmsAlerts} />
       </Section>
 
