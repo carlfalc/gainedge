@@ -83,6 +83,12 @@ export default function TradeNotificationPopup() {
               timestamp: row.scanned_at,
             };
             setNotifications((prev) => [notif, ...prev].slice(0, 5));
+            if (pushEnabledRef.current) {
+              fireBrowserNotification(
+                `🔴 LIVE TRADE: ${row.symbol} ${row.direction}`,
+                `Confidence: ${row.confidence}/10${row.entry_price ? ` | Entry: ${row.entry_price}` : ""}`
+              );
+            }
           }
         }
       )
