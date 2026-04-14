@@ -822,8 +822,8 @@ function applyV2Rules(v1Result: AnalysisResult, candles: any[], rules: Knowledge
 
 // Wrapper: runs V1, then optionally layers V2
 // useV1Pure: when true, V1 fires on every EMA crossover with no additional filters
-function runAnalysis(candles: any[], v2Rules: KnowledgeRule[] = [], session = "", recentSignalCount = 0, useV2 = true, useV1Pure = false): AnalysisResult {
-  const v1Result = runAnalysisV1(candles, useV1Pure);
+function runAnalysis(candles: any[], v2Rules: KnowledgeRule[] = [], session = "", recentSignalCount = 0, useV2 = true, useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
+  const v1Result = runAnalysisV1(candles, useV1Pure, rrRatio, symbolCategory, symbolName);
   if (!useV2 || v2Rules.length === 0) return v1Result;
   return applyV2Rules(v1Result, candles, v2Rules, session, recentSignalCount);
 }
