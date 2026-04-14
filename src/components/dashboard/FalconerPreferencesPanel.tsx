@@ -29,7 +29,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
   const [style, setStyle] = useState("balanced");
   const [saving, setSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [signalEngine, setSignalEngine] = useState("v1v2");
+  const [signalEngine, setSignalEngine] = useState("v1");
 
   useEffect(() => {
     load();
@@ -55,7 +55,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
       const p = prefRes.data;
       const filters = (typeof p.instrument_filters === "object" && p.instrument_filters !== null ? p.instrument_filters : {}) as Record<string, boolean>;
       setPrefs({ id: p.id, min_confidence: p.min_confidence, instrument_filters: filters, currency: p.currency, lot_size: p.lot_size });
-      setSignalEngine((p as any).signal_engine || "v1v2");
+      setSignalEngine((p as any).signal_engine || "v1");
       // Determine style from min_confidence
       const matched = SIGNAL_STYLES.find(s => s.minConf === p.min_confidence);
       setStyle(matched?.value || "balanced");
