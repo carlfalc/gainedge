@@ -1586,21 +1586,21 @@ serve(async (req) => {
           if (livePrice >= sig.take_profit) {
             result = "win";
             pnl = sig.take_profit - sig.entry_price;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           } else if (livePrice <= sig.stop_loss) {
             result = "loss";
             pnl = sig.stop_loss - sig.entry_price;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           }
         } else if (sig.direction === "SELL") {
           if (livePrice <= sig.take_profit) {
             result = "win";
             pnl = sig.entry_price - sig.take_profit;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           } else if (livePrice >= sig.stop_loss) {
             result = "loss";
             pnl = sig.entry_price - sig.stop_loss;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           }
         }
 
