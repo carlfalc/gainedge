@@ -1055,7 +1055,7 @@ serve(async (req) => {
           let analysis: AnalysisResult;
 
           if (candles && candles.length > 20) {
-            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2);
+            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2, useV1Pure);
           } else {
             // Mock analysis — still apply RON logic
             const mockRsi = data.rsi;
