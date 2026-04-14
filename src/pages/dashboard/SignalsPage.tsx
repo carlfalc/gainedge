@@ -440,8 +440,8 @@ export default function SignalsPage() {
                 <Cell><span style={{ color: s.direction === "BUY" ? C.green : C.red, fontWeight: 700 }}>{s.direction}</span></Cell>
                 <Cell mono>{s.confidence}</Cell>
                 <Cell mono>{formatPrice(s.entry_price)}</Cell>
-                <Cell mono>{formatPrice(s.take_profit)}</Cell>
-                <Cell mono>{formatPrice(s.stop_loss)}</Cell>
+                <Cell mono style={{ fontSize: 10, color: C.green }}>{formatSlTp(s.take_profit, s.entry_price, s.symbol, true)}</Cell>
+                <Cell mono style={{ fontSize: 10, color: C.red }}>{formatSlTp(s.stop_loss, s.entry_price, s.symbol, false)}</Cell>
                 <Cell mono>{s.risk_reward}</Cell>
                 <Cell>
                   <span style={{
