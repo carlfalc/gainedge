@@ -122,36 +122,45 @@ export type Database = {
       }
       candle_history: {
         Row: {
+          buy_volume: number | null
           close: number
           created_at: string
+          cumulative_delta: number | null
           high: number
           id: string
           low: number
           open: number
+          sell_volume: number | null
           symbol: string
           timeframe: string
           timestamp: string
           volume: number | null
         }
         Insert: {
+          buy_volume?: number | null
           close: number
           created_at?: string
+          cumulative_delta?: number | null
           high: number
           id?: string
           low: number
           open: number
+          sell_volume?: number | null
           symbol: string
           timeframe: string
           timestamp: string
           volume?: number | null
         }
         Update: {
+          buy_volume?: number | null
           close?: number
           created_at?: string
+          cumulative_delta?: number | null
           high?: number
           id?: string
           low?: number
           open?: number
+          sell_volume?: number | null
           symbol?: string
           timeframe?: string
           timestamp?: string
@@ -454,6 +463,51 @@ export type Database = {
           },
         ]
       }
+      liquidity_zones: {
+        Row: {
+          created_at: string
+          created_at_candle: string
+          id: string
+          price_high: number
+          price_low: number
+          respected: boolean | null
+          status: string
+          symbol: string
+          tested_count: number
+          timeframe: string
+          updated_at: string
+          zone_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_at_candle: string
+          id?: string
+          price_high: number
+          price_low: number
+          respected?: boolean | null
+          status?: string
+          symbol: string
+          tested_count?: number
+          timeframe?: string
+          updated_at?: string
+          zone_type: string
+        }
+        Update: {
+          created_at?: string
+          created_at_candle?: string
+          id?: string
+          price_high?: number
+          price_low?: number
+          respected?: boolean | null
+          status?: string
+          symbol?: string
+          tested_count?: number
+          timeframe?: string
+          updated_at?: string
+          zone_type?: string
+        }
+        Relationships: []
+      }
       live_market_data: {
         Row: {
           adx: number | null
@@ -467,6 +521,7 @@ export type Database = {
           market_open: boolean | null
           price_direction: string | null
           rsi: number | null
+          session_bias: string | null
           sparkline_data: Json | null
           spike_magnitude: number | null
           stoch_rsi: number | null
@@ -487,6 +542,7 @@ export type Database = {
           market_open?: boolean | null
           price_direction?: string | null
           rsi?: number | null
+          session_bias?: string | null
           sparkline_data?: Json | null
           spike_magnitude?: number | null
           stoch_rsi?: number | null
@@ -507,6 +563,7 @@ export type Database = {
           market_open?: boolean | null
           price_direction?: string | null
           rsi?: number | null
+          session_bias?: string | null
           sparkline_data?: Json | null
           spike_magnitude?: number | null
           stoch_rsi?: number | null
@@ -514,6 +571,48 @@ export type Database = {
           updated_at?: string
           user_id?: string
           volume_today?: number | null
+        }
+        Relationships: []
+      }
+      news_impact_results: {
+        Row: {
+          created_at: string
+          direction: string | null
+          id: string
+          magnitude_pips: number | null
+          measured_at: string | null
+          news_id: string
+          price_after_15m: number | null
+          price_after_1h: number | null
+          price_after_30m: number | null
+          price_at_news: number
+          symbol: string
+        }
+        Insert: {
+          created_at?: string
+          direction?: string | null
+          id?: string
+          magnitude_pips?: number | null
+          measured_at?: string | null
+          news_id: string
+          price_after_15m?: number | null
+          price_after_1h?: number | null
+          price_after_30m?: number | null
+          price_at_news: number
+          symbol: string
+        }
+        Update: {
+          created_at?: string
+          direction?: string | null
+          id?: string
+          magnitude_pips?: number | null
+          measured_at?: string | null
+          news_id?: string
+          price_after_15m?: number | null
+          price_after_1h?: number | null
+          price_after_30m?: number | null
+          price_at_news?: number
+          symbol?: string
         }
         Relationships: []
       }
@@ -724,6 +823,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_risk_metrics: {
+        Row: {
+          consecutive_losses: number
+          current_drawdown_pips: number | null
+          equity_current: number | null
+          equity_peak: number | null
+          id: string
+          max_drawdown_pips: number | null
+          recovery_time_hours: number | null
+          risk_mode: string
+          symbol: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consecutive_losses?: number
+          current_drawdown_pips?: number | null
+          equity_current?: number | null
+          equity_peak?: number | null
+          id?: string
+          max_drawdown_pips?: number | null
+          recovery_time_hours?: number | null
+          risk_mode?: string
+          symbol?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consecutive_losses?: number
+          current_drawdown_pips?: number | null
+          equity_current?: number | null
+          equity_peak?: number | null
+          id?: string
+          max_drawdown_pips?: number | null
+          recovery_time_hours?: number | null
+          risk_mode?: string
+          symbol?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       scan_results: {
         Row: {
           adx: number | null
@@ -863,6 +1004,7 @@ export type Database = {
           hour_utc: number | null
           id: string
           macd_status: string | null
+          mtf_alignment: string | null
           pattern_active: string | null
           pnl_currency: number | null
           pnl_pips: number | null
@@ -889,6 +1031,7 @@ export type Database = {
           hour_utc?: number | null
           id?: string
           macd_status?: string | null
+          mtf_alignment?: string | null
           pattern_active?: string | null
           pnl_currency?: number | null
           pnl_pips?: number | null
@@ -915,6 +1058,7 @@ export type Database = {
           hour_utc?: number | null
           id?: string
           macd_status?: string | null
+          mtf_alignment?: string | null
           pattern_active?: string | null
           pnl_currency?: number | null
           pnl_pips?: number | null
@@ -1135,6 +1279,42 @@ export type Database = {
           signal_engine?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      volume_profile_daily: {
+        Row: {
+          created_at: string
+          id: string
+          poc_price: number | null
+          price_levels: Json | null
+          profile_date: string
+          symbol: string
+          total_volume: number | null
+          value_area_high: number | null
+          value_area_low: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          poc_price?: number | null
+          price_levels?: Json | null
+          profile_date?: string
+          symbol: string
+          total_volume?: number | null
+          value_area_high?: number | null
+          value_area_low?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          poc_price?: number | null
+          price_levels?: Json | null
+          profile_date?: string
+          symbol?: string
+          total_volume?: number | null
+          value_area_high?: number | null
+          value_area_low?: number | null
         }
         Relationships: []
       }

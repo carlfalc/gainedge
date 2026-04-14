@@ -192,6 +192,100 @@ serve(async (req) => {
             systemPrompt += `- ${i.title}: ${i.description}\n`;
           }
         }
+
+        // 6. Liquidity zones for current instrument
+        if (context.instrument) {
+          const { data: activeZones } = await supabase
+            .from("liquidity_zones")
+            .select("zone_type, price_high, price_low, tested_count, respected, status")
+            .eq("symbol", context.instrument)
+            .eq("status", "active")
+            .order("created_at", { ascending: false })
+            .limit(10);
+
+          if (activeZones && activeZones.length > 0) {
+            systemPrompt += `\n## Active Liquidity Zones for ${context.instrument}\n`;
+            for (const z of activeZones) {
+              systemPrompt += `- ${z.zone_type.replace(/_/g, " ")}: ${z.price_low}–${z.price_high} (tested ${z.tested_count}x${z.respected ? ", respected" : ""})\n`;
+            }
+          }
+        }
+
+        // 7. Risk metrics for user
+        if (context.userId) {
+          const { data: riskMetrics } = await supabase
+            .from("ron_risk_metrics")
+            .select("symbol, consecutive_losses, max_drawdown_pips, current_drawdown_pips, equity_peak, equity_current, risk_mode")
+            .eq("user_id", context.userId);
+
+          if (riskMetrics && riskMetrics.length > 0) {
+            const inDrawdown = riskMetrics.some(r => r.risk_mode === "conservative");
+            systemPrompt += `\n## User Risk Status\n`;
+            if (inDrawdown) {
+              systemPrompt += `- ⚠️ CONSERVATIVE MODE: User has consecutive losses. Be more cautious with recommendations.\n`;
+            }
+            for (const r of riskMetrics) {
+              if (r.consecutive_losses >= 2 || r.current_drawdown_pips > 0) {
+                systemPrompt += `- ${r.symbol}: ${r.consecutive_losses} consecutive losses, DD ${r.current_drawdown_pips} pips\n`;
+              }
+            }
+          }
+        }
+
+        // 8. Volume profile for current instrument
+        if (context.instrument) {
+          const today = new Date().toISOString().split("T")[0];
+          const { data: volProfile } = await supabase
+            .from("volume_profile_daily")
+            .select("poc_price, value_area_high, value_area_low, total_volume")
+            .eq("symbol", context.instrument)
+            .eq("profile_date", today)
+            .maybeSingle();
+
+          if (volProfile) {
+            systemPrompt += `\n## Today's Volume Profile for ${context.instrument}\n`;
+            systemPrompt += `- POC: ${volProfile.poc_price}, VA: ${volProfile.value_area_low}–${volProfile.value_area_high}\n`;
+          }
+        }
+
+        // 9. News impact intelligence
+        if (context.instrument) {
+          const { data: newsImpact } = await supabase
+            .from("news_impact_results")
+            .select("magnitude_pips, direction")
+            .eq("symbol", context.instrument)
+            .not("magnitude_pips", "is", null)
+            .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+
+          if (newsImpact && newsImpact.length >= 3) {
+            const avgMag = newsImpact.reduce((s, n) => s + Math.abs(n.magnitude_pips || 0), 0) / newsImpact.length;
+            const bullish = newsImpact.filter(n => n.direction === "up").length;
+            systemPrompt += `\n## News Impact on ${context.instrument}\n`;
+            systemPrompt += `- Avg move: ${avgMag.toFixed(1)} pips, Bullish bias: ${Math.round((bullish / newsImpact.length) * 100)}% (${newsImpact.length} events)\n`;
+          }
+        }
+
+        // 10. MTF alignment stats
+        const { data: mtfOutcomes } = await supabase
+          .from("signal_outcomes")
+          .select("mtf_alignment, result")
+          .not("mtf_alignment", "is", null)
+          .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+          .limit(200);
+
+        if (mtfOutcomes && mtfOutcomes.length >= 5) {
+          const mtfMap: Record<string, { w: number; t: number }> = {};
+          for (const o of mtfOutcomes) {
+            const a = o.mtf_alignment!;
+            if (!mtfMap[a]) mtfMap[a] = { w: 0, t: 0 };
+            mtfMap[a].t++;
+            if (o.result === "WIN") mtfMap[a].w++;
+          }
+          systemPrompt += `\n## MTF Alignment Performance\n`;
+          for (const [alignment, s] of Object.entries(mtfMap)) {
+            if (s.t >= 3) systemPrompt += `- ${alignment.replace(/_/g, " ")}: ${Math.round((s.w / s.t) * 100)}% WR (${s.t})\n`;
+          }
+        }
       } catch (intErr) {
         console.warn("Intelligence data fetch warning:", intErr);
         // Non-fatal — continue without intelligence data
