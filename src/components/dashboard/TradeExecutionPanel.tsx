@@ -59,6 +59,7 @@ interface TradeExecutionPanelProps {
   currentPrice?: number | null;
   onOrderModeChange?: (mode: OrderMode) => void;
   onLimitPricesChange?: (prices: LimitOrderPrices) => void;
+  onPositionsChange?: (positions: Position[]) => void;
   positions?: Position[];
 }
 
@@ -79,7 +80,7 @@ async function callTrade(body: Record<string, unknown>) {
   return data;
 }
 
-const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPanelProps>(function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, onOrderModeChange, onLimitPricesChange, positions: externalPositions }, ref) {
+const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPanelProps>(function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, onOrderModeChange, onLimitPricesChange, onPositionsChange, positions: externalPositions }, ref) {
   const [collapsed, setCollapsed] = useState(false);
   const [lotSize, setLotSize] = useState("0.01");
   const [sl, setSl] = useState("");
