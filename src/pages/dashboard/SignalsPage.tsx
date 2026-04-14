@@ -208,6 +208,22 @@ export default function SignalsPage() {
 
   const formatPrice = (v: number) => v >= 100 ? v.toLocaleString() : v.toFixed(4);
 
+  // Format SL/TP with pip distance and dollar value
+  const formatSlTp = (price: number, entry: number, symbol: string, isTp: boolean) => {
+    const isIndex = ["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol);
+    const isGold = symbol === "XAUUSD";
+    const isJpy = symbol.includes("JPY");
+    const pipSize = isIndex ? 1 : isGold ? 0.01 : isJpy ? 0.01 : 0.0001;
+    const pips = Math.abs(price - entry) / pipSize;
+    const pipValuePerLot = isIndex ? 1 : isGold ? 1 : 10;
+    const dollarVal = pips * pipValuePerLot * lotSize;
+    const displayVal = convertToDisplayCurrency(dollarVal, currency, fxRates);
+    const currSymbol = currency === "JPY" ? "¥" : "$";
+    const sign = isTp ? "+" : "-";
+    const priceStr = price >= 100 ? price.toLocaleString() : price.toFixed(4);
+    return `${priceStr} (${sign}${pips.toFixed(0)} pips / ${currSymbol}${displayVal.toFixed(0)})`;
+  };
+
   const resultColor = (r: string, pnlPips?: number | null) => {
     if (r === "win") return C.green;
     if (r === "loss") return C.red;
