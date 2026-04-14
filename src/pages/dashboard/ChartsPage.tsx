@@ -1339,7 +1339,37 @@ export default function ChartsPage() {
       });
   }, [patternHistory, userId, selected]);
 
-  /* ─── helpers ─── */
+  // Query REAL pattern stats from signal_outcomes for current instrument
+  useEffect(() => {
+    if (!selected) return;
+    supabase.from("signal_outcomes")
+      .select("pattern_active, result, pnl_pips, created_at")
+      .eq("symbol", selected)
+      .not("pattern_active", "is", null)
+      .then(({ data }) => {
+        if (!data || data.length === 0) { setRealPatternStats({}); return; }
+        const map: Record<string, { total: number; wins: number; pipSums: number; dates: string[] }> = {};
+        for (const row of data) {
+          const p = row.pattern_active!;
+          if (!map[p]) map[p] = { total: 0, wins: 0, pipSums: 0, dates: [] };
+          map[p].total++;
+          if (row.result === "WIN") { map[p].wins++; map[p].pipSums += Math.abs(row.pnl_pips || 0); }
+          map[p].dates.push(row.created_at);
+        }
+        const result: typeof realPatternStats = {};
+        for (const [pattern, stats] of Object.entries(map)) {
+          const winRate = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
+          const avgPips = stats.wins > 0 ? Math.round(stats.pipSums / stats.wins) : 0;
+          // Calculate frequency: trades per week
+          const dates = stats.dates.map(d => new Date(d).getTime()).sort();
+          const weekSpan = dates.length >= 2 ? Math.max(1, (dates[dates.length - 1] - dates[0]) / (7 * 24 * 60 * 60 * 1000)) : 1;
+          const perWeek = (stats.total / weekSpan).toFixed(1);
+          result[pattern] = { total: stats.total, wins: stats.wins, winRate, avgPips, frequency: `~${perWeek}x/week` };
+        }
+        setRealPatternStats(result);
+      });
+  }, [selected]);
+
   const dirColor = (d: string) => d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
   const dirIcon = (d: string) =>
     d === "BUY" ? <ArrowUpRight className="w-4 h-4" /> :
