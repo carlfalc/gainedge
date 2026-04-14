@@ -1677,11 +1677,24 @@ export default function ChartsPage() {
           {/* RON Stats line */}
           {patternHistory.length > 0 && (() => {
             const currentName = patternHistory[0].pattern.pattern_name;
-            const stats = PATTERN_STATS[currentName];
-            if (!stats) return null;
+            const fallback = PATTERN_STATS_FALLBACK[currentName];
+            const real = realPatternStats[currentName];
+            if (!fallback && !real) return null;
+
+            // Use real data if we have enough (5+ outcomes), otherwise show building status + industry avg
+            const hasEnoughData = real && real.total >= 5;
+            const hitRate = hasEnoughData ? real.winRate : fallback?.targetHitRate || 0;
+            const avgMove = hasEnoughData ? `${real.avgPips}` : fallback?.avgPipMove || "N/A";
+            const freq = hasEnoughData ? real.frequency : fallback?.avgFrequency || "N/A";
+            const dataLabel = hasEnoughData 
+              ? `${hitRate}% win rate (${real.total} trades)` 
+              : real && real.total > 0 
+                ? `Building data (${real.total}/5) — ${real.wins}/${real.total} wins so far | Industry avg: ~${fallback?.targetHitRate || 65}%`
+                : `~${hitRate}% historically (industry avg)`;
+
             return (
               <div className="text-[9px] text-[#00CFA5]/60 pl-[90px]">
-                🧠 RON Stats: "{currentName}" hits target ~{stats.targetHitRate}% historically | Avg move: {stats.avgPipMove} pips | {stats.avgFrequency} on {selected}
+                🧠 RON Stats: "{currentName}" {dataLabel} | Avg move: {avgMove} pips | {freq} on {selected}
                 {patternUserStats && patternUserStats.total > 0 && (
                   <span className="text-[#00CFA5]/80 font-semibold">
                     {" | Your history: "}{patternUserStats.confirmed}/{patternUserStats.total} confirmed ({Math.round((patternUserStats.confirmed / patternUserStats.total) * 100)}%)
