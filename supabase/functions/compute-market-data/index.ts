@@ -1019,14 +1019,16 @@ serve(async (req) => {
     const session = detectSession();
 
     for (const [userId, instList] of userInstruments) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("default_candle_type, ema_fast, ema_slow")
-        .eq("id", userId)
-        .single();
+      const [profileRes, sigPrefRes] = await Promise.all([
+        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow").eq("id", userId).single(),
+        supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
+      ]);
+      const profile = profileRes.data;
 
-      // Check if user has V2 enabled (default: v2)
-      const useV2 = true; // V2 is default for all users
+      // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
+      const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
+      const useV2 = signalEngine === "v2" || signalEngine === "v1v2";
+      const useV1Pure = signalEngine === "v1"; // Pure V1: only EMA crossover, no extra filters
 
       for (const inst of instList) {
         const data = symbolData.get(inst.symbol);
