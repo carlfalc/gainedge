@@ -89,7 +89,7 @@ export default function SettingsPage() {
       broker,
     } as any);
     // Save clock preferences separately (column not in typed Profile)
-    await supabase.from("profiles").update({ clock_timezones: clockSlots as any }).eq("id", userId);
+    await supabase.from("profiles").update({ clock_timezones: clockSlots as any, rr_ratio: parseFloat(rrRatio) } as any).eq("id", userId);
     // Also save RON/AI preferences
     await falconerPrefsRef.current?.save();
     toast.success("Settings saved");
