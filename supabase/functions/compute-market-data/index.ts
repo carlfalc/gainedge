@@ -1187,7 +1187,7 @@ serve(async (req) => {
 
     for (const [userId, instList] of userInstruments) {
       const [profileRes, sigPrefRes] = await Promise.all([
-        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused").eq("id", userId).single(),
+        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
         supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
       ]);
       const profile = profileRes.data;
