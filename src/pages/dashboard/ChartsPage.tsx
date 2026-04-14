@@ -393,6 +393,8 @@ export default function ChartsPage() {
   }, [userId, selected]);
 
   /* ─── fetch signals for chart markers ─── */
+  const autoTradeProcessedRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!userId || !selected) return;
     supabase.from("signals").select("*")
@@ -403,7 +405,73 @@ export default function ChartsPage() {
     // Subscribe to realtime updates
     const channel = supabase.channel(`signals-markers-${selected}`)
       .on("postgres_changes", {
-        event: "*", schema: "public", table: "signals",
+        event: "INSERT", schema: "public", table: "signals",
+        filter: `symbol=eq.${selected}`,
+      }, (payload) => {
+        // Refresh chart signals
+        supabase.from("signals").select("*")
+          .eq("user_id", userId).eq("symbol", selected)
+          .order("created_at", { ascending: true }).limit(200)
+          .then(({ data }) => setChartSignals((data as SignalRecord[]) ?? []));
+
+        // Auto-trade execution
+        const newSig = payload.new as SignalRecord;
+        if (newSig && newSig.confidence >= 7 && newSig.result === "pending") {
+          const traderState = (() => {
+            try {
+              const raw = localStorage.getItem("ge_intelligent_trader");
+              return raw ? JSON.parse(raw) : {};
+            } catch { return {}; }
+          })();
+          const autoEnabled = traderState.autoTradeMap?.[selected] ?? false;
+          const autoLot = traderState.autoLotSize || "0.01";
+
+          if (autoEnabled && !autoTradeProcessedRef.current.has(newSig.id) && accountIdRef.current) {
+            autoTradeProcessedRef.current.add(newSig.id);
+            const actionType = newSig.direction === "BUY" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL";
+            const price = newSig.entry_price;
+
+            console.log(`RON Auto-Trade: Executing ${newSig.direction} ${selected} at ${price}, lot ${autoLot}`);
+
+            const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+            const TRADE_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/metaapi-trade`;
+
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              if (!session) return;
+              fetch(TRADE_URL, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${session.access_token}`,
+                  apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                },
+                body: JSON.stringify({
+                  action: "trade", accountId: accountIdRef.current, symbol: selected,
+                  actionType, volume: autoLot,
+                  stopLoss: newSig.stop_loss?.toString(),
+                  takeProfit: newSig.take_profit?.toString(),
+                }),
+              })
+                .then(r => r.json())
+                .then(data => {
+                  if (data.error) {
+                    console.error(`RON Auto-Trade FAILED: ${data.error}`);
+                    toast.error(`Auto-trade failed: ${data.error}`);
+                  } else {
+                    console.log(`RON Auto-Trade SUCCESS: ${newSig.direction} ${selected} at ${price}`);
+                    toast.success(`RON Auto-Trade: ${newSig.direction} ${selected} ${autoLot} lot @ ${price}`);
+                  }
+                })
+                .catch(err => {
+                  console.error(`RON Auto-Trade ERROR: ${err.message}`);
+                  toast.error(`Auto-trade error: ${err.message}`);
+                });
+            });
+          }
+        }
+      })
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "signals",
         filter: `symbol=eq.${selected}`,
       }, () => {
         supabase.from("signals").select("*")
