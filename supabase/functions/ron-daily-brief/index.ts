@@ -7,24 +7,12 @@ const corsHeaders = {
 };
 
 interface SymbolStats {
-  symbol: string;
-  wins: number;
-  losses: number;
-  expired: number;
-  total: number;
-  winRate: number;
-  avgWinPips: number;
-  avgLossPips: number;
-  bestSession: string | null;
-  bestSessionWR: number;
-  bestPattern: string | null;
-  bestPatternWR: number;
-  bestPatternTotal: number;
-  worstSession: string | null;
-  worstSessionWR: number;
-  worstPattern: string | null;
-  worstPatternWR: number;
-  worstPatternTotal: number;
+  symbol: string; wins: number; losses: number; expired: number; total: number; winRate: number;
+  avgWinPips: number; avgLossPips: number;
+  bestSession: string | null; bestSessionWR: number;
+  bestPattern: string | null; bestPatternWR: number; bestPatternTotal: number;
+  worstSession: string | null; worstSessionWR: number;
+  worstPattern: string | null; worstPatternWR: number; worstPatternTotal: number;
 }
 
 function buildSymbolStats(outcomes: any[]): SymbolStats[] {
@@ -46,7 +34,6 @@ function buildSymbolStats(outcomes: any[]): SymbolStats[] {
     const avgWinPips = winPips.length > 0 ? +(winPips.reduce((a, b) => a + b, 0) / winPips.length).toFixed(1) : 0;
     const avgLossPips = lossPips.length > 0 ? +(lossPips.reduce((a, b) => a + b, 0) / lossPips.length).toFixed(1) : 0;
 
-    // Best/worst session
     const sessionMap: Record<string, { w: number; t: number }> = {};
     for (const r of rows) {
       const s = r.session || "unknown";
@@ -59,7 +46,6 @@ function buildSymbolStats(outcomes: any[]): SymbolStats[] {
     const bestSess = sessions[0] || null;
     const worstSess = sessions[sessions.length - 1] || null;
 
-    // Best/worst pattern
     const patternMap: Record<string, { w: number; t: number }> = {};
     for (const r of rows) {
       if (!r.pattern_active) continue;
@@ -94,6 +80,19 @@ serve(async (req) => {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
+    // ─── PLATFORM-WIDE stats (all users) ───
+    const { data: allOutcomes } = await supabase
+      .from("signal_outcomes")
+      .select("symbol, result, pnl_pips, session, pattern_active, direction, user_id")
+      .gte("resolved_at", sevenDaysAgo)
+      .limit(5000);
+
+    const platformStats = buildSymbolStats(allOutcomes || []);
+    const platformTotalTrades = (allOutcomes || []).length;
+    const platformTotalUsers = new Set((allOutcomes || []).map(o => o.user_id)).size;
+    const platformWins = (allOutcomes || []).filter(o => o.result === "WIN").length;
+    const platformWR = platformTotalTrades > 0 ? Math.round((platformWins / platformTotalTrades) * 100) : 0;
+
     // Get all users
     const { data: users } = await supabase.from("profiles").select("id, full_name, nickname").limit(500);
     if (!users || users.length === 0) {
@@ -105,7 +104,7 @@ serve(async (req) => {
     let insightsCreated = 0;
 
     for (const user of users) {
-      // This week's outcomes
+      // This week's outcomes (personal)
       const { data: thisWeek } = await supabase
         .from("signal_outcomes")
         .select("symbol, result, pnl_pips, session, pattern_active, direction, confidence")
@@ -113,9 +112,8 @@ serve(async (req) => {
         .gte("resolved_at", sevenDaysAgo)
         .limit(500);
 
-      if (!thisWeek || thisWeek.length < 2) continue; // Need at least 2 outcomes
+      if (!thisWeek || thisWeek.length < 2) continue;
 
-      // Last week's outcomes (for comparison)
       const { data: lastWeek } = await supabase
         .from("signal_outcomes")
         .select("symbol, result, pnl_pips")
@@ -127,7 +125,6 @@ serve(async (req) => {
       const thisStats = buildSymbolStats(thisWeek);
       const lastStats = buildSymbolStats(lastWeek || []);
 
-      // ─── Overall performance ───
       const totalWins = thisWeek.filter(o => o.result === "WIN").length;
       const totalLosses = thisWeek.filter(o => o.result === "LOSS").length;
       const totalTrades = thisWeek.length;
@@ -137,16 +134,11 @@ serve(async (req) => {
       const lastTotal = (lastWeek || []).length;
       const lastWR = lastTotal > 0 ? Math.round((lastTotalWins / lastTotal) * 100) : null;
 
-      // ─── Best performer ───
       thisStats.sort((a, b) => b.winRate - a.winRate);
       const bestSymbol = thisStats[0];
-
-      // ─── Worst performer ───
       const worstSymbol = thisStats.filter(s => s.total >= 3).sort((a, b) => a.winRate - b.winRate)[0] || null;
 
-      // ─── Best single setup ───
-      let bestSetup = "";
-      let bestSetupDetail = "";
+      // Best/worst setup
       const setupCandidates: { label: string; wr: number; wins: number; total: number }[] = [];
       for (const s of thisStats) {
         if (s.bestPattern && s.bestPatternTotal >= 2) {
@@ -163,13 +155,13 @@ serve(async (req) => {
         }
       }
       setupCandidates.sort((a, b) => b.wr - a.wr || b.total - a.total);
+
+      let bestSetupDetail = "";
       if (setupCandidates[0]) {
         const top = setupCandidates[0];
-        bestSetup = `Best setup this week: ${top.label}, ${top.wins}/${top.total} wins (${top.wr}%)`;
-        bestSetupDetail = bestSetup;
+        bestSetupDetail = `Best setup this week: ${top.label}, ${top.wins}/${top.total} wins (${top.wr}%)`;
       }
 
-      // ─── Worst setup ───
       let worstSetup = "";
       const worstCandidates = setupCandidates.filter(c => c.total >= 3).sort((a, b) => a.wr - b.wr);
       if (worstCandidates[0] && worstCandidates[0].wr < 50) {
@@ -177,7 +169,6 @@ serve(async (req) => {
         worstSetup = `Worst setup: ${w.label}, ${w.wins}/${w.total} wins (${w.wr}%) — avoid until conditions change`;
       }
 
-      // ─── Week-over-week comparison ───
       let weekComparison = "";
       if (lastWR !== null && lastTotal >= 3) {
         const diff = overallWR - lastWR;
@@ -186,71 +177,86 @@ serve(async (req) => {
         else weekComparison = `Performance steady: ${overallWR}% this week vs ${lastWR}% last week.`;
       }
 
-      // ─── Build per-instrument breakdown ───
-      const instrumentLines: string[] = [];
+      // ─── PLATFORM INSIGHTS section ───
+      const platformLines: string[] = [];
+      if (platformTotalTrades >= 10 && platformTotalUsers >= 5) {
+        platformLines.push(`**📊 PLATFORM INSIGHTS (from ${platformTotalUsers} traders, ${platformTotalTrades} signals):**`);
+        platformLines.push(`Platform win rate this week: ${platformWR}%`);
+
+        // Top platform setups
+        for (const ps of platformStats.slice(0, 3)) {
+          if (ps.total >= 5) {
+            let line = `• ${ps.symbol}: ${ps.winRate}% WR (${ps.wins}W/${ps.losses}L across all traders)`;
+            if (ps.bestPattern && ps.bestPatternTotal >= 3) {
+              line += `. ${ps.bestPattern}: ${ps.bestPatternWR}%`;
+            }
+            if (ps.bestSession) {
+              line += `. Best in ${ps.bestSession}`;
+            }
+            platformLines.push(line);
+          }
+        }
+        platformLines.push("");
+      }
+
+      // ─── PERSONAL INSIGHTS section ───
+      const personalLines: string[] = [];
+      const userName = user.nickname || user.full_name || "Trader";
+      personalLines.push(`**👤 YOUR PERSONAL INSIGHTS, ${userName}:**`);
+      personalLines.push(`${totalTrades} signals — ${totalWins}W/${totalLosses}L (${overallWR}% win rate)`);
+
+      // Compare personal vs platform per symbol
       for (const s of thisStats) {
         if (s.total < 2) continue;
-        let line = `• ${s.symbol}: ${s.winRate}% WR (${s.wins}W/${s.losses}L), avg win ${s.avgWinPips} pips, avg loss ${s.avgLossPips} pips`;
-        if (s.bestSession) line += `. Best in ${s.bestSession} (${s.bestSessionWR}%)`;
+        let line = `• ${s.symbol}: ${s.winRate}% WR (${s.wins}W/${s.losses}L)`;
+        // Find platform average for this symbol
+        const platSym = platformStats.find(p => p.symbol === s.symbol);
+        if (platSym && platSym.total >= 5 && platformTotalUsers >= 5) {
+          const diff = s.winRate - platSym.winRate;
+          if (diff > 5) line += ` ↑ ${diff}pp above platform avg (${platSym.winRate}%)`;
+          else if (diff < -5) line += ` ↓ ${Math.abs(diff)}pp below platform avg (${platSym.winRate}%)`;
+          else line += ` ≈ platform avg (${platSym.winRate}%)`;
+        }
+        if (s.bestSession) line += `. Best: ${s.bestSession} (${s.bestSessionWR}%)`;
         if (s.bestPattern) line += `. Top pattern: ${s.bestPattern} (${s.bestPatternWR}%)`;
 
-        // Compare to last week
         const lastS = lastStats.find(l => l.symbol === s.symbol);
         if (lastS && lastS.total >= 2) {
           const d = s.winRate - lastS.winRate;
           if (d > 10) line += ` ↑ +${d}pp vs last week`;
           else if (d < -10) line += ` ↓ ${d}pp vs last week`;
         }
-        instrumentLines.push(line);
+        personalLines.push(line);
       }
-
-      // ─── Compose the plain English summary ───
-      const userName = user.nickname || user.full_name || "Trader";
-      const summaryParts: string[] = [];
-
-      summaryParts.push(`RON Daily Brief for ${userName}: ${totalTrades} signals this week — ${totalWins}W/${totalLosses}L (${overallWR}% win rate).`);
 
       if (bestSymbol && bestSymbol.total >= 2) {
-        summaryParts.push(`Your best performer was ${bestSymbol.symbol} with ${bestSymbol.winRate}% win rate.`);
+        personalLines.push(`Your best performer: ${bestSymbol.symbol} at ${bestSymbol.winRate}% WR.`);
       }
       if (worstSymbol && worstSymbol.winRate < 50) {
-        summaryParts.push(`${worstSymbol.symbol} struggled at ${worstSymbol.winRate}% — consider reducing position size or pausing.`);
+        personalLines.push(`${worstSymbol.symbol} struggled at ${worstSymbol.winRate}% — consider reducing or pausing.`);
       }
 
-      // Session-specific advice
+      // Session advice
       for (const s of thisStats) {
         if (s.worstSession && s.worstSessionWR < 40 && s.bestSession && s.bestSessionWR > 60) {
-          summaryParts.push(`${s.symbol}: focus on ${s.bestSession} session (${s.bestSessionWR}% WR) and avoid ${s.worstSession} (${s.worstSessionWR}%).`);
+          personalLines.push(`${s.symbol}: focus on ${s.bestSession} (${s.bestSessionWR}%) and avoid ${s.worstSession} (${s.worstSessionWR}%).`);
         }
       }
 
-      // Pattern callouts
-      for (const s of thisStats) {
-        if (s.bestPattern && s.bestPatternWR >= 70 && s.bestPatternTotal >= 3) {
-          summaryParts.push(`${s.bestPattern} on ${s.symbol} has been reliable (${s.bestPatternWR}%, ${s.bestPatternTotal} trades).`);
-        }
-      }
-
-      if (weekComparison) summaryParts.push(weekComparison);
-
-      const fullSummary = summaryParts.join(" ");
-
-      // ─── Build detailed title ───
-      const title = `📋 RON Daily Brief — ${overallWR}% WR (${totalWins}W/${totalLosses}L)`;
+      if (weekComparison) personalLines.push(weekComparison);
 
       // ─── Build full description ───
-      const descParts: string[] = [fullSummary, ""];
-      if (instrumentLines.length > 0) {
-        descParts.push("**Instrument Breakdown:**");
-        descParts.push(...instrumentLines);
-        descParts.push("");
-      }
+      const descParts: string[] = [];
+      if (platformLines.length > 0) descParts.push(...platformLines);
+      descParts.push(...personalLines);
+      descParts.push("");
       if (bestSetupDetail) descParts.push(`✅ ${bestSetupDetail}`);
       if (worstSetup) descParts.push(`⛔ ${worstSetup}`);
 
       const description = descParts.join("\n");
+      const title = `📋 RON Daily Brief — ${overallWR}% WR (${totalWins}W/${totalLosses}L)`;
 
-      // ─── Dedup: one brief per user per day ───
+      // Dedup
       const todayStart = new Date(now);
       todayStart.setUTCHours(0, 0, 0, 0);
       const { data: existing } = await supabase
@@ -261,7 +267,7 @@ serve(async (req) => {
         .gte("created_at", todayStart.toISOString())
         .limit(1);
 
-      if (existing && existing.length > 0) continue; // Already sent today
+      if (existing && existing.length > 0) continue;
 
       await supabase.from("insights").insert({
         user_id: user.id,
@@ -278,6 +284,9 @@ serve(async (req) => {
           best_setup: bestSetupDetail,
           worst_setup: worstSetup,
           week_comparison: weekComparison,
+          platform_wr: platformWR,
+          platform_trades: platformTotalTrades,
+          platform_users: platformTotalUsers,
           instrument_stats: thisStats.map(s => ({
             symbol: s.symbol, wr: s.winRate, wins: s.wins, losses: s.losses,
             avg_win_pips: s.avgWinPips, avg_loss_pips: s.avgLossPips,

@@ -175,6 +175,7 @@ export default function ChartsPage() {
   const [patternHistory, setPatternHistory] = useState<Array<{ pattern: DetectedPattern; detectedAt: string; entryPrice: number; outcome?: "confirmed" | "invalidated"; pipMove?: number }>>([]);
   const [patternUserStats, setPatternUserStats] = useState<{ total: number; confirmed: number } | null>(null);
   const [realPatternStats, setRealPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; frequency: string }>>({});
+  const [platformPatternStats, setPlatformPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; users: number }>>({});
 
   // Refs to break rebuild chain for order mode / limit prices
   const orderModeRef = useRef<OrderMode>(orderMode);
@@ -1339,7 +1340,7 @@ export default function ChartsPage() {
       });
   }, [patternHistory, userId, selected]);
 
-  // Query REAL pattern stats from signal_outcomes for current instrument
+  // Query REAL pattern stats from signal_outcomes for current instrument (personal)
   useEffect(() => {
     if (!selected) return;
     supabase.from("signal_outcomes")
@@ -1360,13 +1361,41 @@ export default function ChartsPage() {
         for (const [pattern, stats] of Object.entries(map)) {
           const winRate = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
           const avgPips = stats.wins > 0 ? Math.round(stats.pipSums / stats.wins) : 0;
-          // Calculate frequency: trades per week
           const dates = stats.dates.map(d => new Date(d).getTime()).sort();
           const weekSpan = dates.length >= 2 ? Math.max(1, (dates[dates.length - 1] - dates[0]) / (7 * 24 * 60 * 60 * 1000)) : 1;
           const perWeek = (stats.total / weekSpan).toFixed(1);
           result[pattern] = { total: stats.total, wins: stats.wins, winRate, avgPips, frequency: `~${perWeek}x/week` };
         }
         setRealPatternStats(result);
+      });
+  }, [selected]);
+
+  // Query COLLECTIVE platform stats from ron_platform_intelligence
+  useEffect(() => {
+    if (!selected) return;
+    supabase.from("ron_platform_intelligence")
+      .select("pattern, total_signals, wins, win_rate, avg_pips_won, sample_size_users")
+      .eq("symbol", selected)
+      .not("pattern", "is", null)
+      .gte("total_signals", 3)
+      .then(({ data }) => {
+        if (!data || data.length === 0) { setPlatformPatternStats({}); return; }
+        const result: typeof platformPatternStats = {};
+        for (const row of data) {
+          if (!row.pattern) continue;
+          // Aggregate across sessions for same pattern
+          if (!result[row.pattern]) {
+            result[row.pattern] = { total: 0, wins: 0, winRate: 0, avgPips: 0, users: 0 };
+          }
+          result[row.pattern].total += row.total_signals;
+          result[row.pattern].wins += row.wins;
+          result[row.pattern].users = Math.max(result[row.pattern].users, row.sample_size_users);
+        }
+        // Recalculate win rates
+        for (const p of Object.values(result)) {
+          p.winRate = p.total > 0 ? Math.round((p.wins / p.total) * 100) : 0;
+        }
+        setPlatformPatternStats(result);
       });
   }, [selected]);
 
@@ -1674,30 +1703,48 @@ export default function ChartsPage() {
               </div>
             );
           })()}
-          {/* RON Stats line */}
+          {/* RON Stats line — Collective + Personal */}
           {patternHistory.length > 0 && (() => {
             const currentName = patternHistory[0].pattern.pattern_name;
             const fallback = PATTERN_STATS_FALLBACK[currentName];
             const real = realPatternStats[currentName];
-            if (!fallback && !real) return null;
+            const platform = platformPatternStats[currentName];
+            if (!fallback && !real && !platform) return null;
 
-            // Use real data if we have enough (5+ outcomes), otherwise show building status + industry avg
-            const hasEnoughData = real && real.total >= 5;
-            const hitRate = hasEnoughData ? real.winRate : fallback?.targetHitRate || 0;
-            const avgMove = hasEnoughData ? `${real.avgPips}` : fallback?.avgPipMove || "N/A";
-            const freq = hasEnoughData ? real.frequency : fallback?.avgFrequency || "N/A";
-            const dataLabel = hasEnoughData 
-              ? `${hitRate}% win rate (${real.total} trades)` 
-              : real && real.total > 0 
-                ? `Building data (${real.total}/5) — ${real.wins}/${real.total} wins so far | Industry avg: ~${fallback?.targetHitRate || 65}%`
-                : `~${hitRate}% historically (industry avg)`;
+            // Platform (collective) data
+            const hasPlatformData = platform && platform.total >= 5;
+            const dataBadge = hasPlatformData
+              ? platform.total >= 100 ? "✅" : platform.total >= 20 ? "🟢" : "🟡"
+              : "";
+            const platformLabel = hasPlatformData
+              ? `Platform: ${platform.winRate}% WR (${platform.total} trades from ${platform.users} traders) ${dataBadge}`
+              : platform && platform.total > 0
+                ? `Platform: Building (${platform.total}/5 trades)`
+                : "";
+
+            // Personal data
+            const hasPersonalData = real && real.total >= 5;
+            const personalLabel = hasPersonalData
+              ? `You: ${real.winRate}% (${real.wins}/${real.total})`
+              : real && real.total > 0
+                ? `You: ${real.wins}/${real.total} so far`
+                : "";
+
+            // Fallback if no collective data
+            const hitRate = hasPlatformData ? platform.winRate : hasPersonalData ? real!.winRate : fallback?.targetHitRate || 0;
+            const avgMove = hasPersonalData ? `${real!.avgPips}` : fallback?.avgPipMove || "N/A";
+            const freq = hasPersonalData ? real!.frequency : fallback?.avgFrequency || "N/A";
 
             return (
               <div className="text-[9px] text-[#00CFA5]/60 pl-[90px]">
-                🧠 RON Stats: "{currentName}" {dataLabel} | Avg move: {avgMove} pips | {freq} on {selected}
+                🧠 RON Stats: "{currentName}" on {selected}
+                {platformLabel && <span className="text-[#00CFA5]/80"> | {platformLabel}</span>}
+                {personalLabel && <span className="text-[#00CFA5]/80 font-semibold"> | {personalLabel}</span>}
+                {!platformLabel && !personalLabel && <span> | ~{hitRate}% historically (industry avg)</span>}
+                {" | Avg move: "}{avgMove}{" pips | "}{freq}
                 {patternUserStats && patternUserStats.total > 0 && (
                   <span className="text-[#00CFA5]/80 font-semibold">
-                    {" | Your history: "}{patternUserStats.confirmed}/{patternUserStats.total} confirmed ({Math.round((patternUserStats.confirmed / patternUserStats.total) * 100)}%)
+                    {" | History: "}{patternUserStats.confirmed}/{patternUserStats.total} confirmed ({Math.round((patternUserStats.confirmed / patternUserStats.total) * 100)}%)
                   </span>
                 )}
               </div>
