@@ -120,6 +120,45 @@ export type Database = {
           },
         ]
       }
+      candle_history: {
+        Row: {
+          close: number
+          created_at: string
+          high: number
+          id: string
+          low: number
+          open: number
+          symbol: string
+          timeframe: string
+          timestamp: string
+          volume: number | null
+        }
+        Insert: {
+          close: number
+          created_at?: string
+          high: number
+          id?: string
+          low: number
+          open: number
+          symbol: string
+          timeframe: string
+          timestamp: string
+          volume?: number | null
+        }
+        Update: {
+          close?: number
+          created_at?: string
+          high?: number
+          id?: string
+          low?: number
+          open?: number
+          symbol?: string
+          timeframe?: string
+          timestamp?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
       chart_drawings: {
         Row: {
           created_at: string
@@ -514,6 +553,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pattern_weights: {
+        Row: {
+          avg_pips: number | null
+          id: string
+          pattern_name: string
+          session: string | null
+          symbol: string
+          total: number
+          updated_at: string
+          weight_adjustment: number | null
+          win_rate: number
+          wins: number
+        }
+        Insert: {
+          avg_pips?: number | null
+          id?: string
+          pattern_name: string
+          session?: string | null
+          symbol: string
+          total?: number
+          updated_at?: string
+          weight_adjustment?: number | null
+          win_rate?: number
+          wins?: number
+        }
+        Update: {
+          avg_pips?: number | null
+          id?: string
+          pattern_name?: string
+          session?: string | null
+          symbol?: string
+          total?: number
+          updated_at?: string
+          weight_adjustment?: number | null
+          win_rate?: number
+          wins?: number
+        }
+        Relationships: []
+      }
       platform_config: {
         Row: {
           created_at: string
@@ -610,6 +688,39 @@ export type Database = {
           trading_preferences?: Json | null
           trial_ends_at?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      ron_calibration: {
+        Row: {
+          calibrated_at: string
+          confidence_level: number
+          id: string
+          notes: string | null
+          recommended_action: string | null
+          total_signals: number
+          win_rate: number
+          wins: number
+        }
+        Insert: {
+          calibrated_at?: string
+          confidence_level: number
+          id?: string
+          notes?: string | null
+          recommended_action?: string | null
+          total_signals?: number
+          win_rate?: number
+          wins?: number
+        }
+        Update: {
+          calibrated_at?: string
+          confidence_level?: number
+          id?: string
+          notes?: string | null
+          recommended_action?: string | null
+          total_signals?: number
+          win_rate?: number
+          wins?: number
         }
         Relationships: []
       }
@@ -740,6 +851,95 @@ export type Database = {
           total_volume?: number | null
         }
         Relationships: []
+      }
+      signal_outcomes: {
+        Row: {
+          adx_at_entry: number | null
+          confidence: number
+          created_at: string
+          day_of_week: number | null
+          direction: string
+          entry_price: number
+          hour_utc: number | null
+          id: string
+          macd_status: string | null
+          pattern_active: string | null
+          pnl_currency: number | null
+          pnl_pips: number | null
+          resolved_at: string | null
+          result: string
+          ron_version: string
+          rsi_at_entry: number | null
+          session: string | null
+          signal_id: string | null
+          sl_price: number
+          stoch_rsi: number | null
+          symbol: string
+          timeframe: string
+          tp_price: number
+          user_id: string
+        }
+        Insert: {
+          adx_at_entry?: number | null
+          confidence?: number
+          created_at?: string
+          day_of_week?: number | null
+          direction: string
+          entry_price: number
+          hour_utc?: number | null
+          id?: string
+          macd_status?: string | null
+          pattern_active?: string | null
+          pnl_currency?: number | null
+          pnl_pips?: number | null
+          resolved_at?: string | null
+          result: string
+          ron_version?: string
+          rsi_at_entry?: number | null
+          session?: string | null
+          signal_id?: string | null
+          sl_price: number
+          stoch_rsi?: number | null
+          symbol: string
+          timeframe?: string
+          tp_price: number
+          user_id: string
+        }
+        Update: {
+          adx_at_entry?: number | null
+          confidence?: number
+          created_at?: string
+          day_of_week?: number | null
+          direction?: string
+          entry_price?: number
+          hour_utc?: number | null
+          id?: string
+          macd_status?: string | null
+          pattern_active?: string | null
+          pnl_currency?: number | null
+          pnl_pips?: number | null
+          resolved_at?: string | null
+          result?: string
+          ron_version?: string
+          rsi_at_entry?: number | null
+          session?: string | null
+          signal_id?: string | null
+          sl_price?: number
+          stoch_rsi?: number | null
+          symbol?: string
+          timeframe?: string
+          tp_price?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_outcomes_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       signals: {
         Row: {
@@ -940,9 +1140,24 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ron_platform_stats: {
+        Row: {
+          avg_confidence: number | null
+          avg_loss_pips: number | null
+          avg_win_pips: number | null
+          losses: number | null
+          pattern_name: string | null
+          session: string | null
+          symbol: string | null
+          total: number | null
+          win_rate: number | null
+          wins: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      cleanup_old_candles: { Args: never; Returns: undefined }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -968,6 +1183,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      refresh_ron_intelligence: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
