@@ -1118,21 +1118,25 @@ export default function ChartsPage() {
     };
 
     for (const pat of patterns) {
-      const color = pat.direction === "bullish" ? "#22C55E" : "#EF4444";
       const isSR = pat.pattern_name === "Support" || pat.pattern_name === "Resistance";
 
       // Draw support/resistance as price lines on the candle series
       if (isSR) {
+        const isSupport = pat.pattern_name === "Support";
         const level = pat.key_prices.support ?? pat.key_prices.resistance;
         if (level) {
           addPatternPriceLine(candleSeries, {
-            price: level, color: "#F59E0B", lineWidth: 1, lineStyle: 1, axisLabelVisible: true,
-          }, pat.pattern_name);
+            price: level,
+            color: isSupport ? "#22C55E" : "#EF4444",
+            lineWidth: 1, lineStyle: 2, axisLabelVisible: true,
+          }, `${pat.pattern_name}: ${level.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
         }
         continue;
       }
 
-      // Draw trendlines for triangles, flags (these are line series, no title text)
+      const color = pat.direction === "bullish" ? "#22C55E" : "#EF4444";
+
+      // Draw trendlines for triangles, flags
       if (pat.key_prices.upper_line) {
         const ul = pat.key_prices.upper_line;
         const series = chart.addSeries(LineSeries, {
@@ -1158,18 +1162,18 @@ export default function ChartsPage() {
         patternSeriesRef.current.push(series);
       }
 
-      // Draw neckline for double top/bottom, H&S
+      // Draw neckline for double top/bottom, H&S — cyan
       if (pat.key_prices.neckline) {
         addPatternPriceLine(candleSeries, {
-          price: pat.key_prices.neckline, color, lineWidth: 1, lineStyle: 1, axisLabelVisible: true,
-        }, `${pat.pattern_name} Neckline`);
+          price: pat.key_prices.neckline, color: "#06B6D4", lineWidth: 1, lineStyle: 2, axisLabelVisible: true,
+        }, `${pat.pattern_name} Neckline: ${pat.key_prices.neckline.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
       }
 
-      // Draw target
+      // Draw target — amber
       if (pat.key_prices.target) {
         addPatternPriceLine(candleSeries, {
-          price: pat.key_prices.target, color, lineWidth: 1, lineStyle: 3, axisLabelVisible: true,
-        }, `${pat.pattern_name} Target`);
+          price: pat.key_prices.target, color: "#F59E0B", lineWidth: 1, lineStyle: 2, axisLabelVisible: true,
+        }, `${pat.pattern_name} Target: ${pat.key_prices.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
       }
     }
 
@@ -1839,6 +1843,7 @@ export default function ChartsPage() {
           currentPrice={lastCandle?.close ?? null}
           onOrderModeChange={setOrderMode}
           onLimitPricesChange={setLimitPrices}
+          onPositionsChange={setTradePositions}
         />
       )}
 
