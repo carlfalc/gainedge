@@ -823,6 +823,72 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_platform_intelligence: {
+        Row: {
+          avg_pips_lost: number | null
+          avg_pips_won: number | null
+          best_day_of_week: number | null
+          best_hour_utc: number | null
+          calculated_at: string
+          direction: string | null
+          expired: number
+          id: string
+          losses: number
+          metric_type: string
+          pattern: string | null
+          profit_factor: number | null
+          sample_size_users: number
+          session: string | null
+          symbol: string
+          timeframe: string
+          total_signals: number
+          win_rate: number
+          wins: number
+        }
+        Insert: {
+          avg_pips_lost?: number | null
+          avg_pips_won?: number | null
+          best_day_of_week?: number | null
+          best_hour_utc?: number | null
+          calculated_at?: string
+          direction?: string | null
+          expired?: number
+          id?: string
+          losses?: number
+          metric_type?: string
+          pattern?: string | null
+          profit_factor?: number | null
+          sample_size_users?: number
+          session?: string | null
+          symbol: string
+          timeframe?: string
+          total_signals?: number
+          win_rate?: number
+          wins?: number
+        }
+        Update: {
+          avg_pips_lost?: number | null
+          avg_pips_won?: number | null
+          best_day_of_week?: number | null
+          best_hour_utc?: number | null
+          calculated_at?: string
+          direction?: string | null
+          expired?: number
+          id?: string
+          losses?: number
+          metric_type?: string
+          pattern?: string | null
+          profit_factor?: number | null
+          sample_size_users?: number
+          session?: string | null
+          symbol?: string
+          timeframe?: string
+          total_signals?: number
+          win_rate?: number
+          wins?: number
+        }
+        Relationships: []
+      }
       ron_risk_metrics: {
         Row: {
           consecutive_losses: number
@@ -1332,6 +1398,30 @@ export type Database = {
           total: number | null
           win_rate: number | null
           wins: number | null
+        }
+        Insert: {
+          avg_confidence?: never
+          avg_loss_pips?: number | null
+          avg_win_pips?: number | null
+          losses?: never
+          pattern_name?: string | null
+          session?: string | null
+          symbol?: string | null
+          total?: never
+          win_rate?: number | null
+          wins?: never
+        }
+        Update: {
+          avg_confidence?: never
+          avg_loss_pips?: number | null
+          avg_win_pips?: number | null
+          losses?: never
+          pattern_name?: string | null
+          session?: string | null
+          symbol?: string | null
+          total?: never
+          win_rate?: number | null
+          wins?: never
         }
         Relationships: []
       }
