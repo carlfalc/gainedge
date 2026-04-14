@@ -1231,7 +1231,8 @@ serve(async (req) => {
           let analysis: AnalysisResult;
 
           if (candles && candles.length > 20) {
-            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2, useV1Pure);
+            const instCategory = categoryMap.get(inst.symbol);
+            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2, useV1Pure, rrRatio, instCategory, inst.symbol);
           } else {
             // Mock analysis — still apply RON logic
             const mockRsi = data.rsi;
