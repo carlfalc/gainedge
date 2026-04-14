@@ -144,7 +144,19 @@ Deno.serve(async (req: Request) => {
         headers: metaHeaders,
       });
       const data = await res.json();
-      return new Response(JSON.stringify({ positions: Array.isArray(data) ? data : [] }), {
+      // Map MetaApi position fields to a normalized structure
+      const mapped = Array.isArray(data) ? data.map((p: any) => ({
+        id: p.id,
+        symbol: p.symbol,
+        type: p.type, // e.g. POSITION_TYPE_BUY
+        volume: p.volume,
+        openPrice: p.openPrice,
+        currentPrice: p.currentPrice,
+        stopLoss: p.stopLoss,
+        takeProfit: p.takeProfit,
+        profit: p.profit ?? p.unrealizedProfit ?? 0,
+      })) : [];
+      return new Response(JSON.stringify({ positions: mapped }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
