@@ -48,6 +48,7 @@ export default function SettingsPage() {
       setSmsAlerts(profile.sms_alerts);
       setBroker(profile.broker);
       setSignalsPaused(profile.signals_paused ?? false);
+      setRrRatio(String((profile as any).rr_ratio ?? 2.0));
       // Load clock preferences
       if ((profile as any).clock_timezones && Array.isArray((profile as any).clock_timezones) && (profile as any).clock_timezones.length > 0) {
         setClockSlots((profile as any).clock_timezones as ClockConfig[]);
