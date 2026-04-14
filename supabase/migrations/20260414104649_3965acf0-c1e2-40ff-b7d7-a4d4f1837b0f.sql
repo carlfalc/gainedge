@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN rr_ratio numeric NOT NULL DEFAULT 2.0;
