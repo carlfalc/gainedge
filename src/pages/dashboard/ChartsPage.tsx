@@ -174,6 +174,7 @@ export default function ChartsPage() {
   const [showPatternLabels, setShowPatternLabels] = useState(true);
   const [patternHistory, setPatternHistory] = useState<Array<{ pattern: DetectedPattern; detectedAt: string; entryPrice: number; outcome?: "confirmed" | "invalidated"; pipMove?: number }>>([]);
   const [patternUserStats, setPatternUserStats] = useState<{ total: number; confirmed: number } | null>(null);
+  const [realPatternStats, setRealPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; frequency: string }>>({});
 
   // Refs to break rebuild chain for order mode / limit prices
   const orderModeRef = useRef<OrderMode>(orderMode);
