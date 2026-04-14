@@ -203,13 +203,15 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
     const load = async () => {
       try {
         const data = await callTrade({ action: "positions", accountId });
-        setPositions(data.positions ?? []);
+        const pos = data.positions ?? [];
+        setPositions(pos);
+        onPositionsChange?.(pos);
       } catch { /* ignore */ }
     };
     load();
     posRef.current = setInterval(load, 5000);
     return () => { if (posRef.current) clearInterval(posRef.current); };
-  }, [isLive, accountId]);
+  }, [isLive, accountId, onPositionsChange]);
 
   // Load history when toggled
   useEffect(() => {
