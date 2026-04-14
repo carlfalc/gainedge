@@ -14,6 +14,7 @@ interface AskRonModalProps {
     price?: string;
     sessionLabel?: string;
     userName?: string;
+    userId?: string;
   };
 }
 

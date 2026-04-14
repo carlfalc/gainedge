@@ -361,6 +361,7 @@ export default function DashboardLayout() {
           page: location.pathname,
           sessionLabel,
           userName: userName || undefined,
+          userId: userId || undefined,
         }}
       />
       <TradeNotificationPopup />
