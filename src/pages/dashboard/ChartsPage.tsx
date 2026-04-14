@@ -67,8 +67,8 @@ interface SignalRecord {
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"];
 
-/* ───── RON Pattern Historical Stats ───── */
-const PATTERN_STATS: Record<string, { targetHitRate: number; avgPipMove: string; direction: string; avgFrequency: string }> = {
+/* ───── RON Pattern Historical Stats (industry avg fallback) ───── */
+const PATTERN_STATS_FALLBACK: Record<string, { targetHitRate: number; avgPipMove: string; direction: string; avgFrequency: string }> = {
   "Double Top": { targetHitRate: 65, avgPipMove: "40-80", direction: "bearish", avgFrequency: "~3x/week" },
   "Double Bottom": { targetHitRate: 65, avgPipMove: "40-80", direction: "bullish", avgFrequency: "~3x/week" },
   "Head & Shoulders": { targetHitRate: 70, avgPipMove: "60-120", direction: "bearish", avgFrequency: "~2x/week" },
