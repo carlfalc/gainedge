@@ -1815,7 +1815,7 @@ serve(async (req) => {
           if (ageMin >= 60) {
             updates.price_after_1h = liveData.last_price;
             const diff = liveData.last_price - imp.price_at_news;
-            const pipSize = imp.price_at_news >= 100 ? 1 : 0.0001;
+            const pipSize = getPipSize(imp.symbol);
             updates.magnitude_pips = +(diff / pipSize).toFixed(1);
             updates.direction = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
             updates.measured_at = new Date().toISOString();
