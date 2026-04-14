@@ -1241,26 +1241,85 @@ serve(async (req) => {
     let resolvedCount = 0;
     const { data: pendingSignals } = await supabase
       .from("signals")
-      .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at, scan_result_id")
+      .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at, scan_result_id, confidence")
       .eq("result", "pending");
 
     if (pendingSignals && pendingSignals.length > 0) {
-      // Batch-fetch timeframes from linked scan_results
+      // Batch-fetch timeframes + indicator context from linked scan_results
       const scanIds = pendingSignals.map(s => s.scan_result_id).filter(Boolean);
-      let scanTimeframes: Record<string, string> = {};
+      let scanContext: Record<string, { timeframe: string; adx: number | null; rsi: number | null; macd_status: string | null; stoch_rsi: number | null; session: string }> = {};
       if (scanIds.length > 0) {
         const { data: scans } = await supabase
           .from("scan_results")
-          .select("id, timeframe")
+          .select("id, timeframe, adx, rsi, macd_status, stoch_rsi, session")
           .in("id", scanIds);
         if (scans) {
-          for (const sc of scans) scanTimeframes[sc.id] = sc.timeframe;
+          for (const sc of scans) scanContext[sc.id] = { timeframe: sc.timeframe, adx: sc.adx, rsi: sc.rsi, macd_status: sc.macd_status, stoch_rsi: sc.stoch_rsi, session: sc.session };
         }
+      }
+
+      // Helper: insert signal outcome
+      async function insertSignalOutcome(sig: any, resultStr: string, pnl: number, pnlPips: number) {
+        const ctx = sig.scan_result_id ? scanContext[sig.scan_result_id] : null;
+        const now = new Date();
+        const createdAt = new Date(sig.created_at);
+
+        // Look up active pattern at signal creation time
+        let patternActive: string | null = null;
+        const { data: patInsights } = await supabase
+          .from("insights")
+          .select("data")
+          .eq("user_id", sig.user_id)
+          .eq("symbol", sig.symbol)
+          .eq("insight_type", "pattern_detected")
+          .lte("created_at", new Date(createdAt.getTime() + 60 * 60 * 1000).toISOString())
+          .gte("created_at", new Date(createdAt.getTime() - 60 * 60 * 1000).toISOString())
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (patInsights && patInsights.length > 0) {
+          const pd = patInsights[0].data as any;
+          patternActive = pd?.pattern || pd?.pattern_name || null;
+        }
+
+        // Determine RON version from user prefs
+        const { data: sigPref } = await supabase
+          .from("user_signal_preferences")
+          .select("signal_engine")
+          .eq("user_id", sig.user_id)
+          .maybeSingle();
+        const ronVersion = sigPref?.signal_engine || "v1";
+
+        await supabase.from("signal_outcomes").insert({
+          user_id: sig.user_id,
+          signal_id: sig.id,
+          symbol: sig.symbol,
+          direction: sig.direction,
+          timeframe: ctx?.timeframe || "15m",
+          entry_price: sig.entry_price,
+          tp_price: sig.take_profit,
+          sl_price: sig.stop_loss,
+          result: resultStr.toUpperCase(),
+          pnl_pips: +pnlPips.toFixed(1),
+          pnl_currency: +pnl.toFixed(2),
+          confidence: sig.confidence || 5,
+          ron_version: ronVersion,
+          adx_at_entry: ctx?.adx,
+          rsi_at_entry: ctx?.rsi,
+          macd_status: ctx?.macd_status,
+          stoch_rsi: ctx?.stoch_rsi,
+          pattern_active: patternActive,
+          session: ctx?.session || session,
+          day_of_week: createdAt.getUTCDay(),
+          hour_utc: createdAt.getUTCHours(),
+          resolved_at: now.toISOString(),
+          created_at: sig.created_at,
+        });
       }
 
       for (const sig of pendingSignals) {
         // Determine expiry based on timeframe
-        const tf = sig.scan_result_id ? scanTimeframes[sig.scan_result_id] : null;
+        const ctx = sig.scan_result_id ? scanContext[sig.scan_result_id] : null;
+        const tf = ctx?.timeframe || null;
         const expiryMs = tf ? (EXPIRY_MAP[tf] || DEFAULT_EXPIRY_MS) : DEFAULT_EXPIRY_MS;
         const ageMs = Date.now() - new Date(sig.created_at).getTime();
 
@@ -1270,15 +1329,11 @@ serve(async (req) => {
 
         // Check expiry
         if (ageMs > expiryMs) {
-          // Calculate unrealized P&L at expiry
           let pnl = 0;
           let pnlPips = 0;
           if (livePrice) {
-            if (sig.direction === "BUY") {
-              pnl = livePrice - sig.entry_price;
-            } else {
-              pnl = sig.entry_price - livePrice;
-            }
+            if (sig.direction === "BUY") pnl = livePrice - sig.entry_price;
+            else pnl = sig.entry_price - livePrice;
             pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
           }
           await supabase.from("signals").update({
