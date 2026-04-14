@@ -67,8 +67,8 @@ interface SignalRecord {
 
 const TIMEFRAMES = ["1m", "5m", "15m", "1H", "4H", "1D"];
 
-/* ───── RON Pattern Historical Stats ───── */
-const PATTERN_STATS: Record<string, { targetHitRate: number; avgPipMove: string; direction: string; avgFrequency: string }> = {
+/* ───── RON Pattern Historical Stats (industry avg fallback) ───── */
+const PATTERN_STATS_FALLBACK: Record<string, { targetHitRate: number; avgPipMove: string; direction: string; avgFrequency: string }> = {
   "Double Top": { targetHitRate: 65, avgPipMove: "40-80", direction: "bearish", avgFrequency: "~3x/week" },
   "Double Bottom": { targetHitRate: 65, avgPipMove: "40-80", direction: "bullish", avgFrequency: "~3x/week" },
   "Head & Shoulders": { targetHitRate: 70, avgPipMove: "60-120", direction: "bearish", avgFrequency: "~2x/week" },
@@ -174,6 +174,7 @@ export default function ChartsPage() {
   const [showPatternLabels, setShowPatternLabels] = useState(true);
   const [patternHistory, setPatternHistory] = useState<Array<{ pattern: DetectedPattern; detectedAt: string; entryPrice: number; outcome?: "confirmed" | "invalidated"; pipMove?: number }>>([]);
   const [patternUserStats, setPatternUserStats] = useState<{ total: number; confirmed: number } | null>(null);
+  const [realPatternStats, setRealPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; frequency: string }>>({});
 
   // Refs to break rebuild chain for order mode / limit prices
   const orderModeRef = useRef<OrderMode>(orderMode);
@@ -1338,7 +1339,37 @@ export default function ChartsPage() {
       });
   }, [patternHistory, userId, selected]);
 
-  /* ─── helpers ─── */
+  // Query REAL pattern stats from signal_outcomes for current instrument
+  useEffect(() => {
+    if (!selected) return;
+    supabase.from("signal_outcomes")
+      .select("pattern_active, result, pnl_pips, created_at")
+      .eq("symbol", selected)
+      .not("pattern_active", "is", null)
+      .then(({ data }) => {
+        if (!data || data.length === 0) { setRealPatternStats({}); return; }
+        const map: Record<string, { total: number; wins: number; pipSums: number; dates: string[] }> = {};
+        for (const row of data) {
+          const p = row.pattern_active!;
+          if (!map[p]) map[p] = { total: 0, wins: 0, pipSums: 0, dates: [] };
+          map[p].total++;
+          if (row.result === "WIN") { map[p].wins++; map[p].pipSums += Math.abs(row.pnl_pips || 0); }
+          map[p].dates.push(row.created_at);
+        }
+        const result: typeof realPatternStats = {};
+        for (const [pattern, stats] of Object.entries(map)) {
+          const winRate = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
+          const avgPips = stats.wins > 0 ? Math.round(stats.pipSums / stats.wins) : 0;
+          // Calculate frequency: trades per week
+          const dates = stats.dates.map(d => new Date(d).getTime()).sort();
+          const weekSpan = dates.length >= 2 ? Math.max(1, (dates[dates.length - 1] - dates[0]) / (7 * 24 * 60 * 60 * 1000)) : 1;
+          const perWeek = (stats.total / weekSpan).toFixed(1);
+          result[pattern] = { total: stats.total, wins: stats.wins, winRate, avgPips, frequency: `~${perWeek}x/week` };
+        }
+        setRealPatternStats(result);
+      });
+  }, [selected]);
+
   const dirColor = (d: string) => d === "BUY" ? "text-green-400" : d === "SELL" ? "text-red-400" : "text-amber-400";
   const dirIcon = (d: string) =>
     d === "BUY" ? <ArrowUpRight className="w-4 h-4" /> :
@@ -1646,11 +1677,24 @@ export default function ChartsPage() {
           {/* RON Stats line */}
           {patternHistory.length > 0 && (() => {
             const currentName = patternHistory[0].pattern.pattern_name;
-            const stats = PATTERN_STATS[currentName];
-            if (!stats) return null;
+            const fallback = PATTERN_STATS_FALLBACK[currentName];
+            const real = realPatternStats[currentName];
+            if (!fallback && !real) return null;
+
+            // Use real data if we have enough (5+ outcomes), otherwise show building status + industry avg
+            const hasEnoughData = real && real.total >= 5;
+            const hitRate = hasEnoughData ? real.winRate : fallback?.targetHitRate || 0;
+            const avgMove = hasEnoughData ? `${real.avgPips}` : fallback?.avgPipMove || "N/A";
+            const freq = hasEnoughData ? real.frequency : fallback?.avgFrequency || "N/A";
+            const dataLabel = hasEnoughData 
+              ? `${hitRate}% win rate (${real.total} trades)` 
+              : real && real.total > 0 
+                ? `Building data (${real.total}/5) — ${real.wins}/${real.total} wins so far | Industry avg: ~${fallback?.targetHitRate || 65}%`
+                : `~${hitRate}% historically (industry avg)`;
+
             return (
               <div className="text-[9px] text-[#00CFA5]/60 pl-[90px]">
-                🧠 RON Stats: "{currentName}" hits target ~{stats.targetHitRate}% historically | Avg move: {stats.avgPipMove} pips | {stats.avgFrequency} on {selected}
+                🧠 RON Stats: "{currentName}" {dataLabel} | Avg move: {avgMove} pips | {freq} on {selected}
                 {patternUserStats && patternUserStats.total > 0 && (
                   <span className="text-[#00CFA5]/80 font-semibold">
                     {" | Your history: "}{patternUserStats.confirmed}/{patternUserStats.total} confirmed ({Math.round((patternUserStats.confirmed / patternUserStats.total) * 100)}%)
