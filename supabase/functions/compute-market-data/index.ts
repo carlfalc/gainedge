@@ -337,11 +337,19 @@ function findSwingHigh(highs: number[], endIdx: number, lookback = 20): number {
   return maxVal;
 }
 
+// ─── ATR multiplier per instrument category ───
+function getAtrSlMultiplier(symbol: string, category?: string): number {
+  if (symbol === "XAUUSD" || symbol === "GOLD") return 2.0;
+  if (category === "Commodities") return 2.0;
+  // Indices and Forex all use 1.5
+  return 1.5;
+}
+
 // ─── V1 Legacy Analysis (ATR-based SL/TP per instrument) ───
 // When useV1Pure is true, the ONLY entry condition is a confirmed EMA 4/17 crossover.
 // No ADX, ATR-range, or EMA-flatness filters are applied. Confidence is scored by
 // indicator alignment but does NOT gate signal firing.
-function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
+function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
   const closes = candles.map((c: any) => c.close);
   const highs = candles.map((c: any) => c.high);
   const lows = candles.map((c: any) => c.low);
