@@ -1347,6 +1347,8 @@ serve(async (req) => {
             symbol: sig.symbol, severity: "low",
             data: { entry_price: sig.entry_price, take_profit: sig.take_profit, stop_loss: sig.stop_loss, pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1), expired: true },
           });
+          // ─── ML: record outcome ───
+          await insertSignalOutcome(sig, "EXPIRED", pnl, pnlPips);
           resolvedCount++;
           continue;
         }
