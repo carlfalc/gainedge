@@ -227,7 +227,10 @@ function findSwingHigh(highs: number[], endIdx: number, lookback = 20): number {
 }
 
 // ─── V1 Legacy Analysis (ATR-based SL/TP per instrument) ───
-function runAnalysisV1(candles: any[]): AnalysisResult {
+// When useV1Pure is true, the ONLY entry condition is a confirmed EMA 4/17 crossover.
+// No ADX, ATR-range, or EMA-flatness filters are applied. Confidence is scored by
+// indicator alignment but does NOT gate signal firing.
+function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
   const closes = candles.map((c: any) => c.close);
   const highs = candles.map((c: any) => c.high);
   const lows = candles.map((c: any) => c.low);
@@ -261,43 +264,46 @@ function runAnalysisV1(candles: any[]): AnalysisResult {
   const avgVolume = volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : 0;
   const lastVolume = volumes[volumes.length - 1] || 0;
 
-  // ─── V1 NO-TRADE FILTERS ───
-  const reasons: string[] = [];
-  let noTrade = false;
+  // ─── V1 NO-TRADE FILTERS (SKIPPED when useV1Pure) ───
+  if (!useV1Pure) {
+    const reasons: string[] = [];
+    let noTrade = false;
 
-  if (adx !== null && adx < 20) {
-    noTrade = true;
-    reasons.push(`ADX at ${adx} — no clear trend, staying flat`);
-  }
-
-  if (atr !== null) {
-    const avgAtr = calcATR(highs.slice(0, -14), lows.slice(0, -14), closes.slice(0, -14));
-    if (avgAtr && atr < avgAtr * 0.6) {
+    if (adx !== null && adx < 20) {
       noTrade = true;
-      reasons.push("Price in tight range — ATR well below average");
+      reasons.push(`ADX at ${adx} — no clear trend, staying flat`);
     }
-  }
 
-  if (crossoverStatus === "NONE") {
-    const emaDiff = Math.abs(currFast - currSlow) / currSlow;
-    const prevDiff = Math.abs(prevFast - prevSlow) / prevSlow;
-    if (emaDiff < 0.001 && prevDiff < 0.001) {
-      noTrade = true;
-      reasons.push("EMAs flat and parallel — no crossover forming");
+    if (atr !== null) {
+      const avgAtr = calcATR(highs.slice(0, -14), lows.slice(0, -14), closes.slice(0, -14));
+      if (avgAtr && atr < avgAtr * 0.6) {
+        noTrade = true;
+        reasons.push("Price in tight range — ATR well below average");
+      }
     }
-  }
 
-  if (noTrade) {
-    return {
-      direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
-      stop_loss: null, risk_reward: null, ema_crossover_status: crossoverStatus,
-      ema_crossover_direction: crossoverDir,
-      reasoning: `[Legacy V1] ${reasons.join(". ")}. No trade conditions met.`,
-      verdict: "NO_TRADE", rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
-    };
+    if (crossoverStatus === "NONE") {
+      const emaDiff = Math.abs(currFast - currSlow) / currSlow;
+      const prevDiff = Math.abs(prevFast - prevSlow) / prevSlow;
+      if (emaDiff < 0.001 && prevDiff < 0.001) {
+        noTrade = true;
+        reasons.push("EMAs flat and parallel — no crossover forming");
+      }
+    }
+
+    if (noTrade) {
+      return {
+        direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
+        stop_loss: null, risk_reward: null, ema_crossover_status: crossoverStatus,
+        ema_crossover_direction: crossoverDir,
+        reasoning: `[Legacy V1] ${reasons.join(". ")}. No trade conditions met.`,
+        verdict: "NO_TRADE", rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+      };
+    }
   }
 
   // ─── V1 CONFIDENCE SCORING ───
+  // In V1 Pure mode, confidence is informational only — every crossover fires a signal
   let confidence = 0;
   const tradeReasons: string[] = [];
 
@@ -314,13 +320,14 @@ function runAnalysisV1(candles: any[]): AnalysisResult {
   if (rsi !== null) {
     if (isBullish && rsi > 55) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bullish momentum`); }
     else if (isBearish && rsi < 45) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bearish momentum`); }
-    if (rsi >= 45 && rsi <= 55) { confidence -= 2; tradeReasons.push(`RSI ${rsi} in neutral zone — reduced conviction`); }
+    if (!useV1Pure && rsi >= 45 && rsi <= 55) { confidence -= 2; tradeReasons.push(`RSI ${rsi} in neutral zone — reduced conviction`); }
   }
 
   if (macd === "Bullish" && isBullish) { confidence += 1; tradeReasons.push("MACD bullish momentum aligned"); }
   else if (macd === "Bearish" && isBearish) { confidence += 1; tradeReasons.push("MACD bearish momentum aligned"); }
 
   if (adx !== null && adx > 25) { confidence += 1; tradeReasons.push(`ADX at ${adx} confirms trend strength`); }
+  else if (adx !== null && adx > 20) { confidence += 1; tradeReasons.push(`ADX at ${adx} above 20`); }
 
   if (stochRsi !== null) {
     if (isBullish && stochRsi > 60) { confidence += 1; tradeReasons.push(`StochRSI ${stochRsi} confirms bullish`); }
@@ -333,16 +340,37 @@ function runAnalysisV1(candles: any[]): AnalysisResult {
 
   confidence = Math.max(1, Math.min(10, confidence));
 
+  // ─── V1 Pure: every confirmed crossover IS a signal ───
   let direction: string;
   let verdict: string;
-  if (confidence >= 5 && crossoverStatus === "CONFIRMED") {
-    direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
-    verdict = direction;
-  } else if (confidence >= 3 && crossoverStatus !== "NONE") {
-    direction = isBullish ? "BUY" : "SELL";
-    verdict = "WAIT"; confidence = Math.min(confidence, 4);
+
+  if (useV1Pure) {
+    // In pure V1 mode, a confirmed crossover always generates a signal
+    if (crossoverStatus === "CONFIRMED") {
+      direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
+      verdict = direction;
+      // Ensure minimum confidence of 5 so signal is always created
+      confidence = Math.max(5, confidence);
+    } else if (crossoverStatus === "FORMING") {
+      direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
+      verdict = "WAIT";
+      confidence = Math.max(3, confidence);
+    } else {
+      // No crossover at all — WAIT (not NO TRADE)
+      direction = "WAIT";
+      verdict = "WAIT";
+    }
   } else {
-    direction = "WAIT"; verdict = "WAIT"; confidence = Math.min(confidence, 3);
+    // Original V1 logic with confidence gating
+    if (confidence >= 5 && crossoverStatus === "CONFIRMED") {
+      direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
+      verdict = direction;
+    } else if (confidence >= 3 && crossoverStatus !== "NONE") {
+      direction = isBullish ? "BUY" : "SELL";
+      verdict = "WAIT"; confidence = Math.min(confidence, 4);
+    } else {
+      direction = "WAIT"; verdict = "WAIT"; confidence = Math.min(confidence, 3);
+    }
   }
 
   // ─── V1 ENTRY / TP / SL (ATR-based per instrument) ───
@@ -385,7 +413,7 @@ function runAnalysisV1(candles: any[]): AnalysisResult {
       const reward = Math.abs(tp - entry);
       const rrVal = risk > 0 ? reward / risk : 2;
 
-      // Enforce minimum 2:1 R:R — if can't achieve, NO_TRADE
+      // Enforce minimum 2:1 R:R — if can't achieve, adjust TP (don't block in V1 Pure)
       if (rrVal < 2.0) {
         tp = direction === "BUY" ? +(entry + risk * 2).toFixed(5) : +(entry - risk * 2).toFixed(5);
       }
@@ -683,8 +711,9 @@ function applyV2Rules(v1Result: AnalysisResult, candles: any[], rules: Knowledge
 }
 
 // Wrapper: runs V1, then optionally layers V2
-function runAnalysis(candles: any[], v2Rules: KnowledgeRule[] = [], session = "", recentSignalCount = 0, useV2 = true): AnalysisResult {
-  const v1Result = runAnalysisV1(candles);
+// useV1Pure: when true, V1 fires on every EMA crossover with no additional filters
+function runAnalysis(candles: any[], v2Rules: KnowledgeRule[] = [], session = "", recentSignalCount = 0, useV2 = true, useV1Pure = false): AnalysisResult {
+  const v1Result = runAnalysisV1(candles, useV1Pure);
   if (!useV2 || v2Rules.length === 0) return v1Result;
   return applyV2Rules(v1Result, candles, v2Rules, session, recentSignalCount);
 }
@@ -990,14 +1019,16 @@ serve(async (req) => {
     const session = detectSession();
 
     for (const [userId, instList] of userInstruments) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("default_candle_type, ema_fast, ema_slow")
-        .eq("id", userId)
-        .single();
+      const [profileRes, sigPrefRes] = await Promise.all([
+        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow").eq("id", userId).single(),
+        supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
+      ]);
+      const profile = profileRes.data;
 
-      // Check if user has V2 enabled (default: v2)
-      const useV2 = true; // V2 is default for all users
+      // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
+      const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
+      const useV2 = signalEngine === "v2" || signalEngine === "v1v2";
+      const useV1Pure = signalEngine === "v1"; // Pure V1: only EMA crossover, no extra filters
 
       for (const inst of instList) {
         const data = symbolData.get(inst.symbol);
@@ -1024,7 +1055,7 @@ serve(async (req) => {
           let analysis: AnalysisResult;
 
           if (candles && candles.length > 20) {
-            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2);
+            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2, useV1Pure);
           } else {
             // Mock analysis — still apply RON logic
             const mockRsi = data.rsi;
@@ -1032,8 +1063,8 @@ serve(async (req) => {
             const mockMacd = data.macd_status;
             const mockStoch = data.stoch_rsi;
             
-            // Apply NO-TRADE filter for mock too
-            if (mockAdx !== null && mockAdx < 20) {
+            // Apply NO-TRADE filter for mock too (skip in V1 Pure mode)
+            if (!useV1Pure && mockAdx !== null && mockAdx < 20) {
               analysis = {
                 direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
                 stop_loss: null, risk_reward: null, ema_crossover_status: "NONE",
