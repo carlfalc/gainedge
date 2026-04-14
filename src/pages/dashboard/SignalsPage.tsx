@@ -428,7 +428,7 @@ export default function SignalsPage() {
               <div
                 onClick={() => setExpanded(expanded === s.id ? null : s.id)}
                 style={{
-                  display: "grid", gridTemplateColumns: "140px 90px 60px 50px 90px 90px 90px 50px 80px 1fr",
+                  display: "grid", gridTemplateColumns: "120px 80px 50px 40px 80px 160px 160px 50px 70px 1fr",
                   padding: 0, cursor: "pointer", borderBottom: `1px solid ${C.border}`,
                   transition: "background 0.15s",
                 }}
