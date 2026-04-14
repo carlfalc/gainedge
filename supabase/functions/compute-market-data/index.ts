@@ -1153,16 +1153,51 @@ serve(async (req) => {
     const { data: v2Rules } = await supabase.from("falconer_knowledge").select("*").eq("is_active", true);
     const activeRules: KnowledgeRule[] = (v2Rules || []) as KnowledgeRule[];
 
+    // Load instrument library for pip sizes
+    const { data: instrumentLib } = await supabase.from("instrument_library").select("symbol, pip_size, pip_value_per_lot, category");
+    const pipSizeMap = new Map<string, number>();
+    const pipValueMap = new Map<string, number>();
+    const categoryMap = new Map<string, string>();
+    if (instrumentLib) {
+      for (const il of instrumentLib) {
+        pipSizeMap.set(il.symbol, il.pip_size);
+        pipValueMap.set(il.symbol, il.pip_value_per_lot);
+        categoryMap.set(il.symbol, il.category);
+      }
+    }
+
+    // Helper: get pip size for a symbol
+    function getPipSize(symbol: string): number {
+      if (pipSizeMap.has(symbol)) return pipSizeMap.get(symbol)!;
+      // Fallback heuristics
+      if (symbol.includes("JPY")) return 0.01;
+      if (symbol === "XAUUSD" || symbol === "GOLD") return 0.01;
+      if (["US30", "NAS100", "SPX500", "UK100", "GER40", "HK50", "JPN225", "AUS200"].some(idx => symbol.includes(idx))) return 1.0;
+      return 0.0001; // Standard forex
+    }
+
+    // Helper: convert price diff to pips
+    function priceToPips(priceDiff: number, symbol: string): number {
+      const pipSize = getPipSize(symbol);
+      return pipSize > 0 ? priceDiff / pipSize : 0;
+    }
+
     let autoScans = 0;
     let signalsCreated = 0;
     const session = detectSession();
 
     for (const [userId, instList] of userInstruments) {
       const [profileRes, sigPrefRes] = await Promise.all([
-        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow").eq("id", userId).single(),
+        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused").eq("id", userId).single(),
         supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
       ]);
       const profile = profileRes.data;
+
+      // ─── KILL SWITCH: skip signal generation if paused ───
+      if (profile?.signals_paused) {
+        console.log(`Signals paused for user ${userId.slice(0, 8)} — skipping scan`);
+        continue;
+      }
 
       // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
       const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
