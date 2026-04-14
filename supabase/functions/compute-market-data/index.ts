@@ -91,6 +91,117 @@ function calcATR(highs: number[], lows: number[], closes: number[], period = 14)
   return sum / period;
 }
 
+/* ─── Buy/Sell Volume & Cumulative Delta ─── */
+function calcBuySellVolume(open: number, high: number, low: number, close: number, volume: number) {
+  const range = high - low;
+  if (range === 0 || volume === 0) return { buy: 0, sell: 0 };
+  const buy = volume * ((close - low) / range);
+  const sell = volume * ((high - close) / range);
+  return { buy: +buy.toFixed(2), sell: +sell.toFixed(2) };
+}
+
+/* ─── Liquidity Zone Detection ─── */
+function detectLiquidityZones(candles: any[], symbol: string, timeframe: string) {
+  const zones: any[] = [];
+  if (candles.length < 10) return zones;
+
+  // Order Blocks: strong move candle preceded by opposite candle
+  for (let i = 2; i < candles.length - 1; i++) {
+    const prev = candles[i - 1];
+    const curr = candles[i];
+    const next = candles[i + 1];
+    const currBody = Math.abs(curr.close - curr.open);
+    const avgBody = candles.slice(Math.max(0, i - 10), i).reduce((s: number, c: any) => s + Math.abs(c.close - c.open), 0) / Math.min(i, 10);
+
+    // Bullish OB: bearish candle followed by strong bullish move
+    if (currBody > avgBody * 2 && curr.close > curr.open && prev.close < prev.open) {
+      zones.push({
+        symbol, timeframe, zone_type: "order_block_bull",
+        price_high: prev.open, price_low: prev.close,
+        created_at_candle: prev.time, status: "active",
+      });
+    }
+    // Bearish OB: bullish candle followed by strong bearish move
+    if (currBody > avgBody * 2 && curr.close < curr.open && prev.close > prev.open) {
+      zones.push({
+        symbol, timeframe, zone_type: "order_block_bear",
+        price_high: prev.close, price_low: prev.open,
+        created_at_candle: prev.time, status: "active",
+      });
+    }
+
+    // Fair Value Gap (FVG)
+    if (i >= 2) {
+      const c1 = candles[i - 2], c2 = candles[i - 1], c3 = candles[i];
+      // Bullish FVG: gap between c1.high and c3.low
+      if (c3.low > c1.high) {
+        zones.push({
+          symbol, timeframe, zone_type: "fvg_bull",
+          price_high: c3.low, price_low: c1.high,
+          created_at_candle: c2.time, status: "active",
+        });
+      }
+      // Bearish FVG: gap between c3.high and c1.low
+      if (c3.high < c1.low) {
+        zones.push({
+          symbol, timeframe, zone_type: "fvg_bear",
+          price_high: c1.low, price_low: c3.high,
+          created_at_candle: c2.time, status: "active",
+        });
+      }
+    }
+  }
+
+  // Liquidity pools: swing highs/lows with equal-level clusters
+  const swingHighs: number[] = [];
+  const swingLows: number[] = [];
+  for (let i = 2; i < candles.length - 2; i++) {
+    if (candles[i].high > candles[i - 1].high && candles[i].high > candles[i + 1].high &&
+        candles[i].high > candles[i - 2].high && candles[i].high > candles[i + 2].high) {
+      swingHighs.push(candles[i].high);
+    }
+    if (candles[i].low < candles[i - 1].low && candles[i].low < candles[i + 1].low &&
+        candles[i].low < candles[i - 2].low && candles[i].low < candles[i + 2].low) {
+      swingLows.push(candles[i].low);
+    }
+  }
+
+  // Cluster equal highs (within 0.05%) as liquidity pools
+  const threshold = candles[candles.length - 1].close * 0.0005;
+  for (let i = 0; i < swingHighs.length; i++) {
+    const cluster = swingHighs.filter(h => Math.abs(h - swingHighs[i]) < threshold);
+    if (cluster.length >= 2) {
+      zones.push({
+        symbol, timeframe, zone_type: "liquidity_pool_high",
+        price_high: Math.max(...cluster), price_low: Math.min(...cluster),
+        created_at_candle: candles[candles.length - 1].time, status: "active",
+      });
+    }
+  }
+  for (let i = 0; i < swingLows.length; i++) {
+    const cluster = swingLows.filter(l => Math.abs(l - swingLows[i]) < threshold);
+    if (cluster.length >= 2) {
+      zones.push({
+        symbol, timeframe, zone_type: "liquidity_pool_low",
+        price_high: Math.max(...cluster), price_low: Math.min(...cluster),
+        created_at_candle: candles[candles.length - 1].time, status: "active",
+      });
+    }
+  }
+
+  return zones.slice(0, 20); // Limit per scan
+}
+
+/* ─── MTF Alignment ─── */
+function determineTrendDirection(closes: number[]): string {
+  if (closes.length < 5) return "neutral";
+  const sma5 = closes.slice(-5).reduce((a, b) => a + b, 0) / 5;
+  const sma20 = closes.length >= 20 ? closes.slice(-20).reduce((a, b) => a + b, 0) / 20 : sma5;
+  if (sma5 > sma20 * 1.001) return "bullish";
+  if (sma5 < sma20 * 0.999) return "bearish";
+  return "neutral";
+}
+
 /* ─── MetaApi helpers ─── */
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
@@ -865,18 +976,19 @@ serve(async (req) => {
             symbolCandles.set(symbol, candles);
             usedLive = true;
 
-            // ─── PERSIST CANDLES TO candle_history (deduplicated) ───
-            const candleRows = candles.map((c: any) => ({
-              symbol,
-              timeframe,
-              timestamp: c.time,
-              open: c.open,
-              high: c.high,
-              low: c.low,
-              close: c.close,
-              volume: c.tickVolume || 0,
-            }));
-            // Batch insert, ignore duplicates
+            // ─── PERSIST CANDLES TO candle_history with buy/sell volume ───
+            let cumulativeDelta = 0;
+            const candleRows = candles.map((c: any) => {
+              const vol = c.tickVolume || 0;
+              const bsv = calcBuySellVolume(c.open, c.high, c.low, c.close, vol);
+              cumulativeDelta += (bsv.buy - bsv.sell);
+              return {
+                symbol, timeframe, timestamp: c.time,
+                open: c.open, high: c.high, low: c.low, close: c.close,
+                volume: vol, buy_volume: bsv.buy, sell_volume: bsv.sell,
+                cumulative_delta: +cumulativeDelta.toFixed(2),
+              };
+            });
             const { error: chErr } = await supabase
               .from("candle_history")
               .upsert(candleRows, { onConflict: "symbol,timeframe,timestamp", ignoreDuplicates: true });
