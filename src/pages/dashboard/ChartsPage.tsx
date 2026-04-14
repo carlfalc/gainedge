@@ -1116,7 +1116,6 @@ export default function ChartsPage() {
       // Helper: find nearest candle timestamp for a given ISO date
       const findNearestTs = (isoDate: string): number => {
         const ts = Math.floor(new Date(isoDate).getTime() / 1000);
-        // Find closest candle time
         let closest = rawData[0].time;
         let minDiff = Math.abs(ts - closest);
         for (const c of rawData) {
@@ -1126,17 +1125,29 @@ export default function ChartsPage() {
         return closest;
       };
 
+      // Deduplicate: filter confidence < 5, keep only highest confidence per candle+direction
+      const filteredSignals = chartSignals.filter(s => s.confidence >= 5);
+      const bestPerCandle = new Map<string, SignalRecord>();
+      for (const sig of filteredSignals) {
+        const entryTs = findNearestTs(sig.created_at);
+        const key = `${entryTs}-${sig.direction}`;
+        const existing = bestPerCandle.get(key);
+        if (!existing || sig.confidence > existing.confidence) {
+          bestPerCandle.set(key, sig);
+        }
+      }
+      const dedupedSignals = Array.from(bestPerCandle.values());
+
       const markers: Array<{
         time: Time; position: "belowBar" | "aboveBar" | "inBar";
         color: string; shape: "arrowUp" | "arrowDown" | "circle";
         text: string;
       }> = [];
 
-      for (const sig of chartSignals) {
+      for (const sig of dedupedSignals) {
         const entryTs = findNearestTs(sig.created_at);
         if (entryTs < firstCandleTs || entryTs > lastCandleTs) continue;
 
-        // Entry marker
         if (sig.direction === "BUY") {
           markers.push({
             time: entryTs as Time, position: "belowBar", color: "#22C55E",
@@ -1149,7 +1160,6 @@ export default function ChartsPage() {
           });
         }
 
-        // Result marker
         const resolvedDate = sig.resolved_at || sig.closed_at;
         if (resolvedDate && sig.result !== "pending") {
           const exitTs = findNearestTs(resolvedDate);
@@ -1166,7 +1176,6 @@ export default function ChartsPage() {
               shape: "circle", text: pipsText,
             });
 
-            // Connector line from entry to exit
             if (entryTs !== exitTs) {
               const connectorSeries = chart.addSeries(LineSeries, {
                 color: isWin ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)",
@@ -1183,7 +1192,6 @@ export default function ChartsPage() {
         }
       }
 
-      // Sort markers by time (required by lightweight-charts)
       markers.sort((a, b) => (a.time as number) - (b.time as number));
       if (markers.length > 0) {
         createSeriesMarkers(candleSeries, markers);
