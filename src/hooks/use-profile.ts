@@ -21,6 +21,7 @@ export interface Profile {
   trading_preferences: string[];
   favourite_sessions: string[];
   show_nickname: boolean;
+  signals_paused: boolean;
 }
 
 export function useProfile() {

@@ -26,6 +26,7 @@ export default function SettingsPage() {
   const [emailAlerts, setEmailAlerts] = useState(true);
   const [pushAlerts, setPushAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(false);
+  const [signalsPaused, setSignalsPaused] = useState(false);
   const [broker, setBroker] = useState("eightcap");
   const [instruments, setInstruments] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -45,6 +46,7 @@ export default function SettingsPage() {
       setPushAlerts(profile.push_notifications);
       setSmsAlerts(profile.sms_alerts);
       setBroker(profile.broker);
+      setSignalsPaused(profile.signals_paused ?? false);
       // Load clock preferences
       if ((profile as any).clock_timezones && Array.isArray((profile as any).clock_timezones) && (profile as any).clock_timezones.length > 0) {
         setClockSlots((profile as any).clock_timezones as ClockConfig[]);
@@ -151,6 +153,21 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+
+      <Section icon={<AlertTriangle size={16} color={signalsPaused ? C.red : C.jade} />} title="Signal Generation">
+        <Toggle label="Pause All Signals (Kill Switch)" checked={signalsPaused} onChange={async (val) => {
+          setSignalsPaused(val);
+          if (userId) {
+            await supabase.from("profiles").update({ signals_paused: val }).eq("id", userId);
+            toast.success(val ? "Signals PAUSED — no new signals will fire" : "Signals RESUMED — scanning will restart");
+          }
+        }} />
+        {signalsPaused && (
+          <div style={{ fontSize: 11, color: C.red, marginTop: -4, marginBottom: 8, paddingLeft: 4, fontWeight: 600 }}>
+            ⛔ Signal generation is currently PAUSED. No new signals will be created until you resume.
+          </div>
+        )}
+      </Section>
 
       <Section icon={<Bell size={16} color={C.amber} />} title={t("settings.notifications")}>
         <Toggle label={t("settings.emailAlerts")} checked={emailAlerts} onChange={setEmailAlerts} />

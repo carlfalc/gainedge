@@ -729,6 +729,7 @@ export type Database = {
           nickname: string | null
           push_notifications: boolean
           show_nickname: boolean | null
+          signals_paused: boolean
           sms_alerts: boolean
           subscription_status: string
           subscription_tier: string
@@ -755,6 +756,7 @@ export type Database = {
           nickname?: string | null
           push_notifications?: boolean
           show_nickname?: boolean | null
+          signals_paused?: boolean
           sms_alerts?: boolean
           subscription_status?: string
           subscription_tier?: string
@@ -781,6 +783,7 @@ export type Database = {
           nickname?: string | null
           push_notifications?: boolean
           show_nickname?: boolean | null
+          signals_paused?: boolean
           sms_alerts?: boolean
           subscription_status?: string
           subscription_tier?: string

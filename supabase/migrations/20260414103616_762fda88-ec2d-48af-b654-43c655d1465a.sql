@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN signals_paused boolean NOT NULL DEFAULT true;

@@ -484,7 +484,7 @@ function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
     }
   }
 
-  // ─── V1 ENTRY / TP / SL (ATR-based per instrument) ───
+  // ─── V1 ENTRY / TP / SL (ATR-based, capped to prevent insane distances) ───
   const lastClose = closes[closes.length - 1];
   let entry: number | null = null;
   let tp: number | null = null;
@@ -496,54 +496,36 @@ function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
     const atrVal = calcATR(highs, lows, closes);
 
     if (atrVal && atrVal > 0) {
-      // Instrument-specific ATR multipliers
-      const symbol = candles[0]?.symbol || "";
-      const slMult = (symbol === "XAUUSD" || symbol === "GOLD") ? 2.0 : 1.5;
-      const tpMult = (symbol === "XAUUSD" || symbol === "GOLD") ? 4.0 : 3.0;
+      // SL = 2x ATR, TP = 4x ATR — simple and consistent
+      const slMult = 2.0;
+      const tpMult = 4.0;
 
       const atrSl = atrVal * slMult;
       const atrTp = atrVal * tpMult;
-      const minSl = atrVal; // Never tighter than 1x ATR
 
       if (direction === "BUY") {
-        const swingLow = findSwingLow(lows, lows.length - 1, 20);
-        const swingSl = entry - swingLow;
-        // Use wider of ATR-based or swing-based SL, but never tighter than 1x ATR
-        const slDist = Math.max(atrSl, swingSl, minSl);
-        sl = +(entry - slDist).toFixed(5);
-        tp = +(entry + Math.max(atrTp, slDist * 2)).toFixed(5);
+        sl = +(entry - atrSl).toFixed(5);
+        tp = +(entry + atrTp).toFixed(5);
       } else {
-        const swingHigh = findSwingHigh(highs, highs.length - 1, 20);
-        const swingSl = swingHigh - entry;
-        const slDist = Math.max(atrSl, swingSl, minSl);
-        sl = +(entry + slDist).toFixed(5);
-        tp = +(entry - Math.max(atrTp, slDist * 2)).toFixed(5);
+        sl = +(entry + atrSl).toFixed(5);
+        tp = +(entry - atrTp).toFixed(5);
       }
 
       const risk = Math.abs(entry - sl);
       const reward = Math.abs(tp - entry);
-      const rrVal = risk > 0 ? reward / risk : 2;
+      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
 
-      // Enforce minimum 2:1 R:R — if can't achieve, adjust TP (don't block in V1 Pure)
-      if (rrVal < 2.0) {
-        tp = direction === "BUY" ? +(entry + risk * 2).toFixed(5) : +(entry - risk * 2).toFixed(5);
-      }
-      const finalReward = Math.abs(tp - entry);
-      rr = risk > 0 ? `${(finalReward / risk).toFixed(1)}:1` : "2.0:1";
-
-      tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL dist=${risk.toFixed(5)}, TP dist=${finalReward.toFixed(5)}`);
+      tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL=${atrSl.toFixed(5)} (2xATR), TP=${atrTp.toFixed(5)} (4xATR)`);
     } else {
-      // Fallback: no ATR available, use swing points
+      // Fallback: percentage-based (0.5% SL, 1% TP)
+      const pctSl = lastClose * 0.005;
+      const pctTp = lastClose * 0.01;
       if (direction === "BUY") {
-        const swingLow = findSwingLow(lows, lows.length - 1, 20);
-        sl = +(swingLow - (lastClose - swingLow) * 0.05).toFixed(5);
-        const risk = Math.abs(entry - sl);
-        tp = +(entry + risk * 2).toFixed(5);
+        sl = +(entry - pctSl).toFixed(5);
+        tp = +(entry + pctTp).toFixed(5);
       } else {
-        const swingHigh = findSwingHigh(highs, highs.length - 1, 20);
-        sl = +(swingHigh + (swingHigh - lastClose) * 0.05).toFixed(5);
-        const risk = Math.abs(sl - entry);
-        tp = +(entry - risk * 2).toFixed(5);
+        sl = +(entry + pctSl).toFixed(5);
+        tp = +(entry - pctTp).toFixed(5);
       }
       const risk = Math.abs(entry - sl);
       const reward = Math.abs(tp - entry);
@@ -1153,16 +1135,51 @@ serve(async (req) => {
     const { data: v2Rules } = await supabase.from("falconer_knowledge").select("*").eq("is_active", true);
     const activeRules: KnowledgeRule[] = (v2Rules || []) as KnowledgeRule[];
 
+    // Load instrument library for pip sizes
+    const { data: instrumentLib } = await supabase.from("instrument_library").select("symbol, pip_size, pip_value_per_lot, category");
+    const pipSizeMap = new Map<string, number>();
+    const pipValueMap = new Map<string, number>();
+    const categoryMap = new Map<string, string>();
+    if (instrumentLib) {
+      for (const il of instrumentLib) {
+        pipSizeMap.set(il.symbol, il.pip_size);
+        pipValueMap.set(il.symbol, il.pip_value_per_lot);
+        categoryMap.set(il.symbol, il.category);
+      }
+    }
+
+    // Helper: get pip size for a symbol
+    function getPipSize(symbol: string): number {
+      if (pipSizeMap.has(symbol)) return pipSizeMap.get(symbol)!;
+      // Fallback heuristics
+      if (symbol.includes("JPY")) return 0.01;
+      if (symbol === "XAUUSD" || symbol === "GOLD") return 0.01;
+      if (["US30", "NAS100", "SPX500", "UK100", "GER40", "HK50", "JPN225", "AUS200"].some(idx => symbol.includes(idx))) return 1.0;
+      return 0.0001; // Standard forex
+    }
+
+    // Helper: convert price diff to pips
+    function priceToPips(priceDiff: number, symbol: string): number {
+      const pipSize = getPipSize(symbol);
+      return pipSize > 0 ? priceDiff / pipSize : 0;
+    }
+
     let autoScans = 0;
     let signalsCreated = 0;
     const session = detectSession();
 
     for (const [userId, instList] of userInstruments) {
       const [profileRes, sigPrefRes] = await Promise.all([
-        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow").eq("id", userId).single(),
+        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused").eq("id", userId).single(),
         supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
       ]);
       const profile = profileRes.data;
+
+      // ─── KILL SWITCH: skip signal generation if paused ───
+      if (profile?.signals_paused) {
+        console.log(`Signals paused for user ${userId.slice(0, 8)} — skipping scan`);
+        continue;
+      }
 
       // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
       const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
@@ -1305,32 +1322,47 @@ serve(async (req) => {
 
             // ─── SIGNAL CREATION: only on meaningful new signals with conf >= 5 ───
             if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
-              // Check for duplicate pending signal: same direction & entry within 0.5%
-              const { data: recentPending } = await supabase
+              // Candle-period dedup: check if a signal was already created within this candle window
+              const tfMin = TF_MINUTES[inst.timeframe] || 15;
+              const candleWindowStart = new Date(Math.floor(Date.now() / (tfMin * 60000)) * tfMin * 60000).toISOString();
+              const { data: candlePeriodSignals } = await supabase
                 .from("signals")
-                .select("entry_price, direction")
+                .select("id")
                 .eq("user_id", userId)
                 .eq("symbol", inst.symbol)
-                .eq("result", "pending")
-                .order("created_at", { ascending: false })
+                .gte("created_at", candleWindowStart)
                 .limit(1);
 
-              let isDuplicate = false;
-              if (recentPending && recentPending.length > 0) {
-                const prev = recentPending[0];
-                const sameDir = prev.direction === analysis.direction;
-                const priceDiff = Math.abs(prev.entry_price - analysis.entry_price!) / analysis.entry_price!;
-                if (sameDir && priceDiff < 0.005) isDuplicate = true;
-              }
+              if (candlePeriodSignals && candlePeriodSignals.length > 0) {
+                console.log(`Candle-period dedup: ${inst.symbol} already has signal in current ${inst.timeframe} window`);
+              } else {
+                // Check for duplicate pending signal: same direction & entry within 0.5%
+                const { data: recentPending } = await supabase
+                  .from("signals")
+                  .select("entry_price, direction")
+                  .eq("user_id", userId)
+                  .eq("symbol", inst.symbol)
+                  .eq("result", "pending")
+                  .order("created_at", { ascending: false })
+                  .limit(1);
 
-              if (!isDuplicate) {
-                await supabase.from("signals").insert({
-                  user_id: userId, symbol: inst.symbol, direction: analysis.direction,
-                  confidence: analysis.confidence, entry_price: analysis.entry_price,
-                  take_profit: analysis.take_profit, stop_loss: analysis.stop_loss,
-                  risk_reward: analysis.risk_reward || "2.0:1",
-                });
-                signalsCreated++;
+                let isDuplicate = false;
+                if (recentPending && recentPending.length > 0) {
+                  const prev = recentPending[0];
+                  const sameDir = prev.direction === analysis.direction;
+                  const priceDiff = Math.abs(prev.entry_price - analysis.entry_price!) / analysis.entry_price!;
+                  if (sameDir && priceDiff < 0.005) isDuplicate = true;
+                }
+
+                if (!isDuplicate) {
+                  await supabase.from("signals").insert({
+                    user_id: userId, symbol: inst.symbol, direction: analysis.direction,
+                    confidence: analysis.confidence, entry_price: analysis.entry_price,
+                    take_profit: analysis.take_profit, stop_loss: analysis.stop_loss,
+                    risk_reward: analysis.risk_reward || "2.0:1",
+                  });
+                  signalsCreated++;
+                }
               }
             }
           }
@@ -1525,7 +1557,7 @@ serve(async (req) => {
           if (livePrice) {
             if (sig.direction === "BUY") pnl = livePrice - sig.entry_price;
             else pnl = sig.entry_price - livePrice;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           }
           await supabase.from("signals").update({
             result: "expired", pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1), resolved_at: new Date().toISOString(),
@@ -1554,21 +1586,21 @@ serve(async (req) => {
           if (livePrice >= sig.take_profit) {
             result = "win";
             pnl = sig.take_profit - sig.entry_price;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           } else if (livePrice <= sig.stop_loss) {
             result = "loss";
             pnl = sig.stop_loss - sig.entry_price;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           }
         } else if (sig.direction === "SELL") {
           if (livePrice <= sig.take_profit) {
             result = "win";
             pnl = sig.entry_price - sig.take_profit;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           } else if (livePrice >= sig.stop_loss) {
             result = "loss";
             pnl = sig.entry_price - sig.stop_loss;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           }
         }
 
@@ -1783,7 +1815,7 @@ serve(async (req) => {
           if (ageMin >= 60) {
             updates.price_after_1h = liveData.last_price;
             const diff = liveData.last_price - imp.price_at_news;
-            const pipSize = imp.price_at_news >= 100 ? 1 : 0.0001;
+            const pipSize = getPipSize(imp.symbol);
             updates.magnitude_pips = +(diff / pipSize).toFixed(1);
             updates.direction = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
             updates.measured_at = new Date().toISOString();
