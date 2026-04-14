@@ -1401,6 +1401,34 @@ serve(async (req) => {
           .maybeSingle();
         const ronVersion = sigPref?.signal_engine || "v1";
 
+        // MTF alignment: check candle_history for multiple timeframes
+        let mtfAlignment: string | null = null;
+        try {
+          const tfChecks = ["5m", "15m", "1h", "4h", "1d"];
+          let bullCount = 0, bearCount = 0;
+          for (const tf of tfChecks) {
+            const { data: tfCandles } = await supabase
+              .from("candle_history")
+              .select("close")
+              .eq("symbol", sig.symbol)
+              .eq("timeframe", tf)
+              .order("timestamp", { ascending: false })
+              .limit(20);
+            if (tfCandles && tfCandles.length >= 5) {
+              const closes = tfCandles.reverse().map((c: any) => c.close);
+              const trend = determineTrendDirection(closes);
+              if (trend === "bullish") bullCount++;
+              else if (trend === "bearish") bearCount++;
+            }
+          }
+          const total = bullCount + bearCount;
+          if (total >= 3) {
+            if (bullCount === total || bearCount === total) mtfAlignment = "all_aligned";
+            else if (Math.max(bullCount, bearCount) >= total * 0.6) mtfAlignment = "partially_aligned";
+            else mtfAlignment = "conflicting";
+          }
+        } catch (e) { console.warn("MTF alignment check failed:", e); }
+
         await supabase.from("signal_outcomes").insert({
           user_id: sig.user_id,
           signal_id: sig.id,
@@ -1425,7 +1453,58 @@ serve(async (req) => {
           hour_utc: createdAt.getUTCHours(),
           resolved_at: now.toISOString(),
           created_at: sig.created_at,
+          mtf_alignment: mtfAlignment,
         });
+
+        // ─── RISK METRICS: track consecutive losses & drawdown ───
+        try {
+          const { data: recentOutcomes } = await supabase
+            .from("signal_outcomes")
+            .select("result, pnl_pips")
+            .eq("user_id", sig.user_id)
+            .eq("symbol", sig.symbol)
+            .order("resolved_at", { ascending: false })
+            .limit(20);
+
+          let consecutiveLosses = 0;
+          if (recentOutcomes) {
+            for (const o of recentOutcomes) {
+              if (o.result === "LOSS") consecutiveLosses++;
+              else break;
+            }
+          }
+
+          // Calculate equity from all outcomes for this user+symbol
+          const { data: allOutcomes } = await supabase
+            .from("signal_outcomes")
+            .select("pnl_pips")
+            .eq("user_id", sig.user_id)
+            .eq("symbol", sig.symbol);
+          
+          let equity = 0, peak = 0, maxDD = 0;
+          if (allOutcomes) {
+            for (const o of allOutcomes) {
+              equity += (o.pnl_pips || 0);
+              if (equity > peak) peak = equity;
+              const dd = peak - equity;
+              if (dd > maxDD) maxDD = dd;
+            }
+          }
+
+          const riskMode = consecutiveLosses >= 3 ? "conservative" : "normal";
+
+          await supabase.from("ron_risk_metrics").upsert({
+            user_id: sig.user_id,
+            symbol: sig.symbol,
+            consecutive_losses: consecutiveLosses,
+            max_drawdown_pips: +maxDD.toFixed(1),
+            current_drawdown_pips: +(peak - equity).toFixed(1),
+            equity_peak: +peak.toFixed(1),
+            equity_current: +equity.toFixed(1),
+            risk_mode: riskMode,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_id,symbol" });
+        } catch (e) { console.warn("Risk metrics update failed:", e); }
       }
 
       for (const sig of pendingSignals) {
