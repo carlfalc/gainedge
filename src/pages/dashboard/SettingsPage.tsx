@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [signalsPaused, setSignalsPaused] = useState(false);
   const [broker, setBroker] = useState("eightcap");
+  const [rrRatio, setRrRatio] = useState("2.0");
   const [instruments, setInstruments] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
