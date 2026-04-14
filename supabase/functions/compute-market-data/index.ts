@@ -1557,7 +1557,7 @@ serve(async (req) => {
           if (livePrice) {
             if (sig.direction === "BUY") pnl = livePrice - sig.entry_price;
             else pnl = sig.entry_price - livePrice;
-            pnlPips = pnl * (sig.entry_price >= 100 ? 1 : 10000);
+            pnlPips = priceToPips(pnl, sig.symbol);
           }
           await supabase.from("signals").update({
             result: "expired", pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1), resolved_at: new Date().toISOString(),
