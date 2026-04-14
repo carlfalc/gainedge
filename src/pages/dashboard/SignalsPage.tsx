@@ -208,6 +208,22 @@ export default function SignalsPage() {
 
   const formatPrice = (v: number) => v >= 100 ? v.toLocaleString() : v.toFixed(4);
 
+  // Format SL/TP with pip distance and dollar value
+  const formatSlTp = (price: number, entry: number, symbol: string, isTp: boolean) => {
+    const isIndex = ["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol);
+    const isGold = symbol === "XAUUSD";
+    const isJpy = symbol.includes("JPY");
+    const pipSize = isIndex ? 1 : isGold ? 0.01 : isJpy ? 0.01 : 0.0001;
+    const pips = Math.abs(price - entry) / pipSize;
+    const pipValuePerLot = isIndex ? 1 : isGold ? 1 : 10;
+    const dollarVal = pips * pipValuePerLot * lotSize;
+    const displayVal = convertToDisplayCurrency(dollarVal, currency, fxRates);
+    const currSymbol = currency === "JPY" ? "¥" : "$";
+    const sign = isTp ? "+" : "-";
+    const priceStr = price >= 100 ? price.toLocaleString() : price.toFixed(4);
+    return `${priceStr} (${sign}${pips.toFixed(0)} pips / ${currSymbol}${displayVal.toFixed(0)})`;
+  };
+
   const resultColor = (r: string, pnlPips?: number | null) => {
     if (r === "win") return C.green;
     if (r === "loss") return C.red;
@@ -393,7 +409,7 @@ export default function SignalsPage() {
 
       {/* Signal Table */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "140px 90px 60px 50px 90px 90px 90px 50px 80px 1fr", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "120px 80px 50px 40px 80px 160px 160px 50px 70px 1fr", borderBottom: `1px solid ${C.border}` }}>
           <div style={hdr} onClick={() => toggleSort("date")}>Date <SortIcon k="date" /></div>
           <div style={hdr} onClick={() => toggleSort("instrument")}>Instrument <SortIcon k="instrument" /></div>
           <div style={hdr}>Dir</div>
@@ -412,7 +428,7 @@ export default function SignalsPage() {
               <div
                 onClick={() => setExpanded(expanded === s.id ? null : s.id)}
                 style={{
-                  display: "grid", gridTemplateColumns: "140px 90px 60px 50px 90px 90px 90px 50px 80px 1fr",
+                  display: "grid", gridTemplateColumns: "120px 80px 50px 40px 80px 160px 160px 50px 70px 1fr",
                   padding: 0, cursor: "pointer", borderBottom: `1px solid ${C.border}`,
                   transition: "background 0.15s",
                 }}
@@ -424,8 +440,8 @@ export default function SignalsPage() {
                 <Cell><span style={{ color: s.direction === "BUY" ? C.green : C.red, fontWeight: 700 }}>{s.direction}</span></Cell>
                 <Cell mono>{s.confidence}</Cell>
                 <Cell mono>{formatPrice(s.entry_price)}</Cell>
-                <Cell mono>{formatPrice(s.take_profit)}</Cell>
-                <Cell mono>{formatPrice(s.stop_loss)}</Cell>
+                <Cell mono style={{ fontSize: 10, color: C.green }}>{formatSlTp(s.take_profit, s.entry_price, s.symbol, true)}</Cell>
+                <Cell mono style={{ fontSize: 10, color: C.red }}>{formatSlTp(s.stop_loss, s.entry_price, s.symbol, false)}</Cell>
                 <Cell mono>{s.risk_reward}</Cell>
                 <Cell>
                   <span style={{

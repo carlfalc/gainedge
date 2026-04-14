@@ -337,11 +337,19 @@ function findSwingHigh(highs: number[], endIdx: number, lookback = 20): number {
   return maxVal;
 }
 
+// ─── ATR multiplier per instrument category ───
+function getAtrSlMultiplier(symbol: string, category?: string): number {
+  if (symbol === "XAUUSD" || symbol === "GOLD") return 2.0;
+  if (category === "Commodities") return 2.0;
+  // Indices and Forex all use 1.5
+  return 1.5;
+}
+
 // ─── V1 Legacy Analysis (ATR-based SL/TP per instrument) ───
 // When useV1Pure is true, the ONLY entry condition is a confirmed EMA 4/17 crossover.
 // No ADX, ATR-range, or EMA-flatness filters are applied. Confidence is scored by
 // indicator alignment but does NOT gate signal firing.
-function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
+function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
   const closes = candles.map((c: any) => c.close);
   const highs = candles.map((c: any) => c.high);
   const lows = candles.map((c: any) => c.low);
@@ -496,9 +504,9 @@ function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
     const atrVal = calcATR(highs, lows, closes);
 
     if (atrVal && atrVal > 0) {
-      // SL = 2x ATR, TP = 4x ATR — simple and consistent
-      const slMult = 2.0;
-      const tpMult = 4.0;
+      // ATR multiplier varies by instrument type
+      const slMult = getAtrSlMultiplier(symbolName || "", symbolCategory);
+      const tpMult = slMult * rrRatio; // TP = SL_mult × user R:R ratio
 
       const atrSl = atrVal * slMult;
       const atrTp = atrVal * tpMult;
@@ -511,15 +519,24 @@ function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
         tp = +(entry - atrTp).toFixed(5);
       }
 
-      const risk = Math.abs(entry - sl);
-      const reward = Math.abs(tp - entry);
-      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
-
-      tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL=${atrSl.toFixed(5)} (2xATR), TP=${atrTp.toFixed(5)} (4xATR)`);
+      // ─── SANITY CHECK: SL distance > 2% of entry = something wrong ───
+      const slDistPct = Math.abs(entry - sl) / entry;
+      if (slDistPct > 0.02) {
+        // Skip — this would be an insane SL distance
+        entry = null; sl = null; tp = null; rr = null;
+        direction = "WAIT";
+        verdict = "WAIT";
+        tradeReasons.push(`ATR SL distance ${(slDistPct * 100).toFixed(1)}% exceeds 2% safety cap — signal blocked`);
+      } else {
+        const risk = Math.abs(entry - sl);
+        const reward = Math.abs(tp - entry);
+        rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : `${rrRatio.toFixed(1)}:1`;
+        tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL=${atrSl.toFixed(5)} (${slMult}xATR), TP=${atrTp.toFixed(5)} (${tpMult.toFixed(1)}xATR, R:R ${rrRatio}:1)`);
+      }
     } else {
-      // Fallback: percentage-based (0.5% SL, 1% TP)
+      // Fallback: percentage-based
       const pctSl = lastClose * 0.005;
-      const pctTp = lastClose * 0.01;
+      const pctTp = lastClose * 0.005 * rrRatio;
       if (direction === "BUY") {
         sl = +(entry - pctSl).toFixed(5);
         tp = +(entry + pctTp).toFixed(5);
@@ -529,7 +546,7 @@ function runAnalysisV1(candles: any[], useV1Pure = false): AnalysisResult {
       }
       const risk = Math.abs(entry - sl);
       const reward = Math.abs(tp - entry);
-      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
+      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : `${rrRatio.toFixed(1)}:1`;
     }
   }
 
@@ -805,8 +822,8 @@ function applyV2Rules(v1Result: AnalysisResult, candles: any[], rules: Knowledge
 
 // Wrapper: runs V1, then optionally layers V2
 // useV1Pure: when true, V1 fires on every EMA crossover with no additional filters
-function runAnalysis(candles: any[], v2Rules: KnowledgeRule[] = [], session = "", recentSignalCount = 0, useV2 = true, useV1Pure = false): AnalysisResult {
-  const v1Result = runAnalysisV1(candles, useV1Pure);
+function runAnalysis(candles: any[], v2Rules: KnowledgeRule[] = [], session = "", recentSignalCount = 0, useV2 = true, useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
+  const v1Result = runAnalysisV1(candles, useV1Pure, rrRatio, symbolCategory, symbolName);
   if (!useV2 || v2Rules.length === 0) return v1Result;
   return applyV2Rules(v1Result, candles, v2Rules, session, recentSignalCount);
 }
@@ -1170,7 +1187,7 @@ serve(async (req) => {
 
     for (const [userId, instList] of userInstruments) {
       const [profileRes, sigPrefRes] = await Promise.all([
-        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused").eq("id", userId).single(),
+        supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
         supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
       ]);
       const profile = profileRes.data;
@@ -1180,6 +1197,9 @@ serve(async (req) => {
         console.log(`Signals paused for user ${userId.slice(0, 8)} — skipping scan`);
         continue;
       }
+
+      // User's R:R ratio preference (default 2.0)
+      const rrRatio = (profile as any)?.rr_ratio ?? 2.0;
 
       // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
       const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
@@ -1211,7 +1231,8 @@ serve(async (req) => {
           let analysis: AnalysisResult;
 
           if (candles && candles.length > 20) {
-            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2, useV1Pure);
+            const instCategory = categoryMap.get(inst.symbol);
+            analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2, useV1Pure, rrRatio, instCategory, inst.symbol);
           } else {
             // Mock analysis — still apply RON logic
             const mockRsi = data.rsi;

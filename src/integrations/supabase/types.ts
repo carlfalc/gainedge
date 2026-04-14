@@ -728,6 +728,7 @@ export type Database = {
           news_preferences: Json | null
           nickname: string | null
           push_notifications: boolean
+          rr_ratio: number
           show_nickname: boolean | null
           signals_paused: boolean
           sms_alerts: boolean
@@ -755,6 +756,7 @@ export type Database = {
           news_preferences?: Json | null
           nickname?: string | null
           push_notifications?: boolean
+          rr_ratio?: number
           show_nickname?: boolean | null
           signals_paused?: boolean
           sms_alerts?: boolean
@@ -782,6 +784,7 @@ export type Database = {
           news_preferences?: Json | null
           nickname?: string | null
           push_notifications?: boolean
+          rr_ratio?: number
           show_nickname?: boolean | null
           signals_paused?: boolean
           sms_alerts?: boolean

@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [signalsPaused, setSignalsPaused] = useState(false);
   const [broker, setBroker] = useState("eightcap");
+  const [rrRatio, setRrRatio] = useState("2.0");
   const [instruments, setInstruments] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [clockSlots, setClockSlots] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
@@ -47,6 +48,7 @@ export default function SettingsPage() {
       setSmsAlerts(profile.sms_alerts);
       setBroker(profile.broker);
       setSignalsPaused(profile.signals_paused ?? false);
+      setRrRatio(String((profile as any).rr_ratio ?? 2.0));
       // Load clock preferences
       if ((profile as any).clock_timezones && Array.isArray((profile as any).clock_timezones) && (profile as any).clock_timezones.length > 0) {
         setClockSlots((profile as any).clock_timezones as ClockConfig[]);
@@ -87,7 +89,7 @@ export default function SettingsPage() {
       broker,
     } as any);
     // Save clock preferences separately (column not in typed Profile)
-    await supabase.from("profiles").update({ clock_timezones: clockSlots as any }).eq("id", userId);
+    await supabase.from("profiles").update({ clock_timezones: clockSlots as any, rr_ratio: parseFloat(rrRatio) } as any).eq("id", userId);
     // Also save RON/AI preferences
     await falconerPrefsRef.current?.save();
     toast.success("Settings saved");
@@ -149,6 +151,14 @@ export default function SettingsPage() {
           </Field>
           <Field label={t("settings.emaSlow")}>
             <input value={emaSlow} onChange={e => setEmaSlow(e.target.value)} style={inputStyle} type="number" />
+          </Field>
+          <Field label="Risk:Reward Ratio">
+            <select value={rrRatio} onChange={e => setRrRatio(e.target.value)} style={inputStyle}>
+              <option value="1.5">1.5:1 (Conservative)</option>
+              <option value="2.0">2.0:1 (Standard — recommended)</option>
+              <option value="2.5">2.5:1 (Moderate)</option>
+              <option value="3.0">3.0:1 (Aggressive)</option>
+            </select>
           </Field>
         </div>
       </Section>
