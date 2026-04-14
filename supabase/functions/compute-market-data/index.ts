@@ -1632,6 +1632,169 @@ serve(async (req) => {
       }
     }
 
+    // ─── LIQUIDITY ZONE DETECTION & SESSION BIAS ───
+    try {
+      for (const [symbol, candles] of symbolCandles) {
+        if (!Array.isArray(candles) || candles.length < 10) continue;
+        const timeframe = symbolTfSet.get(symbol) || "15m";
+
+        // Detect and upsert liquidity zones
+        const zones = detectLiquidityZones(candles, symbol, timeframe);
+        if (zones.length > 0) {
+          // Mark old zones as broken if price has passed through
+          const lastPrice = candles[candles.length - 1].close;
+          const { data: activeZones } = await supabase
+            .from("liquidity_zones")
+            .select("id, price_high, price_low, zone_type, tested_count")
+            .eq("symbol", symbol)
+            .eq("status", "active");
+
+          if (activeZones) {
+            for (const z of activeZones) {
+              const priceInZone = lastPrice >= z.price_low && lastPrice <= z.price_high;
+              const priceThrough = (z.zone_type.includes("bull") && lastPrice < z.price_low) ||
+                                   (z.zone_type.includes("bear") && lastPrice > z.price_high);
+              if (priceInZone) {
+                await supabase.from("liquidity_zones").update({
+                  tested_count: z.tested_count + 1, respected: true, updated_at: new Date().toISOString(),
+                }).eq("id", z.id);
+              } else if (priceThrough) {
+                await supabase.from("liquidity_zones").update({
+                  status: "broken", respected: false, updated_at: new Date().toISOString(),
+                }).eq("id", z.id);
+              }
+            }
+          }
+
+          // Insert new zones (deduplicate by checking existing active zones for same symbol+type+price range)
+          for (const zone of zones) {
+            const { data: existing } = await supabase
+              .from("liquidity_zones")
+              .select("id")
+              .eq("symbol", zone.symbol)
+              .eq("zone_type", zone.zone_type)
+              .eq("status", "active")
+              .gte("price_high", zone.price_high * 0.999)
+              .lte("price_low", zone.price_low * 1.001)
+              .limit(1);
+            if (!existing || existing.length === 0) {
+              await supabase.from("liquidity_zones").insert(zone);
+            }
+          }
+        }
+
+        // Session bias: determine 4H and Daily trend
+        const closes = candles.map((c: any) => c.close);
+        const trend = determineTrendDirection(closes);
+        // Update session_bias for all users with this symbol
+        await supabase.from("live_market_data").update({ session_bias: trend }).eq("symbol", symbol);
+
+        // Volume profile daily
+        const today = new Date().toISOString().split("T")[0];
+        const todayCandles = candles.filter((c: any) => c.time && c.time.startsWith(today));
+        if (todayCandles.length >= 3) {
+          const priceLevels: Record<number, number> = {};
+          const priceStep = (Math.max(...todayCandles.map((c: any) => c.high)) - Math.min(...todayCandles.map((c: any) => c.low))) / 20;
+          if (priceStep > 0) {
+            for (const c of todayCandles) {
+              const level = Math.round(((c.high + c.low) / 2) / priceStep) * priceStep;
+              priceLevels[level] = (priceLevels[level] || 0) + (c.tickVolume || 0);
+            }
+            const levels = Object.entries(priceLevels).map(([p, v]) => ({ price: +p, volume: v }));
+            levels.sort((a, b) => b.volume - a.volume);
+            const pocPrice = levels[0]?.price || 0;
+            const totalVol = levels.reduce((s, l) => s + l.volume, 0);
+            // Value area: 70% of volume centered on POC
+            let vaVol = 0;
+            const sortedByPrice = [...levels].sort((a, b) => a.price - b.price);
+            const pocIdx = sortedByPrice.findIndex(l => l.price === pocPrice);
+            let lo = pocIdx, hi = pocIdx;
+            vaVol = sortedByPrice[pocIdx]?.volume || 0;
+            while (vaVol < totalVol * 0.7 && (lo > 0 || hi < sortedByPrice.length - 1)) {
+              const loVol = lo > 0 ? sortedByPrice[lo - 1].volume : 0;
+              const hiVol = hi < sortedByPrice.length - 1 ? sortedByPrice[hi + 1].volume : 0;
+              if (loVol >= hiVol && lo > 0) { lo--; vaVol += loVol; }
+              else if (hi < sortedByPrice.length - 1) { hi++; vaVol += hiVol; }
+              else break;
+            }
+            await supabase.from("volume_profile_daily").upsert({
+              symbol, profile_date: today,
+              poc_price: pocPrice,
+              value_area_high: sortedByPrice[hi]?.price || pocPrice,
+              value_area_low: sortedByPrice[lo]?.price || pocPrice,
+              total_volume: totalVol,
+              price_levels: levels.slice(0, 30),
+            }, { onConflict: "symbol,profile_date" });
+          }
+        }
+      }
+    } catch (e) { console.warn("Liquidity/Volume/Bias processing error:", e); }
+
+    // ─── NEWS IMPACT TRACKING: baseline prices for recent news ───
+    try {
+      const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const { data: recentNews } = await supabase
+        .from("news_items")
+        .select("id, instruments_affected, published_at")
+        .gte("published_at", fifteenMinAgo)
+        .limit(20);
+
+      if (recentNews) {
+        for (const news of recentNews) {
+          const affected = news.instruments_affected || [];
+          for (const sym of affected) {
+            const liveData = symbolData.get(sym);
+            if (!liveData?.last_price) continue;
+            // Check if we already have an impact record
+            const { data: existing } = await supabase
+              .from("news_impact_results")
+              .select("id")
+              .eq("news_id", news.id)
+              .eq("symbol", sym)
+              .limit(1);
+            if (!existing || existing.length === 0) {
+              await supabase.from("news_impact_results").insert({
+                news_id: news.id,
+                symbol: sym,
+                price_at_news: liveData.last_price,
+              });
+            }
+          }
+        }
+      }
+
+      // Measure impact for older news (15m, 30m, 1h marks)
+      const oneHourAgo = new Date(Date.now() - 65 * 60 * 1000).toISOString();
+      const { data: pendingImpact } = await supabase
+        .from("news_impact_results")
+        .select("id, news_id, symbol, price_at_news, price_after_15m, price_after_30m, price_after_1h, created_at")
+        .gte("created_at", oneHourAgo)
+        .is("price_after_1h", null)
+        .limit(50);
+
+      if (pendingImpact) {
+        for (const imp of pendingImpact) {
+          const ageMin = (Date.now() - new Date(imp.created_at).getTime()) / 60000;
+          const liveData = symbolData.get(imp.symbol);
+          if (!liveData?.last_price) continue;
+          const updates: any = {};
+          if (ageMin >= 15 && !imp.price_after_15m) updates.price_after_15m = liveData.last_price;
+          if (ageMin >= 30 && !imp.price_after_30m) updates.price_after_30m = liveData.last_price;
+          if (ageMin >= 60) {
+            updates.price_after_1h = liveData.last_price;
+            const diff = liveData.last_price - imp.price_at_news;
+            const pipSize = imp.price_at_news >= 100 ? 1 : 0.0001;
+            updates.magnitude_pips = +(diff / pipSize).toFixed(1);
+            updates.direction = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+            updates.measured_at = new Date().toISOString();
+          }
+          if (Object.keys(updates).length > 0) {
+            await supabase.from("news_impact_results").update(updates).eq("id", imp.id);
+          }
+        }
+      }
+    } catch (e) { console.warn("News impact tracking error:", e); }
+
     return new Response(JSON.stringify({
       success: true, symbols: symbolTfSet.size, users: userInstruments.size,
       rows: upserts.length, auto_scans: autoScans, signals_created: signalsCreated,
