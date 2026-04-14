@@ -42,14 +42,9 @@ export default function TradeNotificationPopup() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
-  // Auto-dismiss after 15 seconds
-  useEffect(() => {
-    if (notifications.length === 0) return;
-    const timer = setTimeout(() => {
-      setNotifications((prev) => prev.slice(1));
-    }, 15000);
-    return () => clearTimeout(timer);
-  }, [notifications]);
+  const clearAll = useCallback(() => {
+    setNotifications([]);
+  }, []);
 
   useEffect(() => {
     let userId: string | null = null;
@@ -82,7 +77,7 @@ export default function TradeNotificationPopup() {
               stop_loss: row.stop_loss,
               timestamp: row.scanned_at,
             };
-            setNotifications((prev) => [notif, ...prev].slice(0, 5));
+            setNotifications((prev) => [notif, ...prev]);
             if (pushEnabledRef.current) {
               fireBrowserNotification(
                 `🔴 LIVE TRADE: ${row.symbol} ${row.direction}`,
@@ -113,7 +108,7 @@ export default function TradeNotificationPopup() {
             stop_loss: row.stop_loss,
             timestamp: row.created_at,
           };
-          setNotifications((prev) => [notif, ...prev].slice(0, 5));
+          setNotifications((prev) => [notif, ...prev]);
             if (pushEnabledRef.current) {
               fireBrowserNotification(
                 `⚡ NEW SIGNAL: ${row.symbol} ${row.direction}`,
@@ -145,8 +140,31 @@ export default function TradeNotificationPopup() {
       gap: 10,
       maxWidth: 380,
       width: "100%",
+      maxHeight: "calc(100vh - 100px)",
+      overflowY: "auto",
       pointerEvents: "none",
     }}>
+      {notifications.length >= 2 && (
+        <button
+          onClick={clearAll}
+          style={{
+            pointerEvents: "auto",
+            alignSelf: "flex-end",
+            background: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 6,
+            padding: "4px 12px",
+            fontSize: 11,
+            color: C.muted,
+            cursor: "pointer",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = C.text; e.currentTarget.style.background = "rgba(255,255,255,0.15)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = C.muted; e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+        >
+          Clear All
+        </button>
+      )}
       {notifications.map((n, i) => {
         const buy = isBuy(n.direction);
         const accent = buy ? C.jade : C.red;
