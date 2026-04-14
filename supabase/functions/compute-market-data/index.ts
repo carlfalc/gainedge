@@ -504,9 +504,9 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
     const atrVal = calcATR(highs, lows, closes);
 
     if (atrVal && atrVal > 0) {
-      // SL = 2x ATR, TP = 4x ATR — simple and consistent
-      const slMult = 2.0;
-      const tpMult = 4.0;
+      // ATR multiplier varies by instrument type
+      const slMult = getAtrSlMultiplier(symbolName || "", symbolCategory);
+      const tpMult = slMult * rrRatio; // TP = SL_mult × user R:R ratio
 
       const atrSl = atrVal * slMult;
       const atrTp = atrVal * tpMult;
@@ -519,15 +519,24 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
         tp = +(entry - atrTp).toFixed(5);
       }
 
-      const risk = Math.abs(entry - sl);
-      const reward = Math.abs(tp - entry);
-      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
-
-      tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL=${atrSl.toFixed(5)} (2xATR), TP=${atrTp.toFixed(5)} (4xATR)`);
+      // ─── SANITY CHECK: SL distance > 2% of entry = something wrong ───
+      const slDistPct = Math.abs(entry - sl) / entry;
+      if (slDistPct > 0.02) {
+        // Skip — this would be an insane SL distance
+        entry = null; sl = null; tp = null; rr = null;
+        direction = "WAIT";
+        verdict = "WAIT";
+        tradeReasons.push(`ATR SL distance ${(slDistPct * 100).toFixed(1)}% exceeds 2% safety cap — signal blocked`);
+      } else {
+        const risk = Math.abs(entry - sl);
+        const reward = Math.abs(tp - entry);
+        rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : `${rrRatio.toFixed(1)}:1`;
+        tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL=${atrSl.toFixed(5)} (${slMult}xATR), TP=${atrTp.toFixed(5)} (${tpMult.toFixed(1)}xATR, R:R ${rrRatio}:1)`);
+      }
     } else {
-      // Fallback: percentage-based (0.5% SL, 1% TP)
+      // Fallback: percentage-based
       const pctSl = lastClose * 0.005;
-      const pctTp = lastClose * 0.01;
+      const pctTp = lastClose * 0.005 * rrRatio;
       if (direction === "BUY") {
         sl = +(entry - pctSl).toFixed(5);
         tp = +(entry + pctTp).toFixed(5);
@@ -537,7 +546,7 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
       }
       const risk = Math.abs(entry - sl);
       const reward = Math.abs(tp - entry);
-      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : "2.0:1";
+      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : `${rrRatio.toFixed(1)}:1`;
     }
   }
 
