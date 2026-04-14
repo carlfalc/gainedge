@@ -1198,6 +1198,9 @@ serve(async (req) => {
         continue;
       }
 
+      // User's R:R ratio preference (default 2.0)
+      const rrRatio = (profile as any)?.rr_ratio ?? 2.0;
+
       // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
       const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
       const useV2 = signalEngine === "v2" || signalEngine === "v1v2";
