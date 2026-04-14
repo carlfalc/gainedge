@@ -861,44 +861,71 @@ serve(async (req) => {
             fetchPriceFromBroker(METAAPI_TOKEN, accountId, symbol),
           ]);
 
-          if (Array.isArray(candles) && candles.length > 20) {
+          if (candles && candles.length > 0) {
+            symbolCandles.set(symbol, candles);
+            usedLive = true;
+
+            // ─── PERSIST CANDLES TO candle_history (deduplicated) ───
+            const candleRows = candles.map((c: any) => ({
+              symbol,
+              timeframe,
+              timestamp: c.time,
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+              volume: c.tickVolume || 0,
+            }));
+            // Batch insert, ignore duplicates
+            const { error: chErr } = await supabase
+              .from("candle_history")
+              .upsert(candleRows, { onConflict: "symbol,timeframe,timestamp", ignoreDuplicates: true });
+            if (chErr) console.warn(`candle_history insert warn for ${symbol}:`, chErr.message);
+
             const closes = candles.map((c: any) => c.close);
+            const lastPrice = price?.bid ?? closes[closes.length - 1];
             const highs = candles.map((c: any) => c.high);
             const lows = candles.map((c: any) => c.low);
+
+            const rsi = calcRSI(closes);
+            const adx = calcADX(highs, lows, closes);
+            const macd = calcMACDStatus(closes);
+            const stochRsi = calcStochRSI(closes);
+
             const sparkline = closes.slice(-20);
-            const first = sparkline[0], last = sparkline[sparkline.length - 1];
+            const first = sparkline[0];
+            const last = sparkline[sparkline.length - 1];
             const direction = last > first * 1.001 ? "up" : last < first * 0.999 ? "down" : "flat";
-            const todayVolume = candles.slice(-96).reduce((s: number, c: any) => s + (c.tickVolume || 0), 0);
-            const lastCandleTime = candles[candles.length - 1]?.time || null;
+
+            const lastCandle = candles[candles.length - 1];
+            const tfMin = TF_MINUTES[timeframe] || 15;
+            const candleBucket = Math.floor(new Date(lastCandle.time).getTime() / (tfMin * 60000));
 
             symbolData.set(symbol, {
-              bid: price?.bid ?? last,
-              ask: price?.ask ?? last,
-              last_price: price ? (price.bid + price.ask) / 2 : last,
-              rsi: calcRSI(closes),
-              adx: calcADX(highs, lows, closes),
-              macd_status: calcMACDStatus(closes),
-              stoch_rsi: calcStochRSI(closes),
-              volume_today: todayVolume,
+              bid: price?.bid ?? +(lastPrice - lastPrice * 0.0001).toFixed(5),
+              ask: price?.ask ?? +(lastPrice + lastPrice * 0.0001).toFixed(5),
+              last_price: +lastPrice.toFixed(5),
+              rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+              volume_today: candles.reduce((s: number, c: any) => s + (c.tickVolume || 0), 0),
               market_open: true,
               sparkline_data: sparkline,
               price_direction: direction,
-              last_candle_time: lastCandleTime,
+              last_candle_time: new Date(candleBucket * tfMin * 60000).toISOString(),
             });
-            symbolCandles.set(symbol, candles);
-            usedLive = true;
-            continue;
           }
         } catch (e) {
-          console.warn(`MetaApi failed for ${symbol}: ${e.message}`);
+          console.warn(`Broker fetch failed for ${symbol}:`, e.message);
         }
       }
-      const mock = generateMockData(symbol);
-      const tfMin = TF_MINUTES[timeframe] || 15;
-      const now = Date.now();
-      const candleBucket = Math.floor(now / (tfMin * 60000));
-      mock.last_candle_time = new Date(candleBucket * tfMin * 60000).toISOString();
-      symbolData.set(symbol, mock);
+
+      // If no live data, use mock
+      if (!symbolData.has(symbol)) {
+        const mock = generateMockData(symbol);
+        const tfMin = TF_MINUTES[timeframe] || 15;
+        const candleBucket = Math.floor(Date.now() / (tfMin * 60000));
+        mock.last_candle_time = new Date(candleBucket * tfMin * 60000).toISOString();
+        symbolData.set(symbol, mock);
+      }
     }
 
     // ─── SPIKE / ANOMALY DETECTION ───
