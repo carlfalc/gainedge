@@ -152,6 +152,14 @@ export default function SettingsPage() {
           <Field label={t("settings.emaSlow")}>
             <input value={emaSlow} onChange={e => setEmaSlow(e.target.value)} style={inputStyle} type="number" />
           </Field>
+          <Field label="Risk:Reward Ratio">
+            <select value={rrRatio} onChange={e => setRrRatio(e.target.value)} style={inputStyle}>
+              <option value="1.5">1.5:1 (Conservative)</option>
+              <option value="2.0">2.0:1 (Standard — recommended)</option>
+              <option value="2.5">2.5:1 (Moderate)</option>
+              <option value="3.0">3.0:1 (Aggressive)</option>
+            </select>
+          </Field>
         </div>
       </Section>
 
