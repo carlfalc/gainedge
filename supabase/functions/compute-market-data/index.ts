@@ -1063,8 +1063,8 @@ serve(async (req) => {
             const mockMacd = data.macd_status;
             const mockStoch = data.stoch_rsi;
             
-            // Apply NO-TRADE filter for mock too
-            if (mockAdx !== null && mockAdx < 20) {
+            // Apply NO-TRADE filter for mock too (skip in V1 Pure mode)
+            if (!useV1Pure && mockAdx !== null && mockAdx < 20) {
               analysis = {
                 direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
                 stop_loss: null, risk_reward: null, ema_crossover_status: "NONE",
