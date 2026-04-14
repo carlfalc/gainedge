@@ -1393,6 +1393,8 @@ serve(async (req) => {
             symbol: sig.symbol, severity: result === "win" ? "positive" : "negative",
             data: { entry_price: sig.entry_price, take_profit: sig.take_profit, stop_loss: sig.stop_loss, pnl, pnl_pips: pnlPips },
           });
+          // ─── ML: record outcome ───
+          await insertSignalOutcome(sig, result.toUpperCase(), pnl, pnlPips);
           resolvedCount++;
         }
       }
