@@ -719,9 +719,9 @@ export default function ChartsPage() {
     });
     tradeLinesRef.current = [];
 
-    const addLine = (price: number, color: string, title: string) => {
+    const addLine = (price: number, color: string, title: string, lineStyle: number = 2, lineWidth: number = 1) => {
       const line = candleSeries.createPriceLine({
-        price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title,
+        price, color, lineWidth: lineWidth as any, lineStyle, axisLabelVisible: true, title,
       });
       tradeLinesRef.current.push(line);
     };
@@ -729,9 +729,9 @@ export default function ChartsPage() {
     if (scanResult) {
       const fresh = signalFreshness(scanResult.scanned_at);
       if (fresh !== "expired") {
-        if (scanResult.entry_price) addLine(scanResult.entry_price, "#FFFFFF", `Entry: ${scanResult.entry_price.toLocaleString()}`);
-        if (scanResult.stop_loss) addLine(scanResult.stop_loss, "#EF4444", `SL: ${scanResult.stop_loss.toLocaleString()}`);
-        if (scanResult.take_profit) addLine(scanResult.take_profit, "#22C55E", `TP: ${scanResult.take_profit.toLocaleString()}`);
+        if (scanResult.entry_price) addLine(scanResult.entry_price, "#FFFFFF", `Entry: ${scanResult.entry_price.toLocaleString()}`, 0, 1);
+        if (scanResult.stop_loss) addLine(scanResult.stop_loss, "#3B82F6", `SL: ${scanResult.stop_loss.toLocaleString()}`, 0, 1);
+        if (scanResult.take_profit) addLine(scanResult.take_profit, "#4ADE80", `TP: ${scanResult.take_profit.toLocaleString()}`, 0, 1);
       }
     }
 
@@ -741,18 +741,18 @@ export default function ChartsPage() {
     });
     symbolPositions.forEach((p, i) => {
       const label = i > 0 ? ` #${i + 1}` : "";
-      addLine(p.openPrice, "#3B82F6", `Pos${label}: ${p.openPrice.toLocaleString()}`);
-      if (p.stopLoss) addLine(p.stopLoss, "#EF4444", `Pos SL${label}`);
-      if (p.takeProfit) addLine(p.takeProfit, "#22C55E", `Pos TP${label}`);
+      addLine(p.openPrice, "#FFFFFF", `Entry${label}: ${p.openPrice.toLocaleString()}`, 0, 2);
+      if (p.stopLoss) addLine(p.stopLoss, "#3B82F6", `SL${label}: ${p.stopLoss.toLocaleString()}`, 0, 2);
+      if (p.takeProfit) addLine(p.takeProfit, "#4ADE80", `TP${label}: ${p.takeProfit.toLocaleString()}`, 0, 2);
     });
 
     // Read from refs to avoid triggering rebuild chain
     const lp = limitPricesRef.current;
     const om = orderModeRef.current;
     if (lp && (om === "limit" || om === "stop")) {
-      if (lp.entry) addLine(lp.entry, "#FFFFFF", om === "limit" ? "Limit Entry" : "Stop Entry");
-      if (lp.slEnabled && lp.sl) addLine(lp.sl, "#EF4444", "Pending SL");
-      if (lp.tpEnabled && lp.tp) addLine(lp.tp, "#22C55E", "Pending TP");
+      if (lp.entry) addLine(lp.entry, "#FFFFFF", om === "limit" ? "Limit Entry" : "Stop Entry", 2);
+      if (lp.slEnabled && lp.sl) addLine(lp.sl, "#3B82F6", "Pending SL", 2);
+      if (lp.tpEnabled && lp.tp) addLine(lp.tp, "#4ADE80", "Pending TP", 2);
     }
   }, [scanResult, tradePositions, selected]);
 
