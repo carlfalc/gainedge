@@ -115,36 +115,37 @@ serve(async (req) => {
           }
         }
 
-        // 2. Platform-wide pattern stats (for the current instrument)
+        // 2. COLLECTIVE platform intelligence (all users, from ron_platform_intelligence)
         if (context.instrument) {
-          const { data: platStats } = await supabase
-            .from("signal_outcomes")
-            .select("pattern_active, result, pnl_pips, session")
+          const { data: platIntel } = await supabase
+            .from("ron_platform_intelligence")
+            .select("pattern, session, direction, total_signals, wins, win_rate, avg_pips_won, sample_size_users, profit_factor")
             .eq("symbol", context.instrument)
-            .not("pattern_active", "is", null)
-            .gte("created_at", new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
-            .limit(500);
+            .gte("total_signals", 5);
 
-          if (platStats && platStats.length > 0) {
-            const patternMap: Record<string, { wins: number; total: number; avgPips: number[] }> = {};
-            for (const s of platStats) {
-              const p = s.pattern_active!;
-              if (!patternMap[p]) patternMap[p] = { wins: 0, total: 0, avgPips: [] };
-              patternMap[p].total++;
-              if (s.result === "WIN") {
-                patternMap[p].wins++;
-                patternMap[p].avgPips.push(Math.abs(s.pnl_pips || 0));
-              }
+          if (platIntel && platIntel.length > 0) {
+            systemPrompt += `\n## Platform Collective Intelligence for ${context.instrument} (ALL GAINEDGE traders)\n`;
+            systemPrompt += `IMPORTANT: These are REAL stats from all traders on the platform. Cite them confidently.\n`;
+            for (const p of platIntel) {
+              const badge = p.total_signals >= 100 ? "✅ High confidence" : p.total_signals >= 20 ? "🟢 Growing" : "🟡 Limited";
+              const label = [p.pattern, p.session, p.direction].filter(Boolean).join(" / ") || "Overall";
+              systemPrompt += `- ${label}: ${p.win_rate}% WR (${p.total_signals} trades from ${p.sample_size_users} traders) [${badge}], avg win: ${p.avg_pips_won} pips, PF: ${p.profit_factor}\n`;
             }
+          }
 
-            systemPrompt += `\n## Platform Pattern Intelligence for ${context.instrument}\n`;
-            for (const [pattern, stats] of Object.entries(patternMap)) {
-              if (stats.total >= 3) {
-                const wr = ((stats.wins / stats.total) * 100).toFixed(0);
-                const avgP = stats.avgPips.length > 0 ? (stats.avgPips.reduce((a, b) => a + b, 0) / stats.avgPips.length).toFixed(1) : "N/A";
-                systemPrompt += `- ${pattern}: ${wr}% win rate (${stats.total} trades), avg win: ${avgP} pips\n`;
-              }
-            }
+          // Also get overall platform stats for this symbol
+          const { data: symbolOverall } = await supabase
+            .from("ron_platform_intelligence")
+            .select("total_signals, wins, win_rate, sample_size_users")
+            .eq("symbol", context.instrument)
+            .eq("metric_type", "pattern_session")
+            .is("pattern", null)
+            .is("session", null)
+            .limit(1);
+
+          if (symbolOverall && symbolOverall.length > 0) {
+            const s = symbolOverall[0];
+            systemPrompt += `- ${context.instrument} overall platform: ${s.win_rate}% WR (${s.total_signals} trades from ${s.sample_size_users} traders)\n`;
           }
         }
 
