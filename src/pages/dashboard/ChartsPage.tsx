@@ -1340,7 +1340,7 @@ export default function ChartsPage() {
       });
   }, [patternHistory, userId, selected]);
 
-  // Query REAL pattern stats from signal_outcomes for current instrument
+  // Query REAL pattern stats from signal_outcomes for current instrument (personal)
   useEffect(() => {
     if (!selected) return;
     supabase.from("signal_outcomes")
@@ -1361,13 +1361,41 @@ export default function ChartsPage() {
         for (const [pattern, stats] of Object.entries(map)) {
           const winRate = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
           const avgPips = stats.wins > 0 ? Math.round(stats.pipSums / stats.wins) : 0;
-          // Calculate frequency: trades per week
           const dates = stats.dates.map(d => new Date(d).getTime()).sort();
           const weekSpan = dates.length >= 2 ? Math.max(1, (dates[dates.length - 1] - dates[0]) / (7 * 24 * 60 * 60 * 1000)) : 1;
           const perWeek = (stats.total / weekSpan).toFixed(1);
           result[pattern] = { total: stats.total, wins: stats.wins, winRate, avgPips, frequency: `~${perWeek}x/week` };
         }
         setRealPatternStats(result);
+      });
+  }, [selected]);
+
+  // Query COLLECTIVE platform stats from ron_platform_intelligence
+  useEffect(() => {
+    if (!selected) return;
+    supabase.from("ron_platform_intelligence")
+      .select("pattern, total_signals, wins, win_rate, avg_pips_won, sample_size_users")
+      .eq("symbol", selected)
+      .not("pattern", "is", null)
+      .gte("total_signals", 3)
+      .then(({ data }) => {
+        if (!data || data.length === 0) { setPlatformPatternStats({}); return; }
+        const result: typeof platformPatternStats = {};
+        for (const row of data) {
+          if (!row.pattern) continue;
+          // Aggregate across sessions for same pattern
+          if (!result[row.pattern]) {
+            result[row.pattern] = { total: 0, wins: 0, winRate: 0, avgPips: 0, users: 0 };
+          }
+          result[row.pattern].total += row.total_signals;
+          result[row.pattern].wins += row.wins;
+          result[row.pattern].users = Math.max(result[row.pattern].users, row.sample_size_users);
+        }
+        // Recalculate win rates
+        for (const p of Object.values(result)) {
+          p.winRate = p.total > 0 ? Math.round((p.wins / p.total) * 100) : 0;
+        }
+        setPlatformPatternStats(result);
       });
   }, [selected]);
 
