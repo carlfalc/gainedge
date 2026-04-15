@@ -271,6 +271,10 @@ function getBrokerVariants(symbol: string): string[] {
   return BROKER_SYMBOL_MAP[symbol] || [symbol];
 }
 
+// Cache symbols that failed recently to skip them on subsequent invocations within same isolate
+const failedSymbolCache = new Map<string, number>();
+const FAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+
 async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs = 12000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -283,6 +287,11 @@ async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs = 1200
 }
 
 async function fetchCandlesFromBroker(token: string, accountId: string, symbol: string, timeframe: string, limit: number) {
+  const cacheKey = `candle:${symbol}`;
+  const lastFail = failedSymbolCache.get(cacheKey);
+  if (lastFail && Date.now() - lastFail < FAIL_CACHE_TTL_MS) {
+    throw new Error(`Skipping ${symbol} — failed recently`);
+  }
   const tfMinutes = TF_MINUTES[timeframe] || 15;
   const start = new Date(Date.now() - limit * tfMinutes * 60000).toISOString();
   const variants = getBrokerVariants(symbol);
@@ -295,10 +304,14 @@ async function fetchCandlesFromBroker(token: string, accountId: string, symbol: 
       if (Array.isArray(data) && data.length > 0) return data;
     } catch { /* try next variant */ }
   }
+  failedSymbolCache.set(cacheKey, Date.now());
   throw new Error(`No valid broker symbol found for ${symbol} (tried: ${variants.join(", ")})`);
 }
 
 async function fetchPriceFromBroker(token: string, accountId: string, symbol: string) {
+  const cacheKey = `price:${symbol}`;
+  const lastFail = failedSymbolCache.get(cacheKey);
+  if (lastFail && Date.now() - lastFail < FAIL_CACHE_TTL_MS) return null;
   const variants = getBrokerVariants(symbol);
   for (const variant of variants) {
     try {
@@ -308,6 +321,7 @@ async function fetchPriceFromBroker(token: string, accountId: string, symbol: st
       return await res.json();
     } catch { /* try next variant */ }
   }
+  failedSymbolCache.set(cacheKey, Date.now());
   return null;
 }
 
