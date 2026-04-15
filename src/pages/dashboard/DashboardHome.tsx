@@ -9,6 +9,7 @@ import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMa
 import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
+import MoversShakersWidget from "@/components/dashboard/MoversShakersWidget";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
 import { useLiveMarketData, triggerMarketDataCompute, type LiveMarketRow } from "@/services/broker-data";
 
@@ -295,6 +296,7 @@ export default function DashboardHome() {
       <LiveTradeAlert />
       <BreakingNewsTicker />
       <NewsSentimentPanel />
+      <MoversShakersWidget />
 
       {/* CURRENT INSTRUMENT TRACKING header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
