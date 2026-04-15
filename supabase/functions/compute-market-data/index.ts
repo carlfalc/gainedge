@@ -218,6 +218,11 @@ function determineTrendDirection(closes: number[]): string {
 /* ─── MetaApi helpers ─── */
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
+const BROKER_CANDLE_TIMEOUT_MS = 4000;
+const BROKER_PRICE_TIMEOUT_MS = 2500;
+const BROKER_SESSION_TIMEOUT_MS = 5000;
+const TIME_LIMIT_CRITICAL_MS = 75_000;
+const TIME_LIMIT_HARD_MS = 105_000;
 
 const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
@@ -262,7 +267,7 @@ async function fetchCandlesFromBroker(token: string, accountId: string, symbol: 
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${limit}`;
-      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } }, BROKER_CANDLE_TIMEOUT_MS);
       if (!res.ok) { await res.text(); continue; }
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) return data;
@@ -276,7 +281,7 @@ async function fetchPriceFromBroker(token: string, accountId: string, symbol: st
   for (const variant of variants) {
     try {
       const url = `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
-      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } }, BROKER_PRICE_TIMEOUT_MS);
       if (!res.ok) { await res.text(); continue; }
       return await res.json();
     } catch { /* try next variant */ }
@@ -868,7 +873,7 @@ async function fetchHourlyCandles(token: string, accountId: string, symbol: stri
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
-      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } }, BROKER_SESSION_TIMEOUT_MS);
       if (!res.ok) { await res.text(); continue; }
       const candles = await res.json();
       if (Array.isArray(candles) && candles.length > 0) {
@@ -985,8 +990,8 @@ serve(async (req) => {
     // ─── TIME BUDGET: track elapsed time to skip non-critical work ───
     const startTime = Date.now();
     const elapsed = () => Date.now() - startTime;
-    const TIME_LIMIT_CRITICAL = 100_000; // 100s: skip non-critical after this
-    const TIME_LIMIT_HARD = 130_000;     // 130s: bail out entirely
+    const TIME_LIMIT_CRITICAL = TIME_LIMIT_CRITICAL_MS;
+    const TIME_LIMIT_HARD = TIME_LIMIT_HARD_MS;
 
     // Fetch data for all symbols IN PARALLEL with concurrency limit
     const symbolData = new Map<string, any>();
@@ -1234,7 +1239,12 @@ serve(async (req) => {
     let signalsCreated = 0;
     const session = detectSession();
 
+    userScanLoop:
     for (const [userId, instList] of userInstruments) {
+      if (elapsed() > TIME_LIMIT_HARD) {
+        console.warn(`Time budget hard limit reached before user scan loop (${elapsed()}ms)`);
+        break;
+      }
       const [profileRes, sigPrefRes] = await Promise.all([
         supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
         supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
@@ -1253,6 +1263,10 @@ serve(async (req) => {
       const useV1Pure = signalEngine === "v1"; // Pure V1: only EMA crossover, no extra filters
 
       for (const inst of instList) {
+        if (elapsed() > TIME_LIMIT_HARD) {
+          console.warn(`Time budget hard limit reached during instrument scan (${elapsed()}ms)`);
+          break userScanLoop;
+        }
         const data = symbolData.get(inst.symbol);
         if (!data || !data.last_candle_time) continue;
 
@@ -1474,11 +1488,13 @@ serve(async (req) => {
     const DEFAULT_EXPIRY_MS = 48 * 15 * 60 * 1000; // 12 hours default
 
     let resolvedCount = 0;
-    const { data: pendingSignals } = await supabase
-      .from("signals")
-      .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at, scan_result_id, confidence")
-      .eq("result", "pending")
-      .limit(30); // Limit per run to stay within time budget
+    const { data: pendingSignals } = elapsed() < TIME_LIMIT_HARD
+      ? await supabase
+          .from("signals")
+          .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at, scan_result_id, confidence")
+          .eq("result", "pending")
+          .limit(12)
+      : { data: [] as any[] };
 
     if (pendingSignals && pendingSignals.length > 0) {
       // Batch-fetch timeframes + indicator context from linked scan_results
