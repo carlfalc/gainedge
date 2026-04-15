@@ -91,6 +91,19 @@ function calcATR(highs: number[], lows: number[], closes: number[], period = 14)
   return sum / period;
 }
 
+function validateTradeLevels(direction: string, entry: number | null, tp: number | null, sl: number | null) {
+  if (!entry || !tp || !sl) return false;
+  if (direction === "BUY") return tp > entry && sl < entry;
+  if (direction === "SELL") return tp < entry && sl > entry;
+  return false;
+}
+
+function ensureMinimumStopDistance(entry: number, direction: string, atrDistance: number, symbol: string) {
+  const fallbackPipSize = symbol.includes("JPY") ? 0.01 : symbol === "XAUUSD" || symbol === "GOLD" ? 0.1 : ["US30", "NAS100", "SPX500", "UK100", "GER40", "HK50", "JPN225", "AUS200"].some((idx) => symbol.includes(idx)) ? 1 : 0.0001;
+  const minDistance = Math.max(atrDistance, fallbackPipSize);
+  return direction === "BUY" ? +(entry - minDistance).toFixed(5) : +(entry + minDistance).toFixed(5);
+}
+
 /* ─── Buy/Sell Volume & Cumulative Delta ─── */
 function calcBuySellVolume(open: number, high: number, low: number, close: number, volume: number) {
   const range = high - low;
@@ -1193,10 +1206,7 @@ serve(async (req) => {
       const profile = profileRes.data;
 
       // ─── KILL SWITCH: skip signal generation if paused ───
-      if (profile?.signals_paused) {
-        console.log(`Signals paused for user ${userId.slice(0, 8)} — skipping scan`);
-        continue;
-      }
+      const signalsPaused = Boolean(profile?.signals_paused);
 
       // User's R:R ratio preference (default 2.0)
       const rrRatio = (profile as any)?.rr_ratio ?? 2.0;
@@ -1341,8 +1351,20 @@ serve(async (req) => {
               }
             }
 
+            if (signalsPaused) {
+              console.log(`Signals paused for user ${userId.slice(0, 8)} — scan saved, signal creation skipped for ${inst.symbol}`);
+              continue;
+            }
+
+            const hasValidTradeLevels = validateTradeLevels(analysis.direction, analysis.entry_price, analysis.take_profit, analysis.stop_loss);
+            if (!hasValidTradeLevels && analysis.entry_price && analysis.stop_loss) {
+              analysis.stop_loss = ensureMinimumStopDistance(analysis.entry_price, analysis.direction, Math.abs(analysis.entry_price - analysis.stop_loss), inst.symbol);
+            }
+
+            const validAfterAdjustment = validateTradeLevels(analysis.direction, analysis.entry_price, analysis.take_profit, analysis.stop_loss);
+
             // ─── SIGNAL CREATION: strict ONE active signal per instrument ───
-            if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
+            if (analysis.confidence >= 5 && validAfterAdjustment && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
               // RULE 1: Only ONE pending signal per instrument at any time
               const { data: existingPending } = await supabase
                 .from("signals")
@@ -1369,15 +1391,34 @@ serve(async (req) => {
                 if (candlePeriodSignals && candlePeriodSignals.length > 0) {
                   console.log(`Candle-period dedup: ${inst.symbol} already has signal in current ${inst.timeframe} window`);
                 } else {
+                  const { data: latestScan } = await supabase
+                    .from("scan_results")
+                    .select("id")
+                    .eq("user_id", userId)
+                    .eq("symbol", inst.symbol)
+                    .order("scanned_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
                   await supabase.from("signals").insert({
                     user_id: userId, symbol: inst.symbol, direction: analysis.direction,
                     confidence: analysis.confidence, entry_price: analysis.entry_price,
                     take_profit: analysis.take_profit, stop_loss: analysis.stop_loss,
                     risk_reward: analysis.risk_reward || "2.0:1",
+                    scan_result_id: latestScan?.id ?? null,
                   });
                   signalsCreated++;
                   console.log(`Signal created: ${inst.symbol} ${analysis.direction} conf=${analysis.confidence}`);
                 }
+              }
+            } else if (analysis.direction === "BUY" || analysis.direction === "SELL") {
+              console.log(`Signal blocked for ${inst.symbol}: invalid trade levels or confidence below minimum`, {
+                confidence: analysis.confidence,
+                direction: analysis.direction,
+                entry: analysis.entry_price,
+                tp: analysis.take_profit,
+                sl: analysis.stop_loss,
+              });
               }
             }
           }
