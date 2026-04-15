@@ -1478,7 +1478,8 @@ serve(async (req) => {
     const { data: pendingSignals } = await supabase
       .from("signals")
       .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at, scan_result_id, confidence")
-      .eq("result", "pending");
+      .eq("result", "pending")
+      .limit(30); // Limit per run to stay within time budget
 
     if (pendingSignals && pendingSignals.length > 0) {
       // Batch-fetch timeframes + indicator context from linked scan_results
