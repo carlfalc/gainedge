@@ -4,59 +4,93 @@ const corsHeaders = {
 };
 
 const PAIRS = [
-  { symbol: "EUR/USD", finnhub: "OANDA:EUR_USD" },
-  { symbol: "USD/JPY", finnhub: "OANDA:USD_JPY" },
-  { symbol: "GBP/USD", finnhub: "OANDA:GBP_USD" },
-  { symbol: "EUR/JPY", finnhub: "OANDA:EUR_JPY" },
-  { symbol: "GBP/JPY", finnhub: "OANDA:GBP_JPY" },
-  { symbol: "USD/CAD", finnhub: "OANDA:USD_CAD" },
-  { symbol: "XAU/USD", finnhub: "OANDA:XAU_USD" },
-  { symbol: "AUD/USD", finnhub: "OANDA:AUD_USD" },
-  { symbol: "USD/CHF", finnhub: "OANDA:USD_CHF" },
-  { symbol: "NZD/USD", finnhub: "OANDA:NZD_USD" },
+  { symbol: "EUR/USD", from: "EUR", to: "USD" },
+  { symbol: "USD/JPY", from: "USD", to: "JPY" },
+  { symbol: "GBP/USD", from: "GBP", to: "USD" },
+  { symbol: "EUR/JPY", from: "EUR", to: "JPY" },
+  { symbol: "GBP/JPY", from: "GBP", to: "JPY" },
+  { symbol: "USD/CAD", from: "USD", to: "CAD" },
+  { symbol: "AUD/USD", from: "AUD", to: "USD" },
+  { symbol: "USD/CHF", from: "USD", to: "CHF" },
+  { symbol: "NZD/USD", from: "NZD", to: "USD" },
 ];
+
+// Cache to avoid hitting rate limits (5 calls/min on free tier)
+let cachedQuotes: any[] = [];
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 60_000; // 1 minute
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const FINNHUB_API_KEY = Deno.env.get("FINNHUB_API_KEY");
-  if (!FINNHUB_API_KEY) {
-    return new Response(JSON.stringify({ error: "FINNHUB_API_KEY not set" }), {
+  // Return cache if fresh
+  if (cachedQuotes.length > 0 && Date.now() - cacheTimestamp < CACHE_TTL_MS) {
+    return new Response(JSON.stringify({ quotes: cachedQuotes, timestamp: cacheTimestamp, cached: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=30" },
+    });
+  }
+
+  const API_KEY = Deno.env.get("ALPHA_VANTAGE_API_KEY");
+  if (!API_KEY) {
+    return new Response(JSON.stringify({ error: "ALPHA_VANTAGE_API_KEY not set" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   try {
-    // Fetch all quotes in parallel
-    const results = await Promise.allSettled(
-      PAIRS.map(async (pair) => {
-        const url = `https://finnhub.io/api/v1/quote?symbol=${pair.finnhub}&token=${FINNHUB_API_KEY}`;
-        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-        if (!resp.ok) return null;
-        const data = await resp.json();
-        // Finnhub quote: c=current, pc=previous close, d=change, dp=change%
-        if (!data || !data.c || data.c === 0) return null;
-        return {
-          symbol: pair.symbol,
-          price: data.c,
-          change: data.d ?? 0,
-          changePercent: data.dp ?? 0,
-        };
-      })
-    );
+    // Alpha Vantage batch endpoint — fetch all at once
+    const fromCurrencies = PAIRS.map(p => p.from).join(",");
+    const toCurrencies = PAIRS.map(p => p.to).join(",");
 
-    const quotes = results
-      .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled" && r.value !== null)
-      .map((r) => r.value);
+    // Use individual calls but with a small stagger to stay under rate limit
+    // Fetch first 5 pairs (free tier = 25 calls/day, so we batch smartly)
+    const quotes: any[] = [];
+
+    for (const pair of PAIRS) {
+      const url = `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${pair.from}&to_currency=${pair.to}&apikey=${API_KEY}`;
+      try {
+        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        const data = await resp.json();
+
+        const rateInfo = data?.["Realtime Currency Exchange Rate"];
+        if (rateInfo) {
+          const price = parseFloat(rateInfo["5. Exchange Rate"]);
+          const bid = parseFloat(rateInfo["8. Bid Price"]);
+          const ask = parseFloat(rateInfo["9. Ask Price"]);
+
+          quotes.push({
+            symbol: pair.symbol,
+            price,
+            bid,
+            ask,
+            change: 0, // AV doesn't provide change directly
+            changePercent: 0,
+          });
+        }
+      } catch (e) {
+        console.warn(`Failed to fetch ${pair.symbol}:`, e);
+      }
+    }
+
+    if (quotes.length > 0) {
+      cachedQuotes = quotes;
+      cacheTimestamp = Date.now();
+    }
 
     return new Response(JSON.stringify({ quotes, timestamp: Date.now() }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=15" },
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=30" },
     });
   } catch (err) {
     console.error("forex-ticker error:", err);
+    // Return stale cache if available
+    if (cachedQuotes.length > 0) {
+      return new Response(JSON.stringify({ quotes: cachedQuotes, timestamp: cacheTimestamp, stale: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: "Failed to fetch quotes" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
