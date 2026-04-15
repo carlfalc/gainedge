@@ -16,6 +16,9 @@ DukascopyApplet = {
     instrumentColor: "#94A3B8",
     priceColor: "#E2E8F0",
     delimeterColor: "#00CFA5",
+    positiveChangeColor: "#22C55E",
+    negativeChangeColor: "#EF4444",
+    deltaColor: "#E2E8F0",
     bgColor: "#0B1121",
     width: "100%",
     height: "30",
@@ -24,6 +27,17 @@ DukascopyApplet = {
 };
 <\/script>
 <script type="text/javascript" src="https://freeserv-static.dukascopy.com/2.0/core.js"><\/script>
+<style>
+  .duka-runboard .delta-value { color: inherit !important; }
+  .duka-runboard .positive .delta-value,
+  .duka-runboard .up .delta-value,
+  .duka-runboard [class*="positive"] span,
+  .duka-runboard [class*="up"] span { color: #22C55E !important; }
+  .duka-runboard .negative .delta-value,
+  .duka-runboard .down .delta-value,
+  .duka-runboard [class*="negative"] span,
+  .duka-runboard [class*="down"] span { color: #EF4444 !important; }
+</style>
 </body></html>`;
 
   return (
