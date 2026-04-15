@@ -345,6 +345,7 @@ export default function DashboardLayout() {
             )}
           </div>
         </header>
+        <LiveQuotesTicker />
 
         {/* PAGE CONTENT */}
         <main style={{ flex: 1, padding: 24, overflowY: "auto", background: lightBg ? "#F8FAFC" : "transparent", transition: "background 0.3s" }}>
