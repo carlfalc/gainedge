@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -11,7 +11,6 @@ interface Quote {
 
 export default function LiveQuotesTicker() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -29,7 +28,7 @@ export default function LiveQuotesTicker() {
     };
 
     fetchQuotes();
-    const interval = setInterval(fetchQuotes, 30_000); // refresh every 30s
+    const interval = setInterval(fetchQuotes, 60_000);
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 
@@ -48,8 +47,8 @@ export default function LiveQuotesTicker() {
     );
   }
 
-  // Duplicate for seamless loop
   const tickerItems = [...quotes, ...quotes];
+  const duration = Math.max(quotes.length * 4, 30);
 
   return (
     <div style={{
@@ -58,59 +57,58 @@ export default function LiveQuotesTicker() {
       borderBottom: `1px solid ${C.border}`,
       position: "relative",
     }}>
-      <div
-        ref={scrollRef}
-        style={{
-          display: "flex", alignItems: "center", height: "100%",
-          animation: `ticker-scroll ${quotes.length * 3}s linear infinite`,
-          whiteSpace: "nowrap",
-        }}
-      >
+      <div style={{
+        display: "flex", alignItems: "center", height: "100%",
+        animation: `ticker-scroll ${duration}s linear infinite`,
+        whiteSpace: "nowrap",
+        willChange: "transform",
+      }}>
         {tickerItems.map((q, i) => {
-          const isUp = q.change >= 0;
-          const color = isUp ? "#22C55E" : "#EF4444";
-          const arrow = isUp ? "▲" : "▼";
+          const isUp = q.change > 0;
+          const isDown = q.change < 0;
+          const color = isUp ? "#22C55E" : isDown ? "#EF4444" : C.sec;
+          const arrow = isUp ? "▲" : isDown ? "▼" : "–";
           const decimals = q.symbol.includes("JPY") ? 3 : q.symbol.includes("XAU") ? 2 : 5;
 
           return (
             <div key={`${q.symbol}-${i}`} style={{
               display: "inline-flex", alignItems: "center", gap: 6,
-              padding: "0 20px",
+              padding: "0 16px",
               flexShrink: 0,
             }}>
-              {/* Delimiter dot */}
               {i > 0 && (
-                <span style={{ color: C.jade, fontSize: 8, marginRight: 8 }}>●</span>
+                <span style={{ color: C.jade, fontSize: 6, marginRight: 10 }}>●</span>
               )}
-              {/* Symbol */}
               <span style={{
-                color: C.sec, fontSize: 12, fontWeight: 600,
+                color: "#94A3B8", fontSize: 12, fontWeight: 600,
                 fontFamily: "'DM Sans', sans-serif",
               }}>
                 {q.symbol}
               </span>
-              {/* Price */}
               <span style={{
-                color: C.text, fontSize: 12, fontWeight: 700,
+                color: "#E2E8F0", fontSize: 12, fontWeight: 700,
                 fontFamily: "'JetBrains Mono', monospace",
               }}>
                 {q.price.toFixed(decimals)}
               </span>
-              {/* Arrow */}
               <span style={{ color, fontSize: 9 }}>{arrow}</span>
-              {/* Change */}
               <span style={{
                 color, fontSize: 11, fontWeight: 600,
                 fontFamily: "'JetBrains Mono', monospace",
               }}>
-                {isUp ? "+" : ""}{q.change.toFixed(decimals)}
+                {q.change !== 0
+                  ? `${isUp ? "+" : ""}${q.change.toFixed(decimals)}`
+                  : "0.00"
+                }
               </span>
-              {/* Change % */}
               <span style={{
                 color, fontSize: 11, fontWeight: 600,
                 fontFamily: "'JetBrains Mono', monospace",
               }}>
-                {isUp ? "+" : ""}{q.changePercent.toFixed(2)}%
+                {q.changePercent !== 0
+                  ? `${isUp ? "+" : ""}${q.changePercent.toFixed(2)}%`
+                  : "0.00%"
+                }
               </span>
             </div>
           );
