@@ -1037,9 +1037,24 @@ serve(async (req) => {
     const symbolEntries = [...symbolTfSet.entries()];
 
     if (METAAPI_TOKEN && accountId) {
-      // Process in batches of 5 to avoid overwhelming the API
+      // Quick connectivity check — if MetaApi is unreachable, skip all broker fetches
+      let metaapiReachable = true;
+      try {
+        const healthRes = await fetchWithTimeout(
+          `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/XAUUSD/current-price`,
+          { headers: { "auth-token": METAAPI_TOKEN } },
+          3000
+        );
+        if (!healthRes.ok) { await healthRes.text(); metaapiReachable = false; }
+        else await healthRes.json();
+      } catch { metaapiReachable = false; }
+
+      if (!metaapiReachable) {
+        console.warn("MetaApi unreachable — skipping all broker fetches, using mock data");
+      }
+
       const BATCH_SIZE = 8;
-      for (let b = 0; b < symbolEntries.length; b += BATCH_SIZE) {
+      if (metaapiReachable) for (let b = 0; b < symbolEntries.length; b += BATCH_SIZE) {
         if (elapsed() > TIME_LIMIT_CRITICAL) {
           console.warn(`Time budget exceeded at symbol fetch (${elapsed()}ms) — using mock for remaining`);
           break;
