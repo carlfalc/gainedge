@@ -228,6 +228,44 @@ const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
 };
 
+/* ─── SIGNAL WHITELIST: only generate signals for verified instruments ─── */
+const SIGNAL_WHITELIST = new Set(["XAUUSD", "US30", "NAS100", "NZDUSD", "AUDUSD"]);
+
+/* ─── PRICE SANITY RANGES: reject signals with obviously wrong prices ─── */
+const PRICE_RANGES: Record<string, { min: number; max: number }> = {
+  XAUUSD: { min: 1000, max: 10000 },
+  US30:   { min: 20000, max: 60000 },
+  NAS100: { min: 10000, max: 40000 },
+  NZDUSD: { min: 0.3, max: 1.0 },
+  AUDUSD: { min: 0.3, max: 1.0 },
+  XAGUSD: { min: 10, max: 100 },
+  EURUSD: { min: 0.80, max: 1.30 },
+  GBPUSD: { min: 1.00, max: 1.60 },
+  USDJPY: { min: 100, max: 200 },
+  USDCAD: { min: 1.10, max: 1.50 },
+  USDCHF: { min: 0.70, max: 1.10 },
+  GER40:  { min: 10000, max: 30000 },
+  JPN225: { min: 20000, max: 50000 },
+  SPX500: { min: 3000, max: 8000 },
+  UK100:  { min: 5000, max: 12000 },
+  HK50:   { min: 15000, max: 35000 },
+  AUS200: { min: 5000, max: 10000 },
+  XNGUSD: { min: 1, max: 15 },
+  NZDCAD: { min: 0.75, max: 0.95 },
+  GBPCAD: { min: 1.50, max: 1.90 },
+  EURGBP: { min: 0.70, max: 1.00 },
+};
+
+/** Returns true if the price is sane for the given symbol */
+function isPriceSane(symbol: string, price: number): boolean {
+  const range = PRICE_RANGES[symbol];
+  if (!range) return true; // unknown symbol — allow
+  return price >= range.min && price <= range.max;
+}
+
+/** Max TP/SL distance in pips — if exceeded, data is bad */
+const MAX_TPSL_PIPS = 5000;
+
 const BROKER_SYMBOL_MAP: Record<string, string[]> = {
   NAS100: ["NDX100", "NAS100", "USTEC", "NAS100.i"],
   US30: ["US30", "DJ30", "US30.i"],
@@ -1404,6 +1442,28 @@ serve(async (req) => {
             if (signalsPaused) {
               console.log(`Signals paused for user ${userId.slice(0, 8)} — scan saved, signal creation skipped for ${inst.symbol}`);
               continue;
+            }
+
+            // ─── INSTRUMENT WHITELIST: only generate signals for verified instruments ───
+            if (!SIGNAL_WHITELIST.has(inst.symbol)) {
+              console.log(`Signal blocked: ${inst.symbol} not in whitelist — skipping signal creation`);
+              continue;
+            }
+
+            // ─── PRICE SANITY CHECK: reject signals with obviously wrong prices ───
+            if (analysis.entry_price && !isPriceSane(inst.symbol, analysis.entry_price)) {
+              console.warn(`Price sanity FAILED for ${inst.symbol}: entry ${analysis.entry_price} outside expected range`);
+              continue;
+            }
+
+            // ─── MAX TP/SL DISTANCE CHECK: reject insane pip distances ───
+            if (analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
+              const tpPips = Math.abs(priceToPips(analysis.take_profit - analysis.entry_price, inst.symbol));
+              const slPips = Math.abs(priceToPips(analysis.entry_price - analysis.stop_loss, inst.symbol));
+              if (tpPips > MAX_TPSL_PIPS || slPips > MAX_TPSL_PIPS) {
+                console.warn(`TP/SL sanity FAILED for ${inst.symbol}: TP=${tpPips.toFixed(0)} pips, SL=${slPips.toFixed(0)} pips — exceeds ${MAX_TPSL_PIPS} max`);
+                continue;
+              }
             }
 
             const hasValidTradeLevels = validateTradeLevels(analysis.direction, analysis.entry_price, analysis.take_profit, analysis.stop_loss);
