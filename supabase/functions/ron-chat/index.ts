@@ -91,6 +91,98 @@ serve(async (req) => {
 
       // ─── INTELLIGENCE DATA: Real stats from ML pipeline ───
       try {
+        // 0. LIVE MARKET DATA — real-time prices and indicators
+        if (context.userId) {
+          const { data: liveData } = await supabase
+            .from("live_market_data")
+            .select("symbol, bid, ask, last_price, rsi, adx, macd_status, stoch_rsi, volume_today, market_open, price_direction, session_bias, updated_at")
+            .eq("user_id", context.userId);
+
+          if (liveData && liveData.length > 0) {
+            systemPrompt += `\n## Live Market Data (Real-Time)\n`;
+            systemPrompt += `Use these prices when discussing instruments. These are LIVE from the broker.\n`;
+            for (const m of liveData) {
+              const age = Math.round((Date.now() - new Date(m.updated_at).getTime()) / 60000);
+              systemPrompt += `- **${m.symbol}**: Bid ${m.bid} / Ask ${m.ask} | RSI ${m.rsi?.toFixed(1) ?? "n/a"} | ADX ${m.adx?.toFixed(1) ?? "n/a"} | MACD ${m.macd_status ?? "n/a"} | StochRSI ${m.stoch_rsi?.toFixed(1) ?? "n/a"} | Direction: ${m.price_direction} | Session bias: ${m.session_bias ?? "n/a"} | Vol: ${m.volume_today} | ${m.market_open ? "OPEN" : "CLOSED"} | Updated ${age}m ago\n`;
+            }
+          }
+        }
+
+        // 0b. RECENT SIGNALS — active and recently resolved
+        if (context.userId) {
+          const { data: recentSignals } = await supabase
+            .from("signals")
+            .select("symbol, direction, confidence, entry_price, stop_loss, take_profit, result, pnl_pips, pnl, risk_reward, created_at, notes")
+            .eq("user_id", context.userId)
+            .order("created_at", { ascending: false })
+            .limit(20);
+
+          if (recentSignals && recentSignals.length > 0) {
+            const pending = recentSignals.filter(s => s.result === "pending");
+            const resolved = recentSignals.filter(s => s.result !== "pending");
+
+            if (pending.length > 0) {
+              systemPrompt += `\n## Active Pending Signals\n`;
+              for (const s of pending) {
+                systemPrompt += `- ${s.symbol} ${s.direction} @ ${s.entry_price} | SL: ${s.stop_loss} | TP: ${s.take_profit} | R:R ${s.risk_reward} | Conf: ${s.confidence}\n`;
+              }
+            }
+            if (resolved.length > 0) {
+              systemPrompt += `\n## Recent Resolved Signals (Last ${resolved.length})\n`;
+              for (const s of resolved.slice(0, 10)) {
+                systemPrompt += `- ${s.symbol} ${s.direction}: ${s.result.toUpperCase()} (${s.pnl_pips ? s.pnl_pips.toFixed(1) : 0} pips, $${s.pnl ? s.pnl.toFixed(2) : "0.00"})\n`;
+              }
+            }
+          }
+        }
+
+        // 0c. SESSION-SPECIFIC WIN RATES per instrument
+        if (context.userId && context.instrument) {
+          const { data: sessionStats } = await supabase
+            .from("signal_outcomes")
+            .select("session, result, pnl_pips, hour_utc, day_of_week")
+            .eq("user_id", context.userId)
+            .eq("symbol", context.instrument)
+            .gte("created_at", new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString())
+            .limit(200);
+
+          if (sessionStats && sessionStats.length >= 3) {
+            const bySession: Record<string, { w: number; t: number; pips: number }> = {};
+            const byHour: Record<number, { w: number; t: number }> = {};
+            const byDay: Record<number, { w: number; t: number }> = {};
+            for (const s of sessionStats) {
+              const sess = s.session || "unknown";
+              if (!bySession[sess]) bySession[sess] = { w: 0, t: 0, pips: 0 };
+              bySession[sess].t++;
+              if (s.result === "WIN") { bySession[sess].w++; bySession[sess].pips += Math.abs(s.pnl_pips || 0); }
+              if (s.hour_utc != null) {
+                if (!byHour[s.hour_utc]) byHour[s.hour_utc] = { w: 0, t: 0 };
+                byHour[s.hour_utc].t++;
+                if (s.result === "WIN") byHour[s.hour_utc].w++;
+              }
+              if (s.day_of_week != null) {
+                if (!byDay[s.day_of_week]) byDay[s.day_of_week] = { w: 0, t: 0 };
+                byDay[s.day_of_week].t++;
+                if (s.result === "WIN") byDay[s.day_of_week].w++;
+              }
+            }
+            systemPrompt += `\n## ${context.instrument} Session Performance (Your Data)\n`;
+            for (const [sess, d] of Object.entries(bySession)) {
+              if (d.t >= 2) systemPrompt += `- ${sess}: ${Math.round((d.w / d.t) * 100)}% WR (${d.t} trades, ${d.pips.toFixed(0)} pips won)\n`;
+            }
+            // Best hour
+            const bestHourEntry = Object.entries(byHour).filter(([_, d]) => d.t >= 2).sort((a, b) => (b[1].w / b[1].t) - (a[1].w / a[1].t))[0];
+            if (bestHourEntry) {
+              systemPrompt += `- Best hour: ${bestHourEntry[0]}:00 UTC (${Math.round((bestHourEntry[1].w / bestHourEntry[1].t) * 100)}% WR, ${bestHourEntry[1].t} trades)\n`;
+            }
+            const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+            const bestDayEntry = Object.entries(byDay).filter(([_, d]) => d.t >= 2).sort((a, b) => (b[1].w / b[1].t) - (a[1].w / a[1].t))[0];
+            if (bestDayEntry) {
+              systemPrompt += `- Best day: ${days[Number(bestDayEntry[0])] || bestDayEntry[0]} (${Math.round((bestDayEntry[1].w / bestDayEntry[1].t) * 100)}% WR)\n`;
+            }
+          }
+        }
+
         // 1. User's personal signal outcomes (last 30 days)
         if (context.userId) {
           const { data: userStats } = await supabase
@@ -121,6 +213,13 @@ serve(async (req) => {
             if (bestSymbol && bestSymbol[1].total >= 3) {
               systemPrompt += `- Best instrument: ${bestSymbol[0]} (${((bestSymbol[1].wins / bestSymbol[1].total) * 100).toFixed(0)}% win rate, ${bestSymbol[1].total} trades)\n`;
             }
+
+            // Per-instrument direction stats
+            const dirStats: Record<string, { buyW: number; buyT: number; sellW: number; sellT: number }> = {};
+            for (const s of userStats) {
+              if (!dirStats[s.symbol]) dirStats[s.symbol] = { buyW: 0, buyT: 0, sellW: 0, sellT: 0 };
+            }
+            // We don't have direction in signal_outcomes select above, but we have it from recent signals
           }
         }
 
@@ -142,7 +241,6 @@ serve(async (req) => {
             }
           }
 
-          // Also get overall platform stats for this symbol
           const { data: symbolOverall } = await supabase
             .from("ron_platform_intelligence")
             .select("total_signals, wins, win_rate, sample_size_users")
@@ -158,7 +256,7 @@ serve(async (req) => {
           }
         }
 
-        // 3. Calibration data — confidence performance
+        // 3. Calibration data
         const { data: calibration } = await supabase
           .from("ron_calibration")
           .select("confidence_level, win_rate, total_signals, recommended_action")
@@ -171,7 +269,7 @@ serve(async (req) => {
           }
         }
 
-        // 4. Pattern weights — learned adjustments
+        // 4. Pattern weights
         if (context.instrument) {
           const { data: weights } = await supabase
             .from("pattern_weights")
@@ -203,7 +301,7 @@ serve(async (req) => {
           }
         }
 
-        // 6. Liquidity zones for current instrument
+        // 6. Liquidity zones
         if (context.instrument) {
           const { data: activeZones } = await supabase
             .from("liquidity_zones")
@@ -221,7 +319,7 @@ serve(async (req) => {
           }
         }
 
-        // 7. Risk metrics for user
+        // 7. Risk metrics
         if (context.userId) {
           const { data: riskMetrics } = await supabase
             .from("ron_risk_metrics")
@@ -242,7 +340,7 @@ serve(async (req) => {
           }
         }
 
-        // 8. Volume profile for current instrument
+        // 8. Volume profile
         if (context.instrument) {
           const today = new Date().toISOString().split("T")[0];
           const { data: volProfile } = await supabase
@@ -258,7 +356,7 @@ serve(async (req) => {
           }
         }
 
-        // 9. News impact intelligence
+        // 9. News impact
         if (context.instrument) {
           const { data: newsImpact } = await supabase
             .from("news_impact_results")
@@ -294,6 +392,60 @@ serve(async (req) => {
           systemPrompt += `\n## MTF Alignment Performance\n`;
           for (const [alignment, s] of Object.entries(mtfMap)) {
             if (s.t >= 3) systemPrompt += `- ${alignment.replace(/_/g, " ")}: ${Math.round((s.w / s.t) * 100)}% WR (${s.t})\n`;
+          }
+        }
+
+        // 11. RON ML PREDICTION — call ML server for current instrument setup
+        if (context.instrument) {
+          try {
+            const RON_ML_URL = Deno.env.get("RON_ML_URL");
+            const RON_ML_API_KEY = Deno.env.get("RON_ML_API_KEY");
+            if (RON_ML_URL && RON_ML_API_KEY) {
+              // Get latest scan for this instrument
+              const { data: latestScan } = await supabase
+                .from("scan_results")
+                .select("direction, adx, rsi, stoch_rsi, macd_status, confidence, session")
+                .eq("symbol", context.instrument)
+                .order("scanned_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (latestScan) {
+                const now = new Date();
+                const mlResp = await fetch(`${RON_ML_URL}/analyse-setup`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": RON_ML_API_KEY,
+                  },
+                  body: JSON.stringify({
+                    symbol: context.instrument,
+                    direction: latestScan.direction,
+                    adx: latestScan.adx,
+                    rsi: latestScan.rsi,
+                    stoch_rsi: latestScan.stoch_rsi,
+                    macd_status: latestScan.macd_status,
+                    confidence: latestScan.confidence,
+                    session: latestScan.session,
+                    hour_utc: now.getUTCHours(),
+                    day_of_week: now.getUTCDay(),
+                    pattern_active: context.pattern || null,
+                  }),
+                  signal: AbortSignal.timeout(5000),
+                });
+
+                if (mlResp.ok) {
+                  const mlData = await mlResp.json();
+                  systemPrompt += `\n## RON ML Prediction for ${context.instrument}\n`;
+                  systemPrompt += `- ML Probability: ${((mlData.probability ?? mlData.score ?? 0) * 100).toFixed(0)}%\n`;
+                  systemPrompt += `- Direction bias: ${latestScan.direction}\n`;
+                  if (mlData.recommendation) systemPrompt += `- ML recommendation: ${mlData.recommendation}\n`;
+                  systemPrompt += `When discussing this instrument, cite: "My ML model rates this setup at ${((mlData.probability ?? mlData.score ?? 0) * 100).toFixed(0)}% probability"\n`;
+                }
+              }
+            }
+          } catch (mlErr) {
+            console.warn("ML prediction fetch warning (non-fatal):", mlErr);
           }
         }
       } catch (intErr) {
