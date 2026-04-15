@@ -218,11 +218,11 @@ function determineTrendDirection(closes: number[]): string {
 /* ─── MetaApi helpers ─── */
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
-const BROKER_CANDLE_TIMEOUT_MS = 4000;
-const BROKER_PRICE_TIMEOUT_MS = 2500;
-const BROKER_SESSION_TIMEOUT_MS = 5000;
-const TIME_LIMIT_CRITICAL_MS = 75_000;
-const TIME_LIMIT_HARD_MS = 105_000;
+const BROKER_CANDLE_TIMEOUT_MS = 3000;
+const BROKER_PRICE_TIMEOUT_MS = 2000;
+const BROKER_SESSION_TIMEOUT_MS = 3000;
+const TIME_LIMIT_CRITICAL_MS = 50_000;
+const TIME_LIMIT_HARD_MS = 80_000;
 
 const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
@@ -271,6 +271,10 @@ function getBrokerVariants(symbol: string): string[] {
   return BROKER_SYMBOL_MAP[symbol] || [symbol];
 }
 
+// Cache symbols that failed recently to skip them on subsequent invocations within same isolate
+const failedSymbolCache = new Map<string, number>();
+const FAIL_CACHE_TTL_MS = 5 * 60 * 1000;
+
 async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs = 12000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -283,6 +287,11 @@ async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs = 1200
 }
 
 async function fetchCandlesFromBroker(token: string, accountId: string, symbol: string, timeframe: string, limit: number) {
+  const cacheKey = `candle:${symbol}`;
+  const lastFail = failedSymbolCache.get(cacheKey);
+  if (lastFail && Date.now() - lastFail < FAIL_CACHE_TTL_MS) {
+    throw new Error(`Skipping ${symbol} — failed recently`);
+  }
   const tfMinutes = TF_MINUTES[timeframe] || 15;
   const start = new Date(Date.now() - limit * tfMinutes * 60000).toISOString();
   const variants = getBrokerVariants(symbol);
@@ -295,10 +304,14 @@ async function fetchCandlesFromBroker(token: string, accountId: string, symbol: 
       if (Array.isArray(data) && data.length > 0) return data;
     } catch { /* try next variant */ }
   }
+  failedSymbolCache.set(cacheKey, Date.now());
   throw new Error(`No valid broker symbol found for ${symbol} (tried: ${variants.join(", ")})`);
 }
 
 async function fetchPriceFromBroker(token: string, accountId: string, symbol: string) {
+  const cacheKey = `price:${symbol}`;
+  const lastFail = failedSymbolCache.get(cacheKey);
+  if (lastFail && Date.now() - lastFail < FAIL_CACHE_TTL_MS) return null;
   const variants = getBrokerVariants(symbol);
   for (const variant of variants) {
     try {
@@ -308,6 +321,7 @@ async function fetchPriceFromBroker(token: string, accountId: string, symbol: st
       return await res.json();
     } catch { /* try next variant */ }
   }
+  failedSymbolCache.set(cacheKey, Date.now());
   return null;
 }
 
@@ -1023,9 +1037,24 @@ serve(async (req) => {
     const symbolEntries = [...symbolTfSet.entries()];
 
     if (METAAPI_TOKEN && accountId) {
-      // Process in batches of 5 to avoid overwhelming the API
-      const BATCH_SIZE = 5;
-      for (let b = 0; b < symbolEntries.length; b += BATCH_SIZE) {
+      // Quick connectivity check — if MetaApi is unreachable, skip all broker fetches
+      let metaapiReachable = true;
+      try {
+        const healthRes = await fetchWithTimeout(
+          `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/XAUUSD/current-price`,
+          { headers: { "auth-token": METAAPI_TOKEN } },
+          3000
+        );
+        if (!healthRes.ok) { await healthRes.text(); metaapiReachable = false; }
+        else await healthRes.json();
+      } catch { metaapiReachable = false; }
+
+      if (!metaapiReachable) {
+        console.warn("MetaApi unreachable — skipping all broker fetches, using mock data");
+      }
+
+      const BATCH_SIZE = 8;
+      if (metaapiReachable) for (let b = 0; b < symbolEntries.length; b += BATCH_SIZE) {
         if (elapsed() > TIME_LIMIT_CRITICAL) {
           console.warn(`Time budget exceeded at symbol fetch (${elapsed()}ms) — using mock for remaining`);
           break;
