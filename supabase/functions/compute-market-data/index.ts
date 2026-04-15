@@ -868,8 +868,8 @@ async function fetchHourlyCandles(token: string, accountId: string, symbol: stri
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
-      const res = await fetch(url, { headers: { "auth-token": token } });
-      if (!res.ok) continue;
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      if (!res.ok) { await res.text(); continue; }
       const candles = await res.json();
       if (Array.isArray(candles) && candles.length > 0) {
         const startTs = new Date(startISO).getTime();
