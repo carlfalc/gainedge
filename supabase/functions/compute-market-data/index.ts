@@ -1024,7 +1024,7 @@ serve(async (req) => {
 
     if (METAAPI_TOKEN && accountId) {
       // Process in batches of 5 to avoid overwhelming the API
-      const BATCH_SIZE = 5;
+      const BATCH_SIZE = 8;
       for (let b = 0; b < symbolEntries.length; b += BATCH_SIZE) {
         if (elapsed() > TIME_LIMIT_CRITICAL) {
           console.warn(`Time budget exceeded at symbol fetch (${elapsed()}ms) — using mock for remaining`);
