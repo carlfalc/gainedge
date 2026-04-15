@@ -231,29 +231,13 @@ const TF_MINUTES: Record<string, number> = {
 /* ─── SIGNAL WHITELIST: only generate signals for verified instruments ─── */
 const SIGNAL_WHITELIST = new Set(["XAUUSD", "US30", "NAS100", "NZDUSD", "AUDUSD"]);
 
-/* ─── PRICE SANITY RANGES: reject signals with obviously wrong prices ─── */
+/* ─── PRICE SANITY RANGES: verified signal instruments only ─── */
 const PRICE_RANGES: Record<string, { min: number; max: number }> = {
   XAUUSD: { min: 1000, max: 10000 },
-  US30:   { min: 20000, max: 60000 },
+  US30: { min: 20000, max: 60000 },
   NAS100: { min: 10000, max: 40000 },
   NZDUSD: { min: 0.3, max: 1.0 },
   AUDUSD: { min: 0.3, max: 1.0 },
-  XAGUSD: { min: 10, max: 100 },
-  EURUSD: { min: 0.80, max: 1.30 },
-  GBPUSD: { min: 1.00, max: 1.60 },
-  USDJPY: { min: 100, max: 200 },
-  USDCAD: { min: 1.10, max: 1.50 },
-  USDCHF: { min: 0.70, max: 1.10 },
-  GER40:  { min: 10000, max: 30000 },
-  JPN225: { min: 20000, max: 50000 },
-  SPX500: { min: 3000, max: 8000 },
-  UK100:  { min: 5000, max: 12000 },
-  HK50:   { min: 15000, max: 35000 },
-  AUS200: { min: 5000, max: 10000 },
-  XNGUSD: { min: 1, max: 15 },
-  NZDCAD: { min: 0.75, max: 0.95 },
-  GBPCAD: { min: 1.50, max: 1.90 },
-  EURGBP: { min: 0.70, max: 1.00 },
 };
 
 /** Returns true if the price is sane for the given symbol */
@@ -1305,8 +1289,19 @@ serve(async (req) => {
           console.warn(`Time budget hard limit reached during instrument scan (${elapsed()}ms)`);
           break userScanLoop;
         }
+
+        if (!SIGNAL_WHITELIST.has(inst.symbol)) {
+          continue;
+        }
+
         const data = symbolData.get(inst.symbol);
         if (!data || !data.last_candle_time) continue;
+
+        const liveEntryCandidate = data.last_price ?? data.bid ?? data.ask ?? null;
+        if (typeof liveEntryCandidate === "number" && !isPriceSane(inst.symbol, liveEntryCandidate)) {
+          console.warn(`Live price sanity FAILED for ${inst.symbol}: ${liveEntryCandidate} outside expected range`);
+          continue;
+        }
 
         const prevKey = `${userId}:${inst.symbol}`;
         const prevTime = prevCandleTimes.get(prevKey);
@@ -1441,12 +1436,6 @@ serve(async (req) => {
 
             if (signalsPaused) {
               console.log(`Signals paused for user ${userId.slice(0, 8)} — scan saved, signal creation skipped for ${inst.symbol}`);
-              continue;
-            }
-
-            // ─── INSTRUMENT WHITELIST: only generate signals for verified instruments ───
-            if (!SIGNAL_WHITELIST.has(inst.symbol)) {
-              console.log(`Signal blocked: ${inst.symbol} not in whitelist — skipping signal creation`);
               continue;
             }
 
