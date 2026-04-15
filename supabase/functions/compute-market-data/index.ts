@@ -244,6 +244,17 @@ function getBrokerVariants(symbol: string): string[] {
   return BROKER_SYMBOL_MAP[symbol] || [symbol];
 }
 
+async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs = 12000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchCandlesFromBroker(token: string, accountId: string, symbol: string, timeframe: string, limit: number) {
   const tfMinutes = TF_MINUTES[timeframe] || 15;
   const start = new Date(Date.now() - limit * tfMinutes * 60000).toISOString();
@@ -251,8 +262,8 @@ async function fetchCandlesFromBroker(token: string, accountId: string, symbol: 
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${limit}`;
-      const res = await fetch(url, { headers: { "auth-token": token } });
-      if (!res.ok) continue;
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      if (!res.ok) { await res.text(); continue; }
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) return data;
     } catch { /* try next variant */ }
@@ -265,8 +276,8 @@ async function fetchPriceFromBroker(token: string, accountId: string, symbol: st
   for (const variant of variants) {
     try {
       const url = `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
-      const res = await fetch(url, { headers: { "auth-token": token } });
-      if (!res.ok) continue;
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      if (!res.ok) { await res.text(); continue; }
       return await res.json();
     } catch { /* try next variant */ }
   }
