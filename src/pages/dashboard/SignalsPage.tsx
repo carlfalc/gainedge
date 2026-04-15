@@ -26,7 +26,9 @@ function pipToUsd(pips: number, symbol: string, lotSize: number): number {
   const isIndex = ["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol);
   const isGold = symbol === "XAUUSD";
   // pip value per standard lot (1.0 lot)
-  const pipValuePerLot = isIndex ? 1 : isGold ? 1 : 10;
+  // Gold: 1 pip = 0.1 price move, pip_value = $1 per lot (100oz × $0.01 per pip = no, 100oz × $0.10 per pip = $10... 
+  // Standard: Gold pip_value_per_lot = 10 (100oz * $0.10), Forex = 10, Index = 1
+  const pipValuePerLot = isIndex ? 1 : isGold ? 10 : 10;
   return pips * pipValuePerLot * lotSize;
 }
 
@@ -213,9 +215,9 @@ export default function SignalsPage() {
     const isIndex = ["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol);
     const isGold = symbol === "XAUUSD";
     const isJpy = symbol.includes("JPY");
-    const pipSize = isIndex ? 1 : isGold ? 0.01 : isJpy ? 0.01 : 0.0001;
+    const pipSize = isIndex ? 1 : isGold ? 0.1 : isJpy ? 0.01 : 0.0001;
     const pips = Math.abs(price - entry) / pipSize;
-    const pipValuePerLot = isIndex ? 1 : isGold ? 1 : 10;
+    const pipValuePerLot = isIndex ? 1 : isGold ? 10 : 10;
     const dollarVal = pips * pipValuePerLot * lotSize;
     const displayVal = convertToDisplayCurrency(dollarVal, currency, fxRates);
     const currSymbol = currency === "JPY" ? "¥" : "$";
