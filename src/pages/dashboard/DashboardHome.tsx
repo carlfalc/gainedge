@@ -296,6 +296,7 @@ export default function DashboardHome() {
       <LiveTradeAlert />
       <BreakingNewsTicker />
       <NewsSentimentPanel />
+      <MoversShakersWidget />
 
       {/* CURRENT INSTRUMENT TRACKING header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
