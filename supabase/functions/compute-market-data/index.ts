@@ -1691,12 +1691,12 @@ serve(async (req) => {
       }
     }
 
-    // ─── Retroactive session volume backfill ───
+    // ─── Retroactive session volume backfill (skip if time budget exceeded) ───
     const utcHour = new Date().getUTCHours();
     const today = new Date().toISOString().split("T")[0];
     const completedSessions = getCompletedSessions(utcHour);
 
-    if (completedSessions.length > 0 && METAAPI_TOKEN && accountId) {
+    if (elapsed() < TIME_LIMIT_CRITICAL && completedSessions.length > 0 && METAAPI_TOKEN && accountId) {
       const { data: existingSummaries } = await supabase
         .from("session_volume_summary")
         .select("session, symbol")
