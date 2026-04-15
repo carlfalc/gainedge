@@ -982,19 +982,44 @@ serve(async (req) => {
       }
     }
 
-    // Fetch data for each unique symbol
+    // ─── TIME BUDGET: track elapsed time to skip non-critical work ───
+    const startTime = Date.now();
+    const elapsed = () => Date.now() - startTime;
+    const TIME_LIMIT_CRITICAL = 100_000; // 100s: skip non-critical after this
+    const TIME_LIMIT_HARD = 130_000;     // 130s: bail out entirely
+
+    // Fetch data for all symbols IN PARALLEL with concurrency limit
     const symbolData = new Map<string, any>();
     const symbolCandles = new Map<string, any[]>();
     let usedLive = false;
 
-    for (const [symbol, timeframe] of symbolTfSet) {
-      if (METAAPI_TOKEN && accountId) {
-        try {
-          const [candles, price] = await Promise.all([
-            fetchCandlesFromBroker(METAAPI_TOKEN, accountId, symbol, timeframe, 100),
-            fetchPriceFromBroker(METAAPI_TOKEN, accountId, symbol),
-          ]);
+    const symbolEntries = [...symbolTfSet.entries()];
 
+    if (METAAPI_TOKEN && accountId) {
+      // Process in batches of 5 to avoid overwhelming the API
+      const BATCH_SIZE = 5;
+      for (let b = 0; b < symbolEntries.length; b += BATCH_SIZE) {
+        if (elapsed() > TIME_LIMIT_CRITICAL) {
+          console.warn(`Time budget exceeded at symbol fetch (${elapsed()}ms) — using mock for remaining`);
+          break;
+        }
+        const batch = symbolEntries.slice(b, b + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async ([symbol, timeframe]) => {
+            const [candles, price] = await Promise.all([
+              fetchCandlesFromBroker(METAAPI_TOKEN!, accountId, symbol, timeframe, 100),
+              fetchPriceFromBroker(METAAPI_TOKEN!, accountId, symbol),
+            ]);
+            return { symbol, timeframe, candles, price };
+          })
+        );
+
+        for (const res of results) {
+          if (res.status === "rejected") {
+            console.warn(`Broker fetch failed:`, res.reason?.message || res.reason);
+            continue;
+          }
+          const { symbol, timeframe, candles, price } = res.value;
           if (candles && candles.length > 0) {
             symbolCandles.set(symbol, candles);
             usedLive = true;
@@ -1048,12 +1073,12 @@ serve(async (req) => {
               last_candle_time: new Date(candleBucket * tfMin * 60000).toISOString(),
             });
           }
-        } catch (e) {
-          console.warn(`Broker fetch failed for ${symbol}:`, e.message);
         }
       }
+    }
 
-      // If no live data, use mock
+    // Fill remaining with mock
+    for (const [symbol, timeframe] of symbolEntries) {
       if (!symbolData.has(symbol)) {
         const mock = generateMockData(symbol);
         const tfMin = TF_MINUTES[timeframe] || 15;
