@@ -218,11 +218,11 @@ function determineTrendDirection(closes: number[]): string {
 /* ─── MetaApi helpers ─── */
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
-const BROKER_CANDLE_TIMEOUT_MS = 4000;
-const BROKER_PRICE_TIMEOUT_MS = 2500;
-const BROKER_SESSION_TIMEOUT_MS = 5000;
-const TIME_LIMIT_CRITICAL_MS = 75_000;
-const TIME_LIMIT_HARD_MS = 105_000;
+const BROKER_CANDLE_TIMEOUT_MS = 3000;
+const BROKER_PRICE_TIMEOUT_MS = 2000;
+const BROKER_SESSION_TIMEOUT_MS = 3000;
+const TIME_LIMIT_CRITICAL_MS = 50_000;
+const TIME_LIMIT_HARD_MS = 80_000;
 
 const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
