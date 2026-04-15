@@ -1444,6 +1444,28 @@ serve(async (req) => {
               continue;
             }
 
+            // ─── INSTRUMENT WHITELIST: only generate signals for verified instruments ───
+            if (!SIGNAL_WHITELIST.has(inst.symbol)) {
+              console.log(`Signal blocked: ${inst.symbol} not in whitelist — skipping signal creation`);
+              continue;
+            }
+
+            // ─── PRICE SANITY CHECK: reject signals with obviously wrong prices ───
+            if (analysis.entry_price && !isPriceSane(inst.symbol, analysis.entry_price)) {
+              console.warn(`Price sanity FAILED for ${inst.symbol}: entry ${analysis.entry_price} outside expected range`);
+              continue;
+            }
+
+            // ─── MAX TP/SL DISTANCE CHECK: reject insane pip distances ───
+            if (analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
+              const tpPips = Math.abs(priceToPips(analysis.take_profit - analysis.entry_price, inst.symbol));
+              const slPips = Math.abs(priceToPips(analysis.entry_price - analysis.stop_loss, inst.symbol));
+              if (tpPips > MAX_TPSL_PIPS || slPips > MAX_TPSL_PIPS) {
+                console.warn(`TP/SL sanity FAILED for ${inst.symbol}: TP=${tpPips.toFixed(0)} pips, SL=${slPips.toFixed(0)} pips — exceeds ${MAX_TPSL_PIPS} max`);
+                continue;
+              }
+            }
+
             const hasValidTradeLevels = validateTradeLevels(analysis.direction, analysis.entry_price, analysis.take_profit, analysis.stop_loss);
             if (!hasValidTradeLevels && analysis.entry_price && analysis.stop_loss) {
               analysis.stop_loss = ensureMinimumStopDistance(analysis.entry_price, analysis.direction, Math.abs(analysis.entry_price - analysis.stop_loss), inst.symbol);
