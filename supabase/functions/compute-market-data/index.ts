@@ -218,6 +218,11 @@ function determineTrendDirection(closes: number[]): string {
 /* ─── MetaApi helpers ─── */
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
+const BROKER_CANDLE_TIMEOUT_MS = 4000;
+const BROKER_PRICE_TIMEOUT_MS = 2500;
+const BROKER_SESSION_TIMEOUT_MS = 5000;
+const TIME_LIMIT_CRITICAL_MS = 75_000;
+const TIME_LIMIT_HARD_MS = 105_000;
 
 const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
@@ -262,7 +267,7 @@ async function fetchCandlesFromBroker(token: string, accountId: string, symbol: 
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${limit}`;
-      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } }, BROKER_CANDLE_TIMEOUT_MS);
       if (!res.ok) { await res.text(); continue; }
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) return data;
@@ -276,7 +281,7 @@ async function fetchPriceFromBroker(token: string, accountId: string, symbol: st
   for (const variant of variants) {
     try {
       const url = `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
-      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } }, BROKER_PRICE_TIMEOUT_MS);
       if (!res.ok) { await res.text(); continue; }
       return await res.json();
     } catch { /* try next variant */ }
@@ -868,7 +873,7 @@ async function fetchHourlyCandles(token: string, accountId: string, symbol: stri
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
-      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } }, BROKER_SESSION_TIMEOUT_MS);
       if (!res.ok) { await res.text(); continue; }
       const candles = await res.json();
       if (Array.isArray(candles) && candles.length > 0) {
