@@ -2,19 +2,9 @@ export default function LiveQuotesTicker() {
   const html = `<!DOCTYPE html>
 <html><head><style>
 body { margin:0; padding:0; background:#0B1121; overflow:hidden; }
-
-/* Force all delta/change text to inherit color from parent state */
-/* Dukascopy uses classes or inline styles for up/down — override everything */
-span[style*="color: rgb(0, 0, 0)"],
-span[style*="color:#000000"],
-span[style*="color:#000"],
-span[style*="color:black"],
-font[color="#000000"],
-font[color="black"] {
-  color: #94A3B8 !important;
-}
-
-/* MutationObserver will handle dynamic coloring */
+/* Override any black text in any nested element */
+* { color: inherit; }
+iframe { width:100%; height:30px; border:none; }
 </style></head><body>
 <script type="text/javascript">
 DukascopyApplet = {
@@ -38,44 +28,86 @@ DukascopyApplet = {
 <\/script>
 <script type="text/javascript" src="https://freeserv-static.dukascopy.com/2.0/core.js"><\/script>
 <script>
-// Poll and fix black text colors based on nearby arrow direction
-function fixColors() {
-  // Find all spans/elements with black text and recolor based on context
-  var allEls = document.querySelectorAll('span, font, td, div');
-  for (var i = 0; i < allEls.length; i++) {
-    var el = allEls[i];
-    var style = el.getAttribute('style') || '';
-    var computedColor = window.getComputedStyle(el).color;
+// Dukascopy creates a nested iframe - we need to reach into it
+function fixNestedIframe() {
+  try {
+    var iframes = document.querySelectorAll('iframe');
+    for (var i = 0; i < iframes.length; i++) {
+      var iframeDoc = iframes[i].contentDocument || iframes[i].contentWindow.document;
+      if (!iframeDoc) continue;
+      
+      // Inject style into the nested iframe
+      if (!iframeDoc.querySelector('#gainedge-fix')) {
+        var style = iframeDoc.createElement('style');
+        style.id = 'gainedge-fix';
+        style.textContent = [
+          'span[style*="color: rgb(0, 0, 0)"] { color: #94A3B8 !important; }',
+          'span[style*="color:#000000"] { color: #94A3B8 !important; }',
+          'span[style*="color:#000"] { color: #94A3B8 !important; }',
+          'font[color="#000000"] { color: #94A3B8 !important; }',
+          'font[color="black"] { color: #94A3B8 !important; }',
+          '.negative span, .down span { color: #EF4444 !important; }',
+          '.positive span, .up span { color: #22C55E !important; }',
+        ].join('\\n');
+        iframeDoc.head.appendChild(style);
+      }
 
-    // Check if text is black or very dark (invisible on dark bg)
-    if (computedColor === 'rgb(0, 0, 0)' || style.indexOf('#000') !== -1 || style.indexOf('rgb(0, 0, 0)') !== -1) {
-      // Look at the text content for clues
-      var text = (el.textContent || '').trim();
+      // Also directly fix any black-colored elements
+      var els = iframeDoc.querySelectorAll('*');
+      for (var j = 0; j < els.length; j++) {
+        var computed = iframeDoc.defaultView.getComputedStyle(els[j]);
+        if (computed.color === 'rgb(0, 0, 0)') {
+          var txt = (els[j].textContent || '').trim();
+          if (txt.indexOf('-') === 0) {
+            els[j].style.setProperty('color', '#EF4444', 'important');
+          } else if (txt.match(/^\\+/) || txt.match(/^[0-9]/)) {
+            els[j].style.setProperty('color', '#22C55E', 'important');
+          } else {
+            els[j].style.setProperty('color', '#94A3B8', 'important');
+          }
+        }
+      }
 
-      // Check parent/sibling context for arrow direction
-      var parent = el.parentElement;
-      var parentHTML = parent ? parent.innerHTML : '';
-      var hasDown = parentHTML.indexOf('▼') !== -1 || parentHTML.indexOf('↓') !== -1;
-      var hasUp = parentHTML.indexOf('▲') !== -1 || parentHTML.indexOf('↑') !== -1;
-
-      // Also check if the value itself is negative
-      if (text.indexOf('-') === 0 || hasDown) {
-        el.style.setProperty('color', '#EF4444', 'important');
-      } else if (hasUp || (text.match && text.match(/^[+0-9]/))) {
-        el.style.setProperty('color', '#22C55E', 'important');
-      } else {
-        // Default: make it visible at least
-        el.style.setProperty('color', '#94A3B8', 'important');
+      // Recurse into deeper iframes
+      var deepIframes = iframeDoc.querySelectorAll('iframe');
+      for (var k = 0; k < deepIframes.length; k++) {
+        try {
+          var deepDoc = deepIframes[k].contentDocument || deepIframes[k].contentWindow.document;
+          if (!deepDoc) continue;
+          if (!deepDoc.querySelector('#gainedge-fix')) {
+            var deepStyle = deepDoc.createElement('style');
+            deepStyle.id = 'gainedge-fix';
+            deepStyle.textContent = [
+              'span[style*="color: rgb(0, 0, 0)"] { color: #94A3B8 !important; }',
+              'span[style*="color:#000000"] { color: #94A3B8 !important; }',
+              'font[color="#000000"] { color: #94A3B8 !important; }',
+            ].join('\\n');
+            deepDoc.head.appendChild(deepStyle);
+          }
+          var deepEls = deepDoc.querySelectorAll('*');
+          for (var m = 0; m < deepEls.length; m++) {
+            var dc = deepDoc.defaultView.getComputedStyle(deepEls[m]);
+            if (dc.color === 'rgb(0, 0, 0)') {
+              var dtxt = (deepEls[m].textContent || '').trim();
+              if (dtxt.indexOf('-') === 0) {
+                deepEls[m].style.setProperty('color', '#EF4444', 'important');
+              } else if (dtxt.match(/^\\+/) || dtxt.match(/^[0-9]/)) {
+                deepEls[m].style.setProperty('color', '#22C55E', 'important');
+              } else {
+                deepEls[m].style.setProperty('color', '#94A3B8', 'important');
+              }
+            }
+          }
+        } catch(e) {}
       }
     }
-  }
+  } catch(e) {}
 }
 
-// Run periodically since the widget updates dynamically
-setInterval(fixColors, 500);
-// Also run after initial load
-setTimeout(fixColors, 2000);
-setTimeout(fixColors, 4000);
+setInterval(fixNestedIframe, 300);
+setTimeout(fixNestedIframe, 1500);
+setTimeout(fixNestedIframe, 3000);
+setTimeout(fixNestedIframe, 5000);
 <\/script>
 </body></html>`;
 
