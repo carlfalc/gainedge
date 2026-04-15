@@ -1170,7 +1170,7 @@ serve(async (req) => {
       if (pipSizeMap.has(symbol)) return pipSizeMap.get(symbol)!;
       // Fallback heuristics
       if (symbol.includes("JPY")) return 0.01;
-      if (symbol === "XAUUSD" || symbol === "GOLD") return 0.01;
+      if (symbol === "XAUUSD" || symbol === "GOLD") return 0.1; // Gold: 10 pips per $1 move
       if (["US30", "NAS100", "SPX500", "UK100", "GER40", "HK50", "JPN225", "AUS200"].some(idx => symbol.includes(idx))) return 1.0;
       return 0.0001; // Standard forex
     }
@@ -1581,7 +1581,7 @@ serve(async (req) => {
             pnlPips = priceToPips(pnl, sig.symbol);
           }
           await supabase.from("signals").update({
-            result: "expired", pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1), resolved_at: new Date().toISOString(),
+            result: "expired", pnl: +pnl.toFixed(5), pnl_pips: +pnlPips.toFixed(1), resolved_at: new Date().toISOString(),
           }).eq("id", sig.id);
           const expiryHours = Math.round(expiryMs / 3600000);
           await supabase.from("insights").insert({
@@ -1627,7 +1627,7 @@ serve(async (req) => {
 
         if (result) {
           await supabase.from("signals").update({
-            result, pnl: +pnl.toFixed(2), pnl_pips: +pnlPips.toFixed(1),
+            result, pnl: +pnl.toFixed(5), pnl_pips: +pnlPips.toFixed(1),
             resolved_at: new Date().toISOString(),
           }).eq("id", sig.id);
           await supabase.from("insights").insert({
