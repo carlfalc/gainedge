@@ -1525,33 +1525,8 @@ serve(async (req) => {
           .maybeSingle();
         const ronVersion = sigPref?.signal_engine || "v1";
 
-        // MTF alignment: check candle_history for multiple timeframes
-        let mtfAlignment: string | null = null;
-        try {
-          const tfChecks = ["5m", "15m", "1h", "4h", "1d"];
-          let bullCount = 0, bearCount = 0;
-          for (const tf of tfChecks) {
-            const { data: tfCandles } = await supabase
-              .from("candle_history")
-              .select("close")
-              .eq("symbol", sig.symbol)
-              .eq("timeframe", tf)
-              .order("timestamp", { ascending: false })
-              .limit(20);
-            if (tfCandles && tfCandles.length >= 5) {
-              const closes = tfCandles.reverse().map((c: any) => c.close);
-              const trend = determineTrendDirection(closes);
-              if (trend === "bullish") bullCount++;
-              else if (trend === "bearish") bearCount++;
-            }
-          }
-          const total = bullCount + bearCount;
-          if (total >= 3) {
-            if (bullCount === total || bearCount === total) mtfAlignment = "all_aligned";
-            else if (Math.max(bullCount, bearCount) >= total * 0.6) mtfAlignment = "partially_aligned";
-            else mtfAlignment = "conflicting";
-          }
-        } catch (e) { console.warn("MTF alignment check failed:", e); }
+        // MTF alignment: SKIP expensive per-timeframe queries to stay within time budget
+        const mtfAlignment: string | null = null;
 
         await supabase.from("signal_outcomes").insert({
           user_id: sig.user_id,
