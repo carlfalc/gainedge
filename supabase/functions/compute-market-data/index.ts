@@ -244,6 +244,17 @@ function getBrokerVariants(symbol: string): string[] {
   return BROKER_SYMBOL_MAP[symbol] || [symbol];
 }
 
+async function fetchWithTimeout(url: string, opts: RequestInit, timeoutMs = 12000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchCandlesFromBroker(token: string, accountId: string, symbol: string, timeframe: string, limit: number) {
   const tfMinutes = TF_MINUTES[timeframe] || 15;
   const start = new Date(Date.now() - limit * tfMinutes * 60000).toISOString();
@@ -251,8 +262,8 @@ async function fetchCandlesFromBroker(token: string, accountId: string, symbol: 
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/${timeframe}/candles?startTime=${encodeURIComponent(start)}&limit=${limit}`;
-      const res = await fetch(url, { headers: { "auth-token": token } });
-      if (!res.ok) continue;
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      if (!res.ok) { await res.text(); continue; }
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) return data;
     } catch { /* try next variant */ }
@@ -265,8 +276,8 @@ async function fetchPriceFromBroker(token: string, accountId: string, symbol: st
   for (const variant of variants) {
     try {
       const url = `${CLIENT_API_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
-      const res = await fetch(url, { headers: { "auth-token": token } });
-      if (!res.ok) continue;
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      if (!res.ok) { await res.text(); continue; }
       return await res.json();
     } catch { /* try next variant */ }
   }
@@ -857,8 +868,8 @@ async function fetchHourlyCandles(token: string, accountId: string, symbol: stri
   for (const variant of variants) {
     try {
       const url = `${MARKET_DATA_URL}/users/current/accounts/${accountId}/historical-market-data/symbols/${encodeURIComponent(variant)}/timeframes/1h/candles?startTime=${encodeURIComponent(startISO)}&limit=500`;
-      const res = await fetch(url, { headers: { "auth-token": token } });
-      if (!res.ok) continue;
+      const res = await fetchWithTimeout(url, { headers: { "auth-token": token } });
+      if (!res.ok) { await res.text(); continue; }
       const candles = await res.json();
       if (Array.isArray(candles) && candles.length > 0) {
         const startTs = new Date(startISO).getTime();
@@ -971,19 +982,44 @@ serve(async (req) => {
       }
     }
 
-    // Fetch data for each unique symbol
+    // ─── TIME BUDGET: track elapsed time to skip non-critical work ───
+    const startTime = Date.now();
+    const elapsed = () => Date.now() - startTime;
+    const TIME_LIMIT_CRITICAL = 100_000; // 100s: skip non-critical after this
+    const TIME_LIMIT_HARD = 130_000;     // 130s: bail out entirely
+
+    // Fetch data for all symbols IN PARALLEL with concurrency limit
     const symbolData = new Map<string, any>();
     const symbolCandles = new Map<string, any[]>();
     let usedLive = false;
 
-    for (const [symbol, timeframe] of symbolTfSet) {
-      if (METAAPI_TOKEN && accountId) {
-        try {
-          const [candles, price] = await Promise.all([
-            fetchCandlesFromBroker(METAAPI_TOKEN, accountId, symbol, timeframe, 100),
-            fetchPriceFromBroker(METAAPI_TOKEN, accountId, symbol),
-          ]);
+    const symbolEntries = [...symbolTfSet.entries()];
 
+    if (METAAPI_TOKEN && accountId) {
+      // Process in batches of 5 to avoid overwhelming the API
+      const BATCH_SIZE = 5;
+      for (let b = 0; b < symbolEntries.length; b += BATCH_SIZE) {
+        if (elapsed() > TIME_LIMIT_CRITICAL) {
+          console.warn(`Time budget exceeded at symbol fetch (${elapsed()}ms) — using mock for remaining`);
+          break;
+        }
+        const batch = symbolEntries.slice(b, b + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async ([symbol, timeframe]) => {
+            const [candles, price] = await Promise.all([
+              fetchCandlesFromBroker(METAAPI_TOKEN!, accountId, symbol, timeframe, 100),
+              fetchPriceFromBroker(METAAPI_TOKEN!, accountId, symbol),
+            ]);
+            return { symbol, timeframe, candles, price };
+          })
+        );
+
+        for (const res of results) {
+          if (res.status === "rejected") {
+            console.warn(`Broker fetch failed:`, res.reason?.message || res.reason);
+            continue;
+          }
+          const { symbol, timeframe, candles, price } = res.value;
           if (candles && candles.length > 0) {
             symbolCandles.set(symbol, candles);
             usedLive = true;
@@ -1037,12 +1073,12 @@ serve(async (req) => {
               last_candle_time: new Date(candleBucket * tfMin * 60000).toISOString(),
             });
           }
-        } catch (e) {
-          console.warn(`Broker fetch failed for ${symbol}:`, e.message);
         }
       }
+    }
 
-      // If no live data, use mock
+    // Fill remaining with mock
+    for (const [symbol, timeframe] of symbolEntries) {
       if (!symbolData.has(symbol)) {
         const mock = generateMockData(symbol);
         const tfMin = TF_MINUTES[timeframe] || 15;
@@ -1419,7 +1455,6 @@ serve(async (req) => {
                 tp: analysis.take_profit,
                 sl: analysis.stop_loss,
               });
-              }
             }
           }
         }
@@ -1442,7 +1477,8 @@ serve(async (req) => {
     const { data: pendingSignals } = await supabase
       .from("signals")
       .select("id, user_id, symbol, direction, entry_price, take_profit, stop_loss, created_at, scan_result_id, confidence")
-      .eq("result", "pending");
+      .eq("result", "pending")
+      .limit(30); // Limit per run to stay within time budget
 
     if (pendingSignals && pendingSignals.length > 0) {
       // Batch-fetch timeframes + indicator context from linked scan_results
@@ -1489,33 +1525,8 @@ serve(async (req) => {
           .maybeSingle();
         const ronVersion = sigPref?.signal_engine || "v1";
 
-        // MTF alignment: check candle_history for multiple timeframes
-        let mtfAlignment: string | null = null;
-        try {
-          const tfChecks = ["5m", "15m", "1h", "4h", "1d"];
-          let bullCount = 0, bearCount = 0;
-          for (const tf of tfChecks) {
-            const { data: tfCandles } = await supabase
-              .from("candle_history")
-              .select("close")
-              .eq("symbol", sig.symbol)
-              .eq("timeframe", tf)
-              .order("timestamp", { ascending: false })
-              .limit(20);
-            if (tfCandles && tfCandles.length >= 5) {
-              const closes = tfCandles.reverse().map((c: any) => c.close);
-              const trend = determineTrendDirection(closes);
-              if (trend === "bullish") bullCount++;
-              else if (trend === "bearish") bearCount++;
-            }
-          }
-          const total = bullCount + bearCount;
-          if (total >= 3) {
-            if (bullCount === total || bearCount === total) mtfAlignment = "all_aligned";
-            else if (Math.max(bullCount, bearCount) >= total * 0.6) mtfAlignment = "partially_aligned";
-            else mtfAlignment = "conflicting";
-          }
-        } catch (e) { console.warn("MTF alignment check failed:", e); }
+        // MTF alignment: SKIP expensive per-timeframe queries to stay within time budget
+        const mtfAlignment: string | null = null;
 
         await supabase.from("signal_outcomes").insert({
           user_id: sig.user_id,
@@ -1596,6 +1607,7 @@ serve(async (req) => {
       }
 
       for (const sig of pendingSignals) {
+        if (elapsed() > TIME_LIMIT_HARD) { console.warn("Time budget hard limit — stopping signal resolution"); break; }
         // Determine expiry based on timeframe
         const ctx = sig.scan_result_id ? scanContext[sig.scan_result_id] : null;
         const tf = ctx?.timeframe || null;
@@ -1679,12 +1691,12 @@ serve(async (req) => {
       }
     }
 
-    // ─── Retroactive session volume backfill ───
+    // ─── Retroactive session volume backfill (skip if time budget exceeded) ───
     const utcHour = new Date().getUTCHours();
     const today = new Date().toISOString().split("T")[0];
     const completedSessions = getCompletedSessions(utcHour);
 
-    if (completedSessions.length > 0 && METAAPI_TOKEN && accountId) {
+    if (elapsed() < TIME_LIMIT_CRITICAL && completedSessions.length > 0 && METAAPI_TOKEN && accountId) {
       const { data: existingSummaries } = await supabase
         .from("session_volume_summary")
         .select("session, symbol")
@@ -1720,8 +1732,8 @@ serve(async (req) => {
       }
     }
 
-    // ─── LIQUIDITY ZONE DETECTION & SESSION BIAS ───
-    try {
+    // ─── LIQUIDITY ZONE DETECTION & SESSION BIAS (skip if time budget exceeded) ───
+    if (elapsed() < TIME_LIMIT_CRITICAL) { try {
       for (const [symbol, candles] of symbolCandles) {
         if (!Array.isArray(candles) || candles.length < 10) continue;
         const timeframe = symbolTfSet.get(symbol) || "15m";
@@ -1816,10 +1828,10 @@ serve(async (req) => {
           }
         }
       }
-    } catch (e) { console.warn("Liquidity/Volume/Bias processing error:", e); }
+    } catch (e) { console.warn("Liquidity/Volume/Bias processing error:", e); } }
 
-    // ─── NEWS IMPACT TRACKING: baseline prices for recent news ───
-    try {
+    // ─── NEWS IMPACT TRACKING (skip if time budget exceeded) ───
+    if (elapsed() < TIME_LIMIT_CRITICAL) { try {
       const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       const { data: recentNews } = await supabase
         .from("news_items")
@@ -1881,12 +1893,12 @@ serve(async (req) => {
           }
         }
       }
-    } catch (e) { console.warn("News impact tracking error:", e); }
+    } catch (e) { console.warn("News impact tracking error:", e); } }
 
     return new Response(JSON.stringify({
       success: true, symbols: symbolTfSet.size, users: userInstruments.size,
       rows: upserts.length, auto_scans: autoScans, signals_created: signalsCreated,
-      signals_resolved: resolvedCount, live: usedLive,
+      signals_resolved: resolvedCount, live: usedLive, elapsed_ms: elapsed(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
