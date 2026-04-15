@@ -1830,8 +1830,8 @@ serve(async (req) => {
       }
     } catch (e) { console.warn("Liquidity/Volume/Bias processing error:", e); }
 
-    // ─── NEWS IMPACT TRACKING: baseline prices for recent news ───
-    try {
+    // ─── NEWS IMPACT TRACKING (skip if time budget exceeded) ───
+    if (elapsed() < TIME_LIMIT_CRITICAL) try {
       const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
       const { data: recentNews } = await supabase
         .from("news_items")
