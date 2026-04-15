@@ -1455,7 +1455,6 @@ serve(async (req) => {
                 tp: analysis.take_profit,
                 sl: analysis.stop_loss,
               });
-              }
             }
           }
         }
