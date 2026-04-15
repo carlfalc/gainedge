@@ -13,6 +13,18 @@ interface Signal {
   created_at: string; resolved_at: string | null;
 }
 
+interface SignalStats {
+  allTimePnlCurrency: number;
+  monthPnlCurrency: number;
+  winRate: number;
+  totalSignals: number;
+  avgRR: number;
+  wins: number;
+  losses: number;
+  resolved: number;
+  winsAndLosses: number;
+}
+
 type SortKey = "date" | "instrument" | "confidence";
 type DateRange = "today" | "week" | "month" | "all";
 
@@ -52,6 +64,17 @@ function convertToDisplayCurrency(usdAmount: number, currency: string, fxRates: 
 
 export default function SignalsPage() {
   const [signals, setSignals] = useState<Signal[]>([]);
+  const [stats, setStats] = useState<SignalStats>({
+    allTimePnlCurrency: 0,
+    monthPnlCurrency: 0,
+    winRate: 0,
+    totalSignals: 0,
+    avgRR: 0,
+    wins: 0,
+    losses: 0,
+    resolved: 0,
+    winsAndLosses: 0,
+  });
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [filterInst, setFilterInst] = useState("");
@@ -104,14 +127,77 @@ export default function SignalsPage() {
   const loadSignals = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-    const { data } = await supabase
-      .from("signals")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false });
+    const [{ data }, { data: prefData }, { data: fxData }] = await Promise.all([
+      supabase
+        .from("signals")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("user_signal_preferences")
+        .select("currency, lot_size")
+        .eq("user_id", session.user.id)
+        .maybeSingle(),
+      supabase
+        .from("live_market_data")
+        .select("symbol, last_price")
+        .eq("user_id", session.user.id)
+        .in("symbol", ["NZDUSD", "AUDUSD", "GBPUSD", "EURUSD", "USDJPY"]),
+    ]);
+
+    if (prefData) {
+      setCurrency((prefData as any).currency || "NZD");
+      setLotSize((prefData as any).lot_size ?? 0.01);
+    }
+
+    const nextFxRates: Record<string, number> = {};
+    if (fxData) {
+      for (const row of fxData as any[]) {
+        if (row.symbol === "NZDUSD") nextFxRates.NZD = row.last_price;
+        else if (row.symbol === "AUDUSD") nextFxRates.AUD = row.last_price;
+        else if (row.symbol === "GBPUSD") nextFxRates.GBP = row.last_price;
+        else if (row.symbol === "EURUSD") nextFxRates.EUR = row.last_price;
+        else if (row.symbol === "USDJPY") nextFxRates.JPY = row.last_price;
+      }
+      setFxRates(nextFxRates);
+    }
+
     if (data) {
-      setSignals(data as Signal[]);
-      const syms = [...new Set(data.map((s: any) => s.symbol))];
+      const rows = data as Signal[];
+      const resolvedWinsLosses = rows.filter(s => s.result === "win" || s.result === "loss");
+      const wins = resolvedWinsLosses.filter(s => s.result === "win");
+      const losses = resolvedWinsLosses.filter(s => s.result === "loss");
+      const activeCurrency = (prefData as any)?.currency || currency;
+      const activeLotSize = (prefData as any)?.lot_size ?? lotSize;
+      const allTimePnlUsd = resolvedWinsLosses.reduce((sum, s) => sum + Number(s.pnl ?? 0), 0);
+      const allTimePnlCurrency = convertToDisplayCurrency(allTimePnlUsd, activeCurrency, nextFxRates);
+      const monthStart = startOfMonth(new Date());
+      const monthSignals = resolvedWinsLosses.filter(s => new Date(s.resolved_at || s.created_at) >= monthStart);
+      const monthPnlUsd = monthSignals.reduce((sum, s) => sum + Number(s.pnl ?? 0), 0);
+      const monthPnlCurrency = convertToDisplayCurrency(monthPnlUsd, activeCurrency, nextFxRates);
+      const rrValues = resolvedWinsLosses
+        .filter(s => s.risk_reward)
+        .map(s => {
+          const match = s.risk_reward.match(/([\d.]+):\d/);
+          return match ? parseFloat(match[1]) : 0;
+        })
+        .filter(v => v > 0);
+      const winsAndLosses = wins.length + losses.length;
+
+      setStats({
+        allTimePnlCurrency,
+        monthPnlCurrency,
+        winRate: winsAndLosses > 0 ? (wins.length / winsAndLosses) * 100 : 0,
+        totalSignals: rows.length,
+        avgRR: rrValues.length > 0 ? rrValues.reduce((a, b) => a + b, 0) / rrValues.length : 0,
+        wins: wins.length,
+        losses: losses.length,
+        resolved: resolvedWinsLosses.length,
+        winsAndLosses,
+      });
+
+      setSignals(rows);
+      const syms = [...new Set(rows.map((s: any) => s.symbol))];
       setInstruments(syms);
     }
   };
@@ -148,37 +234,6 @@ export default function SignalsPage() {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortKey(key); setSortDir("desc"); }
   };
-
-  // Stats
-  const stats = useMemo(() => {
-    const resolved = signals.filter(s => s.result !== "pending");
-    const wins = resolved.filter(s => s.result === "win");
-    const losses = resolved.filter(s => s.result === "loss");
-    const allTimePnlUsd = resolved.reduce((sum, s) => sum + pipToUsd(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
-    const allTimePnlCurrency = convertToDisplayCurrency(allTimePnlUsd, currency, fxRates);
-
-    const now = new Date();
-    const monthStart = startOfMonth(now);
-    const monthSignals = resolved.filter(s => new Date(s.resolved_at || s.created_at) >= monthStart);
-    const monthPnlUsd = monthSignals.reduce((sum, s) => sum + pipToUsd(s.pnl_pips ?? 0, s.symbol, lotSize), 0);
-    const monthPnlCurrency = convertToDisplayCurrency(monthPnlUsd, currency, fxRates);
-
-    // Win rate: wins / (wins + losses) — exclude expired/pending
-    const winsAndLosses = wins.length + losses.length;
-    const winRate = winsAndLosses > 0 ? (wins.length / winsAndLosses) * 100 : 0;
-
-    // Parse R:R strings like "2.1:1" and average them for resolved wins/losses
-    const rrValues = resolved
-      .filter(s => s.risk_reward)
-      .map(s => {
-        const match = s.risk_reward.match(/([\d.]+):\d/);
-        return match ? parseFloat(match[1]) : 0;
-      })
-      .filter(v => v > 0);
-    const avgRR = rrValues.length > 0 ? rrValues.reduce((a, b) => a + b, 0) / rrValues.length : 0;
-
-    return { allTimePnlCurrency, monthPnlCurrency, winRate, totalSignals: signals.length, avgRR, wins: wins.length, losses: losses.length, resolved: resolved.length, winsAndLosses };
-  }, [signals, lotSize, currency, fxRates]);
 
   // Filter
   const filtered = useMemo(() => {

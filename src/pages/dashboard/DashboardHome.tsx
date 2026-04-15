@@ -180,12 +180,11 @@ export default function DashboardHome() {
 
     const { data: signals } = await supabase.from("signals").select("*").eq("user_id", uid);
     if (signals) {
-      const closed = signals.filter((s: any) => s.result !== "pending");
+      const closed = signals.filter((s: any) => s.result === "win" || s.result === "loss");
       const wins = closed.filter((s: any) => s.result === "win");
       const losses = closed.filter((s: any) => s.result === "loss");
-      // Use pnl_pips-based calculation (same as Signals page)
-      const totalPnlUsd = closed.reduce((sum: number, s: any) => sum + dashPipToUsd(s.pnl_pips ?? 0, s.symbol), 0);
-      const totalPnl = dashConvert(totalPnlUsd);
+      const totalPnl = closed.reduce((sum: number, s: any) => sum + Number(s.pnl ?? 0), 0);
+      const totalPnlUsd = totalPnl;
       const avgWinUsd = wins.length ? wins.reduce((s: number, w: any) => s + dashPipToUsd(w.pnl_pips ?? 0, w.symbol), 0) / wins.length : 0;
       const avgLossUsd = losses.length ? Math.abs(losses.reduce((s: number, l: any) => s + dashPipToUsd(l.pnl_pips ?? 0, l.symbol), 0) / losses.length) : 1;
 
@@ -229,7 +228,7 @@ export default function DashboardHome() {
 
       const sorted = [...closed].sort((a: any, b: any) => new Date(a.closed_at || a.resolved_at || a.created_at).getTime() - new Date(b.closed_at || b.resolved_at || b.created_at).getTime());
       let cumulative = 0;
-      const curve = [0, ...sorted.map((s: any) => { cumulative += dashPipToUsd(s.pnl_pips ?? 0, s.symbol); return dashConvert(cumulative); })];
+      const curve = [0, ...sorted.map((s: any) => { cumulative += Number(s.pnl ?? 0); return cumulative; })];
       setEquityCurve(curve);
     }
   };
