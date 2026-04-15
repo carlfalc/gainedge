@@ -1608,6 +1608,7 @@ serve(async (req) => {
       }
 
       for (const sig of pendingSignals) {
+        if (elapsed() > TIME_LIMIT_HARD) { console.warn("Time budget hard limit — stopping signal resolution"); break; }
         // Determine expiry based on timeframe
         const ctx = sig.scan_result_id ? scanContext[sig.scan_result_id] : null;
         const tf = ctx?.timeframe || null;
