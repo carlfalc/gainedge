@@ -1899,7 +1899,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true, symbols: symbolTfSet.size, users: userInstruments.size,
       rows: upserts.length, auto_scans: autoScans, signals_created: signalsCreated,
-      signals_resolved: resolvedCount, live: usedLive,
+      signals_resolved: resolvedCount, live: usedLive, elapsed_ms: elapsed(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
