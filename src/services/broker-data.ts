@@ -105,11 +105,11 @@ export function useLiveMarketData(userId: string | undefined) {
 
 /**
  * Trigger the background compute job manually (e.g., on page load).
+ * Fire-and-forget: don't await the response since the function can take 60-120s.
  */
-export async function triggerMarketDataCompute() {
-  try {
-    await supabase.functions.invoke("compute-market-data", { method: "POST" });
-  } catch (e) {
-    console.warn("Failed to trigger market data compute:", e);
-  }
+export function triggerMarketDataCompute() {
+  supabase.functions.invoke("compute-market-data", { method: "POST" }).catch((e) => {
+    // Silently ignore — this is a background job, the data arrives via realtime/polling
+    console.debug("Market data compute trigger:", e?.message || "timeout (expected)");
+  });
 }
