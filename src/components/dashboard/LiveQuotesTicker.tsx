@@ -1,128 +1,126 @@
-export default function LiveQuotesTicker() {
-  const html = `<!DOCTYPE html>
-<html><head><style>
-body { margin:0; padding:0; background:#0B1121; overflow:hidden; }
-/* Override any black text in any nested element */
-* { color: inherit; }
-iframe { width:100%; height:30px; border:none; }
-</style></head><body>
-<script type="text/javascript">
-DukascopyApplet = {
-  type: "runboard",
-  params: {
-    instruments: "EUR/USD,USD/JPY,GBP/USD,EUR/JPY,GBP/JPY,USD/CAD,XAU/USD,AUD/USD,USD/CHF,NZD/USD,E_Brent,E_SandP-500,E_DJE50XX,E_N225Jap",
-    showDelta: true,
-    showDeltaPercent: true,
-    animationSpeed: ["100000"],
-    fontSize: "12",
-    fontFamily: ["Verdana, Geneva, sans-serif"],
-    instrumentColor: "#94A3B8",
-    priceColor: "#E2E8F0",
-    delimeterColor: "#00CFA5",
-    bgColor: "#0B1121",
-    width: "100%",
-    height: "30",
-    adv: "popup"
-  }
-};
-<\/script>
-<script type="text/javascript" src="https://freeserv-static.dukascopy.com/2.0/core.js"><\/script>
-<script>
-// Dukascopy creates a nested iframe - we need to reach into it
-function fixNestedIframe() {
-  try {
-    var iframes = document.querySelectorAll('iframe');
-    for (var i = 0; i < iframes.length; i++) {
-      var iframeDoc = iframes[i].contentDocument || iframes[i].contentWindow.document;
-      if (!iframeDoc) continue;
-      
-      // Inject style into the nested iframe
-      if (!iframeDoc.querySelector('#gainedge-fix')) {
-        var style = iframeDoc.createElement('style');
-        style.id = 'gainedge-fix';
-        style.textContent = [
-          'span[style*="color: rgb(0, 0, 0)"] { color: #94A3B8 !important; }',
-          'span[style*="color:#000000"] { color: #94A3B8 !important; }',
-          'span[style*="color:#000"] { color: #94A3B8 !important; }',
-          'font[color="#000000"] { color: #94A3B8 !important; }',
-          'font[color="black"] { color: #94A3B8 !important; }',
-          '.negative span, .down span { color: #EF4444 !important; }',
-          '.positive span, .up span { color: #22C55E !important; }',
-        ].join('\\n');
-        iframeDoc.head.appendChild(style);
-      }
+import { useState, useEffect } from "react";
+import { C } from "@/lib/mock-data";
+import { supabase } from "@/integrations/supabase/client";
 
-      // Also directly fix any black-colored elements
-      var els = iframeDoc.querySelectorAll('*');
-      for (var j = 0; j < els.length; j++) {
-        var computed = iframeDoc.defaultView.getComputedStyle(els[j]);
-        if (computed.color === 'rgb(0, 0, 0)') {
-          var txt = (els[j].textContent || '').trim();
-          if (txt.indexOf('-') === 0) {
-            els[j].style.setProperty('color', '#EF4444', 'important');
-          } else if (txt.match(/^\\+/) || txt.match(/^[0-9]/)) {
-            els[j].style.setProperty('color', '#22C55E', 'important');
-          } else {
-            els[j].style.setProperty('color', '#94A3B8', 'important');
-          }
-        }
-      }
-
-      // Recurse into deeper iframes
-      var deepIframes = iframeDoc.querySelectorAll('iframe');
-      for (var k = 0; k < deepIframes.length; k++) {
-        try {
-          var deepDoc = deepIframes[k].contentDocument || deepIframes[k].contentWindow.document;
-          if (!deepDoc) continue;
-          if (!deepDoc.querySelector('#gainedge-fix')) {
-            var deepStyle = deepDoc.createElement('style');
-            deepStyle.id = 'gainedge-fix';
-            deepStyle.textContent = [
-              'span[style*="color: rgb(0, 0, 0)"] { color: #94A3B8 !important; }',
-              'span[style*="color:#000000"] { color: #94A3B8 !important; }',
-              'font[color="#000000"] { color: #94A3B8 !important; }',
-            ].join('\\n');
-            deepDoc.head.appendChild(deepStyle);
-          }
-          var deepEls = deepDoc.querySelectorAll('*');
-          for (var m = 0; m < deepEls.length; m++) {
-            var dc = deepDoc.defaultView.getComputedStyle(deepEls[m]);
-            if (dc.color === 'rgb(0, 0, 0)') {
-              var dtxt = (deepEls[m].textContent || '').trim();
-              if (dtxt.indexOf('-') === 0) {
-                deepEls[m].style.setProperty('color', '#EF4444', 'important');
-              } else if (dtxt.match(/^\\+/) || dtxt.match(/^[0-9]/)) {
-                deepEls[m].style.setProperty('color', '#22C55E', 'important');
-              } else {
-                deepEls[m].style.setProperty('color', '#94A3B8', 'important');
-              }
-            }
-          }
-        } catch(e) {}
-      }
-    }
-  } catch(e) {}
+interface Quote {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
 }
 
-setInterval(fixNestedIframe, 300);
-setTimeout(fixNestedIframe, 1500);
-setTimeout(fixNestedIframe, 3000);
-setTimeout(fixNestedIframe, 5000);
-<\/script>
-</body></html>`;
+export default function LiveQuotesTicker() {
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchQuotes = async () => {
+      try {
+        await supabase.auth.refreshSession();
+        const { data, error } = await supabase.functions.invoke("forex-ticker");
+        if (!error && data?.quotes?.length && mounted) {
+          setQuotes(data.quotes);
+        }
+      } catch (e) {
+        console.warn("Ticker fetch failed:", e);
+      }
+    };
+
+    fetchQuotes();
+    const interval = setInterval(fetchQuotes, 60_000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  if (quotes.length === 0) {
+    return (
+      <div style={{
+        width: "100%", height: 32,
+        background: C.bg2,
+        borderBottom: `1px solid ${C.border}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <span style={{ color: C.muted, fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
+          Loading live quotes…
+        </span>
+      </div>
+    );
+  }
+
+  const tickerItems = [...quotes, ...quotes];
+  const duration = Math.max(quotes.length * 4, 30);
 
   return (
-    <iframe
-      srcDoc={html}
-      style={{
-        width: "100%",
-        height: 30,
-        border: "none",
-        display: "block",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-      }}
-      sandbox="allow-scripts allow-same-origin allow-popups"
-      title="Live Quotes"
-    />
+    <div style={{
+      width: "100%", height: 32, overflow: "hidden",
+      background: C.bg2,
+      borderBottom: `1px solid ${C.border}`,
+      position: "relative",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", height: "100%",
+        animation: `ticker-scroll ${duration}s linear infinite`,
+        whiteSpace: "nowrap",
+        willChange: "transform",
+      }}>
+        {tickerItems.map((q, i) => {
+          const isUp = q.change > 0;
+          const isDown = q.change < 0;
+          const color = isUp ? "#22C55E" : isDown ? "#EF4444" : C.sec;
+          const arrow = isUp ? "▲" : isDown ? "▼" : "–";
+          const decimals = q.symbol.includes("JPY") ? 3 : q.symbol.includes("XAU") ? 2 : 5;
+
+          return (
+            <div key={`${q.symbol}-${i}`} style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "0 16px",
+              flexShrink: 0,
+            }}>
+              {i > 0 && (
+                <span style={{ color: C.jade, fontSize: 6, marginRight: 10 }}>●</span>
+              )}
+              <span style={{
+                color: "#94A3B8", fontSize: 12, fontWeight: 600,
+                fontFamily: "'DM Sans', sans-serif",
+              }}>
+                {q.symbol}
+              </span>
+              <span style={{
+                color: "#E2E8F0", fontSize: 12, fontWeight: 700,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {q.price.toFixed(decimals)}
+              </span>
+              <span style={{ color, fontSize: 9 }}>{arrow}</span>
+              <span style={{
+                color, fontSize: 11, fontWeight: 600,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {q.change !== 0
+                  ? `${isUp ? "+" : ""}${q.change.toFixed(decimals)}`
+                  : "0.00"
+                }
+              </span>
+              <span style={{
+                color, fontSize: 11, fontWeight: 600,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                {q.changePercent !== 0
+                  ? `${isUp ? "+" : ""}${q.changePercent.toFixed(2)}%`
+                  : "0.00%"
+                }
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @keyframes ticker-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
+    </div>
   );
 }
