@@ -126,7 +126,20 @@ export default function SettingsPage() {
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>{t("settings.currentWatchlist")} ({instruments.length}/10 — {tierLabel} {t("common.tier")}):</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
           {instruments.map(i => (
-            <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: C.jade + "18", color: C.jade }}>{i}</span>
+            <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: C.jade + "18", color: C.jade, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {i}
+              <button
+                onClick={async () => {
+                  if (!userId) return;
+                  const { error } = await supabase.from("user_instruments").delete().eq("user_id", userId).eq("symbol", i);
+                  if (error) { toast.error("Failed to remove instrument"); return; }
+                  toast.success(`${i} removed from watchlist`);
+                  loadInstruments();
+                }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 14, lineHeight: 1, padding: 0, fontWeight: 800 }}
+                title={`Remove ${i}`}
+              >×</button>
+            </span>
           ))}
         </div>
         <button onClick={() => setShowAddInstrument(true)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>{t("settings.addInstrument")}</button>
