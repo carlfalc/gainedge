@@ -114,6 +114,44 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const myTradesEnabled = myTradesMap[symbol] ?? false;
   const setMyTradesEnabled = (v: boolean) => setMyTradesMap(prev => ({ ...prev, [symbol]: v }));
 
+  // ─── LOT SIZE SYNC: load from user_signal_preferences as single source of truth ───
+  const lotSizeInitialized = useRef(false);
+  useEffect(() => {
+    if (lotSizeInitialized.current) return;
+    lotSizeInitialized.current = true;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase
+        .from("user_signal_preferences")
+        .select("lot_size")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (data?.lot_size) {
+        const ls = String(data.lot_size);
+        setLotSize(ls);
+      }
+    })();
+  }, []);
+
+  // When trade panel lot size changes, sync to user_signal_preferences
+  const syncLotSizeToDb = useCallback(async (newLotSize: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const numVal = parseFloat(newLotSize);
+    if (isNaN(numVal) || numVal <= 0) return;
+    await supabase.from("user_signal_preferences").upsert({
+      user_id: session.user.id,
+      lot_size: numVal,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
+  }, []);
+
+  const handleLotSizeChange = useCallback((newVal: string) => {
+    setLotSize(newVal);
+    syncLotSizeToDb(newVal);
+  }, [syncLotSizeToDb]);
+
   // Persist intelligent trader state whenever it changes
   useEffect(() => {
     localStorage.setItem("ge_intelligent_trader", JSON.stringify({ autoTradeMap, myTradesMap, autoLotSize }));
@@ -485,7 +523,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                 <div>
                   <div className="text-[9px] text-white mb-0.5">Volume</div>
                   <select
-                    value={lotSize} onChange={e => setLotSize(e.target.value)}
+                    value={lotSize} onChange={e => handleLotSizeChange(e.target.value)}
                     className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
                   >
                     {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
@@ -528,7 +566,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                     <input
                       type="number"
                       value={lotSize}
-                      onChange={e => setLotSize(e.target.value)}
+                      onChange={e => handleLotSizeChange(e.target.value)}
                       step="0.01"
                       min="0.01"
                       className="w-14 bg-[#080B12] border border-white/10 rounded px-1.5 py-1 text-xs text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
@@ -614,7 +652,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                   <div>
                     <div className="text-[9px] text-white mb-0.5">Volume</div>
                     <select
-                      value={lotSize} onChange={e => setLotSize(e.target.value)}
+                      value={lotSize} onChange={e => handleLotSizeChange(e.target.value)}
                       className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
                     >
                       {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}

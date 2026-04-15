@@ -1341,41 +1341,34 @@ serve(async (req) => {
               }
             }
 
-            // ─── SIGNAL CREATION: only on meaningful new signals with conf >= 5 ───
+            // ─── SIGNAL CREATION: strict ONE active signal per instrument ───
             if (analysis.confidence >= 5 && (analysis.direction === "BUY" || analysis.direction === "SELL") && analysis.entry_price && analysis.take_profit && analysis.stop_loss) {
-              // Candle-period dedup: check if a signal was already created within this candle window
-              const tfMin = TF_MINUTES[inst.timeframe] || 15;
-              const candleWindowStart = new Date(Math.floor(Date.now() / (tfMin * 60000)) * tfMin * 60000).toISOString();
-              const { data: candlePeriodSignals } = await supabase
+              // RULE 1: Only ONE pending signal per instrument at any time
+              const { data: existingPending } = await supabase
                 .from("signals")
-                .select("id")
+                .select("id, direction, entry_price")
                 .eq("user_id", userId)
                 .eq("symbol", inst.symbol)
-                .gte("created_at", candleWindowStart)
+                .eq("result", "pending")
                 .limit(1);
 
-              if (candlePeriodSignals && candlePeriodSignals.length > 0) {
-                console.log(`Candle-period dedup: ${inst.symbol} already has signal in current ${inst.timeframe} window`);
+              if (existingPending && existingPending.length > 0) {
+                console.log(`Dedup: ${inst.symbol} already has a PENDING signal — skipping`);
               } else {
-                // Check for duplicate pending signal: same direction & entry within 0.5%
-                const { data: recentPending } = await supabase
+                // RULE 2: Candle-period dedup — max one signal per candle window
+                const tfMin = TF_MINUTES[inst.timeframe] || 15;
+                const candleWindowStart = new Date(Math.floor(Date.now() / (tfMin * 60000)) * tfMin * 60000).toISOString();
+                const { data: candlePeriodSignals } = await supabase
                   .from("signals")
-                  .select("entry_price, direction")
+                  .select("id")
                   .eq("user_id", userId)
                   .eq("symbol", inst.symbol)
-                  .eq("result", "pending")
-                  .order("created_at", { ascending: false })
+                  .gte("created_at", candleWindowStart)
                   .limit(1);
 
-                let isDuplicate = false;
-                if (recentPending && recentPending.length > 0) {
-                  const prev = recentPending[0];
-                  const sameDir = prev.direction === analysis.direction;
-                  const priceDiff = Math.abs(prev.entry_price - analysis.entry_price!) / analysis.entry_price!;
-                  if (sameDir && priceDiff < 0.005) isDuplicate = true;
-                }
-
-                if (!isDuplicate) {
+                if (candlePeriodSignals && candlePeriodSignals.length > 0) {
+                  console.log(`Candle-period dedup: ${inst.symbol} already has signal in current ${inst.timeframe} window`);
+                } else {
                   await supabase.from("signals").insert({
                     user_id: userId, symbol: inst.symbol, direction: analysis.direction,
                     confidence: analysis.confidence, entry_price: analysis.entry_price,
@@ -1383,6 +1376,7 @@ serve(async (req) => {
                     risk_reward: analysis.risk_reward || "2.0:1",
                   });
                   signalsCreated++;
+                  console.log(`Signal created: ${inst.symbol} ${analysis.direction} conf=${analysis.confidence}`);
                 }
               }
             }

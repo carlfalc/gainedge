@@ -133,14 +133,61 @@ export default function DashboardHome() {
       setScans(Array.from(latest.values()));
     }
 
+    // Load lot size and currency for consistent P&L calculation
+    const { data: sigPrefs } = await supabase
+      .from("user_signal_preferences")
+      .select("lot_size, currency")
+      .eq("user_id", uid)
+      .maybeSingle();
+    const dashLotSize = (sigPrefs as any)?.lot_size ?? 0.01;
+    const dashCurrency = (sigPrefs as any)?.currency || "NZD";
+
+    // Load FX rates for currency conversion
+    const { data: fxData } = await supabase
+      .from("live_market_data")
+      .select("symbol, last_price")
+      .eq("user_id", uid)
+      .in("symbol", ["NZDUSD", "AUDUSD", "GBPUSD", "EURUSD", "USDJPY"]);
+    const dashFx: Record<string, number> = {};
+    if (fxData) {
+      for (const row of fxData as any[]) {
+        if (row.symbol === "NZDUSD") dashFx["NZD"] = row.last_price;
+        else if (row.symbol === "AUDUSD") dashFx["AUD"] = row.last_price;
+        else if (row.symbol === "GBPUSD") dashFx["GBP"] = row.last_price;
+        else if (row.symbol === "EURUSD") dashFx["EUR"] = row.last_price;
+        else if (row.symbol === "USDJPY") dashFx["JPY"] = row.last_price;
+      }
+    }
+
+    // Helper: pip to USD (same logic as SignalsPage)
+    const dashPipToUsd = (pips: number, symbol: string) => {
+      const isIndex = ["US30", "NAS100", "SPX500", "DJ30", "NDX100", "USTEC"].includes(symbol);
+      const isGold = symbol === "XAUUSD";
+      const pipValuePerLot = isIndex ? 1 : isGold ? 10 : 10;
+      return pips * pipValuePerLot * dashLotSize;
+    };
+
+    const dashConvert = (usdAmount: number) => {
+      if (dashCurrency === "USD") return usdAmount;
+      const rate = dashFx[dashCurrency];
+      if (!rate || rate === 0) {
+        const fallback: Record<string, number> = { NZD: 1.72, AUD: 1.55, GBP: 0.79, EUR: 0.92, JPY: 155 };
+        return usdAmount * (fallback[dashCurrency] || 1);
+      }
+      if (dashCurrency === "JPY") return usdAmount * rate;
+      return usdAmount / rate;
+    };
+
     const { data: signals } = await supabase.from("signals").select("*").eq("user_id", uid);
     if (signals) {
       const closed = signals.filter((s: any) => s.result !== "pending");
       const wins = closed.filter((s: any) => s.result === "win");
       const losses = closed.filter((s: any) => s.result === "loss");
-      const totalPnl = closed.reduce((sum: number, s: any) => sum + (s.pnl || 0), 0);
-      const avgWin = wins.length ? wins.reduce((s: number, w: any) => s + (w.pnl || 0), 0) / wins.length : 0;
-      const avgLoss = losses.length ? Math.abs(losses.reduce((s: number, l: any) => s + (l.pnl || 0), 0) / losses.length) : 1;
+      // Use pnl_pips-based calculation (same as Signals page)
+      const totalPnlUsd = closed.reduce((sum: number, s: any) => sum + dashPipToUsd(s.pnl_pips ?? 0, s.symbol), 0);
+      const totalPnl = dashConvert(totalPnlUsd);
+      const avgWinUsd = wins.length ? wins.reduce((s: number, w: any) => s + dashPipToUsd(w.pnl_pips ?? 0, w.symbol), 0) / wins.length : 0;
+      const avgLossUsd = losses.length ? Math.abs(losses.reduce((s: number, l: any) => s + dashPipToUsd(l.pnl_pips ?? 0, l.symbol), 0) / losses.length) : 1;
 
       // Compute current win streak
       const sortedDesc = [...closed].sort((a: any, b: any) => new Date(b.closed_at || b.resolved_at || b.created_at).getTime() - new Date(a.closed_at || a.resolved_at || a.created_at).getTime());
@@ -164,11 +211,13 @@ export default function DashboardHome() {
       const bestSession = sessEntries.length ? sessEntries.reduce((a, b) => (a[1].wins / a[1].total) >= (b[1].wins / b[1].total) ? a : b)[0] : "—";
       const worstSession = sessEntries.length ? sessEntries.reduce((a, b) => (a[1].wins / a[1].total) <= (b[1].wins / b[1].total) ? a : b)[0] : "—";
 
+      const currSymbol = dashCurrency === "JPY" ? "¥" : "$";
+
       setStats({
         netPnl: totalPnl,
         wins: wins.length,
         losses: losses.length,
-        profitFactor: avgLoss > 0 ? parseFloat((avgWin / avgLoss).toFixed(2)) : 0,
+        profitFactor: avgLossUsd > 0 ? parseFloat((avgWinUsd / avgLossUsd).toFixed(2)) : 0,
         avgRR: closed.length ? parseFloat((closed.reduce((s: number, c: any) => {
           const rr = c.risk_reward ? parseFloat(c.risk_reward.split(":")[0]) : 0;
           return s + rr;
@@ -178,9 +227,9 @@ export default function DashboardHome() {
         worstSession,
       });
 
-      const sorted = [...closed].sort((a: any, b: any) => new Date(a.closed_at).getTime() - new Date(b.closed_at).getTime());
+      const sorted = [...closed].sort((a: any, b: any) => new Date(a.closed_at || a.resolved_at || a.created_at).getTime() - new Date(b.closed_at || b.resolved_at || b.created_at).getTime());
       let cumulative = 0;
-      const curve = [0, ...sorted.map((s: any) => { cumulative += (s.pnl || 0); return cumulative; })];
+      const curve = [0, ...sorted.map((s: any) => { cumulative += dashPipToUsd(s.pnl_pips ?? 0, s.symbol); return dashConvert(cumulative); })];
       setEquityCurve(curve);
     }
   };
