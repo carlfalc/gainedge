@@ -1732,8 +1732,8 @@ serve(async (req) => {
       }
     }
 
-    // ─── LIQUIDITY ZONE DETECTION & SESSION BIAS ───
-    try {
+    // ─── LIQUIDITY ZONE DETECTION & SESSION BIAS (skip if time budget exceeded) ───
+    if (elapsed() < TIME_LIMIT_CRITICAL) try {
       for (const [symbol, candles] of symbolCandles) {
         if (!Array.isArray(candles) || candles.length < 10) continue;
         const timeframe = symbolTfSet.get(symbol) || "15m";
