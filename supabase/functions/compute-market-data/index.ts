@@ -1894,7 +1894,7 @@ serve(async (req) => {
           }
         }
       }
-    } catch (e) { console.warn("News impact tracking error:", e); }
+    } catch (e) { console.warn("News impact tracking error:", e); } }
 
     return new Response(JSON.stringify({
       success: true, symbols: symbolTfSet.size, users: userInstruments.size,
