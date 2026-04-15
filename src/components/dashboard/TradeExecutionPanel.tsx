@@ -523,7 +523,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                 <div>
                   <div className="text-[9px] text-white mb-0.5">Volume</div>
                   <select
-                    value={lotSize} onChange={e => setLotSize(e.target.value)}
+                    value={lotSize} onChange={e => handleLotSizeChange(e.target.value)}
                     className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
                   >
                     {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
@@ -566,7 +566,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                     <input
                       type="number"
                       value={lotSize}
-                      onChange={e => setLotSize(e.target.value)}
+                      onChange={e => handleLotSizeChange(e.target.value)}
                       step="0.01"
                       min="0.01"
                       className="w-14 bg-[#080B12] border border-white/10 rounded px-1.5 py-1 text-xs text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
@@ -652,7 +652,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                   <div>
                     <div className="text-[9px] text-white mb-0.5">Volume</div>
                     <select
-                      value={lotSize} onChange={e => setLotSize(e.target.value)}
+                      value={lotSize} onChange={e => handleLotSizeChange(e.target.value)}
                       className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
                     >
                       {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
