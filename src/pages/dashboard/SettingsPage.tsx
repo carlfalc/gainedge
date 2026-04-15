@@ -131,10 +131,15 @@ export default function SettingsPage() {
               <button
                 onClick={async () => {
                   if (!userId) return;
+                  // Optimistic: remove from UI immediately
+                  setInstruments(prev => prev.filter(s => s !== i));
                   const { error } = await supabase.from("user_instruments").delete().eq("user_id", userId).eq("symbol", i);
-                  if (error) { toast.error("Failed to remove instrument"); return; }
+                  if (error) {
+                    toast.error("Failed to remove instrument");
+                    loadInstruments(); // revert on failure
+                    return;
+                  }
                   toast.success(`${i} removed from watchlist`);
-                  loadInstruments();
                 }}
                 style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 14, lineHeight: 1, padding: 0, fontWeight: 800 }}
                 title={`Remove ${i}`}
