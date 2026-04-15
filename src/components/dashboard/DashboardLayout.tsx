@@ -17,6 +17,7 @@ import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 import BrokerModal from "./BrokerModal";
 import AskRonModal from "./AskRonModal";
 import TradeNotificationPopup from "./TradeNotificationPopup";
+import LiveQuotesTicker from "./LiveQuotesTicker";
 
 const NAV_ITEMS = [
   { labelKey: "nav.dashboard", icon: LayoutDashboard, path: "/dashboard" },
@@ -344,6 +345,7 @@ export default function DashboardLayout() {
             )}
           </div>
         </header>
+        <LiveQuotesTicker />
 
         {/* PAGE CONTENT */}
         <main style={{ flex: 1, padding: 24, overflowY: "auto", background: lightBg ? "#F8FAFC" : "transparent", transition: "background 0.3s" }}>
