@@ -140,7 +140,7 @@ export default function FalconerRulesPanel() {
       const raw = localStorage.getItem("ge_ron_rules_ui");
       if (raw) return JSON.parse(raw) as { filter: string; versionFilter: string; aiVersion: RonRulesVersion };
     } catch {}
-    return { filter: "all", versionFilter: "all", aiVersion: "v2" as const };
+    return { filter: "all", versionFilter: "v1", aiVersion: "v1" as const };
   };
   const savedUi = loadSavedUiState();
 
@@ -219,6 +219,7 @@ export default function FalconerRulesPanel() {
 
   const switchVersion = (ver: RonRulesVersion) => {
     setAiVersion(ver);
+    setVersionFilter(ver);
     toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
   };
 
