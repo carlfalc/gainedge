@@ -135,7 +135,44 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
     );
   }, [symbol]);
 
-  // Order mode
+  // ─── LOT SIZE SYNC: load from user_signal_preferences as single source of truth ───
+  const lotSizeInitialized = useRef(false);
+  useEffect(() => {
+    if (lotSizeInitialized.current) return;
+    lotSizeInitialized.current = true;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase
+        .from("user_signal_preferences")
+        .select("lot_size")
+        .eq("user_id", session.user.id)
+        .maybeSingle();
+      if (data?.lot_size) {
+        const ls = String(data.lot_size);
+        setLotSize(ls);
+      }
+    })();
+  }, []);
+
+  // When trade panel lot size changes, sync to user_signal_preferences
+  const syncLotSizeToDb = useCallback(async (newLotSize: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const numVal = parseFloat(newLotSize);
+    if (isNaN(numVal) || numVal <= 0) return;
+    await supabase.from("user_signal_preferences").upsert({
+      user_id: session.user.id,
+      lot_size: numVal,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
+  }, []);
+
+  const handleLotSizeChange = useCallback((newVal: string) => {
+    setLotSize(newVal);
+    syncLotSizeToDb(newVal);
+  }, [syncLotSizeToDb]);
+
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
   const [limitEntry, setLimitEntry] = useState("");
   const [limitSl, setLimitSl] = useState("");
