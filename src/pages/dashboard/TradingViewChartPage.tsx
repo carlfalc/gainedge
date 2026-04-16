@@ -200,18 +200,34 @@ export default function TradingViewChartPage() {
 
       {/* Main content: chart + sidebar */}
       <div className="flex flex-1 min-h-0">
-        {/* Chart area */}
-        <div className="flex-1 min-w-0 relative" style={{ minHeight: 600 }}>
-          {selected && (
-            <>
-              <TradingViewWidget symbol={selected} broker={selectedBroker} />
-              <ChartOverlay symbol={selected} userId={userId} positions={positions} />
-            </>
-          )}
+        {/* Left: chart + trade panel with independent scroll */}
+        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          {/* Chart area */}
+          <div className="flex-1 min-h-0 relative" style={{ minHeight: 400 }}>
+            {selected && (
+              <>
+                <TradingViewWidget symbol={selected} broker={selectedBroker} />
+                <ChartOverlay symbol={selected} userId={userId} positions={positions} />
+              </>
+            )}
+          </div>
+
+          {/* Bottom trade strip — scrollable independently */}
+          <div className="shrink-0 border-t border-border max-h-[40vh] overflow-y-auto">
+            <TradeExecutionPanel
+              ref={tradePanelRef}
+              symbol={selected}
+              accountId={accountId}
+              connectionStatus={connectionStatus}
+              onOrderModeChange={setOrderMode}
+              onLimitPricesChange={setLimitPrices}
+              onPositionsChange={setPositions}
+            />
+          </div>
         </div>
 
-        {/* Right sidebar — 320px, sticky with own scroll */}
-        <div className="w-[320px] shrink-0 hidden lg:block h-full">
+        {/* Right sidebar — 320px, independent scroll */}
+        <div className="w-[320px] shrink-0 hidden lg:block overflow-y-auto border-l border-border">
           <ChartSidePanel
             symbol={selected}
             userId={userId}
@@ -222,19 +238,6 @@ export default function TradingViewChartPage() {
             onVersionChange={setRonVersion}
           />
         </div>
-      </div>
-
-      {/* Bottom trade strip — compact */}
-      <div className="shrink-0 border-t border-border">
-        <TradeExecutionPanel
-          ref={tradePanelRef}
-          symbol={selected}
-          accountId={accountId}
-          connectionStatus={connectionStatus}
-          onOrderModeChange={setOrderMode}
-          onLimitPricesChange={setLimitPrices}
-          onPositionsChange={setPositions}
-        />
       </div>
     </div>
   );
