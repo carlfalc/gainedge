@@ -7,6 +7,7 @@ import TradingViewWidget from "@/components/dashboard/TradingViewWidget";
 import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
 import ActiveTradeBar from "@/components/dashboard/ActiveTradeBar";
+import ChartOverlay from "@/components/dashboard/ChartOverlay";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
@@ -177,7 +178,10 @@ export default function TradingViewChartPage() {
         {/* Chart area */}
         <div className="flex-1 min-w-0 relative" style={{ minHeight: 500 }}>
           {selected && (
-            <TradingViewWidget symbol={selected} broker={selectedBroker} />
+            <>
+              <TradingViewWidget symbol={selected} broker={selectedBroker} />
+              <ChartOverlay symbol={selected} userId={userId} positions={positions} />
+            </>
           )}
         </div>
 
