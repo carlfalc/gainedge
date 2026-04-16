@@ -139,15 +139,14 @@ function VersionCard({
       <TooltipTrigger asChild>
         <button
           onClick={onClick}
-          className="w-full text-left rounded-lg p-3 transition-all duration-300 relative overflow-hidden"
+          className={`w-full text-left rounded-lg transition-all duration-300 relative overflow-hidden ${active ? "p-4" : "p-2.5"}`}
           style={{
-            transform: active ? "scale(1)" : "scale(0.95)",
             opacity: active ? 1 : 0.6,
-            border: active ? "1.5px solid rgba(0,207,165,0.5)" : "1px solid hsl(var(--border))",
+            border: active ? "2px solid rgba(0,207,165,0.6)" : "1px solid hsl(var(--border))",
             background: active
-              ? "linear-gradient(135deg, rgba(0,207,165,0.08) 0%, rgba(14,165,233,0.05) 100%)"
+              ? "linear-gradient(135deg, rgba(0,207,165,0.1) 0%, rgba(14,165,233,0.08) 100%)"
               : "hsl(var(--background) / 0.3)",
-            boxShadow: active ? "0 0 16px rgba(0,207,165,0.15), inset 0 1px 0 rgba(0,207,165,0.1)" : "none",
+            boxShadow: active ? "0 0 20px rgba(0,207,165,0.2), 0 0 40px rgba(0,207,165,0.08), inset 0 1px 0 rgba(0,207,165,0.15)" : "none",
           }}
         >
           {/* Active badge */}
@@ -177,14 +176,14 @@ function VersionCard({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`font-bold tracking-wide ${active ? "text-[12px] text-foreground" : "text-[11px] text-muted-foreground"}`}>
+                <span className={`font-bold tracking-wide ${active ? "text-[13px] text-foreground" : "text-[10px] text-muted-foreground"}`}>
                   {emoji} {title}
                 </span>
-                <span className={`text-[9px] font-medium ${active ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+                <span className={`font-medium ${active ? "text-[10px] text-muted-foreground" : "text-[8px] text-muted-foreground/60"}`}>
                   — {subtitle}
                 </span>
               </div>
-              <p className={`mt-1.5 leading-relaxed ${active ? "text-[10px] text-muted-foreground" : "text-[9px] text-muted-foreground/70"}`}>
+              <p className={`mt-1.5 leading-relaxed ${active ? "text-[10px] text-muted-foreground" : "text-[9px] text-muted-foreground/60 line-clamp-2"}`}>
                 {description}
               </p>
               <div className="mt-2">
