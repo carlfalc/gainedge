@@ -13,6 +13,13 @@ import { DEFAULT_CLOCKS, AVAILABLE_CITIES, type ClockConfig } from "@/components
 
 const ADMIN_EMAIL = "falconercarlandrew@gmail.com";
 
+const RISK_PROFILES = [
+  { value: "conservative", ratio: "1.5", label: "Conservative", desc: "Lower reward, tighter stops. Best for cautious trading.", default: false },
+  { value: "balanced", ratio: "2.0", label: "Balanced", desc: "Standard 2:1 reward-to-risk. Recommended for most traders.", default: true },
+  { value: "aggressive", ratio: "2.5", label: "Aggressive", desc: "Higher targets with wider stops. For confident traders.", default: false },
+  { value: "moonshot", ratio: "3.0", label: "Moonshot", desc: "Maximum reward potential. Higher risk, bigger wins.", default: false },
+];
+
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { profile, loading, updateProfile, userId } = useProfile();
