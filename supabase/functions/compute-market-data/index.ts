@@ -1355,6 +1355,12 @@ serve(async (req) => {
             .eq("symbol", inst.symbol)
             .gte("created_at", twoHoursAgo);
 
+          // ─── BLOCK SIGNAL GENERATION FROM MOCK DATA ───
+          if (mockSymbols.has(inst.symbol)) {
+            console.warn(`Skipping signal generation for ${inst.symbol} — using mock data`);
+            continue;
+          }
+
           const candles = symbolCandles.get(inst.symbol);
           let analysis: AnalysisResult;
 
