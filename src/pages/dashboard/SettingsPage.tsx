@@ -220,17 +220,6 @@ export default function SettingsPage() {
         <Toggle label={t("settings.smsAlerts")} checked={smsAlerts} onChange={setSmsAlerts} />
       </Section>
 
-      <Section icon={<Sliders size={16} color={C.orange} />} title={t("settings.brokerSection")}>
-        <Field label={t("settings.selectBroker")}>
-          <select value={broker} onChange={e => setBroker(e.target.value)} style={inputStyle}>
-            <option value="eightcap">Eightcap</option>
-            <option value="icmarkets">IC Markets</option>
-            <option value="pepperstone">Pepperstone</option>
-            <option value="oanda">OANDA</option>
-          </select>
-        </Field>
-        <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>{t("settings.brokerHint")}</div>
-      </Section>
 
       <Section icon={<CreditCard size={16} color={C.jade} />} title={t("settings.subscription")}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
