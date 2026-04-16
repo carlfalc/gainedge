@@ -2,63 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-profile";
 import { provisionAccount } from "@/services/metaapi-client";
-import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type TradeExecutionPanelRef } from "@/components/dashboard/TradeExecutionPanel";
-import ChartOrderLines from "@/components/dashboard/ChartOrderLines";
-import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
-import ActiveTradeInfo from "@/components/dashboard/ActiveTradeInfo";
+import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type TradeExecutionPanelRef, type Position } from "@/components/dashboard/TradeExecutionPanel";
+import TradingViewWidget from "@/components/dashboard/TradingViewWidget";
+import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import { ExternalLink } from "lucide-react";
-
-const BROKER_EXCHANGES: Record<string, string> = {
-  Eightcap: "EIGHTCAP",
-  Pepperstone: "PEPPERSTONE",
-  "IC Markets": "ICMARKETS",
-  OANDA: "OANDA",
-};
-
-const TV_SYMBOL_MAP: Record<string, Record<string, string>> = {
-  XAUUSD: { default: "OANDA:XAUUSD", EIGHTCAP: "EIGHTCAP:XAUUSD", PEPPERSTONE: "PEPPERSTONE:XAUUSD", ICMARKETS: "ICMARKETS:XAUUSD", OANDA: "OANDA:XAUUSD" },
-  XAGUSD: { default: "OANDA:XAGUSD", EIGHTCAP: "EIGHTCAP:XAGUSD", PEPPERSTONE: "PEPPERSTONE:XAGUSD", ICMARKETS: "ICMARKETS:XAGUSD", OANDA: "OANDA:XAGUSD" },
-  EURUSD: { default: "FX:EURUSD", EIGHTCAP: "EIGHTCAP:EURUSD", PEPPERSTONE: "PEPPERSTONE:EURUSD", ICMARKETS: "ICMARKETS:EURUSD", OANDA: "OANDA:EURUSD" },
-  GBPUSD: { default: "FX:GBPUSD", EIGHTCAP: "EIGHTCAP:GBPUSD", PEPPERSTONE: "PEPPERSTONE:GBPUSD", ICMARKETS: "ICMARKETS:GBPUSD", OANDA: "OANDA:GBPUSD" },
-  USDJPY: { default: "FX:USDJPY", EIGHTCAP: "EIGHTCAP:USDJPY", PEPPERSTONE: "PEPPERSTONE:USDJPY", ICMARKETS: "ICMARKETS:USDJPY", OANDA: "OANDA:USDJPY" },
-  AUDUSD: { default: "FX:AUDUSD", EIGHTCAP: "EIGHTCAP:AUDUSD", PEPPERSTONE: "PEPPERSTONE:AUDUSD", ICMARKETS: "ICMARKETS:AUDUSD", OANDA: "OANDA:AUDUSD" },
-  NZDUSD: { default: "FX:NZDUSD", EIGHTCAP: "EIGHTCAP:NZDUSD", PEPPERSTONE: "PEPPERSTONE:NZDUSD", ICMARKETS: "ICMARKETS:NZDUSD", OANDA: "OANDA:NZDUSD" },
-  USDCAD: { default: "FX:USDCAD", EIGHTCAP: "EIGHTCAP:USDCAD", PEPPERSTONE: "PEPPERSTONE:USDCAD", ICMARKETS: "ICMARKETS:USDCAD", OANDA: "OANDA:USDCAD" },
-  USDCHF: { default: "FX:USDCHF", EIGHTCAP: "EIGHTCAP:USDCHF", PEPPERSTONE: "PEPPERSTONE:USDCHF", ICMARKETS: "ICMARKETS:USDCHF", OANDA: "OANDA:USDCHF" },
-  EURGBP: { default: "FX:EURGBP" },
-  EURJPY: { default: "FX:EURJPY" },
-  GBPJPY: { default: "FX:GBPJPY" },
-  NAS100: { default: "PEPPERSTONE:NAS100", EIGHTCAP: "EIGHTCAP:NAS100", PEPPERSTONE: "PEPPERSTONE:NAS100", ICMARKETS: "ICMARKETS:NAS100" },
-  US30: { default: "TVC:DJI", EIGHTCAP: "EIGHTCAP:US30", PEPPERSTONE: "PEPPERSTONE:US30", ICMARKETS: "ICMARKETS:US30" },
-  SPX500: { default: "SP:SPX", EIGHTCAP: "EIGHTCAP:SPX500", PEPPERSTONE: "PEPPERSTONE:SPX500", ICMARKETS: "ICMARKETS:SPX500" },
-  UK100: { default: "TVC:UKX" },
-  GER40: { default: "XETR:DAX" },
-  BTCUSD: { default: "COINBASE:BTCUSD" },
-  ETHUSD: { default: "COINBASE:ETHUSD" },
-};
+import { toast } from "sonner";
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
-
-// Approximate price ranges for linear coordinate mapping
-const PRICE_RANGE_MAP: Record<string, number> = {
-  XAUUSD: 60, XAGUSD: 2, EURUSD: 0.015, GBPUSD: 0.015, USDJPY: 3,
-  AUDUSD: 0.01, NZDUSD: 0.01, USDCAD: 0.015, USDCHF: 0.015,
-  EURGBP: 0.01, EURJPY: 3, GBPJPY: 4, NAS100: 500, US30: 500,
-  SPX500: 100, UK100: 200, GER40: 300, BTCUSD: 5000, ETHUSD: 500,
-};
-
-function getTvSymbol(sym: string, broker: string): string {
-  const exchange = BROKER_EXCHANGES[broker] || "";
-  const map = TV_SYMBOL_MAP[sym];
-  if (map) return map[exchange] || map.default || `FX:${sym}`;
-  if (exchange) return `${exchange}:${sym}`;
-  return `FX:${sym}`;
-}
-
-function buildIframeUrl(symbol: string, broker: string): string {
-  const tvSymbol = getTvSymbol(symbol, broker);
-  return `https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(tvSymbol)}&interval=15&theme=dark&style=1&locale=en&allow_symbol_change=true&hide_top_toolbar=false&hide_side_toolbar=false`;
-}
 
 export default function TradingViewChartPage() {
   const { userId, profile } = useProfile();
@@ -69,43 +19,9 @@ export default function TradingViewChartPage() {
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "live" | "demo">("disconnected");
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [closingId, setClosingId] = useState<string | null>(null);
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-
-  const priceDec = selected.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => selected.includes(s)) ? 2 : 5;
-
-  // Estimated center price for coordinate mapping
-  const estimatedPrice = useCallback(() => {
-    return tradePanelRef.current?.getCurrentPrice() ?? null;
-  }, []);
-
-  // Linear price-to-Y mapping for overlay
-  const priceRange = PRICE_RANGE_MAP[selected] ?? 100;
-
-  const priceToY = useCallback((price: number): number | null => {
-    const center = estimatedPrice();
-    if (!center || !chartContainerRef.current) return null;
-    const h = chartContainerRef.current.clientHeight;
-    const topMargin = 40; // approximate TV top toolbar
-    const bottomMargin = 30; // approximate TV time axis
-    const usable = h - topMargin - bottomMargin;
-    // Map: center price -> middle of usable area
-    const mid = topMargin + usable / 2;
-    const pixelsPerUnit = usable / priceRange;
-    return mid - (price - center) * pixelsPerUnit;
-  }, [estimatedPrice, priceRange]);
-
-  const yToPrice = useCallback((y: number): number | null => {
-    const center = estimatedPrice();
-    if (!center || !chartContainerRef.current) return null;
-    const h = chartContainerRef.current.clientHeight;
-    const topMargin = 40;
-    const bottomMargin = 30;
-    const usable = h - topMargin - bottomMargin;
-    const mid = topMargin + usable / 2;
-    const pixelsPerUnit = usable / priceRange;
-    return center - (y - mid) / pixelsPerUnit;
-  }, [estimatedPrice, priceRange]);
 
   useEffect(() => {
     if (profile?.broker) {
@@ -136,19 +52,47 @@ export default function TradingViewChartPage() {
       .catch(() => setConnectionStatus("demo"));
   }, [userId]);
 
+  const handleClosePosition = useCallback(async (positionId: string) => {
+    if (!accountId) return;
+    setClosingId(positionId);
+    try {
+      await supabase.auth.refreshSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      const res = await fetch(
+        `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/metaapi-trade`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ action: "close", accountId, positionId }),
+        }
+      );
+      if (!res.ok) throw new Error("Close failed");
+      toast.success("Position closed");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to close position");
+    } finally {
+      setClosingId(null);
+    }
+  }, [accountId]);
+
   const handlePopOut = () => {
     window.open(`/chart-popout?type=tradingview&symbol=${selected}`, "_blank", "noopener");
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-104px)]">
-      {/* Top bar */}
-      <div className="flex items-center gap-1.5 flex-wrap px-1 py-1.5">
+    <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden">
+      {/* Top bar — compact */}
+      <div className="flex items-center gap-1.5 flex-wrap px-2 py-1.5 border-b border-border shrink-0">
         {instruments.map((sym) => (
           <button
             key={sym}
             onClick={() => setSelected(sym)}
-            className={`px-3 py-1.5 rounded-full text-[12px] font-bold tracking-wide transition-all border ${
+            className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wide transition-all border ${
               selected === sym
                 ? "bg-white/10 border-white/30 text-foreground"
                 : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-white/20"
@@ -158,12 +102,12 @@ export default function TradingViewChartPage() {
           </button>
         ))}
 
-        <div className="ml-2 h-5 w-px bg-border" />
+        <div className="ml-2 h-4 w-px bg-border" />
         {BROKERS.map((broker) => (
           <button
             key={broker}
             onClick={() => setSelectedBroker(broker)}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide transition-all border ${
+            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide transition-all border ${
               selectedBroker === broker
                 ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
                 : "bg-card border-border text-muted-foreground hover:text-amber-300 hover:border-amber-500/20"
@@ -176,62 +120,37 @@ export default function TradingViewChartPage() {
         <div className="ml-auto">
           <button
             onClick={handlePopOut}
-            className="px-3 py-1.5 rounded text-[11px] font-semibold bg-card border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5"
+            className="px-2.5 py-1 rounded text-[10px] font-semibold bg-card border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
           >
-            <ExternalLink className="w-3.5 h-3.5" /> Pop Out ↗
+            <ExternalLink className="w-3 h-3" /> Pop Out
           </button>
         </div>
       </div>
 
-      {/* RON Signal Alert + Active Trade Info above chart */}
-      <RonSignalAlert symbol={selected} userId={userId} />
-      <ActiveTradeInfo symbol={selected} accountId={accountId} />
+      {/* Main content: chart + sidebar */}
+      <div className="flex flex-1 min-h-0">
+        {/* Chart area — takes remaining space */}
+        <div className="flex-1 min-w-0 relative" style={{ minHeight: 500 }}>
+          {selected && (
+            <TradingViewWidget symbol={selected} broker={selectedBroker} />
+          )}
+        </div>
 
-      {/* TradingView iframe with order lines overlay */}
-      <div
-        ref={chartContainerRef}
-        className="overflow-hidden border-y border-border relative"
-        style={{ flex: 1, minHeight: 400 }}
-      >
-        {selected && (
-          <iframe
-            key={`${selected}-${selectedBroker}`}
-            src={buildIframeUrl(selected, selectedBroker)}
-            style={{ width: "100%", height: "100%", border: "none", display: "block" }}
-            allowFullScreen
+        {/* Right sidebar — fixed 280px */}
+        <div className="w-[280px] shrink-0 hidden lg:block">
+          <ChartSidePanel
+            symbol={selected}
+            userId={userId}
+            accountId={accountId}
+            positions={positions}
+            onClosePosition={handleClosePosition}
+            closingId={closingId}
           />
-        )}
-        <ChartOrderLines
-          visible={orderMode !== "market" || !!(limitPrices?.sl || limitPrices?.tp)}
-          orderMode={orderMode}
-          entry={orderMode !== "market" ? (limitPrices?.entry ?? null) : null}
-          sl={limitPrices?.sl ?? null}
-          tp={limitPrices?.tp ?? null}
-          priceDec={priceDec}
-          priceToY={priceToY}
-          yToPrice={yToPrice}
-          onEntryDrag={(price) => tradePanelRef.current?.setLimitEntry(price.toFixed(priceDec))}
-          onSLDrag={(price) => {
-            if (orderMode === "market") tradePanelRef.current?.setMarketSL(price.toFixed(priceDec));
-            else tradePanelRef.current?.setLimitSL(price.toFixed(priceDec));
-          }}
-          onTPDrag={(price) => {
-            if (orderMode === "market") tradePanelRef.current?.setMarketTP(price.toFixed(priceDec));
-            else tradePanelRef.current?.setLimitTP(price.toFixed(priceDec));
-          }}
-          onSLRemove={() => {
-            if (orderMode === "market") tradePanelRef.current?.setMarketSL("");
-            else tradePanelRef.current?.setLimitSL("");
-          }}
-          onTPRemove={() => {
-            if (orderMode === "market") tradePanelRef.current?.setMarketTP("");
-            else tradePanelRef.current?.setLimitTP("");
-          }}
-        />
+        </div>
       </div>
 
-      {/* Trade Execution Panel */}
-      <div className="flex-1 overflow-auto">
+      {/* Bottom trade strip — compact */}
+      <div className="shrink-0 border-t border-border">
         <TradeExecutionPanel
           ref={tradePanelRef}
           symbol={selected}
@@ -239,10 +158,8 @@ export default function TradingViewChartPage() {
           connectionStatus={connectionStatus}
           onOrderModeChange={setOrderMode}
           onLimitPricesChange={setLimitPrices}
+          onPositionsChange={setPositions}
         />
-        <div className="text-center py-2 text-[10px] font-medium" style={{ color: "#00CFA5" }}>
-          Powered by RON
-        </div>
       </div>
     </div>
   );
