@@ -219,6 +219,7 @@ export default function FalconerRulesPanel() {
 
   const switchVersion = (ver: RonRulesVersion) => {
     setAiVersion(ver);
+    setVersionFilter(ver);
     toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
   };
 
