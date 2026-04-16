@@ -50,104 +50,107 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
   );
 
   return (
-    <div className="flex flex-col h-full bg-card border-l border-border overflow-y-auto">
-      {/* RON Active Signals */}
-      <div className="border-b border-border p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <Zap size={12} style={{ color: "#00CFA5" }} />
-          <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: "#00CFA5" }}>
-            RON Active Signals
-          </span>
-        </div>
-        {signals.length === 0 ? (
-          <p className="text-[10px] text-muted-foreground">No active signals for {symbol}</p>
-        ) : (
-          <div className="space-y-2">
-            {signals.map((sig) => {
-              const dirColor = sig.direction === "BUY" ? "#22C55E" : "#EF4444";
-              return (
-                <div key={sig.id} className="p-2 rounded bg-background/50 border border-border">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[11px] font-bold" style={{ color: dirColor }}>{sig.direction}</span>
-                    <span className="text-[10px] text-muted-foreground">Conf: {sig.confidence}/10</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
-                    <div>
-                      <span className="text-muted-foreground">Entry</span>
-                      <div className="font-mono font-bold text-foreground">{sig.entry_price.toFixed(priceDec)}</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">TP</span>
-                      <div className="font-mono" style={{ color: "#4ADE80" }}>{sig.take_profit.toFixed(priceDec)}</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">SL</span>
-                      <div className="font-mono" style={{ color: "#EF4444" }}>{sig.stop_loss.toFixed(priceDec)}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+    <div className="flex flex-col h-full bg-card border-l border-border overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        {/* RON Active Signals */}
+        <div className="border-b border-border p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap size={13} style={{ color: "#00CFA5" }} />
+            <span className="text-xs font-bold tracking-wider uppercase" style={{ color: "#00CFA5" }}>
+              RON Active Signals
+            </span>
+            <span className="text-[10px] text-muted-foreground ml-auto">({signals.length})</span>
           </div>
-        )}
-      </div>
-
-      {/* Open Positions */}
-      <div className="border-b border-border p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[11px] font-bold tracking-wider uppercase text-foreground">
-            Open Positions
-          </span>
-          <span className="text-[10px] text-muted-foreground">({filteredPositions.length})</span>
-        </div>
-        {filteredPositions.length === 0 ? (
-          <p className="text-[10px] text-muted-foreground">No open positions for {symbol}</p>
-        ) : (
-          <div className="space-y-2">
-            {filteredPositions.map((pos) => {
-              const isBuy = pos.type?.toLowerCase().includes("buy");
-              const pnlColor = pos.profit >= 0 ? "#22C55E" : "#EF4444";
-              return (
-                <div key={pos.id} className="p-2 rounded bg-background/50 border border-border">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      {isBuy ? <TrendingUp size={11} style={{ color: "#22C55E" }} /> : <TrendingDown size={11} style={{ color: "#EF4444" }} />}
-                      <span className="text-[11px] font-bold" style={{ color: isBuy ? "#22C55E" : "#EF4444" }}>
-                        {isBuy ? "BUY" : "SELL"} {pos.volume}
-                      </span>
+          {signals.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-2">No active signals for {symbol}</p>
+          ) : (
+            <div className="space-y-2.5">
+              {signals.map((sig) => {
+                const dirColor = sig.direction === "BUY" ? "#22C55E" : "#EF4444";
+                return (
+                  <div key={sig.id} className="p-2.5 rounded-lg bg-background/50 border border-border">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs font-bold" style={{ color: dirColor }}>{sig.direction}</span>
+                      <span className="text-[10px] text-muted-foreground ml-auto">Conf: {sig.confidence}/10</span>
                     </div>
-                    <button
-                      onClick={() => onClosePosition(pos.id)}
-                      disabled={closingId === pos.id}
-                      className="px-2 py-0.5 rounded text-[9px] font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
-                    >
-                      {closingId === pos.id ? <Loader2 size={10} className="animate-spin" /> : "CLOSE"}
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 text-[10px]">
-                    <div>
-                      <span className="text-muted-foreground">Entry</span>
-                      <div className="font-mono text-foreground">{pos.openPrice.toFixed(priceDec)}</div>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">P&L</span>
-                      <div className="font-mono font-bold" style={{ color: pnlColor }}>
-                        ${pos.profit.toFixed(2)}
+                    <div className="grid grid-cols-3 gap-2 text-[10px]">
+                      <div>
+                        <span className="text-muted-foreground block mb-0.5">Entry</span>
+                        <div className="font-mono font-bold text-foreground">{sig.entry_price.toFixed(priceDec)}</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block mb-0.5">TP</span>
+                        <div className="font-mono font-semibold" style={{ color: "#4ADE80" }}>{sig.take_profit.toFixed(priceDec)}</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block mb-0.5">SL</span>
+                        <div className="font-mono font-semibold" style={{ color: "#EF4444" }}>{sig.stop_loss.toFixed(priceDec)}</div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Open Positions */}
+        <div className="border-b border-border p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-bold tracking-wider uppercase text-foreground">
+              Open Positions
+            </span>
+            <span className="text-[10px] text-muted-foreground ml-auto">({filteredPositions.length})</span>
           </div>
-        )}
+          {filteredPositions.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-2">No open positions for {symbol}</p>
+          ) : (
+            <div className="space-y-2.5">
+              {filteredPositions.map((pos) => {
+                const isBuy = pos.type?.toLowerCase().includes("buy");
+                const pnlColor = pos.profit >= 0 ? "#22C55E" : "#EF4444";
+                return (
+                  <div key={pos.id} className="p-2.5 rounded-lg bg-background/50 border border-border">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        {isBuy ? <TrendingUp size={12} style={{ color: "#22C55E" }} /> : <TrendingDown size={12} style={{ color: "#EF4444" }} />}
+                        <span className="text-xs font-bold" style={{ color: isBuy ? "#22C55E" : "#EF4444" }}>
+                          {isBuy ? "BUY" : "SELL"} {pos.volume}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => onClosePosition(pos.id)}
+                        disabled={closingId === pos.id}
+                        className="px-2.5 py-1 rounded text-[9px] font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
+                      >
+                        {closingId === pos.id ? <Loader2 size={10} className="animate-spin" /> : "CLOSE"}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div>
+                        <span className="text-muted-foreground block mb-0.5">Entry</span>
+                        <div className="font-mono text-foreground">{pos.openPrice.toFixed(priceDec)}</div>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground block mb-0.5">P&L</span>
+                        <div className="font-mono font-bold" style={{ color: pnlColor }}>
+                          ${pos.profit.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Ask RON mini */}
-      <div className="p-3 flex-1 flex flex-col">
+      {/* Ask RON — pinned at bottom */}
+      <div className="p-4 border-t border-border shrink-0">
         <button
           onClick={() => setRonOpen(true)}
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-[11px] font-bold transition-all"
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-xs font-bold transition-all"
           style={{
             background: "linear-gradient(135deg, rgba(0,207,165,0.15) 0%, rgba(14,165,233,0.15) 100%)",
             border: "1px solid rgba(0,207,165,0.3)",
@@ -158,7 +161,7 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
           Ask RON
           <Mic size={12} style={{ opacity: 0.7 }} />
         </button>
-        <div className="mt-auto pt-3 text-center">
+        <div className="mt-2 text-center">
           <span className="text-[10px] font-medium" style={{ color: "#00CFA5" }}>Powered by RON</span>
         </div>
       </div>

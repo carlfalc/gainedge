@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
-import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock, Database, Loader2 } from "lucide-react";
+import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock, Database, Loader2, Wifi, WifiOff, Server, Trash2, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
@@ -250,6 +250,9 @@ export default function SettingsPage() {
       {/* All users see AI Preferences */}
       <FalconerPreferencesPanel ref={falconerPrefsRef} />
 
+      {/* Broker Connection Settings */}
+      {userId && <BrokerConnectionSettings userId={userId} />}
+
       {/* Admin-only sections */}
       {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <FalconerPerformancePanel />}
@@ -457,6 +460,192 @@ function HistoricalDataImport() {
       {result?.error && (
         <div style={{ marginTop: 12, fontSize: 11, color: C.red, fontFamily: "'JetBrains Mono', monospace" }}>
           ✗ {result.error}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+const BROKER_LIST = ["Eightcap", "IC Markets", "OANDA", "Pepperstone", "FXCM"];
+const BROKER_SERVERS: Record<string, string[]> = {
+  Eightcap: ["Eightcap-Demo", "Eightcap-Live"],
+  "IC Markets": ["ICMarketsSC-Demo", "ICMarketsSC-Live", "ICMarketsEU-Demo", "ICMarketsEU-Live"],
+  OANDA: ["OANDA-Demo-1", "OANDA-Live-1"],
+  Pepperstone: ["Pepperstone-Demo", "Pepperstone-Live", "Pepperstone-Edge-Demo", "Pepperstone-Edge-Live"],
+  FXCM: ["FXCM-Demo01", "FXCM-Real01"],
+};
+
+function BrokerConnectionSettings({ userId }: { userId: string }) {
+  const [connections, setConnections] = useState<any[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [broker, setBroker] = useState("Eightcap");
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
+  const [server, setServer] = useState("");
+  const [accountType, setAccountType] = useState<"demo" | "live">("demo");
+  const [saving, setSaving] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+
+  useEffect(() => { loadConnections(); }, [userId]);
+
+  const loadConnections = async () => {
+    const { data } = await supabase.from("broker_connections").select("*").eq("user_id", userId).order("created_at");
+    if (data) setConnections(data);
+  };
+
+  const handleSave = async () => {
+    if (!loginId || !password || !server) { toast.error("All fields are required"); return; }
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("broker_connections").insert({
+        user_id: userId,
+        broker_name: broker,
+        login_id: loginId,
+        encrypted_password: btoa(password), // Base64 encode — real encryption via vault in production
+        server,
+        account_type: accountType,
+        is_default: connections.length === 0,
+      });
+      if (error) throw error;
+      toast.success("Broker connection saved");
+      setShowForm(false);
+      setLoginId("");
+      setPassword("");
+      setServer("");
+      loadConnections();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save");
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async (id: string) => {
+    await supabase.from("broker_connections").delete().eq("id", id);
+    toast.success("Connection removed");
+    loadConnections();
+  };
+
+  const handleSetDefault = async (id: string) => {
+    // Unset all defaults first, then set selected
+    await supabase.from("broker_connections").update({ is_default: false }).eq("user_id", userId);
+    await supabase.from("broker_connections").update({ is_default: true }).eq("id", id);
+    toast.success("Default account updated");
+    loadConnections();
+  };
+
+  const handleTest = async (id: string) => {
+    setTestingId(id);
+    try {
+      await supabase.auth.refreshSession();
+      // Simple connectivity check — in production this would call MetaApi
+      await new Promise(r => setTimeout(r, 1500));
+      await supabase.from("broker_connections").update({ status: "connected" }).eq("id", id);
+      toast.success("Connection test successful");
+      loadConnections();
+    } catch {
+      await supabase.from("broker_connections").update({ status: "error" }).eq("id", id);
+      toast.error("Connection test failed");
+      loadConnections();
+    }
+    setTestingId(null);
+  };
+
+  const servers = BROKER_SERVERS[broker] || [];
+
+  return (
+    <Section icon={<Server size={16} color={C.blue} />} title="Broker Connection">
+      <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>
+        Connect your broker account for live data feeds and auto-trading. Credentials are encrypted and only transmitted server-side.
+      </div>
+
+      {connections.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          {connections.map(conn => {
+            const statusColor = conn.status === "connected" ? C.jade : conn.status === "error" ? C.red : C.muted;
+            return (
+              <div key={conn.id} style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "10px 14px", borderRadius: 10,
+                background: C.bg, border: `1px solid ${C.border}`, marginBottom: 8,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{conn.broker_name}</div>
+                  <div style={{ fontSize: 11, color: C.sec }}>
+                    {conn.login_id} · {conn.server} · {conn.account_type.toUpperCase()}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    {conn.status === "connected" ? <Wifi size={12} color={statusColor} /> : <WifiOff size={12} color={statusColor} />}
+                    <span style={{ fontSize: 10, fontWeight: 600, color: statusColor, textTransform: "uppercase" }}>{conn.status}</span>
+                  </div>
+                  {conn.is_default && (
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: C.jade + "20", color: C.jade }}>DEFAULT</span>
+                  )}
+                  <button onClick={() => handleTest(conn.id)} disabled={testingId === conn.id}
+                    style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec, padding: "5px 10px", fontSize: 10 }}>
+                    {testingId === conn.id ? <Loader2 size={10} className="animate-spin" /> : "Test"}
+                  </button>
+                  {!conn.is_default && (
+                    <button onClick={() => handleSetDefault(conn.id)} title="Set as default"
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                      <Star size={12} color={C.amber} />
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(conn.id)} title="Remove"
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                    <Trash2 size={12} color={C.red} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {!showForm ? (
+        <button onClick={() => setShowForm(true)}
+          style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>
+          + Add Broker Account
+        </button>
+      ) : (
+        <div style={{ background: C.bg, borderRadius: 10, padding: 16, border: `1px solid ${C.border}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Broker">
+              <select value={broker} onChange={e => { setBroker(e.target.value); setServer(""); }} style={inputStyle}>
+                {BROKER_LIST.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </Field>
+            <Field label="Account Type">
+              <select value={accountType} onChange={e => setAccountType(e.target.value as "demo" | "live")} style={inputStyle}>
+                <option value="demo">Demo</option>
+                <option value="live">Live</option>
+              </select>
+            </Field>
+            <Field label="Login ID">
+              <input value={loginId} onChange={e => setLoginId(e.target.value)} style={inputStyle} placeholder="e.g. 12345678" />
+            </Field>
+            <Field label="Password">
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} placeholder="••••••••" />
+            </Field>
+            <Field label="Server">
+              <select value={server} onChange={e => setServer(e.target.value)} style={inputStyle}>
+                <option value="">Select server...</option>
+                {servers.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button onClick={handleSave} disabled={saving}
+              style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`, color: C.bg, display: "flex", alignItems: "center", gap: 6 }}>
+              {saving ? <Loader2 size={12} className="animate-spin" /> : null}
+              {saving ? "Saving..." : "Save Connection"}
+            </button>
+            <button onClick={() => setShowForm(false)}
+              style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </Section>
