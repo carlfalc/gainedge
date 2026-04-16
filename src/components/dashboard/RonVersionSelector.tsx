@@ -176,14 +176,14 @@ function VersionCard({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`font-bold tracking-wide ${active ? "text-[12px] text-foreground" : "text-[11px] text-muted-foreground"}`}>
+                <span className={`font-bold tracking-wide ${active ? "text-[13px] text-foreground" : "text-[10px] text-muted-foreground"}`}>
                   {emoji} {title}
                 </span>
-                <span className={`text-[9px] font-medium ${active ? "text-muted-foreground" : "text-muted-foreground/60"}`}>
+                <span className={`font-medium ${active ? "text-[10px] text-muted-foreground" : "text-[8px] text-muted-foreground/60"}`}>
                   — {subtitle}
                 </span>
               </div>
-              <p className={`mt-1.5 leading-relaxed ${active ? "text-[10px] text-muted-foreground" : "text-[9px] text-muted-foreground/70"}`}>
+              <p className={`mt-1.5 leading-relaxed ${active ? "text-[10px] text-muted-foreground" : "text-[9px] text-muted-foreground/60 line-clamp-2"}`}>
                 {description}
               </p>
               <div className="mt-2">
