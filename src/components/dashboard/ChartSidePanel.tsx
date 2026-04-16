@@ -53,8 +53,10 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
 
   return (
     <div className="flex flex-col h-full bg-card border-l border-border overflow-hidden">
+      {/* RON Version Selector */}
+      <RonVersionSelector userId={userId} onVersionChange={onVersionChange} />
+
       <div className="flex-1 overflow-y-auto">
-        {/* RON Active Signals */}
         <div className="border-b border-border p-4">
           <div className="flex items-center gap-2 mb-3">
             <Zap size={13} style={{ color: "#00CFA5" }} />
