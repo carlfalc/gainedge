@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
-import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock } from "lucide-react";
+import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock, Database, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
@@ -254,6 +254,7 @@ export default function SettingsPage() {
       {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
+      {isAdmin && <HistoricalDataImport />}
 
       <Section icon={<AlertTriangle size={16} color={C.red} />} title={t("settings.dangerZone")}>
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>{t("settings.deleteWarning")}</div>
@@ -388,6 +389,76 @@ function AdminPanel() {
       >
         <Activity size={12} /> {pushing ? "Pushing..." : "Push Test Scan (All Users)"}
       </button>
+    </Section>
+  );
+}
+
+function HistoricalDataImport() {
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<any>(null);
+
+  const handleImport = async () => {
+    setImporting(true);
+    setResult(null);
+    try {
+      await supabase.auth.refreshSession();
+      const { data, error } = await supabase.functions.invoke("ingest-historical-csvs", { method: "POST" });
+      if (error) throw error;
+      setResult(data);
+      if (data?.success) {
+        toast.success(`Imported ${data.total_candles_stored} candles from ${data.total_files} files`);
+      } else {
+        toast.error(data?.error || "Import failed");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Import failed");
+      setResult({ error: e.message });
+    }
+    setImporting(false);
+  };
+
+  return (
+    <Section icon={<Database size={16} color={C.blue} />} title="Historical Data Import">
+      <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>
+        Download Dukascopy CSV files from the RON ML GitHub repo and import into the candle_history table for backtesting and ML training.
+      </div>
+      <button
+        disabled={importing}
+        onClick={handleImport}
+        style={{
+          ...btnStyle,
+          background: importing ? C.muted + "40" : `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "10px 20px",
+        }}
+      >
+        {importing ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+        {importing ? "Importing... (this may take several minutes)" : "Import Historical Data"}
+      </button>
+
+      {result && !result.error && result.details && (
+        <div style={{ marginTop: 16, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ color: C.jade, fontWeight: 700, marginBottom: 8 }}>
+            ✓ {result.total_files} files → {result.total_candles_stored} candles stored
+          </div>
+          <div style={{ maxHeight: 200, overflowY: "auto", background: C.bg, borderRadius: 8, padding: 10, border: `1px solid ${C.border}` }}>
+            {result.details.map((d: any, i: number) => (
+              <div key={i} style={{ color: d.status === "ok" ? C.sec : d.status === "skipped" ? C.amber : C.red, marginBottom: 2 }}>
+                {d.file}: {d.status} {d.parsed != null ? `(${d.parsed} parsed, ${d.stored ?? 0} stored)` : d.reason || ""}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result?.error && (
+        <div style={{ marginTop: 12, fontSize: 11, color: C.red, fontFamily: "'JetBrains Mono', monospace" }}>
+          ✗ {result.error}
+        </div>
+      )}
     </Section>
   );
 }
