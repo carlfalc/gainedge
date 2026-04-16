@@ -243,51 +243,8 @@ export default function FalconerRulesPanel() {
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <Brain size={16} color={C.purple} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>RON&nbsp; Your Expert Trading Buddy</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>RON Rules Management</span>
         <span style={{ fontSize: 11, color: C.sec, marginLeft: "auto" }}>{v2Active}/{v2Total} V2 rules active</span>
-      </div>
-
-      <div className="mb-4 space-y-3">
-        {showWelcome && (
-          <div className="relative rounded-xl border border-primary/25 bg-primary/10 px-3 py-3">
-            <button
-              onClick={dismissWelcome}
-              className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Dismiss welcome banner"
-            >
-              <X size={12} />
-            </button>
-            <p className="pr-6 text-[11px] leading-relaxed text-muted-foreground">
-              <span className="font-semibold text-foreground">Welcome!</span> We've set you up with{" "}
-              <span className="font-semibold text-primary">RON V1 Legacy</span> — our proven premium strategy.
-              You can explore V2 Knowledge Base anytime, but V1 is recommended while you get familiar.
-            </p>
-          </div>
-        )}
-
-        <div className="space-y-3 rounded-xl border border-border bg-background/70 p-3">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            RON Version
-          </div>
-
-          <div className="space-y-3">
-            <RonRulesVersionCard
-              version="v1"
-              active={aiVersion === "v1"}
-              onClick={() => switchVersion("v1")}
-            />
-            <RonRulesVersionCard
-              version="v2"
-              active={aiVersion === "v2"}
-              onClick={() => switchVersion("v2")}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
-          <CheckCircle2 className="h-3.5 w-3.5" />
-          {aiVersion === "v1" ? "V1 Rules Currently Applied" : "V2 Rules Currently Applied"}
-        </div>
       </div>
 
       {/* Filters */}
