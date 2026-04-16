@@ -245,7 +245,7 @@ export default function ChartOverlay({ symbol, userId, positions }: ChartOverlay
         >
           <div className="flex items-center justify-between mb-1">
             <span className="text-[11px] font-bold" style={{ color: "#F59E0B" }}>
-              🎯 {pattern.pattern_name.toUpperCase()} detected
+              🎯 {pattern.pattern_name.replace(/_/g, " ").toUpperCase()} detected
             </span>
             <button onClick={() => setPatternDismissed(true)} className="p-0.5 rounded hover:bg-white/10 transition-colors">
               <X size={12} className="text-muted-foreground" />
