@@ -108,11 +108,16 @@ function TradingViewWidget({ symbol, broker }: TradingViewWidgetProps) {
         hide_side_toolbar: false,
         allow_symbol_change: true,
         save_image: false,
-        studies: ["Volume@tv-basicstudies"],
         withdateranges: true,
         details: false,
         hotlist: false,
         calendar: false,
+        // Remove default volume study to avoid duplicate — volume bars already shown via style 8
+        studies: [],
+        disabled_features: [
+          "header_symbol_search",
+          "volume_force_overlay",
+        ],
       });
     };
 
@@ -125,7 +130,7 @@ function TradingViewWidget({ symbol, broker }: TradingViewWidgetProps) {
       ref={containerRef}
       id={containerId}
       className="w-full h-full"
-      style={{ minHeight: 400 }}
+      style={{ minHeight: 600 }}
     />
   );
 }

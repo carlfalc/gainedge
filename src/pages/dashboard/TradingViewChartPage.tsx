@@ -34,7 +34,6 @@ export default function TradingViewChartPage() {
     }
   }, [profile]);
 
-  // Load instruments
   useEffect(() => {
     if (!userId) return;
     supabase
@@ -49,7 +48,6 @@ export default function TradingViewChartPage() {
       });
   }, [userId]);
 
-  // Load live prices for instrument tabs
   useEffect(() => {
     if (!userId || instruments.length === 0) return;
     const fetchPrices = () => {
@@ -67,11 +65,10 @@ export default function TradingViewChartPage() {
         });
     };
     fetchPrices();
-    const iv = setInterval(fetchPrices, 15000);
+    const iv = setInterval(fetchPrices, 5000);
     return () => clearInterval(iv);
   }, [userId, instruments]);
 
-  // Provision broker
   useEffect(() => {
     if (!userId) return;
     setConnectionStatus("connecting");
@@ -164,7 +161,7 @@ export default function TradingViewChartPage() {
         </div>
       </div>
 
-      {/* Signal alert + active trade bar — overlays above chart */}
+      {/* Signal alert + active trade bar */}
       <RonSignalAlert symbol={selected} userId={userId} />
       <ActiveTradeBar
         symbol={selected}
@@ -176,7 +173,7 @@ export default function TradingViewChartPage() {
       {/* Main content: chart + sidebar */}
       <div className="flex flex-1 min-h-0">
         {/* Chart area */}
-        <div className="flex-1 min-w-0 relative" style={{ minHeight: 500 }}>
+        <div className="flex-1 min-w-0 relative" style={{ minHeight: 600 }}>
           {selected && (
             <>
               <TradingViewWidget symbol={selected} broker={selectedBroker} />
@@ -185,8 +182,8 @@ export default function TradingViewChartPage() {
           )}
         </div>
 
-        {/* Right sidebar — 280px */}
-        <div className="w-[280px] shrink-0 hidden lg:block">
+        {/* Right sidebar — 320px, sticky with own scroll */}
+        <div className="w-[320px] shrink-0 hidden lg:block h-full">
           <ChartSidePanel
             symbol={selected}
             userId={userId}
