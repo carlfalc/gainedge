@@ -237,6 +237,7 @@ export default function SettingsPage() {
       <FalconerPreferencesPanel ref={falconerPrefsRef} />
 
       {/* Admin-only sections */}
+      {isAdmin && <StrategyConfigAdmin />}
       {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
