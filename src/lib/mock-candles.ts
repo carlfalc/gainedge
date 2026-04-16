@@ -3,9 +3,9 @@
 import type { OHLCData } from "./chart-indicators";
 
 const BASE_PRICES: Record<string, number> = {
-  XAUUSD: 3300,
-  US30: 42500,
-  NAS100: 20200,
+  XAUUSD: 4800,
+  US30: 48500,
+  NAS100: 25800,
   NZDUSD: 0.5950,
   AUDUSD: 0.6350,
   EURUSD: 1.0950,
