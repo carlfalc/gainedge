@@ -178,7 +178,10 @@ export default function TradingViewChartPage() {
         {/* Chart area */}
         <div className="flex-1 min-w-0 relative" style={{ minHeight: 500 }}>
           {selected && (
-            <TradingViewWidget symbol={selected} broker={selectedBroker} />
+            <>
+              <TradingViewWidget symbol={selected} broker={selectedBroker} />
+              <ChartOverlay symbol={selected} userId={userId} positions={positions} />
+            </>
           )}
         </div>
 
