@@ -10,7 +10,14 @@ interface SignalPrefs {
   instrument_filters: Record<string, boolean>;
   currency: string;
   lot_size: number;
+  signal_direction: string;
 }
+
+const DIRECTION_OPTIONS = [
+  { value: "both", label: "Both", desc: "Buy & Sell signals" },
+  { value: "buy", label: "Buys Only", desc: "Long entries only" },
+  { value: "sell", label: "Sells Only", desc: "Short entries only" },
+];
 
 const SIGNAL_STYLES = [
   { value: "conservative", label: "Conservative", desc: "High conviction only (confidence ≥ 8)", minConf: 8 },
@@ -23,7 +30,7 @@ export interface FalconerPreferencesPanelRef {
 }
 
 const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(function FalconerPreferencesPanel(_, ref) {
-  const [prefs, setPrefs] = useState<SignalPrefs>({ min_confidence: 6, instrument_filters: {}, currency: "NZD", lot_size: 0.01 });
+  const [prefs, setPrefs] = useState<SignalPrefs>({ min_confidence: 6, instrument_filters: {}, currency: "NZD", lot_size: 0.01, signal_direction: "both" });
   const [instruments, setInstruments] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(true);
   const [style, setStyle] = useState("balanced");
@@ -54,7 +61,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
     if (prefRes.data) {
       const p = prefRes.data;
       const filters = (typeof p.instrument_filters === "object" && p.instrument_filters !== null ? p.instrument_filters : {}) as Record<string, boolean>;
-      setPrefs({ id: p.id, min_confidence: p.min_confidence, instrument_filters: filters, currency: p.currency, lot_size: p.lot_size });
+      setPrefs({ id: p.id, min_confidence: p.min_confidence, instrument_filters: filters, currency: p.currency, lot_size: p.lot_size, signal_direction: (p as any).signal_direction || "both" });
       setSignalEngine((p as any).signal_engine || "v1");
       // Determine style from min_confidence
       const matched = SIGNAL_STYLES.find(s => s.minConf === p.min_confidence);
@@ -92,6 +99,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
         currency: prefs.currency,
         lot_size: prefs.lot_size,
         signal_engine: signalEngine,
+        signal_direction: prefs.signal_direction,
       };
 
       if (prefs.id) {
