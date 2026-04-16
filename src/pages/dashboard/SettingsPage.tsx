@@ -250,6 +250,9 @@ export default function SettingsPage() {
       {/* All users see AI Preferences */}
       <FalconerPreferencesPanel ref={falconerPrefsRef} />
 
+      {/* Broker Connection Settings */}
+      {userId && <BrokerConnectionSettings userId={userId} />}
+
       {/* Admin-only sections */}
       {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <FalconerPerformancePanel />}
