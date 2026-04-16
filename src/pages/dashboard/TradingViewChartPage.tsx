@@ -4,6 +4,8 @@ import { useProfile } from "@/hooks/use-profile";
 import { provisionAccount } from "@/services/metaapi-client";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type TradeExecutionPanelRef } from "@/components/dashboard/TradeExecutionPanel";
 import ChartOrderLines from "@/components/dashboard/ChartOrderLines";
+import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
+import ActiveTradeInfo from "@/components/dashboard/ActiveTradeInfo";
 import { ExternalLink } from "lucide-react";
 
 const BROKER_EXCHANGES: Record<string, string> = {
@@ -181,11 +183,15 @@ export default function TradingViewChartPage() {
         </div>
       </div>
 
+      {/* RON Signal Alert + Active Trade Info above chart */}
+      <RonSignalAlert symbol={selected} userId={userId} />
+      <ActiveTradeInfo symbol={selected} accountId={accountId} />
+
       {/* TradingView iframe with order lines overlay */}
       <div
         ref={chartContainerRef}
         className="overflow-hidden border-y border-border relative"
-        style={{ height: "60%", minHeight: 500 }}
+        style={{ flex: 1, minHeight: 400 }}
       >
         {selected && (
           <iframe
