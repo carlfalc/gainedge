@@ -153,7 +153,19 @@ export default function TradingViewChartPage() {
           </button>
         ))}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {/* RON Version pill */}
+          <div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide"
+            style={{
+              background: "rgba(0,207,165,0.1)",
+              border: "1px solid rgba(0,207,165,0.3)",
+              color: "#00CFA5",
+            }}
+          >
+            <Cpu className="w-3 h-3" />
+            {ronVersion === "v1_legacy" ? "RON V1 Legacy" : "RON V2 Knowledge Base"}
+          </div>
           <button
             onClick={handlePopOut}
             className="px-2.5 py-1 rounded text-[10px] font-semibold bg-card border border-border text-muted-foreground hover:text-foreground transition-all flex items-center gap-1"
@@ -193,6 +205,7 @@ export default function TradingViewChartPage() {
             positions={positions}
             onClosePosition={handleClosePosition}
             closingId={closingId}
+            onVersionChange={setRonVersion}
           />
         </div>
       </div>
