@@ -226,6 +226,8 @@ export default function SettingsPage() {
         <RonVersionSelector userId={userId} />
       </Section>
 
+      {isAdmin && <FalconerRulesPanel />}
+
 
       <Section icon={<CreditCard size={16} color={C.jade} />} title={t("settings.subscription")}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
@@ -251,7 +253,6 @@ export default function SettingsPage() {
       {/* Admin-only sections */}
       {isAdmin && <StrategyConfigAdmin />}
       {isAdmin && <BrokerMappingsAdmin />}
-      {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
       {isAdmin && <HistoricalDataImport />}
