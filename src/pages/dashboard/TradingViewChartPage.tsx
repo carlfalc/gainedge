@@ -5,6 +5,8 @@ import { provisionAccount } from "@/services/metaapi-client";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type TradeExecutionPanelRef, type Position } from "@/components/dashboard/TradeExecutionPanel";
 import TradingViewWidget from "@/components/dashboard/TradingViewWidget";
 import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
+import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
+import ActiveTradeBar from "@/components/dashboard/ActiveTradeBar";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +23,7 @@ export default function TradingViewChartPage() {
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
+  const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
 
   useEffect(() => {
@@ -30,6 +33,7 @@ export default function TradingViewChartPage() {
     }
   }, [profile]);
 
+  // Load instruments
   useEffect(() => {
     if (!userId) return;
     supabase
@@ -44,6 +48,29 @@ export default function TradingViewChartPage() {
       });
   }, [userId]);
 
+  // Load live prices for instrument tabs
+  useEffect(() => {
+    if (!userId || instruments.length === 0) return;
+    const fetchPrices = () => {
+      supabase
+        .from("live_market_data")
+        .select("symbol, last_price")
+        .eq("user_id", userId)
+        .in("symbol", instruments)
+        .then(({ data }) => {
+          if (data) {
+            const map: Record<string, number> = {};
+            data.forEach((d) => { if (d.last_price) map[d.symbol] = d.last_price; });
+            setLivePrices(map);
+          }
+        });
+    };
+    fetchPrices();
+    const iv = setInterval(fetchPrices, 15000);
+    return () => clearInterval(iv);
+  }, [userId, instruments]);
+
+  // Provision broker
   useEffect(() => {
     if (!userId) return;
     setConnectionStatus("connecting");
@@ -60,7 +87,7 @@ export default function TradingViewChartPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
       const res = await fetch(
-        `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/metaapi-trade`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/metaapi-trade`,
         {
           method: "POST",
           headers: {
@@ -84,21 +111,30 @@ export default function TradingViewChartPage() {
     window.open(`/chart-popout?type=tradingview&symbol=${selected}`, "_blank", "noopener");
   };
 
+  const formatPrice = (sym: string, price: number) => {
+    if (sym.includes("JPY")) return price.toFixed(3);
+    if (["XAUUSD", "US30", "NAS100", "SPX500", "US500"].some(s => sym.includes(s))) return price.toFixed(2);
+    return price.toFixed(5);
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden">
-      {/* Top bar — compact */}
+      {/* Top bar — instrument tabs with live prices + brokers */}
       <div className="flex items-center gap-1.5 flex-wrap px-2 py-1.5 border-b border-border shrink-0">
         {instruments.map((sym) => (
           <button
             key={sym}
             onClick={() => setSelected(sym)}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wide transition-all border ${
+            className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wide transition-all border flex items-center gap-1.5 ${
               selected === sym
                 ? "bg-white/10 border-white/30 text-foreground"
                 : "bg-card border-border text-muted-foreground hover:text-foreground hover:border-white/20"
             }`}
           >
             {sym}
+            {livePrices[sym] ? (
+              <span className="font-mono text-[10px] text-muted-foreground">{formatPrice(sym, livePrices[sym])}</span>
+            ) : null}
           </button>
         ))}
 
@@ -127,16 +163,25 @@ export default function TradingViewChartPage() {
         </div>
       </div>
 
+      {/* Signal alert + active trade bar — overlays above chart */}
+      <RonSignalAlert symbol={selected} userId={userId} />
+      <ActiveTradeBar
+        symbol={selected}
+        positions={positions}
+        onClosePosition={handleClosePosition}
+        closingId={closingId}
+      />
+
       {/* Main content: chart + sidebar */}
       <div className="flex flex-1 min-h-0">
-        {/* Chart area — takes remaining space */}
+        {/* Chart area */}
         <div className="flex-1 min-w-0 relative" style={{ minHeight: 500 }}>
           {selected && (
             <TradingViewWidget symbol={selected} broker={selectedBroker} />
           )}
         </div>
 
-        {/* Right sidebar — fixed 280px */}
+        {/* Right sidebar — 280px */}
         <div className="w-[280px] shrink-0 hidden lg:block">
           <ChartSidePanel
             symbol={selected}

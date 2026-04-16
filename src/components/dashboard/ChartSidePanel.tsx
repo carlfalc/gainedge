@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchCurrentPrice } from "@/services/metaapi-client";
-import { Zap, TrendingUp, TrendingDown, X, Loader2 } from "lucide-react";
+import { Zap, TrendingUp, TrendingDown, Loader2, Brain, Mic } from "lucide-react";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
+import AskRonModal from "@/components/dashboard/AskRonModal";
 
 interface Signal {
   id: string;
@@ -26,6 +26,7 @@ interface ChartSidePanelProps {
 
 export default function ChartSidePanel({ symbol, userId, accountId, positions, onClosePosition, closingId }: ChartSidePanelProps) {
   const [signals, setSignals] = useState<Signal[]>([]);
+  const [ronOpen, setRonOpen] = useState(false);
 
   const priceDec = symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5;
 
@@ -68,7 +69,7 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
                 <div key={sig.id} className="p-2 rounded bg-background/50 border border-border">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[11px] font-bold" style={{ color: dirColor }}>{sig.direction}</span>
-                    <span className="text-[10px] text-muted-foreground">Conf: {sig.confidence}</span>
+                    <span className="text-[10px] text-muted-foreground">Conf: {sig.confidence}/10</span>
                   </div>
                   <div className="grid grid-cols-3 gap-1 text-[10px]">
                     <div>
@@ -118,7 +119,7 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
                     <button
                       onClick={() => onClosePosition(pos.id)}
                       disabled={closingId === pos.id}
-                      className="px-2 py-0.5 rounded text-[9px] font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                      className="px-2 py-0.5 rounded text-[9px] font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
                     >
                       {closingId === pos.id ? <Loader2 size={10} className="animate-spin" /> : "CLOSE"}
                     </button>
@@ -142,10 +143,31 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
         )}
       </div>
 
-      {/* Powered by RON */}
-      <div className="mt-auto p-3 text-center">
-        <span className="text-[10px] font-medium" style={{ color: "#00CFA5" }}>Powered by RON</span>
+      {/* Ask RON mini */}
+      <div className="p-3 flex-1 flex flex-col">
+        <button
+          onClick={() => setRonOpen(true)}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg text-[11px] font-bold transition-all"
+          style={{
+            background: "linear-gradient(135deg, rgba(0,207,165,0.15) 0%, rgba(14,165,233,0.15) 100%)",
+            border: "1px solid rgba(0,207,165,0.3)",
+            color: "#00CFA5",
+          }}
+        >
+          <Brain size={14} />
+          Ask RON
+          <Mic size={12} style={{ opacity: 0.7 }} />
+        </button>
+        <div className="mt-auto pt-3 text-center">
+          <span className="text-[10px] font-medium" style={{ color: "#00CFA5" }}>Powered by RON</span>
+        </div>
       </div>
+
+      <AskRonModal
+        open={ronOpen}
+        onClose={() => setRonOpen(false)}
+        context={{ page: "TradingView Chart", instrument: symbol, userId }}
+      />
     </div>
   );
 }

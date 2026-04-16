@@ -1,4 +1,4 @@
-import { useEffect, useRef, memo } from "react";
+import { useEffect, useRef, memo, useId } from "react";
 
 const TV_SYMBOL_MAP: Record<string, Record<string, string>> = {
   XAUUSD: { default: "OANDA:XAUUSD", EIGHTCAP: "EIGHTCAP:XAUUSD", PEPPERSTONE: "PEPPERSTONE:XAUUSD", ICMARKETS: "ICMARKETS:XAUUSD", OANDA: "OANDA:XAUUSD" },
@@ -13,6 +13,12 @@ const TV_SYMBOL_MAP: Record<string, Record<string, string>> = {
   EURGBP: { default: "FX:EURGBP" },
   EURJPY: { default: "FX:EURJPY" },
   GBPJPY: { default: "FX:GBPJPY" },
+  AUDJPY: { default: "FX:AUDJPY" },
+  EURNZD: { default: "FX:EURNZD" },
+  AUDNZD: { default: "FX:AUDNZD" },
+  AUDCAD: { default: "FX:AUDCAD" },
+  NZDCAD: { default: "FX:NZDCAD" },
+  GBPCAD: { default: "FX:GBPCAD" },
   NAS100: { default: "PEPPERSTONE:NAS100", EIGHTCAP: "EIGHTCAP:NAS100", PEPPERSTONE: "PEPPERSTONE:NAS100", ICMARKETS: "ICMARKETS:NAS100" },
   US30: { default: "TVC:DJI", EIGHTCAP: "EIGHTCAP:US30", PEPPERSTONE: "PEPPERSTONE:US30", ICMARKETS: "ICMARKETS:US30" },
   SPX500: { default: "SP:SPX", EIGHTCAP: "EIGHTCAP:SPX500", PEPPERSTONE: "PEPPERSTONE:SPX500", ICMARKETS: "ICMARKETS:SPX500" },
@@ -50,31 +56,26 @@ declare global {
   }
 }
 
+let tvScriptPromise: Promise<void> | null = null;
+
 function loadTvScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (window.TradingView) {
-      resolve();
-      return;
-    }
-    const existing = document.getElementById("tradingview-widget-script");
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Failed to load TradingView")));
-      return;
-    }
+  if (tvScriptPromise) return tvScriptPromise;
+  tvScriptPromise = new Promise((resolve, reject) => {
+    if (window.TradingView) { resolve(); return; }
     const script = document.createElement("script");
-    script.id = "tradingview-widget-script";
     script.src = "https://s3.tradingview.com/tv.js";
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load TradingView"));
+    script.onerror = () => { tvScriptPromise = null; reject(new Error("Failed to load TradingView")); };
     document.head.appendChild(script);
   });
+  return tvScriptPromise;
 }
 
 function TradingViewWidget({ symbol, broker }: TradingViewWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const widgetRef = useRef<unknown>(null);
+  const stableId = useId().replace(/:/g, "_");
+  const containerId = `tv_widget_${stableId}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -88,21 +89,18 @@ function TradingViewWidget({ symbol, broker }: TradingViewWidgetProps) {
       }
       if (cancelled || !containerRef.current || !window.TradingView) return;
 
-      // Clear previous widget
       containerRef.current.innerHTML = "";
 
       const tvSymbol = getTvSymbol(symbol, broker);
 
-      widgetRef.current = new window.TradingView.widget({
+      new window.TradingView.widget({
         symbol: tvSymbol,
         interval: "15",
-        container_id: containerRef.current.id,
-        datafeed: undefined,
-        library_path: undefined,
+        container_id: containerId,
         autosize: true,
         timezone: "Etc/UTC",
         theme: "dark",
-        style: "8", // Heiken Ashi
+        style: "8",
         locale: "en",
         toolbar_bg: "#0a0a0a",
         enable_publishing: false,
@@ -111,31 +109,23 @@ function TradingViewWidget({ symbol, broker }: TradingViewWidgetProps) {
         allow_symbol_change: true,
         save_image: false,
         studies: ["Volume@tv-basicstudies"],
-        show_popup_button: false,
         withdateranges: true,
         details: false,
         hotlist: false,
         calendar: false,
-        width: "100%",
-        height: "100%",
       });
     };
 
     init();
-
-    return () => {
-      cancelled = true;
-      widgetRef.current = null;
-    };
-  }, [symbol, broker]);
-
-  const containerId = `tv-widget-${symbol}-${broker}`.replace(/\s+/g, "");
+    return () => { cancelled = true; };
+  }, [symbol, broker, containerId]);
 
   return (
     <div
       ref={containerRef}
       id={containerId}
       className="w-full h-full"
+      style={{ minHeight: 400 }}
     />
   );
 }
