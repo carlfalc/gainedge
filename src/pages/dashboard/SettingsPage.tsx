@@ -6,7 +6,10 @@ import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
 import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
+import BrokerMappingsAdmin from "@/components/dashboard/BrokerMappingsAdmin";
+import BrokerAvailabilityDot from "@/components/dashboard/BrokerAvailabilityDot";
 import { useProfile } from "@/hooks/use-profile";
+import { useBrokerMappings } from "@/hooks/use-broker-mappings";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { DEFAULT_CLOCKS, AVAILABLE_CITIES, type ClockConfig } from "@/components/dashboard/WorldClocks";
@@ -23,6 +26,7 @@ const RISK_PROFILES = [
 export default function SettingsPage() {
   const { t } = useTranslation();
   const { profile, loading, updateProfile, userId } = useProfile();
+  const { getAvailabilityStatus, defaultConnection } = useBrokerMappings(userId);
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
@@ -127,27 +131,30 @@ export default function SettingsPage() {
       <Section icon={<Sliders size={16} color={C.blue} />} title={t("settings.instruments")}>
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>{t("settings.currentWatchlist")} ({instruments.length}/10 — {tierLabel} {t("common.tier")}):</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-          {instruments.map(i => (
-            <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: C.jade + "18", color: C.jade, display: "inline-flex", alignItems: "center", gap: 6 }}>
-              {i}
-              <button
-                onClick={async () => {
-                  if (!userId) return;
-                  // Optimistic: remove from UI immediately
-                  setInstruments(prev => prev.filter(s => s !== i));
-                  const { error } = await supabase.from("user_instruments").delete().eq("user_id", userId).eq("symbol", i);
-                  if (error) {
-                    toast.error("Failed to remove instrument");
-                    loadInstruments(); // revert on failure
-                    return;
-                  }
-                  toast.success(`${i} removed from watchlist`);
-                }}
-                style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 14, lineHeight: 1, padding: 0, fontWeight: 800 }}
-                title={`Remove ${i}`}
-              >×</button>
-            </span>
-          ))}
+          {instruments.map(i => {
+            const avail = getAvailabilityStatus(i);
+            return (
+              <span key={i} style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 6, background: C.jade + "18", color: C.jade, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <BrokerAvailabilityDot status={avail} brokerName={defaultConnection?.broker_name} symbol={i} />
+                {i}
+                <button
+                  onClick={async () => {
+                    if (!userId) return;
+                    setInstruments(prev => prev.filter(s => s !== i));
+                    const { error } = await supabase.from("user_instruments").delete().eq("user_id", userId).eq("symbol", i);
+                    if (error) {
+                      toast.error("Failed to remove instrument");
+                      loadInstruments();
+                      return;
+                    }
+                    toast.success(`${i} removed from watchlist`);
+                  }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 14, lineHeight: 1, padding: 0, fontWeight: 800 }}
+                  title={`Remove ${i}`}
+                >×</button>
+              </span>
+            );
+          })}
         </div>
         <button onClick={() => setShowAddInstrument(true)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>{t("settings.addInstrument")}</button>
       </Section>
@@ -238,6 +245,7 @@ export default function SettingsPage() {
 
       {/* Admin-only sections */}
       {isAdmin && <StrategyConfigAdmin />}
+      {isAdmin && <BrokerMappingsAdmin />}
       {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}

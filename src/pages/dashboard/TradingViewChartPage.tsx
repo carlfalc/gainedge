@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-profile";
+import { useBrokerMappings } from "@/hooks/use-broker-mappings";
 import { provisionAccount } from "@/services/metaapi-client";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type TradeExecutionPanelRef, type Position } from "@/components/dashboard/TradeExecutionPanel";
 import TradingViewWidget from "@/components/dashboard/TradingViewWidget";
@@ -9,13 +10,14 @@ import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
 import ActiveTradeBar from "@/components/dashboard/ActiveTradeBar";
 import ChartOverlay from "@/components/dashboard/ChartOverlay";
 import type { RonVersion } from "@/components/dashboard/RonVersionSelector";
-import { ExternalLink, Cpu } from "lucide-react";
+import { ExternalLink, Cpu, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
 
 export default function TradingViewChartPage() {
   const { userId, profile } = useProfile();
+  const { isAvailable, defaultConnection, getAvailabilityStatus } = useBrokerMappings(userId);
   const [instruments, setInstruments] = useState<string[]>([]);
   const [selected, setSelected] = useState("");
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
@@ -28,6 +30,8 @@ export default function TradingViewChartPage() {
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [ronVersion, setRonVersion] = useState<RonVersion>("v1_legacy");
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
+
+  const selectedAvailability = getAvailabilityStatus(selected, selectedBroker);
 
   useEffect(() => {
     if (profile?.broker) {
@@ -183,6 +187,16 @@ export default function TradingViewChartPage() {
         onClosePosition={handleClosePosition}
         closingId={closingId}
       />
+      {/* Broker unavailability banner */}
+      {selected && selectedAvailability === "unavailable" && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border-b border-amber-500/30 text-[11px] text-amber-400 shrink-0">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            <strong>{selected}</strong> not available on {selectedBroker}. Showing RON's analysis only.
+            {" "}Auto-trade will skip signals for this instrument.
+          </span>
+        </div>
+      )}
 
       {/* Main content: chart + sidebar */}
       <div className="flex flex-1 min-h-0">

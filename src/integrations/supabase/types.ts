@@ -165,6 +165,48 @@ export type Database = {
         }
         Relationships: []
       }
+      broker_symbol_mappings: {
+        Row: {
+          broker: string
+          broker_symbol: string
+          canonical_symbol: string
+          contract_size: number
+          created_at: string
+          id: string
+          is_available: boolean
+          last_verified: string | null
+          min_lot_size: number
+          pip_value: number
+          updated_at: string
+        }
+        Insert: {
+          broker: string
+          broker_symbol: string
+          canonical_symbol: string
+          contract_size?: number
+          created_at?: string
+          id?: string
+          is_available?: boolean
+          last_verified?: string | null
+          min_lot_size?: number
+          pip_value?: number
+          updated_at?: string
+        }
+        Update: {
+          broker?: string
+          broker_symbol?: string
+          canonical_symbol?: string
+          contract_size?: number
+          created_at?: string
+          id?: string
+          is_available?: boolean
+          last_verified?: string | null
+          min_lot_size?: number
+          pip_value?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       candle_history: {
         Row: {
           buy_volume: number | null
