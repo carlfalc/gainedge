@@ -8,7 +8,8 @@ import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
 import ActiveTradeBar from "@/components/dashboard/ActiveTradeBar";
 import ChartOverlay from "@/components/dashboard/ChartOverlay";
-import { ExternalLink } from "lucide-react";
+import type { RonVersion } from "@/components/dashboard/RonVersionSelector";
+import { ExternalLink, Cpu } from "lucide-react";
 import { toast } from "sonner";
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
@@ -25,6 +26,7 @@ export default function TradingViewChartPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
+  const [ronVersion, setRonVersion] = useState<RonVersion>("v1_legacy");
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
 
   useEffect(() => {
