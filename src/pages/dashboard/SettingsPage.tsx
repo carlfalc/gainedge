@@ -129,7 +129,7 @@ export default function SettingsPage() {
       {userId && <BrokerConnectionSettings userId={userId} />}
 
       <Section icon={<Sliders size={16} color={C.blue} />} title={t("settings.instruments")}>
-        <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>Dashboard - Current watchlist:</div>
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>Dashboard - Current watchlist: <span style={{ fontSize: 10, opacity: 0.7 }}>(instruments tracked on your dashboard — not limited to trading)</span></div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
           {instruments.map(i => {
             const avail = getAvailabilityStatus(i);

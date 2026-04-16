@@ -202,11 +202,9 @@ function VersionCard({
           </div>
         </button>
       </TooltipTrigger>
-      {!active && (
-        <TooltipContent side="left" className="text-xs">
-          Click to switch to {title}
-        </TooltipContent>
-      )}
+      <TooltipContent side="left" className={`text-xs ${active ? "hidden" : ""}`}>
+        Click to switch to {title}
+      </TooltipContent>
     </Tooltip>
   );
 }
