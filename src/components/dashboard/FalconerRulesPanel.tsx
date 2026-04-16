@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Brain, Plus, Save, Filter, ToggleLeft, ToggleRight, Pencil, X, Check } from "lucide-react";
+import { Brain, Plus, ToggleLeft, ToggleRight, Pencil, X, Check, Sparkles, CheckCircle2 } from "lucide-react";
 
 interface KnowledgeRule {
   id: string;
@@ -36,11 +36,38 @@ const CATEGORY_COLORS: Record<string, string> = {
   pattern_rules: C.blue,
 };
 
+type RonRulesVersion = "v1" | "v2";
+
+const WELCOME_KEY = "ge_ron_rules_welcome_dismissed";
+
+const VERSION_COPY: Record<RonRulesVersion, {
+  title: string;
+  eyebrow: string;
+  summary: string;
+  description: string;
+  badge: string;
+}> = {
+  v1: {
+    title: "RON V1 Legacy",
+    eyebrow: "Premium Trading Vision",
+    summary: "Historical win rate: 82% across 2,600+ backtested trades.",
+    description: "Our proven flagship strategy with consistent high-probability signals. Refined over years of live market analysis.",
+    badge: "Recommended for all traders",
+  },
+  v2: {
+    title: "RON V2 Knowledge Base",
+    eyebrow: "Experimental",
+    summary: "Currently in development — ~50% WR.",
+    description: "Advanced AI model incorporating Smart Money Concepts and live market structure. Improves as more platform data flows through RON.",
+    badge: "Use with caution. Best for experienced traders",
+  },
+};
+
 export default function FalconerRulesPanel() {
   const loadSavedUiState = () => {
     try {
       const raw = localStorage.getItem("ge_ron_rules_ui");
-      if (raw) return JSON.parse(raw) as { filter: string; versionFilter: string; aiVersion: "v1" | "v2" };
+      if (raw) return JSON.parse(raw) as { filter: string; versionFilter: string; aiVersion: RonRulesVersion };
     } catch {}
     return { filter: "all", versionFilter: "all", aiVersion: "v2" as const };
   };
@@ -55,12 +82,19 @@ export default function FalconerRulesPanel() {
   const [editPriority, setEditPriority] = useState(5);
   const [showAdd, setShowAdd] = useState(false);
   const [newRule, setNewRule] = useState({ category: "entry_rules", rule_name: "", rule_text: "", priority: 7 });
-  const [aiVersion, setAiVersion] = useState<"v1" | "v2">(savedUi.aiVersion);
+  const [aiVersion, setAiVersion] = useState<RonRulesVersion>(savedUi.aiVersion);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   // Persist UI state
   useEffect(() => {
     localStorage.setItem("ge_ron_rules_ui", JSON.stringify({ filter, versionFilter, aiVersion }));
   }, [filter, versionFilter, aiVersion]);
+
+  useEffect(() => {
+    if (!localStorage.getItem(WELCOME_KEY)) {
+      setShowWelcome(true);
+    }
+  }, []);
 
   useEffect(() => { loadRules(); }, []);
 
@@ -112,9 +146,14 @@ export default function FalconerRulesPanel() {
     }
   };
 
-  const switchVersion = (ver: "v1" | "v2") => {
+  const switchVersion = (ver: RonRulesVersion) => {
     setAiVersion(ver);
     toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
+  };
+
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem(WELCOME_KEY, "1");
   };
 
   const filtered = rules.filter(r => {
@@ -136,27 +175,47 @@ export default function FalconerRulesPanel() {
         <span style={{ fontSize: 11, color: C.sec, marginLeft: "auto" }}>{v2Active}/{v2Total} V2 rules active</span>
       </div>
 
-      {/* Version Toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: 12, background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>RON Version:</span>
-        <button
-          onClick={() => switchVersion("v1")}
-          style={{
-            padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
-            background: aiVersion === "v1" ? C.amber + "30" : C.bg, color: aiVersion === "v1" ? C.amber : C.sec,
-          }}
-        >
-          V1 (Legacy)
-        </button>
-        <button
-          onClick={() => switchVersion("v2")}
-          style={{
-            padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
-            background: aiVersion === "v2" ? C.jade + "30" : C.bg, color: aiVersion === "v2" ? C.jade : C.sec,
-          }}
-        >
-          V2 (Knowledge Base)
-        </button>
+      <div className="mb-4 space-y-3">
+        {showWelcome && (
+          <div className="relative rounded-xl border border-primary/25 bg-primary/10 px-3 py-3">
+            <button
+              onClick={dismissWelcome}
+              className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Dismiss welcome banner"
+            >
+              <X size={12} />
+            </button>
+            <p className="pr-6 text-[11px] leading-relaxed text-muted-foreground">
+              <span className="font-semibold text-foreground">Welcome!</span> We've set you up with{" "}
+              <span className="font-semibold text-primary">RON V1 Legacy</span> — our proven premium strategy.
+              You can explore V2 Knowledge Base anytime, but V1 is recommended while you get familiar.
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-3 rounded-xl border border-border bg-background/70 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            RON Version
+          </div>
+
+          <div className="space-y-3">
+            <RonRulesVersionCard
+              version="v1"
+              active={aiVersion === "v1"}
+              onClick={() => switchVersion("v1")}
+            />
+            <RonRulesVersionCard
+              version="v2"
+              active={aiVersion === "v2"}
+              onClick={() => switchVersion("v2")}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          {aiVersion === "v1" ? "V1 Rules Currently Applied" : "V2 Rules Currently Applied"}
+        </div>
       </div>
 
       {/* Filters */}
