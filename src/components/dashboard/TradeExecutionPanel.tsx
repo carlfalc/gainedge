@@ -96,23 +96,44 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const [closingId, setClosingId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Intelligent Trader state – persisted to localStorage so settings survive navigation
-  const loadPersistedTraderState = () => {
-    try {
-      const raw = localStorage.getItem("ge_intelligent_trader");
-      if (raw) return JSON.parse(raw) as { autoTradeMap: Record<string, boolean>; myTradesMap: Record<string, boolean>; autoLotSize: string };
-    } catch {}
-    return { autoTradeMap: {}, myTradesMap: {}, autoLotSize: "0.01" };
-  };
-
-  const savedTraderState = useRef(loadPersistedTraderState());
-  const [autoTradeMap, setAutoTradeMap] = useState<Record<string, boolean>>(savedTraderState.current.autoTradeMap);
+  // Intelligent Trader state – persisted to database (user_auto_trade_settings)
+  const [autoTradeMap, setAutoTradeMap] = useState<Record<string, boolean>>({});
   const autoTradeEnabled = autoTradeMap[symbol] ?? false;
-  const setAutoTradeEnabled = (v: boolean) => setAutoTradeMap(prev => ({ ...prev, [symbol]: v }));
-  const [autoLotSize, setAutoLotSize] = useState(savedTraderState.current.autoLotSize);
-  const [myTradesMap, setMyTradesMap] = useState<Record<string, boolean>>(savedTraderState.current.myTradesMap);
+  const [autoLotSize, setAutoLotSize] = useState("0.01");
+  const [myTradesMap, setMyTradesMap] = useState<Record<string, boolean>>({});
   const myTradesEnabled = myTradesMap[symbol] ?? false;
   const setMyTradesEnabled = (v: boolean) => setMyTradesMap(prev => ({ ...prev, [symbol]: v }));
+
+  // Load auto-trade settings from database on mount
+  const autoTradeLoaded = useRef(false);
+  useEffect(() => {
+    if (autoTradeLoaded.current) return;
+    autoTradeLoaded.current = true;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { data } = await supabase
+        .from("user_auto_trade_settings")
+        .select("symbol, enabled")
+        .eq("user_id", session.user.id);
+      if (data && data.length > 0) {
+        const map: Record<string, boolean> = {};
+        data.forEach((row: any) => { map[row.symbol] = row.enabled; });
+        setAutoTradeMap(map);
+      }
+    })();
+  }, []);
+
+  // Toggle auto-trade: update DB + local state
+  const setAutoTradeEnabled = useCallback(async (v: boolean) => {
+    setAutoTradeMap(prev => ({ ...prev, [symbol]: v }));
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    await supabase.from("user_auto_trade_settings").upsert(
+      { user_id: session.user.id, symbol, enabled: v, updated_at: new Date().toISOString() } as any,
+      { onConflict: "user_id,symbol" }
+    );
+  }, [symbol]);
 
   // ─── LOT SIZE SYNC: load from user_signal_preferences as single source of truth ───
   const lotSizeInitialized = useRef(false);
@@ -152,12 +173,6 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
     syncLotSizeToDb(newVal);
   }, [syncLotSizeToDb]);
 
-  // Persist intelligent trader state whenever it changes
-  useEffect(() => {
-    localStorage.setItem("ge_intelligent_trader", JSON.stringify({ autoTradeMap, myTradesMap, autoLotSize }));
-  }, [autoTradeMap, myTradesMap, autoLotSize]);
-
-  // Order mode
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
   const [limitEntry, setLimitEntry] = useState("");
   const [limitSl, setLimitSl] = useState("");

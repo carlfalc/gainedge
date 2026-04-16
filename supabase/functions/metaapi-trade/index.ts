@@ -16,7 +16,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Authenticate
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -28,17 +27,28 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const userId = claimsData.claims.sub as string;
     const body = await req.json();
     const { action } = body;
+
+    // Support service-role calls from backend (compute-market-data)
+    const token = authHeader.replace("Bearer ", "");
+    let userId: string;
+
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (token === SERVICE_ROLE_KEY && body.user_id) {
+      // Backend-initiated trade: trust the user_id from the body
+      userId = body.user_id;
+      console.log(`Service-role trade on behalf of user ${userId}`);
+    } else {
+      // Normal user JWT auth
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = claimsData.claims.sub as string;
+    }
 
     // Hardcoded account ID — no provisioning
     const METAAPI_ACCOUNT_ID = "ea940a26-d263-4017-ad2c-0412f8399b69";

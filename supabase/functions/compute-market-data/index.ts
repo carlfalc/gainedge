@@ -1302,10 +1302,19 @@ serve(async (req) => {
         console.warn(`Time budget hard limit reached before user scan loop (${elapsed()}ms)`);
         break;
       }
-      const [profileRes, sigPrefRes] = await Promise.all([
+      const [profileRes, sigPrefRes, autoTradeRes] = await Promise.all([
         supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
-        supabase.from("user_signal_preferences").select("signal_engine, signal_direction").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_signal_preferences").select("signal_engine, signal_direction, lot_size").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_auto_trade_settings").select("symbol, enabled").eq("user_id", userId),
       ]);
+      // Build auto-trade map for this user
+      const autoTradeMap: Record<string, boolean> = {};
+      if (autoTradeRes.data) {
+        for (const row of autoTradeRes.data) {
+          if (row.enabled) autoTradeMap[row.symbol] = true;
+        }
+      }
+      const userLotSize = sigPrefRes.data?.lot_size ?? 0.01;
       const profile = profileRes.data;
 
       // ─── KILL SWITCH: skip signal generation if paused ───
@@ -1560,6 +1569,39 @@ serve(async (req) => {
                   });
                   signalsCreated++;
                   console.log(`Signal created: ${inst.symbol} ${analysis.direction} conf=${analysis.confidence}`);
+
+                  // ─── AUTO-TRADE EXECUTION ───
+                  if (autoTradeMap[inst.symbol] && analysis.confidence >= 7 && !signalsPaused) {
+                    try {
+                      const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL")!;
+                      const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+                      const tradeActionType = analysis.direction === "BUY" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL";
+                      const tradeRes = await fetch(`${SUPABASE_URL_ENV}/functions/v1/metaapi-trade`, {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          "Authorization": `Bearer ${SRK}`,
+                        },
+                        body: JSON.stringify({
+                          action: "trade",
+                          user_id: userId,
+                          symbol: inst.symbol,
+                          actionType: tradeActionType,
+                          volume: String(userLotSize),
+                          stopLoss: analysis.stop_loss,
+                          takeProfit: analysis.take_profit,
+                        }),
+                      });
+                      const tradeResult = await tradeRes.json();
+                      if (tradeRes.ok && tradeResult.success) {
+                        console.log(`AUTO-TRADE executed: ${inst.symbol} ${analysis.direction} vol=${userLotSize}`);
+                      } else {
+                        console.warn(`AUTO-TRADE failed for ${inst.symbol}: ${tradeResult.error || "unknown error"}`);
+                      }
+                    } catch (tradeErr: any) {
+                      console.error(`AUTO-TRADE error for ${inst.symbol}: ${tradeErr.message}`);
+                    }
+                  }
                 }
               }
             } else if (analysis.direction === "BUY" || analysis.direction === "SELL") {
