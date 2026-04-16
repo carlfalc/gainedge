@@ -173,6 +173,31 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
         </div>
       </div>
 
+      {/* Signal Direction Filter */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: C.sec, fontWeight: 600, marginBottom: 6 }}>Trade Direction</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {DIRECTION_OPTIONS.map(d => {
+            const active = prefs.signal_direction === d.value;
+            return (
+              <button
+                key={d.value}
+                onClick={() => setPrefs(prev => ({ ...prev, signal_direction: d.value }))}
+                style={{
+                  flex: 1, padding: "8px 6px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: active ? (d.value === "buy" ? "#00CFA520" : d.value === "sell" ? "#ef444420" : C.jade + "20") : C.bg,
+                  color: active ? (d.value === "buy" ? C.jade : d.value === "sell" ? "#ef4444" : C.jade) : C.sec,
+                  fontSize: 11, fontWeight: 600, transition: "all 0.2s",
+                }}
+              >
+                <div>{d.label}</div>
+                <div style={{ fontSize: 9, fontWeight: 400, marginTop: 2, opacity: 0.8 }}>{d.desc}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Signal Engine Toggle */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: C.sec, fontWeight: 600, marginBottom: 6 }}>Signal Engine</div>
