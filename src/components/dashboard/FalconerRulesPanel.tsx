@@ -63,6 +63,77 @@ const VERSION_COPY: Record<RonRulesVersion, {
   },
 };
 
+function RonRulesVersionCard({
+  version,
+  active,
+  onClick,
+}: {
+  version: RonRulesVersion;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const copy = VERSION_COPY[version];
+
+  return (
+    <button
+      onClick={onClick}
+      className={`relative w-full overflow-hidden rounded-2xl border text-left transition-all duration-300 ${
+        active
+          ? "scale-100 border-primary/50 bg-card px-4 py-4 opacity-100 shadow-[0_0_0_1px_hsl(var(--primary)/0.25),0_0_24px_hsl(var(--primary)/0.22),0_0_48px_hsl(var(--primary)/0.14)]"
+          : "scale-[0.92] border-border bg-background/60 px-3 py-3 opacity-60 hover:opacity-80"
+      }`}
+      aria-pressed={active}
+    >
+      {active && (
+        <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/15 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-primary animate-pulse">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          Active
+        </div>
+      )}
+
+      <div className="pr-16">
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 rounded-xl border p-2 ${active ? "border-primary/25 bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}>
+            {version === "v1" ? <Sparkles className="h-4 w-4" /> : <Brain className="h-4 w-4" />}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className={`font-bold tracking-wide ${active ? "text-[15px] text-foreground" : "text-[12px] text-foreground"}`}>
+                {version === "v1" ? "✨" : "🧠"} {copy.title}
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${
+                version === "v1"
+                  ? "border-primary/25 bg-primary/10 text-primary"
+                  : "border-muted bg-secondary text-muted-foreground"
+              }`}>
+                {copy.eyebrow}
+              </span>
+            </div>
+
+            <div className="mt-2 text-[11px] font-semibold text-foreground">
+              {copy.summary}
+            </div>
+            <p className={`mt-2 leading-relaxed ${active ? "text-[11px] text-muted-foreground" : "text-[10px] text-muted-foreground"}`}>
+              {copy.description}
+            </p>
+
+            <div className="mt-3">
+              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+                version === "v1"
+                  ? "border-primary/25 bg-primary/10 text-primary"
+                  : "border-amber-500/25 bg-amber-500/10 text-amber-300"
+              }`}>
+                {copy.badge}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export default function FalconerRulesPanel() {
   const loadSavedUiState = () => {
     try {
