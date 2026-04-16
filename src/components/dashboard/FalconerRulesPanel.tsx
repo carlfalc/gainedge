@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Brain, Plus, Save, Filter, ToggleLeft, ToggleRight, Pencil, X, Check } from "lucide-react";
+import { Brain, Plus, ToggleLeft, ToggleRight, Pencil, X, Check, Sparkles, CheckCircle2 } from "lucide-react";
 
 interface KnowledgeRule {
   id: string;
@@ -36,11 +36,109 @@ const CATEGORY_COLORS: Record<string, string> = {
   pattern_rules: C.blue,
 };
 
+type RonRulesVersion = "v1" | "v2";
+
+const WELCOME_KEY = "ge_ron_rules_welcome_dismissed";
+
+const VERSION_COPY: Record<RonRulesVersion, {
+  title: string;
+  eyebrow: string;
+  summary: string;
+  description: string;
+  badge: string;
+}> = {
+  v1: {
+    title: "RON V1 Legacy",
+    eyebrow: "Premium Trading Vision",
+    summary: "Historical win rate: 82% across 2,600+ backtested trades.",
+    description: "Our proven flagship strategy with consistent high-probability signals. Refined over years of live market analysis.",
+    badge: "Recommended for all traders",
+  },
+  v2: {
+    title: "RON V2 Knowledge Base",
+    eyebrow: "Experimental",
+    summary: "Currently in development — ~50% WR.",
+    description: "Advanced AI model incorporating Smart Money Concepts and live market structure. Improves as more platform data flows through RON.",
+    badge: "Use with caution. Best for experienced traders",
+  },
+};
+
+function RonRulesVersionCard({
+  version,
+  active,
+  onClick,
+}: {
+  version: RonRulesVersion;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const copy = VERSION_COPY[version];
+
+  return (
+    <button
+      onClick={onClick}
+      className={`relative w-full overflow-hidden rounded-2xl border text-left transition-all duration-300 ${
+        active
+          ? "scale-100 border-primary/50 bg-card px-4 py-4 opacity-100 shadow-[0_0_0_1px_hsl(var(--primary)/0.25),0_0_24px_hsl(var(--primary)/0.22),0_0_48px_hsl(var(--primary)/0.14)]"
+          : "scale-[0.92] border-border bg-background/60 px-3 py-3 opacity-60 hover:opacity-80"
+      }`}
+      aria-pressed={active}
+    >
+      {active && (
+        <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/15 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-primary animate-pulse">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          Active
+        </div>
+      )}
+
+      <div className="pr-16">
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 rounded-xl border p-2 ${active ? "border-primary/25 bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}>
+            {version === "v1" ? <Sparkles className="h-4 w-4" /> : <Brain className="h-4 w-4" />}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className={`font-bold tracking-wide ${active ? "text-[15px] text-foreground" : "text-[12px] text-foreground"}`}>
+                {version === "v1" ? "✨" : "🧠"} {copy.title}
+              </div>
+              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${
+                version === "v1"
+                  ? "border-primary/25 bg-primary/10 text-primary"
+                  : "border-muted bg-secondary text-muted-foreground"
+              }`}>
+                {copy.eyebrow}
+              </span>
+            </div>
+
+            <div className="mt-2 text-[11px] font-semibold text-foreground">
+              {copy.summary}
+            </div>
+            <p className={`mt-2 leading-relaxed ${active ? "text-[11px] text-muted-foreground" : "text-[10px] text-muted-foreground"}`}>
+              {copy.description}
+            </p>
+
+            <div className="mt-3">
+              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+                version === "v1"
+                  ? "border-primary/25 bg-primary/10 text-primary"
+                  : "border-amber-500/25 bg-amber-500/10 text-amber-300"
+              }`}>
+                {copy.badge}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export default function FalconerRulesPanel() {
   const loadSavedUiState = () => {
     try {
       const raw = localStorage.getItem("ge_ron_rules_ui");
-      if (raw) return JSON.parse(raw) as { filter: string; versionFilter: string; aiVersion: "v1" | "v2" };
+      if (raw) return JSON.parse(raw) as { filter: string; versionFilter: string; aiVersion: RonRulesVersion };
     } catch {}
     return { filter: "all", versionFilter: "all", aiVersion: "v2" as const };
   };
@@ -55,12 +153,19 @@ export default function FalconerRulesPanel() {
   const [editPriority, setEditPriority] = useState(5);
   const [showAdd, setShowAdd] = useState(false);
   const [newRule, setNewRule] = useState({ category: "entry_rules", rule_name: "", rule_text: "", priority: 7 });
-  const [aiVersion, setAiVersion] = useState<"v1" | "v2">(savedUi.aiVersion);
+  const [aiVersion, setAiVersion] = useState<RonRulesVersion>(savedUi.aiVersion);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   // Persist UI state
   useEffect(() => {
     localStorage.setItem("ge_ron_rules_ui", JSON.stringify({ filter, versionFilter, aiVersion }));
   }, [filter, versionFilter, aiVersion]);
+
+  useEffect(() => {
+    if (!localStorage.getItem(WELCOME_KEY)) {
+      setShowWelcome(true);
+    }
+  }, []);
 
   useEffect(() => { loadRules(); }, []);
 
@@ -112,9 +217,14 @@ export default function FalconerRulesPanel() {
     }
   };
 
-  const switchVersion = (ver: "v1" | "v2") => {
+  const switchVersion = (ver: RonRulesVersion) => {
     setAiVersion(ver);
     toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
+  };
+
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem(WELCOME_KEY, "1");
   };
 
   const filtered = rules.filter(r => {
@@ -136,27 +246,47 @@ export default function FalconerRulesPanel() {
         <span style={{ fontSize: 11, color: C.sec, marginLeft: "auto" }}>{v2Active}/{v2Total} V2 rules active</span>
       </div>
 
-      {/* Version Toggle */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, padding: 12, background: C.bg, borderRadius: 10, border: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>RON Version:</span>
-        <button
-          onClick={() => switchVersion("v1")}
-          style={{
-            padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
-            background: aiVersion === "v1" ? C.amber + "30" : C.bg, color: aiVersion === "v1" ? C.amber : C.sec,
-          }}
-        >
-          V1 (Legacy)
-        </button>
-        <button
-          onClick={() => switchVersion("v2")}
-          style={{
-            padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, border: "none", cursor: "pointer",
-            background: aiVersion === "v2" ? C.jade + "30" : C.bg, color: aiVersion === "v2" ? C.jade : C.sec,
-          }}
-        >
-          V2 (Knowledge Base)
-        </button>
+      <div className="mb-4 space-y-3">
+        {showWelcome && (
+          <div className="relative rounded-xl border border-primary/25 bg-primary/10 px-3 py-3">
+            <button
+              onClick={dismissWelcome}
+              className="absolute right-2 top-2 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Dismiss welcome banner"
+            >
+              <X size={12} />
+            </button>
+            <p className="pr-6 text-[11px] leading-relaxed text-muted-foreground">
+              <span className="font-semibold text-foreground">Welcome!</span> We've set you up with{" "}
+              <span className="font-semibold text-primary">RON V1 Legacy</span> — our proven premium strategy.
+              You can explore V2 Knowledge Base anytime, but V1 is recommended while you get familiar.
+            </p>
+          </div>
+        )}
+
+        <div className="space-y-3 rounded-xl border border-border bg-background/70 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            RON Version
+          </div>
+
+          <div className="space-y-3">
+            <RonRulesVersionCard
+              version="v1"
+              active={aiVersion === "v1"}
+              onClick={() => switchVersion("v1")}
+            />
+            <RonRulesVersionCard
+              version="v2"
+              active={aiVersion === "v2"}
+              onClick={() => switchVersion("v2")}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-primary">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          {aiVersion === "v1" ? "V1 Rules Currently Applied" : "V2 Rules Currently Applied"}
+        </div>
       </div>
 
       {/* Filters */}
