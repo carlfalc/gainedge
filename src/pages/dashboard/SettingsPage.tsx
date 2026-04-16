@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
-import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock, Database, Loader2, Wifi, WifiOff, Server, Trash2, Star } from "lucide-react";
+import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock, Database, Loader2, Wifi, WifiOff, Server, Trash2, Star, Brain } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
+import RonVersionSelector from "@/components/dashboard/RonVersionSelector";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
 import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
 import BrokerMappingsAdmin from "@/components/dashboard/BrokerMappingsAdmin";
@@ -219,6 +220,10 @@ export default function SettingsPage() {
           </div>
         )}
         <Toggle label={t("settings.smsAlerts")} checked={smsAlerts} onChange={setSmsAlerts} />
+      </Section>
+
+      <Section icon={<Brain size={16} color={C.purple} />} title="RON  Your Expert Trading Buddy">
+        <RonVersionSelector userId={userId} />
       </Section>
 
 
