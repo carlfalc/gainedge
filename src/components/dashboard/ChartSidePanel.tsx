@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Zap, TrendingUp, TrendingDown, Loader2, Brain, Mic } from "lucide-react";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
 import AskRonModal from "@/components/dashboard/AskRonModal";
+import RonVersionSelector, { type RonVersion } from "@/components/dashboard/RonVersionSelector";
 
 interface Signal {
   id: string;
@@ -22,9 +23,10 @@ interface ChartSidePanelProps {
   positions: Position[];
   onClosePosition: (positionId: string) => void;
   closingId: string | null;
+  onVersionChange?: (version: RonVersion) => void;
 }
 
-export default function ChartSidePanel({ symbol, userId, accountId, positions, onClosePosition, closingId }: ChartSidePanelProps) {
+export default function ChartSidePanel({ symbol, userId, accountId, positions, onClosePosition, closingId, onVersionChange }: ChartSidePanelProps) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [ronOpen, setRonOpen] = useState(false);
 
