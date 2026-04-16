@@ -50,8 +50,8 @@ export default function ActiveTradeInfo({ symbol, accountId }: ActiveTradeInfoPr
 
     const fetchPrice = async () => {
       try {
-        const price = await fetchCurrentPrice(symbol);
-        if (price) setCurrentPrice(price);
+        const priceData = await fetchCurrentPrice(accountId, symbol);
+        if (priceData) setCurrentPrice((priceData.bid + priceData.ask) / 2);
       } catch {
         // silent
       }
