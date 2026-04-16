@@ -1136,7 +1136,8 @@ serve(async (req) => {
       }
     }
 
-    // Fill remaining with mock
+    // Fill remaining with mock — track which symbols are mock
+    const mockSymbols = new Set<string>();
     for (const [symbol, timeframe] of symbolEntries) {
       if (!symbolData.has(symbol)) {
         const mock = generateMockData(symbol);
@@ -1144,6 +1145,8 @@ serve(async (req) => {
         const candleBucket = Math.floor(Date.now() / (tfMin * 60000));
         mock.last_candle_time = new Date(candleBucket * tfMin * 60000).toISOString();
         symbolData.set(symbol, mock);
+        mockSymbols.add(symbol);
+        console.warn(`Mock data used for ${symbol} — signal generation will be skipped`);
       }
     }
 
