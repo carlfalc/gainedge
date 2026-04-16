@@ -75,22 +75,14 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     if (!userId) return;
-    // Save standard profile fields
     await updateProfile({
       full_name: name,
       nickname: nickname || null,
-      default_timeframe: timeframe,
-      default_candle_type: candle,
-      ema_fast: parseInt(emaFast),
-      ema_slow: parseInt(emaSlow),
       email_alerts: emailAlerts,
       push_notifications: pushAlerts,
       sms_alerts: smsAlerts,
-      broker,
     } as any);
-    // Save clock preferences separately (column not in typed Profile)
     await supabase.from("profiles").update({ clock_timezones: clockSlots as any, rr_ratio: parseFloat(rrRatio) } as any).eq("id", userId);
-    // Also save RON/AI preferences
     await falconerPrefsRef.current?.save();
     toast.success("Settings saved");
   };
@@ -153,34 +145,29 @@ export default function SettingsPage() {
         <button onClick={() => setShowAddInstrument(true)} style={{ ...btnStyle, background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>{t("settings.addInstrument")}</button>
       </Section>
 
-      <Section icon={<Sliders size={16} color={C.purple} />} title={t("settings.preferences")}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label={t("settings.defaultTimeframe")}>
-            <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={inputStyle}>
-              {["1", "5", "15", "30", "60", "240", "1440"].map(t => <option key={t} value={t}>{t === "60" ? "1h" : t === "240" ? "4h" : t === "1440" ? "1D" : t + "m"}</option>)}
-            </select>
-          </Field>
-          <Field label={t("settings.candleType")}>
-            <select value={candle} onChange={e => setCandle(e.target.value)} style={inputStyle}>
-              <option value="heiken_ashi">Heiken Ashi</option>
-              <option value="standard">Standard</option>
-              <option value="renko">Renko</option>
-            </select>
-          </Field>
-          <Field label={t("settings.emaFast")}>
-            <input value={emaFast} onChange={e => setEmaFast(e.target.value)} style={inputStyle} type="number" />
-          </Field>
-          <Field label={t("settings.emaSlow")}>
-            <input value={emaSlow} onChange={e => setEmaSlow(e.target.value)} style={inputStyle} type="number" />
-          </Field>
-          <Field label="Risk:Reward Ratio">
-            <select value={rrRatio} onChange={e => setRrRatio(e.target.value)} style={inputStyle}>
-              <option value="1.5">1.5:1 (Conservative)</option>
-              <option value="2.0">2.0:1 (Standard — recommended)</option>
-              <option value="2.5">2.5:1 (Moderate)</option>
-              <option value="3.0">3.0:1 (Aggressive)</option>
-            </select>
-          </Field>
+      <Section icon={<Sliders size={16} color={C.purple} />} title="Signal Preferences">
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>Choose how aggressively RON targets profit on your signals.</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {RISK_PROFILES.map(rp => {
+            const active = rrRatio === rp.ratio;
+            return (
+              <button
+                key={rp.value}
+                onClick={() => setRrRatio(rp.ratio)}
+                style={{
+                  padding: "14px 12px", borderRadius: 10, border: "none", cursor: "pointer",
+                  background: active ? C.jade + "18" : C.bg,
+                  outline: active ? `2px solid ${C.jade}` : `1px solid ${C.border}`,
+                  textAlign: "left", transition: "all 0.2s",
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: active ? C.jade : C.text, marginBottom: 4 }}>
+                  {rp.label} {rp.default && <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, marginLeft: 4 }}>RECOMMENDED</span>}
+                </div>
+                <div style={{ fontSize: 11, color: C.sec, lineHeight: 1.4 }}>{rp.desc}</div>
+              </button>
+            );
+          })}
         </div>
       </Section>
 
