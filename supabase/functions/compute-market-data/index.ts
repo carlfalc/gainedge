@@ -1302,10 +1302,19 @@ serve(async (req) => {
         console.warn(`Time budget hard limit reached before user scan loop (${elapsed()}ms)`);
         break;
       }
-      const [profileRes, sigPrefRes] = await Promise.all([
+      const [profileRes, sigPrefRes, autoTradeRes] = await Promise.all([
         supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
-        supabase.from("user_signal_preferences").select("signal_engine, signal_direction").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_signal_preferences").select("signal_engine, signal_direction, lot_size").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_auto_trade_settings").select("symbol, enabled").eq("user_id", userId),
       ]);
+      // Build auto-trade map for this user
+      const autoTradeMap: Record<string, boolean> = {};
+      if (autoTradeRes.data) {
+        for (const row of autoTradeRes.data) {
+          if (row.enabled) autoTradeMap[row.symbol] = true;
+        }
+      }
+      const userLotSize = sigPrefRes.data?.lot_size ?? 0.01;
       const profile = profileRes.data;
 
       // ─── KILL SWITCH: skip signal generation if paused ───
