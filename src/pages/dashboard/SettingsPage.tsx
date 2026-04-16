@@ -436,7 +436,7 @@ function HistoricalDataImport() {
         }}
       >
         {importing ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
-        {importing ? "Importing... (this may take several minutes)" : "Import Historical Data"}
+        {importing ? "Importing... (this may take several minutes)" : "Import Historical Data from GitHub"}
       </button>
 
       {result && !result.error && result.details && (

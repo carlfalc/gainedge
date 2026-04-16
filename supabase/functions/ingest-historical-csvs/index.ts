@@ -7,12 +7,14 @@ const corsHeaders = {
 
 const SYMBOL_MAP: Record<string, string> = {
   "XAU-USD": "XAUUSD",
+  "XAU-AUD": "XAUAUD",
   "XAG-USD": "XAGUSD",
   "AUD-USD": "AUDUSD",
   "EUR-USD": "EURUSD",
   "GBP-USD": "GBPUSD",
   "USD-JPY": "USDJPY",
   "USD-CAD": "USDCAD",
+  "USD-CHF": "USDCHF",
   "NZD-USD": "NZDUSD",
   "AUD-JPY": "AUDJPY",
   "GBP-JPY": "GBPJPY",
@@ -29,7 +31,6 @@ const SYMBOL_MAP: Record<string, string> = {
 };
 
 function resolveSymbol(filename: string): string | null {
-  // filename like "XAU-USD_2024.csv" or "USA500.IDX-USD_2023.csv"
   for (const [prefix, symbol] of Object.entries(SYMBOL_MAP)) {
     if (filename.startsWith(prefix)) return symbol;
   }
@@ -45,8 +46,7 @@ function parseCSV(text: string, symbol: string): any[] {
     if (!line) continue;
 
     const parts = line.split(",");
-    // Dukascopy format: timestamp, open, high, low, close, volume
-    // First line might be a header
+    // Skip header row
     if (i === 0 && (parts[0].toLowerCase().includes("time") || parts[0].toLowerCase().includes("date"))) {
       continue;
     }
@@ -60,15 +60,14 @@ function parseCSV(text: string, symbol: string): any[] {
     const close = parseFloat(closeStr);
     const volume = parseInt(volStr) || 0;
 
+    // Skip malformed or zero-price candles
     if (isNaN(open) || isNaN(high) || isNaN(low) || isNaN(close)) continue;
+    if (open === 0 || high === 0 || low === 0 || close === 0) continue;
 
-    // Parse timestamp - Dukascopy uses various formats
-    let timestamp: string;
     const parsed = new Date(ts.trim());
     if (isNaN(parsed.getTime())) continue;
-    timestamp = parsed.toISOString();
 
-    rows.push({ symbol, timeframe: "1m", timestamp, open, high, low, close, volume });
+    rows.push({ symbol, timeframe: "1m", timestamp: parsed.toISOString(), open, high, low, close, volume });
   }
 
   return rows;
@@ -116,8 +115,8 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Download raw CSV
-      const rawUrl = file.download_url;
+      // Download raw CSV using raw.githubusercontent.com
+      const rawUrl = `https://raw.githubusercontent.com/carlfalc/ron-ml/main/${encodeURIComponent(file.name)}`;
       const csvRes = await fetch(rawUrl);
       if (!csvRes.ok) {
         details.push({ file: file.name, symbol, status: "error", reason: "download failed" });
@@ -132,9 +131,9 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // 3. Bulk insert in batches of 1000
+      // 3. Bulk insert in batches of 100
       let stored = 0;
-      const BATCH = 1000;
+      const BATCH = 100;
       for (let i = 0; i < rows.length; i += BATCH) {
         const batch = rows.slice(i, i + BATCH);
         const { error, count } = await supabase
