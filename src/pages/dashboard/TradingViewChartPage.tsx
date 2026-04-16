@@ -187,6 +187,16 @@ export default function TradingViewChartPage() {
         onClosePosition={handleClosePosition}
         closingId={closingId}
       />
+      {/* Broker unavailability banner */}
+      {selected && selectedAvailability === "unavailable" && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border-b border-amber-500/30 text-[11px] text-amber-400 shrink-0">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <span>
+            <strong>{selected}</strong> not available on {selectedBroker}. Showing RON's analysis only.
+            {" "}Auto-trade will skip signals for this instrument.
+          </span>
+        </div>
+      )}
 
       {/* Main content: chart + sidebar */}
       <div className="flex flex-1 min-h-0">
