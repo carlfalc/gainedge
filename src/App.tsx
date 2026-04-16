@@ -22,7 +22,6 @@ import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
 import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
 import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
-import ChartsPage from "./pages/dashboard/ChartsPage.tsx";
 import TradingViewChartPage from "./pages/dashboard/TradingViewChartPage.tsx";
 import WhiskyCigarLoungePage from "./pages/dashboard/WhiskyCigarLoungePage.tsx";
 
@@ -53,8 +52,7 @@ const App = () => (
             <Route path="clock-settings" element={<ClockSettingsPage />} />
             <Route path="news-settings" element={<NewsSettingsPage />} />
             <Route path="my-news" element={<MyNewsPage />} />
-            <Route path="charts" element={<ChartsPage />} />
-            <Route path="tradingview-chart" element={<TradingViewChartPage />} />
+            <Route path="charts" element={<TradingViewChartPage />} />
             <Route path="whisky-cigar-lounge" element={<WhiskyCigarLoungePage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
