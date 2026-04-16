@@ -7,6 +7,7 @@ import TradingViewWidget from "@/components/dashboard/TradingViewWidget";
 import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
 import ActiveTradeBar from "@/components/dashboard/ActiveTradeBar";
+import ChartOverlay from "@/components/dashboard/ChartOverlay";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
