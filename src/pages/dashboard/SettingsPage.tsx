@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { C } from "@/lib/mock-data";
-import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock, Database, Loader2 } from "lucide-react";
+import { User, Bell, Sliders, CreditCard, AlertTriangle, Key, Copy, Eye, EyeOff, Shield, Activity, Clock, Database, Loader2, Wifi, WifiOff, Server, Trash2, Star } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import FalconerRulesPanel from "@/components/dashboard/FalconerRulesPanel";
 import FalconerPreferencesPanel, { type FalconerPreferencesPanelRef } from "@/components/dashboard/FalconerPreferencesPanel";
