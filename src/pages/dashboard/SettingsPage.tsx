@@ -122,6 +122,9 @@ export default function SettingsPage() {
         </Field>
       </Section>
 
+      {/* Broker Connection Settings */}
+      {userId && <BrokerConnectionSettings userId={userId} />}
+
       <Section icon={<Sliders size={16} color={C.blue} />} title={t("settings.instruments")}>
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 8 }}>{t("settings.currentWatchlist")} ({instruments.length}/10 — {tierLabel} {t("common.tier")}):</div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
@@ -249,9 +252,6 @@ export default function SettingsPage() {
 
       {/* All users see AI Preferences */}
       <FalconerPreferencesPanel ref={falconerPrefsRef} />
-
-      {/* Broker Connection Settings */}
-      {userId && <BrokerConnectionSettings userId={userId} />}
 
       {/* Admin-only sections */}
       {isAdmin && <FalconerRulesPanel />}
