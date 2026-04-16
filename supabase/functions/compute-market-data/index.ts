@@ -1304,7 +1304,7 @@ serve(async (req) => {
       }
       const [profileRes, sigPrefRes] = await Promise.all([
         supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
-        supabase.from("user_signal_preferences").select("signal_engine").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_signal_preferences").select("signal_engine, signal_direction").eq("user_id", userId).maybeSingle(),
       ]);
       const profile = profileRes.data;
 
@@ -1316,6 +1316,7 @@ serve(async (req) => {
 
       // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
       const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
+      const signalDirection = (sigPrefRes.data as any)?.signal_direction || "both";
       const useV2 = signalEngine === "v2" || signalEngine === "v1v2";
       const useV1Pure = signalEngine === "v1"; // Pure V1: only EMA crossover, no extra filters
 
@@ -1477,6 +1478,16 @@ serve(async (req) => {
 
             if (signalsPaused) {
               console.log(`Signals paused for user ${userId.slice(0, 8)} — scan saved, signal creation skipped for ${inst.symbol}`);
+              continue;
+            }
+
+            // ─── DIRECTION FILTER: respect user's buy/sell preference ───
+            if (signalDirection === "buy" && analysis.direction === "SELL") {
+              console.log(`Direction filter: skipping SELL for ${inst.symbol} — user set Buys Only`);
+              continue;
+            }
+            if (signalDirection === "sell" && analysis.direction === "BUY") {
+              console.log(`Direction filter: skipping BUY for ${inst.symbol} — user set Sells Only`);
               continue;
             }
 
