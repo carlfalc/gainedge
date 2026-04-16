@@ -203,7 +203,7 @@ export default function TradingViewChartPage() {
         {/* Left: chart + trade panel with independent scroll */}
         <div className="flex-1 min-w-0 flex flex-col min-h-0">
           {/* Chart area */}
-          <div className="flex-1 min-h-0 relative" style={{ minHeight: 400 }}>
+          <div className="relative" style={{ height: "60vh", minHeight: 500 }}>
             {selected && (
               <>
                 <TradingViewWidget symbol={selected} broker={selectedBroker} />
