@@ -22,6 +22,34 @@ interface PatternData {
   win_rate: number;
 }
 
+const VALID_PATTERNS = new Set([
+  "double_top", "double_bottom",
+  "head_and_shoulders", "inverse_head_and_shoulders",
+  "triple_top", "triple_bottom",
+  "ascending_triangle", "descending_triangle", "symmetrical_triangle",
+  "bull_flag", "bear_flag",
+  "rising_wedge", "falling_wedge",
+  "cup_and_handle", "inverse_cup_and_handle",
+  "rectangle", "channel",
+  "rounding_top", "rounding_bottom",
+  "bullish_engulfing", "bearish_engulfing",
+  "morning_star", "evening_star",
+  "pin_bar", "hammer", "shooting_star",
+  // Also accept display-name variants
+  "Double Top", "Double Bottom",
+  "Head & Shoulders", "Inverse Head & Shoulders",
+  "Triple Top", "Triple Bottom",
+  "Ascending Triangle", "Descending Triangle", "Symmetrical Triangle",
+  "Bull Flag", "Bear Flag",
+  "Rising Wedge", "Falling Wedge",
+  "Cup & Handle", "Inverse Cup & Handle",
+  "Rectangle", "Channel",
+  "Rounding Top", "Rounding Bottom",
+  "Bullish Engulfing", "Bearish Engulfing",
+  "Morning Star", "Evening Star",
+  "Pin Bar", "Hammer", "Shooting Star",
+]);
+
 interface ChartOverlayProps {
   symbol: string;
   userId: string | undefined;
