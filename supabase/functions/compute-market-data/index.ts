@@ -328,8 +328,10 @@ async function fetchPriceFromBroker(token: string, accountId: string, symbol: st
 /* ─── Mock data fallback ─── */
 function generateMockData(symbol: string) {
   const basePrices: Record<string, number> = {
-    XAUUSD: 3250, US30: 42500, NAS100: 21200, NZDUSD: 0.5950, AUDUSD: 0.6450,
-    EURUSD: 1.0850, GBPUSD: 1.2650, USDJPY: 155.50,
+    XAUUSD: 4800, US30: 48500, NAS100: 25800, NZDUSD: 0.5950, AUDUSD: 0.6350,
+    EURUSD: 1.0950, GBPUSD: 1.2950, USDJPY: 143.50, USDCAD: 1.3850,
+    USDCHF: 0.8750, GBPJPY: 185.80, EURJPY: 157.20, EURGBP: 0.8460,
+    XAGUSD: 33.00, BTCUSD: 83000, ETHUSD: 1600, US500: 5500, SPX500: 5500,
   };
   const base = basePrices[symbol] ?? 100;
   const vol = base * 0.002;
@@ -355,6 +357,7 @@ function generateMockData(symbol: string) {
     sparkline_data: sparkline,
     price_direction: direction,
     last_candle_time: null as string | null,
+    isMock: true,
   };
 }
 
@@ -1133,7 +1136,8 @@ serve(async (req) => {
       }
     }
 
-    // Fill remaining with mock
+    // Fill remaining with mock — track which symbols are mock
+    const mockSymbols = new Set<string>();
     for (const [symbol, timeframe] of symbolEntries) {
       if (!symbolData.has(symbol)) {
         const mock = generateMockData(symbol);
@@ -1141,6 +1145,8 @@ serve(async (req) => {
         const candleBucket = Math.floor(Date.now() / (tfMin * 60000));
         mock.last_candle_time = new Date(candleBucket * tfMin * 60000).toISOString();
         symbolData.set(symbol, mock);
+        mockSymbols.add(symbol);
+        console.warn(`Mock data used for ${symbol} — signal generation will be skipped`);
       }
     }
 
@@ -1348,6 +1354,12 @@ serve(async (req) => {
             .eq("user_id", userId)
             .eq("symbol", inst.symbol)
             .gte("created_at", twoHoursAgo);
+
+          // ─── BLOCK SIGNAL GENERATION FROM MOCK DATA ───
+          if (mockSymbols.has(inst.symbol)) {
+            console.warn(`Skipping signal generation for ${inst.symbol} — using mock data`);
+            continue;
+          }
 
           const candles = symbolCandles.get(inst.symbol);
           let analysis: AnalysisResult;
