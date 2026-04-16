@@ -122,7 +122,7 @@ export default function TradingViewChartPage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-56px)] overflow-y-auto">
+    <div className="flex flex-col h-[calc(100vh-56px)] overflow-hidden">
       {/* Top bar — instrument tabs with live prices + brokers */}
       <div className="flex items-center gap-1.5 flex-wrap px-2 py-1.5 border-b border-border shrink-0">
         {instruments.map((sym) => (
