@@ -98,32 +98,91 @@ export default function ChartOverlay({ symbol, userId, positions }: ChartOverlay
     return () => clearInterval(iv);
   }, [userId, symbol]);
 
-  // Fetch latest pattern detection
+  // Fetch latest pattern detection — from scan_results via verdict/reasoning fields
+  // Also look at signal_outcomes for pattern_active
   useEffect(() => {
     if (!userId || !symbol) return;
     setPatternDismissed(false);
-    supabase
-      .from("scan_results")
-      .select("candle_type, confidence, entry_price, take_profit, stop_loss")
-      .eq("user_id", userId)
-      .eq("symbol", symbol)
-      .neq("candle_type", "standard")
-      .order("scanned_at", { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (data && data.length > 0) {
-          const d = data[0];
-          setPattern({
-            pattern_name: d.candle_type,
-            target_price: d.take_profit ?? undefined,
-            stop_price: d.stop_loss ?? undefined,
-            confidence: d.confidence,
-            win_rate: 65,
-          });
-        } else {
-          setPattern(null);
+
+    const loadPattern = async () => {
+      // First check signal_outcomes for pattern data
+      const { data: outcomes } = await supabase
+        .from("signal_outcomes")
+        .select("pattern_active, confidence, entry_price, tp_price, sl_price")
+        .eq("user_id", userId)
+        .eq("symbol", symbol)
+        .not("pattern_active", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      // Find the first valid pattern (not a candle type)
+      const validOutcome = outcomes?.find(o =>
+        o.pattern_active && VALID_PATTERNS.has(o.pattern_active) && o.confidence >= 6
+      );
+
+      if (validOutcome) {
+        // Fetch historical win rate for this pattern
+        const { data: stats } = await supabase
+          .from("pattern_weights")
+          .select("win_rate")
+          .eq("pattern_name", validOutcome.pattern_active!)
+          .eq("symbol", symbol)
+          .limit(1);
+
+        const winRate = stats?.[0]?.win_rate ?? 0;
+
+        setPattern({
+          pattern_name: validOutcome.pattern_active!,
+          target_price: validOutcome.tp_price ?? undefined,
+          stop_price: validOutcome.sl_price ?? undefined,
+          confidence: validOutcome.confidence * 10, // Convert 1-10 to percentage-like
+          win_rate: Number(winRate),
+        });
+        return;
+      }
+
+      // Fallback: check scan_results for patterns mentioned in reasoning
+      const { data: scans } = await supabase
+        .from("scan_results")
+        .select("reasoning, confidence, take_profit, stop_loss")
+        .eq("user_id", userId)
+        .eq("symbol", symbol)
+        .gte("confidence", 6)
+        .order("scanned_at", { ascending: false })
+        .limit(3);
+
+      if (scans) {
+        for (const scan of scans) {
+          // Don't treat candle types as patterns
+          if (scan.confidence < 6) continue;
+          const reasoning = (scan.reasoning || "").toLowerCase();
+          const detected = Array.from(VALID_PATTERNS).find(p =>
+            reasoning.includes(p.toLowerCase().replace(/_/g, " "))
+          );
+          if (detected) {
+            const { data: stats } = await supabase
+              .from("pattern_weights")
+              .select("win_rate")
+              .eq("pattern_name", detected)
+              .eq("symbol", symbol)
+              .limit(1);
+
+            setPattern({
+              pattern_name: detected,
+              target_price: scan.take_profit ?? undefined,
+              stop_price: scan.stop_loss ?? undefined,
+              confidence: scan.confidence * 10,
+              win_rate: Number(stats?.[0]?.win_rate ?? 0),
+            });
+            return;
+          }
         }
-      });
+      }
+
+      setPattern(null);
+    };
+
+    loadPattern();
   }, [userId, symbol]);
 
   // Filtered positions for this symbol
