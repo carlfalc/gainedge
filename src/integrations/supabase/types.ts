@@ -1343,6 +1343,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_auto_trade_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          symbol: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          symbol: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          symbol?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_indicator_preferences: {
         Row: {
           created_at: string
