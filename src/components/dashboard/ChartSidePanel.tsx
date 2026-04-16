@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Zap, TrendingUp, TrendingDown, Loader2, Brain, Mic } from "lucide-react";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
 import AskRonModal from "@/components/dashboard/AskRonModal";
+import RonVersionSelector, { type RonVersion } from "@/components/dashboard/RonVersionSelector";
 
 interface Signal {
   id: string;
@@ -22,9 +23,10 @@ interface ChartSidePanelProps {
   positions: Position[];
   onClosePosition: (positionId: string) => void;
   closingId: string | null;
+  onVersionChange?: (version: RonVersion) => void;
 }
 
-export default function ChartSidePanel({ symbol, userId, accountId, positions, onClosePosition, closingId }: ChartSidePanelProps) {
+export default function ChartSidePanel({ symbol, userId, accountId, positions, onClosePosition, closingId, onVersionChange }: ChartSidePanelProps) {
   const [signals, setSignals] = useState<Signal[]>([]);
   const [ronOpen, setRonOpen] = useState(false);
 
@@ -51,8 +53,10 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
 
   return (
     <div className="flex flex-col h-full bg-card border-l border-border overflow-hidden">
+      {/* RON Version Selector */}
+      <RonVersionSelector userId={userId} onVersionChange={onVersionChange} />
+
       <div className="flex-1 overflow-y-auto">
-        {/* RON Active Signals */}
         <div className="border-b border-border p-4">
           <div className="flex items-center gap-2 mb-3">
             <Zap size={13} style={{ color: "#00CFA5" }} />
