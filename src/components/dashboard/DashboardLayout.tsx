@@ -22,7 +22,6 @@ import LiveQuotesTicker from "./LiveQuotesTicker";
 const NAV_ITEMS = [
   { labelKey: "nav.dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { labelKey: "nav.charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
-  { labelKey: "nav.tradingviewChart", icon: ExternalLink, path: "/dashboard/tradingview-chart", white: true },
   { labelKey: "nav.signals", icon: Zap, path: "/dashboard/signals" },
   { labelKey: "nav.journal", icon: BookOpen, path: "/dashboard/journal" },
   { labelKey: "nav.analytics", icon: BarChart3, path: "/dashboard/analytics" },
