@@ -120,6 +120,51 @@ export type Database = {
           },
         ]
       }
+      broker_connections: {
+        Row: {
+          account_type: string
+          broker_name: string
+          created_at: string
+          encrypted_password: string
+          id: string
+          is_default: boolean
+          login_id: string
+          metaapi_account_id: string | null
+          server: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_type?: string
+          broker_name: string
+          created_at?: string
+          encrypted_password: string
+          id?: string
+          is_default?: boolean
+          login_id: string
+          metaapi_account_id?: string | null
+          server: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_type?: string
+          broker_name?: string
+          created_at?: string
+          encrypted_password?: string
+          id?: string
+          is_default?: boolean
+          login_id?: string
+          metaapi_account_id?: string | null
+          server?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       candle_history: {
         Row: {
           buy_volume: number | null
