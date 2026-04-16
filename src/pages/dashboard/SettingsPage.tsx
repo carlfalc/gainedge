@@ -254,6 +254,7 @@ export default function SettingsPage() {
       {isAdmin && <FalconerRulesPanel />}
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
+      {isAdmin && <HistoricalDataImport />}
 
       <Section icon={<AlertTriangle size={16} color={C.red} />} title={t("settings.dangerZone")}>
         <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>{t("settings.deleteWarning")}</div>
