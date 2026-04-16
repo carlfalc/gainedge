@@ -10,7 +10,14 @@ interface SignalPrefs {
   instrument_filters: Record<string, boolean>;
   currency: string;
   lot_size: number;
+  signal_direction: string;
 }
+
+const DIRECTION_OPTIONS = [
+  { value: "both", label: "Both", desc: "Buy & Sell signals" },
+  { value: "buy", label: "Buys Only", desc: "Long entries only" },
+  { value: "sell", label: "Sells Only", desc: "Short entries only" },
+];
 
 const SIGNAL_STYLES = [
   { value: "conservative", label: "Conservative", desc: "High conviction only (confidence ≥ 8)", minConf: 8 },
@@ -23,7 +30,7 @@ export interface FalconerPreferencesPanelRef {
 }
 
 const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(function FalconerPreferencesPanel(_, ref) {
-  const [prefs, setPrefs] = useState<SignalPrefs>({ min_confidence: 6, instrument_filters: {}, currency: "NZD", lot_size: 0.01 });
+  const [prefs, setPrefs] = useState<SignalPrefs>({ min_confidence: 6, instrument_filters: {}, currency: "NZD", lot_size: 0.01, signal_direction: "both" });
   const [instruments, setInstruments] = useState<string[]>([]);
   const [notifications, setNotifications] = useState(true);
   const [style, setStyle] = useState("balanced");
@@ -54,7 +61,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
     if (prefRes.data) {
       const p = prefRes.data;
       const filters = (typeof p.instrument_filters === "object" && p.instrument_filters !== null ? p.instrument_filters : {}) as Record<string, boolean>;
-      setPrefs({ id: p.id, min_confidence: p.min_confidence, instrument_filters: filters, currency: p.currency, lot_size: p.lot_size });
+      setPrefs({ id: p.id, min_confidence: p.min_confidence, instrument_filters: filters, currency: p.currency, lot_size: p.lot_size, signal_direction: (p as any).signal_direction || "both" });
       setSignalEngine((p as any).signal_engine || "v1");
       // Determine style from min_confidence
       const matched = SIGNAL_STYLES.find(s => s.minConf === p.min_confidence);
@@ -92,6 +99,7 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
         currency: prefs.currency,
         lot_size: prefs.lot_size,
         signal_engine: signalEngine,
+        signal_direction: prefs.signal_direction,
       };
 
       if (prefs.id) {
@@ -162,6 +170,31 @@ const FalconerPreferencesPanel = forwardRef<FalconerPreferencesPanelRef>(functio
               <div style={{ fontSize: 9, fontWeight: 400, marginTop: 2, opacity: 0.8 }}>{s.desc}</div>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Signal Direction Filter */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: C.sec, fontWeight: 600, marginBottom: 6 }}>Trade Direction</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {DIRECTION_OPTIONS.map(d => {
+            const active = prefs.signal_direction === d.value;
+            return (
+              <button
+                key={d.value}
+                onClick={() => setPrefs(prev => ({ ...prev, signal_direction: d.value }))}
+                style={{
+                  flex: 1, padding: "8px 6px", borderRadius: 8, border: "none", cursor: "pointer",
+                  background: active ? (d.value === "buy" ? "#00CFA520" : d.value === "sell" ? "#ef444420" : C.jade + "20") : C.bg,
+                  color: active ? (d.value === "buy" ? C.jade : d.value === "sell" ? "#ef4444" : C.jade) : C.sec,
+                  fontSize: 11, fontWeight: 600, transition: "all 0.2s",
+                }}
+              >
+                <div>{d.label}</div>
+                <div style={{ fontSize: 9, fontWeight: 400, marginTop: 2, opacity: 0.8 }}>{d.desc}</div>
+              </button>
+            );
+          })}
         </div>
       </div>
 
