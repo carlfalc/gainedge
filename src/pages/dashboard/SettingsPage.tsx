@@ -380,6 +380,72 @@ function AdminPanel() {
   );
 }
 
+function StrategyConfigAdmin() {
+  const [timeframe, setTimeframe] = useState("15");
+  const [candle, setCandle] = useState("heiken_ashi");
+  const [emaFast, setEmaFast] = useState("4");
+  const [emaSlow, setEmaSlow] = useState("17");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) return;
+      const { data } = await supabase.from("profiles").select("default_timeframe, default_candle_type, ema_fast, ema_slow").eq("id", session.user.id).single();
+      if (data) {
+        setTimeframe(data.default_timeframe);
+        setCandle(data.default_candle_type);
+        setEmaFast(String(data.ema_fast));
+        setEmaSlow(String(data.ema_slow));
+      }
+    });
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.from("profiles").update({
+        default_timeframe: timeframe,
+        default_candle_type: candle,
+        ema_fast: parseInt(emaFast),
+        ema_slow: parseInt(emaSlow),
+      }).eq("id", session.user.id);
+      toast.success("Strategy config saved");
+    }
+    setSaving(false);
+  };
+
+  return (
+    <Section icon={<Sliders size={16} color={C.amber} />} title="Strategy Configuration (Admin Only)">
+      <div style={{ fontSize: 11, color: C.amber, marginBottom: 12, fontWeight: 600 }}>⚠ These settings control V1 Legacy engine parameters. Hidden from regular users to protect IP.</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Default Timeframe">
+          <select value={timeframe} onChange={e => setTimeframe(e.target.value)} style={inputStyle}>
+            {["1", "5", "15", "30", "60", "240", "1440"].map(t => <option key={t} value={t}>{t === "60" ? "1h" : t === "240" ? "4h" : t === "1440" ? "1D" : t + "m"}</option>)}
+          </select>
+        </Field>
+        <Field label="Candle Type">
+          <select value={candle} onChange={e => setCandle(e.target.value)} style={inputStyle}>
+            <option value="heiken_ashi">Heiken Ashi</option>
+            <option value="standard">Standard</option>
+            <option value="renko">Renko</option>
+          </select>
+        </Field>
+        <Field label="EMA Fast Period">
+          <input value={emaFast} onChange={e => setEmaFast(e.target.value)} style={inputStyle} type="number" />
+        </Field>
+        <Field label="EMA Slow Period">
+          <input value={emaSlow} onChange={e => setEmaSlow(e.target.value)} style={inputStyle} type="number" />
+        </Field>
+      </div>
+      <button onClick={handleSave} disabled={saving}
+        style={{ ...btnStyle, background: `linear-gradient(135deg, ${C.amber}, #F59E0B)`, color: C.bg, marginTop: 8 }}>
+        {saving ? "Saving..." : "Save Strategy Config"}
+      </button>
+    </Section>
+  );
+}
+
 function HistoricalDataImport() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<any>(null);
