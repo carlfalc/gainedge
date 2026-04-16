@@ -17,6 +17,7 @@ const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
 
 export default function TradingViewChartPage() {
   const { userId, profile } = useProfile();
+  const { isAvailable, defaultConnection, getAvailabilityStatus } = useBrokerMappings(userId);
   const [instruments, setInstruments] = useState<string[]>([]);
   const [selected, setSelected] = useState("");
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
@@ -29,6 +30,8 @@ export default function TradingViewChartPage() {
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
   const [ronVersion, setRonVersion] = useState<RonVersion>("v1_legacy");
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
+
+  const selectedAvailability = getAvailabilityStatus(selected, selectedBroker);
 
   useEffect(() => {
     if (profile?.broker) {
