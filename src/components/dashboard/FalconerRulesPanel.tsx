@@ -243,7 +243,7 @@ export default function FalconerRulesPanel() {
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <Brain size={16} color={C.purple} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>RON Rules</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>RON&nbsp; Your Expert Trading Buddy</span>
         <span style={{ fontSize: 11, color: C.sec, marginLeft: "auto" }}>{v2Active}/{v2Total} V2 rules active</span>
       </div>
 
