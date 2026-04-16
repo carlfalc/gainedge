@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProfile } from "@/hooks/use-profile";
+import { useBrokerMappings } from "@/hooks/use-broker-mappings";
 import { provisionAccount } from "@/services/metaapi-client";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type TradeExecutionPanelRef, type Position } from "@/components/dashboard/TradeExecutionPanel";
 import TradingViewWidget from "@/components/dashboard/TradingViewWidget";
@@ -9,7 +10,7 @@ import RonSignalAlert from "@/components/dashboard/RonSignalAlert";
 import ActiveTradeBar from "@/components/dashboard/ActiveTradeBar";
 import ChartOverlay from "@/components/dashboard/ChartOverlay";
 import type { RonVersion } from "@/components/dashboard/RonVersionSelector";
-import { ExternalLink, Cpu } from "lucide-react";
+import { ExternalLink, Cpu, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
