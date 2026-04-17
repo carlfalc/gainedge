@@ -633,12 +633,14 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
 
                 <div>
                   <div className="text-[9px] text-white mb-0.5">Volume</div>
-                  <select
-                    value={lotSize} onChange={e => handleLotSizeChange(e.target.value)}
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
-                  >
-                    {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
-                  </select>
+                  <input
+                    type="number"
+                    value={lotSize}
+                    onChange={e => handleLotSizeChange(e.target.value)}
+                    step="0.01"
+                    min="0.01"
+                    className="w-20 bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
+                  />
                 </div>
 
                 <div>
@@ -762,12 +764,14 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                   {/* Volume */}
                   <div>
                     <div className="text-[9px] text-white mb-0.5">Volume</div>
-                    <select
-                      value={lotSize} onChange={e => handleLotSizeChange(e.target.value)}
-                      className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
-                    >
-                      {LOT_OPTIONS.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
+                    <input
+                      type="number"
+                      value={lotSize}
+                      onChange={e => handleLotSizeChange(e.target.value)}
+                      step="0.01"
+                      min="0.01"
+                      className="w-20 bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
+                    />
                   </div>
 
                   <div className="w-px h-8 bg-white/10" />
