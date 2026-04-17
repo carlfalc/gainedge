@@ -260,6 +260,7 @@ export default function SignalsPage() {
       .filter(s => !filterDir || s.direction === filterDir)
       .filter(s => !filterResult || s.result === filterResult)
       .filter(s => s.confidence >= minConf)
+      .filter(s => !autoExecOnly || autoExecSignalIds.has(s.id))
       .filter(s => {
         if (dateRange === "all") return true;
         const d = new Date(s.created_at);
@@ -275,7 +276,7 @@ export default function SignalsPage() {
         else if (sortKey === "confidence") cmp = a.confidence - b.confidence;
         return sortDir === "desc" ? -cmp : cmp;
       });
-  }, [signals, filterInst, filterDir, filterResult, minConf, dateRange, sortKey, sortDir]);
+  }, [signals, filterInst, filterDir, filterResult, minConf, dateRange, sortKey, sortDir, autoExecOnly, autoExecSignalIds]);
 
   const SortIcon = ({ k }: { k: SortKey }) => sortKey === k ?
     (sortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />) : null;
