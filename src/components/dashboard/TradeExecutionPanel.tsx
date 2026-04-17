@@ -97,10 +97,13 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const [closingId, setClosingId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Intelligent Trader state – persisted to database (user_auto_trade_settings)
-  const [autoTradeMap, setAutoTradeMap] = useState<Record<string, boolean>>({});
-  const autoTradeEnabled = autoTradeMap[symbol] ?? false;
-  const [autoLotSize, setAutoLotSize] = useState("0.01");
+  // Intelligent Trader state — PER-SYMBOL settings persisted to user_auto_trade_settings
+  // Each symbol has its own enabled flag, lot_size, and signal_direction.
+  const [autoTradeMap, setAutoTradeMap] = useState<Record<string, { enabled: boolean; lot_size: number; signal_direction: "buy" | "sell" | "both" }>>({});
+  const autoSetting = autoTradeMap[symbol] ?? { enabled: false, lot_size: 0.01, signal_direction: "both" as const };
+  const autoTradeEnabled = autoSetting.enabled;
+  const autoLotSize = String(autoSetting.lot_size);
+  const signalDirection = autoSetting.signal_direction;
   const [myTradesMap, setMyTradesMap] = useState<Record<string, boolean>>({});
   const myTradesEnabled = myTradesMap[symbol] ?? false;
   const setMyTradesEnabled = (v: boolean) => setMyTradesMap(prev => ({ ...prev, [symbol]: v }));
@@ -108,9 +111,8 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   // Auto-trade status context
   const [userId, setUserId] = useState<string | null>(null);
   const [signalsPaused, setSignalsPaused] = useState(false);
-  const [signalDirection, setSignalDirection] = useState<"buy" | "sell" | "both">("both");
 
-  // Load auto-trade settings from database on mount
+  // Load ALL per-symbol auto-trade rows once
   const autoTradeLoaded = useRef(false);
   useEffect(() => {
     if (autoTradeLoaded.current) return;
@@ -120,44 +122,87 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
       if (!session) return;
       const { data } = await supabase
         .from("user_auto_trade_settings")
-        .select("symbol, enabled")
+        .select("symbol, enabled, lot_size, signal_direction")
         .eq("user_id", session.user.id);
       if (data && data.length > 0) {
-        const map: Record<string, boolean> = {};
-        data.forEach((row: any) => { map[row.symbol] = row.enabled; });
+        const map: Record<string, { enabled: boolean; lot_size: number; signal_direction: "buy" | "sell" | "both" }> = {};
+        data.forEach((row: any) => {
+          map[row.symbol] = {
+            enabled: !!row.enabled,
+            lot_size: Number(row.lot_size ?? 0.01),
+            signal_direction: (row.signal_direction ?? "both") as "buy" | "sell" | "both",
+          };
+        });
         setAutoTradeMap(map);
       }
     })();
   }, []);
 
-  // Toggle auto-trade: update DB + local state
-  const setAutoTradeEnabled = useCallback(async (v: boolean) => {
-    setAutoTradeMap(prev => ({ ...prev, [symbol]: v }));
+  // Realtime sync — any update to this user's auto-trade rows refreshes local map
+  useEffect(() => {
+    if (!userId) return;
+    const ch = supabase
+      .channel(`auto-trade-sync-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_auto_trade_settings", filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as any;
+          if (!row?.symbol) return;
+          if (payload.eventType === "DELETE") {
+            setAutoTradeMap(prev => { const next = { ...prev }; delete next[row.symbol]; return next; });
+          } else {
+            setAutoTradeMap(prev => ({
+              ...prev,
+              [row.symbol]: {
+                enabled: !!row.enabled,
+                lot_size: Number(row.lot_size ?? 0.01),
+                signal_direction: (row.signal_direction ?? "both") as "buy" | "sell" | "both",
+              },
+            }));
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId]);
+
+  // Per-symbol upsert of auto-trade fields
+  const upsertAutoSetting = useCallback(async (sym: string, patch: Partial<{ enabled: boolean; lot_size: number; signal_direction: "buy" | "sell" | "both" }>) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
+    const current = autoTradeMap[sym] ?? { enabled: false, lot_size: 0.01, signal_direction: "both" as const };
+    const merged = { ...current, ...patch };
+    setAutoTradeMap(prev => ({ ...prev, [sym]: merged }));
     await supabase.from("user_auto_trade_settings").upsert(
-      { user_id: session.user.id, symbol, enabled: v, updated_at: new Date().toISOString() } as any,
+      {
+        user_id: session.user.id,
+        symbol: sym,
+        enabled: merged.enabled,
+        lot_size: merged.lot_size,
+        signal_direction: merged.signal_direction,
+        updated_at: new Date().toISOString(),
+      } as any,
       { onConflict: "user_id,symbol" }
     );
-  }, [symbol]);
+  }, [autoTradeMap]);
 
-  // Load user context (id, signals_paused, signal_direction) for auto-trade status display
+  const setAutoTradeEnabled = useCallback((v: boolean) => upsertAutoSetting(symbol, { enabled: v }), [upsertAutoSetting, symbol]);
+  const setAutoLotSizeForSymbol = useCallback((v: string) => {
+    const n = parseFloat(v);
+    if (!isNaN(n) && n > 0) upsertAutoSetting(symbol, { lot_size: n });
+  }, [upsertAutoSetting, symbol]);
+
+  // Load user context (id, signals_paused) for auto-trade status display
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || cancelled) return;
       setUserId(session.user.id);
-      const [profRes, prefRes] = await Promise.all([
-        supabase.from("profiles").select("signals_paused").eq("id", session.user.id).maybeSingle(),
-        supabase.from("user_signal_preferences").select("signal_direction").eq("user_id", session.user.id).maybeSingle(),
-      ]);
+      const { data: profRes } = await supabase.from("profiles").select("signals_paused").eq("id", session.user.id).maybeSingle();
       if (cancelled) return;
-      if (profRes.data) setSignalsPaused(Boolean((profRes.data as any).signals_paused));
-      if (prefRes.data) {
-        const dir = (prefRes.data as any).signal_direction;
-        if (dir === "buy" || dir === "sell" || dir === "both") setSignalDirection(dir);
-      }
+      if (profRes) setSignalsPaused(Boolean((profRes as any).signals_paused));
     })();
     return () => { cancelled = true; };
   }, []);
@@ -491,7 +536,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                   <input
                     type="number"
                     value={autoLotSize}
-                    onChange={e => setAutoLotSize(e.target.value)}
+                    onChange={e => setAutoLotSizeForSymbol(e.target.value)}
                     step="0.01"
                     min="0.01"
                     className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"

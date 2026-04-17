@@ -24,6 +24,7 @@ const NAV_ITEMS = [
   { labelKey: "nav.dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { labelKey: "nav.charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
   { labelKey: "nav.signals", icon: Zap, path: "/dashboard/signals" },
+  { labelKey: "nav.autoTrade", icon: Zap, path: "/dashboard/auto-trade" },
   { labelKey: "nav.journal", icon: BookOpen, path: "/dashboard/journal" },
   { labelKey: "nav.analytics", icon: BarChart3, path: "/dashboard/analytics" },
   { labelKey: "nav.insights", icon: Lightbulb, path: "/dashboard/insights" },

@@ -179,11 +179,15 @@ export type Database = {
       broker_connections: {
         Row: {
           account_type: string
+          balance: number | null
           broker_name: string
           created_at: string
           encrypted_password: string
+          equity: number | null
           id: string
           is_default: boolean
+          last_error: string | null
+          last_health_check: string | null
           login_id: string
           metaapi_account_id: string | null
           server: string
@@ -193,11 +197,15 @@ export type Database = {
         }
         Insert: {
           account_type?: string
+          balance?: number | null
           broker_name: string
           created_at?: string
           encrypted_password: string
+          equity?: number | null
           id?: string
           is_default?: boolean
+          last_error?: string | null
+          last_health_check?: string | null
           login_id: string
           metaapi_account_id?: string | null
           server: string
@@ -207,11 +215,15 @@ export type Database = {
         }
         Update: {
           account_type?: string
+          balance?: number | null
           broker_name?: string
           created_at?: string
           encrypted_password?: string
+          equity?: number | null
           id?: string
           is_default?: boolean
+          last_error?: string | null
+          last_health_check?: string | null
           login_id?: string
           metaapi_account_id?: string | null
           server?: string
@@ -1404,6 +1416,8 @@ export type Database = {
           created_at: string
           enabled: boolean
           id: string
+          lot_size: number
+          signal_direction: string
           symbol: string
           updated_at: string
           user_id: string
@@ -1412,6 +1426,8 @@ export type Database = {
           created_at?: string
           enabled?: boolean
           id?: string
+          lot_size?: number
+          signal_direction?: string
           symbol: string
           updated_at?: string
           user_id: string
@@ -1420,6 +1436,8 @@ export type Database = {
           created_at?: string
           enabled?: boolean
           id?: string
+          lot_size?: number
+          signal_direction?: string
           symbol?: string
           updated_at?: string
           user_id?: string

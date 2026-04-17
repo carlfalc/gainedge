@@ -1320,16 +1320,22 @@ serve(async (req) => {
       const [profileRes, sigPrefRes, autoTradeRes] = await Promise.all([
         supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
         supabase.from("user_signal_preferences").select("signal_engine, signal_direction, lot_size").eq("user_id", userId).maybeSingle(),
-        supabase.from("user_auto_trade_settings").select("symbol, enabled").eq("user_id", userId),
+        supabase.from("user_auto_trade_settings").select("symbol, enabled, lot_size, signal_direction").eq("user_id", userId),
       ]);
-      // Build auto-trade map for this user
-      const autoTradeMap: Record<string, boolean> = {};
+      // Build per-symbol auto-trade map for this user
+      const autoTradeMap: Record<string, { enabled: boolean; lot_size: number; signal_direction: "buy" | "sell" | "both" }> = {};
       if (autoTradeRes.data) {
-        for (const row of autoTradeRes.data) {
-          if (row.enabled) autoTradeMap[row.symbol] = true;
+        for (const row of autoTradeRes.data as any[]) {
+          autoTradeMap[row.symbol] = {
+            enabled: !!row.enabled,
+            lot_size: Number(row.lot_size ?? 0.01),
+            signal_direction: (row.signal_direction ?? "both") as "buy" | "sell" | "both",
+          };
         }
       }
-      const userLotSize = sigPrefRes.data?.lot_size ?? 0.01;
+      const globalLotSize = sigPrefRes.data?.lot_size ?? 0.01;
+      // Backwards-compat helper used further down — falls back to global if no per-symbol row
+      const userLotSize = globalLotSize;
       const profile = profileRes.data;
 
       // ─── KILL SWITCH: skip signal generation if paused ───
@@ -1505,13 +1511,15 @@ serve(async (req) => {
               continue;
             }
 
-            // ─── DIRECTION FILTER: respect user's buy/sell preference ───
-            if (signalDirection === "buy" && analysis.direction === "SELL") {
-              console.log(`Direction filter: skipping SELL for ${inst.symbol} — user set Buys Only`);
+            // ─── DIRECTION FILTER: per-symbol setting wins, otherwise global preference ───
+            const perSymbolAuto = autoTradeMap[inst.symbol];
+            const effectiveDirection = perSymbolAuto?.signal_direction ?? signalDirection;
+            if (effectiveDirection === "buy" && analysis.direction === "SELL") {
+              console.log(`Direction filter: skipping SELL for ${inst.symbol} — pref=${effectiveDirection}`);
               continue;
             }
-            if (signalDirection === "sell" && analysis.direction === "BUY") {
-              console.log(`Direction filter: skipping BUY for ${inst.symbol} — user set Sells Only`);
+            if (effectiveDirection === "sell" && analysis.direction === "BUY") {
+              console.log(`Direction filter: skipping BUY for ${inst.symbol} — pref=${effectiveDirection}`);
               continue;
             }
 
@@ -1587,11 +1595,13 @@ serve(async (req) => {
                   console.log(`Signal created: ${inst.symbol} ${analysis.direction} conf=${analysis.confidence}`);
 
                   // ─── AUTO-TRADE EXECUTION ───
-                  if (autoTradeMap[inst.symbol] && analysis.confidence >= 7 && !signalsPaused) {
+                  if (autoTradeMap[inst.symbol]?.enabled && analysis.confidence >= 7 && !signalsPaused) {
                     try {
                       const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL")!;
                       const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
                       const tradeActionType = analysis.direction === "BUY" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL";
+                      // Per-symbol lot size, fall back to user's global preference
+                      const perSymbolLot = autoTradeMap[inst.symbol]?.lot_size ?? globalLotSize;
                       const tradeRes = await fetch(`${SUPABASE_URL_ENV}/functions/v1/metaapi-trade`, {
                         method: "POST",
                         headers: {
@@ -1603,7 +1613,7 @@ serve(async (req) => {
                           user_id: userId,
                           symbol: inst.symbol,
                           actionType: tradeActionType,
-                          volume: String(userLotSize),
+                          volume: String(perSymbolLot),
                           stopLoss: analysis.stop_loss,
                           takeProfit: analysis.take_profit,
                         }),
