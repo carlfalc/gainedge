@@ -171,18 +171,22 @@ export default function TradingViewChartPage() {
 
       {/* Main content: chart panes + sidebar */}
       <div className="flex flex-1 min-h-0">
-        <div className="flex-1 min-w-0 flex flex-col min-h-0 relative">
+        <div className="flex-1 min-w-0 relative">
           {tabs.map((tab) => (
-            <ChartTabPane
+            <div
               key={tab.id}
-              symbol={tab.symbol}
-              mode={tab.mode}
-              broker={selectedBroker}
-              userId={userId}
-              accountId={accountId}
-              connectionStatus={connectionStatus}
-              active={tab.id === activeId}
-            />
+              className={`absolute inset-0 ${tab.id === activeId ? "" : "hidden"}`}
+            >
+              <ChartTabPane
+                symbol={tab.symbol}
+                mode={tab.mode}
+                broker={selectedBroker}
+                userId={userId}
+                accountId={accountId}
+                connectionStatus={connectionStatus}
+                active={tab.id === activeId}
+              />
+            </div>
           ))}
         </div>
 
