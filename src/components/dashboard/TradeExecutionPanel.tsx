@@ -105,6 +105,11 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const myTradesEnabled = myTradesMap[symbol] ?? false;
   const setMyTradesEnabled = (v: boolean) => setMyTradesMap(prev => ({ ...prev, [symbol]: v }));
 
+  // Auto-trade status context
+  const [userId, setUserId] = useState<string | null>(null);
+  const [signalsPaused, setSignalsPaused] = useState(false);
+  const [signalDirection, setSignalDirection] = useState<"buy" | "sell" | "both">("both");
+
   // Load auto-trade settings from database on mount
   const autoTradeLoaded = useRef(false);
   useEffect(() => {
