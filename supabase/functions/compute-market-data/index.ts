@@ -221,8 +221,14 @@ const CLIENT_API_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
 const BROKER_CANDLE_TIMEOUT_MS = 3000;
 const BROKER_PRICE_TIMEOUT_MS = 2000;
 const BROKER_SESSION_TIMEOUT_MS = 3000;
-const TIME_LIMIT_CRITICAL_MS = 50_000;
-const TIME_LIMIT_HARD_MS = 80_000;
+const TIME_LIMIT_CRITICAL_MS = 35_000;
+const TIME_LIMIT_HARD_MS = 55_000;
+
+// In-isolate concurrency lock — prevents overlapping scanner runs from same isolate.
+// pg_cron may invoke this every 30s; if a previous run hasn't finished, the new one returns fast.
+let scannerInFlight = false;
+let scannerStartedAt = 0;
+const SCANNER_STALE_MS = 90_000; // safety: release lock if held > 90s
 
 const TF_MINUTES: Record<string, number> = {
   "1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440,
@@ -951,6 +957,15 @@ function isMarketClosed(): boolean {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // ─── CONCURRENCY GUARD: skip overlapping invocations ───
+  if (scannerInFlight && (Date.now() - scannerStartedAt) < SCANNER_STALE_MS) {
+    return new Response(JSON.stringify({ success: true, skipped: "already_running", elapsed_ms: Date.now() - scannerStartedAt }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  scannerInFlight = true;
+  scannerStartedAt = Date.now();
 
   try {
     // Check market hours — skip chart/signal scanning when markets are closed
