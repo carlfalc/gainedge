@@ -584,6 +584,30 @@ function BrokerConnectionSettings({ userId }: { userId: string }) {
   };
 
   const handleDelete = async (id: string) => {
+    // 9h: warn if user has active auto-trades, then bulk-disable on confirm
+    const conn = connections.find(c => c.id === id);
+    const isDefault = conn?.is_default;
+    if (isDefault) {
+      const { data: active } = await supabase
+        .from("user_auto_trade_settings")
+        .select("symbol")
+        .eq("user_id", userId)
+        .eq("enabled", true);
+      const count = active?.length ?? 0;
+      if (count > 0) {
+        const ok = window.confirm(
+          `You have auto-trade enabled for ${count} instrument${count === 1 ? "" : "s"}. ` +
+          `Disconnecting your default broker will disable all auto-trading. Continue?`
+        );
+        if (!ok) return;
+        await supabase
+          .from("user_auto_trade_settings")
+          .update({ enabled: false })
+          .eq("user_id", userId)
+          .eq("enabled", true);
+        toast.warning(`Auto-trade disabled for ${count} instrument${count === 1 ? "" : "s"}`);
+      }
+    }
     await supabase.from("broker_connections").delete().eq("id", id);
     toast.success("Connection removed");
     loadConnections();

@@ -93,13 +93,30 @@ export default function AutoTradePage() {
   const totalFloating = positions.reduce((sum, p) => sum + Number(p.profit ?? 0), 0);
 
   const handleToggle = useCallback(async (symbol: string, enabled: boolean) => {
-    if (enabled && !health.isConnected) {
-      toast.error("Connect your broker before enabling auto-trade");
-      return;
+    if (enabled) {
+      // 9b: pre-flight checks before enabling
+      if (!health.hasDefaultConnection) {
+        toast.error("Connect your broker in Settings before enabling auto-trade");
+        return;
+      }
+      if (!health.isConnected) {
+        toast.error("Your broker connection has issues. Reconnect from Settings.");
+        return;
+      }
+      if (getAvailabilityStatus(symbol) === "unavailable") {
+        toast.error(`${symbol} is not available on ${health.brokerName ?? "your broker"}.`);
+        return;
+      }
+      // Rough margin pre-check: lot * 1000 ≈ required margin assumption (very approximate; broker enforces real)
+      const lot = get(symbol).lot_size || 0.01;
+      if (health.balance != null && health.balance < lot * 100) {
+        toast.error(`Insufficient balance for ${lot} lots on ${symbol}. Free balance: ${health.balance.toFixed(2)}`);
+        return;
+      }
     }
     await update(symbol, { enabled });
     toast.success(`Auto-trade ${enabled ? "enabled" : "disabled"} for ${symbol}`);
-  }, [update, health.isConnected]);
+  }, [update, health, getAvailabilityStatus, get]);
 
   const handleLot = useCallback(async (symbol: string, value: string) => {
     const n = parseFloat(value);
