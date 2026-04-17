@@ -168,7 +168,7 @@ export default function TradingViewChartPage() {
             }}
           >
             <Cpu className="w-3 h-3" />
-            {ronVersion === "v1_legacy" ? "RON V1 Legacy" : "RON V2 Knowledge Base"}
+            {ronVersion === "v1" ? "RON V1 Legacy" : ronVersion === "v2" ? "RON V2 Knowledge Base" : "RON V1 + V2 Combined"}
           </div>
           <button
             onClick={handlePopOut}
