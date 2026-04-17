@@ -536,7 +536,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                   <input
                     type="number"
                     value={autoLotSize}
-                    onChange={e => setAutoLotSize(e.target.value)}
+                    onChange={e => setAutoLotSizeForSymbol(e.target.value)}
                     step="0.01"
                     min="0.01"
                     className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
