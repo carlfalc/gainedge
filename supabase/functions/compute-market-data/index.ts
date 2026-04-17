@@ -1320,16 +1320,22 @@ serve(async (req) => {
       const [profileRes, sigPrefRes, autoTradeRes] = await Promise.all([
         supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
         supabase.from("user_signal_preferences").select("signal_engine, signal_direction, lot_size").eq("user_id", userId).maybeSingle(),
-        supabase.from("user_auto_trade_settings").select("symbol, enabled").eq("user_id", userId),
+        supabase.from("user_auto_trade_settings").select("symbol, enabled, lot_size, signal_direction").eq("user_id", userId),
       ]);
-      // Build auto-trade map for this user
-      const autoTradeMap: Record<string, boolean> = {};
+      // Build per-symbol auto-trade map for this user
+      const autoTradeMap: Record<string, { enabled: boolean; lot_size: number; signal_direction: "buy" | "sell" | "both" }> = {};
       if (autoTradeRes.data) {
-        for (const row of autoTradeRes.data) {
-          if (row.enabled) autoTradeMap[row.symbol] = true;
+        for (const row of autoTradeRes.data as any[]) {
+          autoTradeMap[row.symbol] = {
+            enabled: !!row.enabled,
+            lot_size: Number(row.lot_size ?? 0.01),
+            signal_direction: (row.signal_direction ?? "both") as "buy" | "sell" | "both",
+          };
         }
       }
-      const userLotSize = sigPrefRes.data?.lot_size ?? 0.01;
+      const globalLotSize = sigPrefRes.data?.lot_size ?? 0.01;
+      // Backwards-compat helper used further down — falls back to global if no per-symbol row
+      const userLotSize = globalLotSize;
       const profile = profileRes.data;
 
       // ─── KILL SWITCH: skip signal generation if paused ───
