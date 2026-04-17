@@ -90,6 +90,8 @@ export default function SignalsPage() {
   const [prefsSaving, setPrefsSaving] = useState(false);
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
   const [signalEngine, setSignalEngine] = useState<string>("v1v2");
+  const [autoExecOnly, setAutoExecOnly] = useState(false);
+  const [autoExecSignalIds, setAutoExecSignalIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadSignals();
