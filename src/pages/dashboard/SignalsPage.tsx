@@ -471,6 +471,22 @@ export default function SignalsPage() {
           <option value="month">This Month</option>
         </select>
         <button
+          onClick={() => setAutoExecOnly(v => !v)}
+          style={{
+            background: autoExecOnly ? "#00CFA526" : "transparent",
+            border: `1px solid ${autoExecOnly ? "#00CFA566" : C.border}`,
+            borderRadius: 8,
+            padding: "6px 10px",
+            cursor: "pointer",
+            fontSize: 12,
+            color: autoExecOnly ? "#00CFA5" : C.sec,
+            fontWeight: 600,
+          }}
+          title="Show only signals that RON auto-executed"
+        >
+          ⚡ Auto-executed only
+        </button>
+        <button
           onClick={() => setSettingsOpen(true)}
           style={{
             background: C.amber + "15", border: `1px solid ${C.amber}40`, borderRadius: 8,
