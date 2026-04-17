@@ -1511,13 +1511,15 @@ serve(async (req) => {
               continue;
             }
 
-            // ─── DIRECTION FILTER: respect user's buy/sell preference ───
-            if (signalDirection === "buy" && analysis.direction === "SELL") {
-              console.log(`Direction filter: skipping SELL for ${inst.symbol} — user set Buys Only`);
+            // ─── DIRECTION FILTER: per-symbol setting wins, otherwise global preference ───
+            const perSymbolAuto = autoTradeMap[inst.symbol];
+            const effectiveDirection = perSymbolAuto?.signal_direction ?? signalDirection;
+            if (effectiveDirection === "buy" && analysis.direction === "SELL") {
+              console.log(`Direction filter: skipping SELL for ${inst.symbol} — pref=${effectiveDirection}`);
               continue;
             }
-            if (signalDirection === "sell" && analysis.direction === "BUY") {
-              console.log(`Direction filter: skipping BUY for ${inst.symbol} — user set Sells Only`);
+            if (effectiveDirection === "sell" && analysis.direction === "BUY") {
+              console.log(`Direction filter: skipping BUY for ${inst.symbol} — pref=${effectiveDirection}`);
               continue;
             }
 
@@ -1593,11 +1595,13 @@ serve(async (req) => {
                   console.log(`Signal created: ${inst.symbol} ${analysis.direction} conf=${analysis.confidence}`);
 
                   // ─── AUTO-TRADE EXECUTION ───
-                  if (autoTradeMap[inst.symbol] && analysis.confidence >= 7 && !signalsPaused) {
+                  if (autoTradeMap[inst.symbol]?.enabled && analysis.confidence >= 7 && !signalsPaused) {
                     try {
                       const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL")!;
                       const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
                       const tradeActionType = analysis.direction === "BUY" ? "ORDER_TYPE_BUY" : "ORDER_TYPE_SELL";
+                      // Per-symbol lot size, fall back to user's global preference
+                      const perSymbolLot = autoTradeMap[inst.symbol]?.lot_size ?? globalLotSize;
                       const tradeRes = await fetch(`${SUPABASE_URL_ENV}/functions/v1/metaapi-trade`, {
                         method: "POST",
                         headers: {
@@ -1609,7 +1613,7 @@ serve(async (req) => {
                           user_id: userId,
                           symbol: inst.symbol,
                           actionType: tradeActionType,
-                          volume: String(userLotSize),
+                          volume: String(perSymbolLot),
                           stopLoss: analysis.stop_loss,
                           takeProfit: analysis.take_profit,
                         }),
