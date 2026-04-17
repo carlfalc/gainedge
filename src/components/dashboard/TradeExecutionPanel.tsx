@@ -501,89 +501,99 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
         </div>
 
         <div className="p-3 flex flex-col gap-2">
-          {/* ─── 0. AUTO-TRADE STATUS ─── */}
-          <AutoTradeStatus
-            symbol={symbol}
-            userId={userId}
-            autoTradeEnabled={autoTradeEnabled}
-            brokerConnected={isLive}
-            signalsPaused={signalsPaused}
-            signalDirection={signalDirection}
-            openPositionsForSymbol={positions.filter(p => {
-              const variants = BROKER_SYMBOL_MAP[symbol] ?? [symbol];
-              return variants.includes(p.symbol);
-            }).length}
-            totalOpenPositions={positions.length}
-          />
+          {/* ─── AUTO MODE: status + Intelligent Trader (RON) controls ─── */}
+          {mode === "auto" && (
+            <>
+              <AutoTradeStatus
+                symbol={symbol}
+                userId={userId}
+                autoTradeEnabled={autoTradeEnabled}
+                brokerConnected={isLive}
+                signalsPaused={signalsPaused}
+                signalDirection={signalDirection}
+                openPositionsForSymbol={positions.filter(p => {
+                  const variants = BROKER_SYMBOL_MAP[symbol] ?? [symbol];
+                  return variants.includes(p.symbol);
+                }).length}
+                totalOpenPositions={positions.length}
+              />
 
-          {/* ─── 1. INTELLIGENT TRADER ─── */}
-          <div>
-            <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( RON ) is:</div>
-            <div className="flex items-center gap-4 flex-wrap">
-              <button
-                onClick={() => {
-                  // Block enabling when broker is not connected
-                  if (!autoTradeEnabled && !isLive) {
-                    toast.error("Connect your broker in Settings before enabling auto-trade");
-                    return;
-                  }
-                  setAutoTradeEnabled(!autoTradeEnabled);
-                }}
-                disabled={!autoTradeEnabled && !isLive}
-                title={!isLive ? "Connect your broker in Settings to enable auto-trade" : undefined}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
-                  autoTradeEnabled
-                    ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
-                    : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
-                } ${!autoTradeEnabled && !isLive ? "opacity-40 cursor-not-allowed" : ""}`}
-              >
-                <Zap className="w-3 h-3" />
-                Auto {autoTradeEnabled ? "ON" : "OFF"}
-              </button>
+              <div>
+                <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( RON ) is:</div>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <button
+                    onClick={() => {
+                      if (!autoTradeEnabled && !isLive) {
+                        toast.error("Link your broker in Settings before enabling auto-trade");
+                        return;
+                      }
+                      setAutoTradeEnabled(!autoTradeEnabled);
+                    }}
+                    disabled={!autoTradeEnabled && !isLive}
+                    title={!isLive ? "Link your broker in Settings to enable auto-trade" : undefined}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                      autoTradeEnabled
+                        ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
+                        : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
+                    } ${!autoTradeEnabled && !isLive ? "opacity-40 cursor-not-allowed" : ""}`}
+                  >
+                    <Zap className="w-3 h-3" />
+                    Auto {autoTradeEnabled ? "ON" : "OFF"}
+                  </button>
 
-              {autoTradeEnabled && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] text-white/40">Lot:</span>
-                  <input
-                    type="number"
-                    value={autoLotSize}
-                    onChange={e => setAutoLotSizeForSymbol(e.target.value)}
-                    step="0.01"
-                    min="0.01"
-                    className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
-                  />
+                  {autoTradeEnabled && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] text-white/40">Lot:</span>
+                      <input
+                        type="number"
+                        value={autoLotSize}
+                        onChange={e => setAutoLotSizeForSymbol(e.target.value)}
+                        step="0.01"
+                        min="0.01"
+                        className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
+                      />
+                    </div>
+                  )}
+
+                  <div className="w-px h-5 bg-white/10" />
+
+                  <button
+                    onClick={() => setMyTradesEnabled(!myTradesEnabled)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                      myTradesEnabled
+                        ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
+                        : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
+                    }`}
+                  >
+                    <User className="w-3 h-3" />
+                    My Trades {myTradesEnabled ? "ON" : "OFF"}
+                  </button>
                 </div>
-              )}
 
-              <div className="w-px h-5 bg-white/10" />
+                <div className="mt-1.5 text-[10px]">
+                  {autoTradeEnabled ? (
+                    <span className="text-amber-400">
+                      ⚡ RON will execute trades when high-confidence signals fire (confidence ≥ 7)
+                      <br />
+                      <span className="text-[9px] text-white/30">Safety: max 1 trade per instrument · per-instrument loss pause (3 consecutive) · 5% daily loss limit</span>
+                    </span>
+                  ) : (
+                    <span className="text-white/40">
+                      Toggle Auto ON to let RON execute high-confidence signals on this instrument.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
-              <button
-                onClick={() => setMyTradesEnabled(!myTradesEnabled)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
-                  myTradesEnabled
-                    ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
-                    : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
-                }`}
-              >
-                <User className="w-3 h-3" />
-                My Trades {myTradesEnabled ? "ON" : "OFF"}
-              </button>
+          {/* ─── MANUAL MODE: short banner ─── */}
+          {mode === "manual" && (
+            <div className="rounded border border-blue-500/20 bg-blue-500/[0.05] px-3 py-1.5 text-[11px] text-blue-300 flex items-center gap-2">
+              <User className="w-3.5 h-3.5" />
+              <span>Manual trading mode — you control all entries on {symbol}.</span>
             </div>
-
-            <div className="mt-1.5 text-[10px]">
-              {autoTradeEnabled ? (
-                <span className="text-amber-400">
-                  ⚡ RON will execute trades when high-confidence signals fire (confidence ≥ 7)
-                  <br />
-                  <span className="text-[9px] text-white/30">Safety: max 1 trade per instrument · per-instrument loss pause (3 consecutive) · 5% daily loss limit</span>
-                </span>
-              ) : (
-                <span className="text-white/40">
-                  Manual trading mode — you control all entries
-                </span>
-              )}
-            </div>
-          </div>
+          )}
 
           {/* ─── 2. ORDER TYPE SELECTOR ─── */}
           <div className="border-t border-white/[0.06] pt-2">
