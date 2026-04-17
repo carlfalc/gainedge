@@ -58,6 +58,8 @@ interface TradeExecutionPanelProps {
   accountId: string | null;
   connectionStatus: "disconnected" | "connecting" | "live" | "demo";
   currentPrice?: number | null;
+  /** Tab mode — "auto" shows the Intelligent Trader (RON) controls, "manual" hides them. */
+  mode?: "auto" | "manual";
   onOrderModeChange?: (mode: OrderMode) => void;
   onLimitPricesChange?: (prices: LimitOrderPrices) => void;
   onPositionsChange?: (positions: Position[]) => void;
@@ -81,7 +83,7 @@ async function callTrade(body: Record<string, unknown>) {
   return data;
 }
 
-const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPanelProps>(function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, onOrderModeChange, onLimitPricesChange, onPositionsChange, positions: externalPositions }, ref) {
+const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPanelProps>(function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, mode = "manual", onOrderModeChange, onLimitPricesChange, onPositionsChange, positions: externalPositions }, ref) {
   const [collapsed, setCollapsed] = useState(false);
   const [lotSize, setLotSize] = useState("0.01");
   const [sl, setSl] = useState("");
