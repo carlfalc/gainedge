@@ -96,20 +96,15 @@ export default function AutoTradeStatus({
     </div>
   );
 
-  // 2) No broker connected — blocking message
+  // 2) No broker connected — simple inline text directing to Settings
   if (!brokerConnected) {
     return (
-      <div className="rounded border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[11px] text-amber-300">
-          <Plug className="w-3.5 h-3.5" />
-          <span>Connect your broker in Settings to enable auto-trading</span>
-        </div>
-        <Link
-          to="/dashboard/settings"
-          className="text-[10px] font-semibold px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25"
-        >
-          Connect Broker
-        </Link>
+      <div className="rounded border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] text-white/60">
+        Link your broker in{" "}
+        <Link to="/dashboard/settings" className="text-[#00CFA5] hover:underline font-semibold">
+          Settings
+        </Link>{" "}
+        first to enable live trading.
       </div>
     );
   }
