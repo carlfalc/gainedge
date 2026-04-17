@@ -1,105 +1,56 @@
 
 
-## Plan: Wire Auto-Trade Execution End-to-End
+## Plan: Unify RON Engine Values Platform-Wide
 
-### What This Does
+### The Bug
+The same database column (`user_signal_preferences.signal_engine`) is being written with **two incompatible value formats** by different UI components:
 
-When `compute-market-data` creates a new signal, it checks if the user has auto-trade enabled for that symbol. If yes, it immediately calls `metaapi-trade` to place the order using the user's configured lot size, respecting signal direction preferences and the active RON engine version.
+| Component | Writes Values | Has "Combined" option? |
+|-----------|--------------|------------------------|
+| `RonVersionSelector` (Settings sidebar + Charts) | `v1_legacy`, `v2_knowledge` | No |
+| `FalconerPreferencesPanel` (Settings main) | `v1`, `v2`, `v1v2` | Yes |
+| `SignalsPage` tabs | `v1`, `v2`, `v1v2` | Yes |
+| `TradingViewChartPage` display | reads `v1_legacy`, `v2_knowledge` | No |
+| Backend `compute-market-data` | expects `v1`, `v2`, `v1v2` | Yes |
 
-### Current State
+**Result:** When the user picks "RON V1 Legacy" via the RonVersionSelector card, the DB stores `"v1_legacy"`. The Signals page can't match that string against any tab, falls back to its default `v1v2`, and shows "V1 + V2" highlighted — which is what the user reported.
 
-- **Auto-trade toggle**: localStorage only (`ge_intelligent_trader` key in TradeExecutionPanel) — backend cannot read it
-- **Lot size**: Already synced to `user_signal_preferences.lot_size`
-- **Signal direction**: Already wired in backend (buy/sell/both filter)
-- **RON version**: Already wired (v1/v2/v1v2 engine selection)
-- **Trade execution**: `metaapi-trade` edge function exists and works
+### Canonical Format (chosen)
+Standardize on `"v1"`, `"v2"`, `"v1v2"` everywhere. Reasons:
+- Backend already uses this format — no edge function changes needed
+- It supports the third "Combined" option that the user has been using on the Signals page
+- Shorter, simpler
 
-### Changes Required
+### Changes
 
-#### 1. New database table: `user_auto_trade_settings`
+**1. `src/components/dashboard/RonVersionSelector.tsx`**
+- Change `RonVersion` type from `"v1_legacy" | "v2_knowledge"` to `"v1" | "v2" | "v1v2"`
+- Update read logic: map any legacy `v1_legacy`/`v2_knowledge` values from DB to `v1`/`v2` for backward compatibility
+- Add a third card or button row entry for "V1 + V2 Combined" so this selector matches the other two surfaces
+- Update all internal comparisons (`activeVersion === "v1_legacy"` → `=== "v1"`, etc.)
 
-Stores per-user, per-symbol auto-trade state (replacing localStorage).
+**2. `src/pages/dashboard/TradingViewChartPage.tsx`**
+- Update the display condition `ronVersion === "v1_legacy"` to handle `v1`, `v2`, `v1v2`
+- Show: "RON V1 Legacy", "RON V2 Knowledge Base", or "RON V1 + V2 Combined"
 
-```sql
-CREATE TABLE public.user_auto_trade_settings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  symbol text NOT NULL,
-  enabled boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (user_id, symbol)
-);
+**3. One-time DB cleanup migration**
+- `UPDATE user_signal_preferences SET signal_engine = 'v1' WHERE signal_engine = 'v1_legacy';`
+- `UPDATE user_signal_preferences SET signal_engine = 'v2' WHERE signal_engine = 'v2_knowledge';`
+- This fixes existing users who already have stale values stored
 
-ALTER TABLE public.user_auto_trade_settings ENABLE ROW LEVEL SECURITY;
+**4. No changes needed to:**
+- `FalconerPreferencesPanel` — already on the canonical format
+- `SignalsPage` — already on the canonical format
+- `compute-market-data` edge function — already uses canonical format
+- `FalconerRulesPanel` / `FalconerPerformancePanel` — only read for display
 
-CREATE POLICY "Users can manage own auto trade settings"
-  ON public.user_auto_trade_settings FOR ALL
-  TO authenticated USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+### Outcome
+After this change, picking "V1 Legacy" anywhere on the platform (Settings sidebar card, Settings main panel, Signals page tab, or Charts page) writes the same value, and **all four surfaces will show the same active selection**. The selection becomes a single source of truth, exactly as the user expects.
 
--- Service role needs read access for backend execution
-CREATE POLICY "Service role can read auto trade settings"
-  ON public.user_auto_trade_settings FOR SELECT
-  TO service_role USING (true);
-```
-
-#### 2. Update `TradeExecutionPanel.tsx` — persist auto-trade to database
-
-Replace localStorage persistence with database upserts:
-- On toggle change, upsert to `user_auto_trade_settings` (user_id, symbol, enabled)
-- On mount, load auto-trade state from the database instead of localStorage
-- Keep lot size sync as-is (already in `user_signal_preferences.lot_size`)
-
-#### 3. Update `compute-market-data/index.ts` — execute trade after signal creation
-
-After line 1562 (signal created log), add auto-trade execution:
-
-1. Query `user_auto_trade_settings` for the user+symbol to check if `enabled = true`
-2. Read `lot_size` from `user_signal_preferences` (already fetched)
-3. Call `metaapi-trade` edge function internally with:
-   - `action: "trade"`
-   - `symbol`: the signal's symbol
-   - `actionType`: `ORDER_TYPE_BUY` or `ORDER_TYPE_SELL` based on `analysis.direction`
-   - `volume`: user's lot_size
-   - `stopLoss`: signal's SL
-   - `takeProfit`: signal's TP
-4. Log success/failure — do not block signal creation on trade failure
-
-The call uses the service role key since this is server-to-server. The `metaapi-trade` function needs a small adjustment to accept service-role auth for backend-initiated trades.
-
-#### 4. Update `metaapi-trade/index.ts` — allow service-role calls
-
-Add a check: if the caller is service_role (from backend), accept the `user_id` from the request body instead of JWT claims. This lets `compute-market-data` trigger trades on behalf of users.
-
-#### 5. Safety guards (already partially exist)
-
-The existing safety limits from memory apply:
-- Max simultaneous auto-trades = number of instruments in watchlist
-- Signal must have confidence >= 7 for auto-trade (stricter than signal creation threshold of 5)
-- Skip if `signals_paused` is true
-- Respect `signal_direction` preference (already filtered before this point)
-- RON version rules already determine which signals get created — auto-trade just executes what passes all filters
-
-### Files to Change
-
+### Files Modified
 | File | Change |
 |------|--------|
-| Database migration | Create `user_auto_trade_settings` table |
-| `src/components/dashboard/TradeExecutionPanel.tsx` | Persist auto-trade toggle to DB, load on mount |
-| `supabase/functions/compute-market-data/index.ts` | After signal creation, check auto-trade + execute |
-| `supabase/functions/metaapi-trade/index.ts` | Accept service-role auth for backend calls |
-
-### Data Flow
-
-```text
-Signal Created (compute-market-data)
-  │
-  ├─ Check user_auto_trade_settings: enabled for this symbol?
-  ├─ Check confidence >= 7 (auto-trade minimum)
-  ├─ Read lot_size from user_signal_preferences
-  │
-  └─ YES → Call metaapi-trade internally
-       └─ Place order: symbol + direction + lot_size + SL + TP
-```
+| `src/components/dashboard/RonVersionSelector.tsx` | Switch values to `v1`/`v2`/`v1v2`, add Combined card, map legacy values on load |
+| `src/pages/dashboard/TradingViewChartPage.tsx` | Handle all 3 values in display label |
+| New SQL migration | Backfill existing `v1_legacy`/`v2_knowledge` rows to `v1`/`v2` |
 
