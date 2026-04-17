@@ -140,6 +140,7 @@ export default function ChartTabPane({
           accountId={accountId}
           connectionStatus={connectionStatus}
           currentPrice={livePrice}
+          mode={mode}
           onOrderModeChange={setOrderMode}
           onLimitPricesChange={setLimitPrices}
           onPositionsChange={setPositions}
