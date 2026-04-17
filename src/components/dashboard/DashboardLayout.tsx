@@ -55,6 +55,7 @@ export default function DashboardLayout() {
   const location = useLocation();
 
   useSeedData(userId);
+  useAutoTradeNotifications(userId ?? null);
 
   const sidebarWidth = collapsed && !hovered ? 0 : 240;
 
