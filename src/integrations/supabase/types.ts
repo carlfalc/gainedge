@@ -49,6 +49,62 @@ export type Database = {
           },
         ]
       }
+      auto_trade_executions: {
+        Row: {
+          created_at: string
+          direction: string
+          entry_price: number | null
+          error_message: string | null
+          id: string
+          metaapi_position_id: string | null
+          signal_id: string | null
+          sl: number | null
+          status: string
+          symbol: string
+          tp: number | null
+          user_id: string
+          volume: number
+        }
+        Insert: {
+          created_at?: string
+          direction: string
+          entry_price?: number | null
+          error_message?: string | null
+          id?: string
+          metaapi_position_id?: string | null
+          signal_id?: string | null
+          sl?: number | null
+          status?: string
+          symbol: string
+          tp?: number | null
+          user_id: string
+          volume: number
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          entry_price?: number | null
+          error_message?: string | null
+          id?: string
+          metaapi_position_id?: string | null
+          signal_id?: string | null
+          sl?: number | null
+          status?: string
+          symbol?: string
+          tp?: number | null
+          user_id?: string
+          volume?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "auto_trade_executions_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       backtest_results: {
         Row: {
           avg_rr: number
