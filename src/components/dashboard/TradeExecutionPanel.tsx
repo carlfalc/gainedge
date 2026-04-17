@@ -9,6 +9,7 @@ import {
   ChevronUp, ChevronDown, AlertTriangle, X, Loader2, Zap, User,
 } from "lucide-react";
 import { toast } from "sonner";
+import AutoTradeStatus from "./AutoTradeStatus";
 
 const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const FUNCTION_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/metaapi-trade`;
