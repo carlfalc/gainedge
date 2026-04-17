@@ -601,14 +601,28 @@ function BrokerConnectionSettings({ userId }: { userId: string }) {
     setTestingId(id);
     try {
       await supabase.auth.refreshSession();
-      // Simple connectivity check — in production this would call MetaApi
-      await new Promise(r => setTimeout(r, 1500));
-      await supabase.from("broker_connections").update({ status: "connected" }).eq("id", id);
-      toast.success("Connection test successful");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${PROJECT_ID}.supabase.co/functions/v1/metaapi-trade`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ action: "test-connection" }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Connected · balance ${data.balance ?? "—"} ${data.currency ?? ""} · ${data.latency_ms}ms`);
+      } else {
+        toast.error(`Connection failed: ${data.error || "unknown"}`);
+      }
       loadConnections();
-    } catch {
+    } catch (e: any) {
       await supabase.from("broker_connections").update({ status: "error" }).eq("id", id);
-      toast.error("Connection test failed");
+      toast.error(`Test failed: ${e.message}`);
       loadConnections();
     }
     setTestingId(null);
