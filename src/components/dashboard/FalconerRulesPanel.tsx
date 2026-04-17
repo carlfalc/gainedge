@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Brain, Plus, ToggleLeft, ToggleRight, Pencil, X, Check, Sparkles, CheckCircle2 } from "lucide-react";
+import { Brain, Plus, ToggleLeft, ToggleRight, Pencil, X, Check, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
 
 interface KnowledgeRule {
   id: string;
@@ -37,101 +37,35 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 type RonRulesVersion = "v1" | "v2";
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 const WELCOME_KEY = "ge_ron_rules_welcome_dismissed";
 
 const VERSION_COPY: Record<RonRulesVersion, {
-  title: string;
-  eyebrow: string;
-  summary: string;
-  description: string;
-  badge: string;
+  title: string; eyebrow: string; summary: string; description: string; badge: string;
 }> = {
   v1: {
-    title: "RON V1 Legacy",
-    eyebrow: "Premium Trading Vision",
+    title: "RON V1 Legacy", eyebrow: "Premium Trading Vision",
     summary: "Historical win rate: 82% across 2,600+ backtested trades.",
     description: "Our proven flagship strategy with consistent high-probability signals. Refined over years of live market analysis.",
     badge: "Recommended for all traders",
   },
   v2: {
-    title: "RON V2 Knowledge Base",
-    eyebrow: "Experimental",
+    title: "RON V2 Knowledge Base", eyebrow: "Experimental",
     summary: "Currently in development — ~50% WR.",
     description: "Advanced AI model incorporating Smart Money Concepts and live market structure. Improves as more platform data flows through RON.",
     badge: "Use with caution. Best for experienced traders",
   },
 };
 
-function RonRulesVersionCard({
-  version,
-  active,
-  onClick,
-}: {
-  version: RonRulesVersion;
-  active: boolean;
-  onClick: () => void;
-}) {
-  const copy = VERSION_COPY[version];
-
-  return (
-    <button
-      onClick={onClick}
-      className={`relative w-full overflow-hidden rounded-2xl border text-left transition-all duration-300 ${
-        active
-          ? "scale-100 border-primary/50 bg-card px-4 py-4 opacity-100 shadow-[0_0_0_1px_hsl(var(--primary)/0.25),0_0_24px_hsl(var(--primary)/0.22),0_0_48px_hsl(var(--primary)/0.14)]"
-          : "scale-[0.92] border-border bg-background/60 px-3 py-3 opacity-60 hover:opacity-80"
-      }`}
-      aria-pressed={active}
-    >
-      {active && (
-        <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-primary/35 bg-primary/15 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-primary animate-pulse">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-          Active
-        </div>
-      )}
-
-      <div className="pr-16">
-        <div className="flex items-start gap-3">
-          <div className={`mt-0.5 rounded-xl border p-2 ${active ? "border-primary/25 bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}>
-            {version === "v1" ? <Sparkles className="h-4 w-4" /> : <Brain className="h-4 w-4" />}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className={`font-bold tracking-wide ${active ? "text-[15px] text-foreground" : "text-[12px] text-foreground"}`}>
-                {version === "v1" ? "✨" : "🧠"} {copy.title}
-              </div>
-              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] ${
-                version === "v1"
-                  ? "border-primary/25 bg-primary/10 text-primary"
-                  : "border-muted bg-secondary text-muted-foreground"
-              }`}>
-                {copy.eyebrow}
-              </span>
-            </div>
-
-            <div className="mt-2 text-[11px] font-semibold text-foreground">
-              {copy.summary}
-            </div>
-            <p className={`mt-2 leading-relaxed ${active ? "text-[11px] text-muted-foreground" : "text-[10px] text-muted-foreground"}`}>
-              {copy.description}
-            </p>
-
-            <div className="mt-3">
-              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
-                version === "v1"
-                  ? "border-primary/25 bg-primary/10 text-primary"
-                  : "border-amber-500/25 bg-amber-500/10 text-amber-300"
-              }`}>
-                {copy.badge}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </button>
-  );
+function formatRelative(ts: number | null): string {
+  if (!ts) return "never";
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 5) return "just now";
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 export default function FalconerRulesPanel() {
@@ -154,20 +88,38 @@ export default function FalconerRulesPanel() {
   const [showAdd, setShowAdd] = useState(false);
   const [newRule, setNewRule] = useState({ category: "entry_rules", rule_name: "", rule_text: "", priority: 7 });
   const [aiVersion, setAiVersion] = useState<RonRulesVersion>(savedUi.aiVersion);
-  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Save-state tracking — per-rule spinner / ✓ saved
+  const [ruleSaveState, setRuleSaveState] = useState<Record<string, SaveState>>({});
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [, forceTick] = useState(0);
+  const inflightCount = useRef(0);
 
   // Persist UI state
   useEffect(() => {
     localStorage.setItem("ge_ron_rules_ui", JSON.stringify({ filter, versionFilter, aiVersion }));
   }, [filter, versionFilter, aiVersion]);
 
+  useEffect(() => { loadRules(); }, []);
+
+  // Tick "Last saved" relative time every 30s
   useEffect(() => {
-    if (!localStorage.getItem(WELCOME_KEY)) {
-      setShowWelcome(true);
-    }
+    const iv = setInterval(() => forceTick(t => t + 1), 30000);
+    return () => clearInterval(iv);
   }, []);
 
-  useEffect(() => { loadRules(); }, []);
+  // Warn on unload if saves in flight
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (inflightCount.current > 0) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved changes. Leave anyway?";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
 
   const loadRules = async () => {
     const { data } = await supabase.from("falconer_knowledge").select("*").order("priority", { ascending: false });
@@ -175,58 +127,123 @@ export default function FalconerRulesPanel() {
     setLoading(false);
   };
 
-
-  const toggleRule = async (rule: KnowledgeRule) => {
-    // Use service-role via edge function since RLS blocks client mutations
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-signal`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-      body: JSON.stringify({ action: "toggle_rule", rule_id: rule.id, is_active: !rule.is_active }),
-    });
-    if (res.ok) {
-      setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: !r.is_active } : r));
-      toast.success(`Rule ${!rule.is_active ? "enabled" : "disabled"}`);
+  const setSaveStateFor = (ruleId: string, state: SaveState) => {
+    setRuleSaveState(prev => ({ ...prev, [ruleId]: state }));
+    if (state === "saved") {
+      setTimeout(() => {
+        setRuleSaveState(prev => {
+          if (prev[ruleId] !== "saved") return prev;
+          const { [ruleId]: _, ...rest } = prev;
+          return rest;
+        });
+      }, 2000);
     }
   };
 
-  const saveEdit = async (rule: KnowledgeRule) => {
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-signal`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-      body: JSON.stringify({ action: "edit_rule", rule_id: rule.id, rule_text: editText, priority: editPriority }),
-    });
-    if (res.ok) {
-      setRules(prev => prev.map(r => r.id === rule.id ? { ...r, rule_text: editText, priority: editPriority } : r));
-      setEditingId(null);
-      toast.success("Rule updated");
+  // Generic edge-function call with optimistic update + revert on failure
+  const callEdge = async (body: Record<string, unknown>): Promise<boolean> => {
+    inflightCount.current += 1;
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-signal`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      return true;
+    } catch (e) {
+      throw e;
+    } finally {
+      inflightCount.current = Math.max(0, inflightCount.current - 1);
     }
   };
 
-  const addRule = async () => {
-    if (!newRule.rule_name || !newRule.rule_text) { toast.error("Fill in all fields"); return; }
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-signal`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-      body: JSON.stringify({ action: "add_rule", ...newRule }),
-    });
-    if (res.ok) {
-      toast.success("Rule added");
+  const toggleRule = useCallback(async (rule: KnowledgeRule) => {
+    const prev = rule.is_active;
+    const next = !prev;
+    // Optimistic
+    setRules(rs => rs.map(r => r.id === rule.id ? { ...r, is_active: next } : r));
+    setSaveStateFor(rule.id, "saving");
+    try {
+      await callEdge({ action: "toggle_rule", rule_id: rule.id, is_active: next });
+      setSaveStateFor(rule.id, "saved");
+      setLastSavedAt(Date.now());
+      toast.success("✓ Rule saved", { duration: 2000, position: "bottom-right" });
+    } catch (e: unknown) {
+      // Revert
+      setRules(rs => rs.map(r => r.id === rule.id ? { ...r, is_active: prev } : r));
+      setSaveStateFor(rule.id, "error");
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      toast.error(`Failed to save rule — ${msg}`, {
+        position: "bottom-right",
+        action: { label: "Retry", onClick: () => toggleRule({ ...rule, is_active: prev }) },
+      });
+    }
+  }, []);
+
+  const saveEdit = useCallback(async (rule: KnowledgeRule) => {
+    const prevText = rule.rule_text;
+    const prevPriority = rule.priority;
+    const newText = editText;
+    const newPriority = editPriority;
+    // Optimistic
+    setRules(rs => rs.map(r => r.id === rule.id ? { ...r, rule_text: newText, priority: newPriority } : r));
+    setEditingId(null);
+    setSaveStateFor(rule.id, "saving");
+    try {
+      await callEdge({ action: "edit_rule", rule_id: rule.id, rule_text: newText, priority: newPriority });
+      setSaveStateFor(rule.id, "saved");
+      setLastSavedAt(Date.now());
+      toast.success("✓ Rule saved", { duration: 2000, position: "bottom-right" });
+    } catch (e: unknown) {
+      setRules(rs => rs.map(r => r.id === rule.id ? { ...r, rule_text: prevText, priority: prevPriority } : r));
+      setSaveStateFor(rule.id, "error");
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      toast.error(`Failed to save rule — ${msg}`, {
+        position: "bottom-right",
+        action: {
+          label: "Retry",
+          onClick: () => {
+            setEditingId(rule.id);
+            setEditText(newText);
+            setEditPriority(newPriority);
+          },
+        },
+      });
+    }
+  }, [editText, editPriority]);
+
+  const addRule = useCallback(async () => {
+    if (!newRule.rule_name || !newRule.rule_text) {
+      toast.error("Fill in all fields", { position: "bottom-right" });
+      return;
+    }
+    inflightCount.current += 1;
+    const tempToast = toast.loading("Saving rule…", { position: "bottom-right" });
+    try {
+      await callEdge({ action: "add_rule", ...newRule });
+      toast.success("✓ Rule added", { id: tempToast, duration: 2000, position: "bottom-right" });
       setShowAdd(false);
       setNewRule({ category: "entry_rules", rule_name: "", rule_text: "", priority: 7 });
+      setLastSavedAt(Date.now());
       loadRules();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      toast.error(`Failed to add rule — ${msg}`, {
+        id: tempToast,
+        position: "bottom-right",
+        action: { label: "Retry", onClick: () => addRule() },
+      });
+    } finally {
+      inflightCount.current = Math.max(0, inflightCount.current - 1);
     }
-  };
-
-  const switchVersion = (ver: RonRulesVersion) => {
-    setAiVersion(ver);
-    setVersionFilter(ver);
-    toast.success(`RON switched to ${ver === "v2" ? "V2 (Knowledge Base)" : "V1 (Legacy)"}`);
-  };
-
-  const dismissWelcome = () => {
-    setShowWelcome(false);
-    localStorage.setItem(WELCOME_KEY, "1");
-  };
+  }, [newRule]);
 
   const filtered = rules.filter(r => {
     if (filter !== "all" && r.category !== filter) return false;
@@ -241,10 +258,24 @@ export default function FalconerRulesPanel() {
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <Brain size={16} color={C.purple} />
         <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>RON Rules Management</span>
         <span style={{ fontSize: 11, color: C.sec, marginLeft: "auto" }}>{v2Active}/{v2Total} V2 rules active</span>
+      </div>
+      <div style={{ fontSize: 10, color: C.sec, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+        {inflightCount.current > 0 ? (
+          <>
+            <Loader2 size={10} className="animate-spin" style={{ color: C.amber }} />
+            <span style={{ color: C.amber }}>Saving…</span>
+          </>
+        ) : (
+          <>
+            <CheckCircle2 size={10} style={{ color: C.jade }} />
+            <span>Last saved: {formatRelative(lastSavedAt)}</span>
+          </>
+        )}
+        <span style={{ marginLeft: "auto", opacity: 0.6 }}>All changes auto-save to database</span>
       </div>
 
       {/* Filters */}
@@ -284,12 +315,15 @@ export default function FalconerRulesPanel() {
         {filtered.map(rule => {
           const catColor = CATEGORY_COLORS[rule.category] || C.sec;
           const isEditing = editingId === rule.id;
+          const saveState = ruleSaveState[rule.id] || "idle";
 
           return (
             <div key={rule.id} style={{
               padding: "10px 12px", borderRadius: 8, marginBottom: 6,
-              background: C.bg, border: `1px solid ${C.border}`,
+              background: C.bg,
+              border: `1px solid ${saveState === "error" ? C.red : saveState === "saved" ? C.jade : C.border}`,
               opacity: rule.is_active ? 1 : 0.5,
+              transition: "border-color 0.3s",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: catColor + "18", color: catColor, textTransform: "uppercase" }}>
@@ -300,11 +334,33 @@ export default function FalconerRulesPanel() {
                 </span>
                 <span style={{ fontSize: 9, color: C.sec }}>P{rule.priority}</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{rule.rule_name}</span>
+
+                {/* Save-state badge */}
+                {saveState === "saving" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: C.amber }}>
+                    <Loader2 size={10} className="animate-spin" /> Saving…
+                  </span>
+                )}
+                {saveState === "saved" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: C.jade }}>
+                    <Check size={10} /> Saved
+                  </span>
+                )}
+                {saveState === "error" && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 9, color: C.red }}>
+                    <X size={10} /> Failed
+                  </span>
+                )}
+
                 <button onClick={() => { if (isEditing) { setEditingId(null); } else { setEditingId(rule.id); setEditText(rule.rule_text); setEditPriority(rule.priority); } }}
                   style={{ background: "none", border: "none", cursor: "pointer", color: C.sec, padding: 2 }}>
                   {isEditing ? <X size={12} /> : <Pencil size={12} />}
                 </button>
-                <button onClick={() => toggleRule(rule)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                <button
+                  onClick={() => toggleRule(rule)}
+                  disabled={saveState === "saving"}
+                  style={{ background: "none", border: "none", cursor: saveState === "saving" ? "wait" : "pointer", padding: 2, opacity: saveState === "saving" ? 0.5 : 1 }}
+                >
                   {rule.is_active ? <ToggleRight size={16} color={C.jade} /> : <ToggleLeft size={16} color={C.muted} />}
                 </button>
               </div>
