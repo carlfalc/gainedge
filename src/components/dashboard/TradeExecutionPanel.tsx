@@ -141,6 +141,27 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
     );
   }, [symbol]);
 
+  // Load user context (id, signals_paused, signal_direction) for auto-trade status display
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+      setUserId(session.user.id);
+      const [profRes, prefRes] = await Promise.all([
+        supabase.from("profiles").select("signals_paused").eq("id", session.user.id).maybeSingle(),
+        supabase.from("user_signal_preferences").select("signal_direction").eq("user_id", session.user.id).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      if (profRes.data) setSignalsPaused(Boolean((profRes.data as any).signals_paused));
+      if (prefRes.data) {
+        const dir = (prefRes.data as any).signal_direction;
+        if (dir === "buy" || dir === "sell" || dir === "both") setSignalDirection(dir);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // ─── LOT SIZE SYNC: load from user_signal_preferences as single source of truth ───
   const lotSizeInitialized = useRef(false);
   useEffect(() => {
