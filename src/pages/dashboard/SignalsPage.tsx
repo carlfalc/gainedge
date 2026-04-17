@@ -90,16 +90,33 @@ export default function SignalsPage() {
   const [prefsSaving, setPrefsSaving] = useState(false);
   const [fxRates, setFxRates] = useState<Record<string, number>>({});
   const [signalEngine, setSignalEngine] = useState<string>("v1v2");
+  const [autoExecOnly, setAutoExecOnly] = useState(false);
+  const [autoExecSignalIds, setAutoExecSignalIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadSignals();
     loadPrefs();
     loadFxRates();
+    loadAutoExecIds();
     const channel = supabase.channel('signals-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, () => loadSignals())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auto_trade_executions' }, () => loadAutoExecIds())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  const loadAutoExecIds = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from("auto_trade_executions")
+      .select("signal_id")
+      .eq("user_id", session.user.id)
+      .not("signal_id", "is", null);
+    if (data) {
+      setAutoExecSignalIds(new Set(data.map((r: any) => r.signal_id).filter(Boolean)));
+    }
+  };
 
   const loadFxRates = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -243,6 +260,7 @@ export default function SignalsPage() {
       .filter(s => !filterDir || s.direction === filterDir)
       .filter(s => !filterResult || s.result === filterResult)
       .filter(s => s.confidence >= minConf)
+      .filter(s => !autoExecOnly || autoExecSignalIds.has(s.id))
       .filter(s => {
         if (dateRange === "all") return true;
         const d = new Date(s.created_at);
@@ -258,7 +276,7 @@ export default function SignalsPage() {
         else if (sortKey === "confidence") cmp = a.confidence - b.confidence;
         return sortDir === "desc" ? -cmp : cmp;
       });
-  }, [signals, filterInst, filterDir, filterResult, minConf, dateRange, sortKey, sortDir]);
+  }, [signals, filterInst, filterDir, filterResult, minConf, dateRange, sortKey, sortDir, autoExecOnly, autoExecSignalIds]);
 
   const SortIcon = ({ k }: { k: SortKey }) => sortKey === k ?
     (sortDir === "desc" ? <ChevronDown size={12} /> : <ChevronUp size={12} />) : null;
@@ -452,6 +470,22 @@ export default function SignalsPage() {
           <option value="week">This Week</option>
           <option value="month">This Month</option>
         </select>
+        <button
+          onClick={() => setAutoExecOnly(v => !v)}
+          style={{
+            background: autoExecOnly ? "#00CFA526" : "transparent",
+            border: `1px solid ${autoExecOnly ? "#00CFA566" : C.border}`,
+            borderRadius: 8,
+            padding: "6px 10px",
+            cursor: "pointer",
+            fontSize: 12,
+            color: autoExecOnly ? "#00CFA5" : C.sec,
+            fontWeight: 600,
+          }}
+          title="Show only signals that RON auto-executed"
+        >
+          ⚡ Auto-executed only
+        </button>
         <button
           onClick={() => setSettingsOpen(true)}
           style={{

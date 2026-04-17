@@ -1575,14 +1575,15 @@ serve(async (req) => {
                     .limit(1)
                     .maybeSingle();
 
-                  await supabase.from("signals").insert({
+                  const { data: insertedSignal } = await supabase.from("signals").insert({
                     user_id: userId, symbol: inst.symbol, direction: analysis.direction,
                     confidence: analysis.confidence, entry_price: analysis.entry_price,
                     take_profit: analysis.take_profit, stop_loss: analysis.stop_loss,
                     risk_reward: analysis.risk_reward || "2.0:1",
                     scan_result_id: latestScan?.id ?? null,
-                  });
+                  }).select("id").single();
                   signalsCreated++;
+                  const signalId = insertedSignal?.id ?? null;
                   console.log(`Signal created: ${inst.symbol} ${analysis.direction} conf=${analysis.confidence}`);
 
                   // ─── AUTO-TRADE EXECUTION ───
@@ -1610,11 +1611,48 @@ serve(async (req) => {
                       const tradeResult = await tradeRes.json();
                       if (tradeRes.ok && tradeResult.success) {
                         console.log(`AUTO-TRADE executed: ${inst.symbol} ${analysis.direction} vol=${userLotSize}`);
+                        await supabase.from("auto_trade_executions").insert({
+                          user_id: userId,
+                          signal_id: signalId,
+                          symbol: inst.symbol,
+                          direction: analysis.direction,
+                          volume: Number(userLotSize),
+                          entry_price: analysis.entry_price,
+                          sl: analysis.stop_loss,
+                          tp: analysis.take_profit,
+                          status: "filled",
+                          metaapi_position_id: tradeResult.positionId || tradeResult.orderId || null,
+                        });
                       } else {
-                        console.warn(`AUTO-TRADE failed for ${inst.symbol}: ${tradeResult.error || "unknown error"}`);
+                        const errMsg = tradeResult.error || `HTTP ${tradeRes.status}`;
+                        console.warn(`AUTO-TRADE failed for ${inst.symbol}: ${errMsg}`);
+                        await supabase.from("auto_trade_executions").insert({
+                          user_id: userId,
+                          signal_id: signalId,
+                          symbol: inst.symbol,
+                          direction: analysis.direction,
+                          volume: Number(userLotSize),
+                          entry_price: analysis.entry_price,
+                          sl: analysis.stop_loss,
+                          tp: analysis.take_profit,
+                          status: "failed",
+                          error_message: errMsg,
+                        });
                       }
                     } catch (tradeErr: any) {
                       console.error(`AUTO-TRADE error for ${inst.symbol}: ${tradeErr.message}`);
+                      await supabase.from("auto_trade_executions").insert({
+                        user_id: userId,
+                        signal_id: signalId,
+                        symbol: inst.symbol,
+                        direction: analysis.direction,
+                        volume: Number(userLotSize),
+                        entry_price: analysis.entry_price,
+                        sl: analysis.stop_loss,
+                        tp: analysis.take_profit,
+                        status: "failed",
+                        error_message: String(tradeErr?.message || tradeErr),
+                      });
                     }
                   }
                 }

@@ -9,6 +9,7 @@ import {
   ChevronUp, ChevronDown, AlertTriangle, X, Loader2, Zap, User,
 } from "lucide-react";
 import { toast } from "sonner";
+import AutoTradeStatus from "./AutoTradeStatus";
 
 const PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 const FUNCTION_URL = `https://${PROJECT_ID}.supabase.co/functions/v1/metaapi-trade`;
@@ -104,6 +105,11 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const myTradesEnabled = myTradesMap[symbol] ?? false;
   const setMyTradesEnabled = (v: boolean) => setMyTradesMap(prev => ({ ...prev, [symbol]: v }));
 
+  // Auto-trade status context
+  const [userId, setUserId] = useState<string | null>(null);
+  const [signalsPaused, setSignalsPaused] = useState(false);
+  const [signalDirection, setSignalDirection] = useState<"buy" | "sell" | "both">("both");
+
   // Load auto-trade settings from database on mount
   const autoTradeLoaded = useRef(false);
   useEffect(() => {
@@ -134,6 +140,27 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
       { onConflict: "user_id,symbol" }
     );
   }, [symbol]);
+
+  // Load user context (id, signals_paused, signal_direction) for auto-trade status display
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+      setUserId(session.user.id);
+      const [profRes, prefRes] = await Promise.all([
+        supabase.from("profiles").select("signals_paused").eq("id", session.user.id).maybeSingle(),
+        supabase.from("user_signal_preferences").select("signal_direction").eq("user_id", session.user.id).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      if (profRes.data) setSignalsPaused(Boolean((profRes.data as any).signals_paused));
+      if (prefRes.data) {
+        const dir = (prefRes.data as any).signal_direction;
+        if (dir === "buy" || dir === "sell" || dir === "both") setSignalDirection(dir);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ─── LOT SIZE SYNC: load from user_signal_preferences as single source of truth ───
   const lotSizeInitialized = useRef(false);
@@ -427,6 +454,21 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
         </div>
 
         <div className="p-3 flex flex-col gap-2">
+          {/* ─── 0. AUTO-TRADE STATUS ─── */}
+          <AutoTradeStatus
+            symbol={symbol}
+            userId={userId}
+            autoTradeEnabled={autoTradeEnabled}
+            brokerConnected={isLive}
+            signalsPaused={signalsPaused}
+            signalDirection={signalDirection}
+            openPositionsForSymbol={positions.filter(p => {
+              const variants = BROKER_SYMBOL_MAP[symbol] ?? [symbol];
+              return variants.includes(p.symbol);
+            }).length}
+            totalOpenPositions={positions.length}
+          />
+
           {/* ─── 1. INTELLIGENT TRADER ─── */}
           <div>
             <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( RON ) is:</div>

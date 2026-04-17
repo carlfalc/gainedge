@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
+import { useAutoTradeNotifications } from "@/hooks/use-auto-trade-notifications";
 import LanguageSelector, { LanguageProvider } from "./LanguageSelector";
 import ronAvatar from "@/assets/ron-avatar.png";
 
@@ -54,6 +55,7 @@ export default function DashboardLayout() {
   const location = useLocation();
 
   useSeedData(userId);
+  useAutoTradeNotifications(userId ?? null);
 
   const sidebarWidth = collapsed && !hovered ? 0 : 240;
 
