@@ -454,6 +454,21 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
         </div>
 
         <div className="p-3 flex flex-col gap-2">
+          {/* ─── 0. AUTO-TRADE STATUS ─── */}
+          <AutoTradeStatus
+            symbol={symbol}
+            userId={userId}
+            autoTradeEnabled={autoTradeEnabled}
+            brokerConnected={isLive}
+            signalsPaused={signalsPaused}
+            signalDirection={signalDirection}
+            openPositionsForSymbol={positions.filter(p => {
+              const variants = BROKER_SYMBOL_MAP[symbol] ?? [symbol];
+              return variants.includes(p.symbol);
+            }).length}
+            totalOpenPositions={positions.length}
+          />
+
           {/* ─── 1. INTELLIGENT TRADER ─── */}
           <div>
             <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( RON ) is:</div>
