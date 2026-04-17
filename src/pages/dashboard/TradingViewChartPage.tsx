@@ -28,7 +28,7 @@ export default function TradingViewChartPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
-  const [ronVersion, setRonVersion] = useState<RonVersion>("v1_legacy");
+  const [ronVersion, setRonVersion] = useState<RonVersion>("v1");
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
 
   const selectedAvailability = getAvailabilityStatus(selected, selectedBroker);
