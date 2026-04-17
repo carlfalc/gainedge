@@ -97,11 +97,26 @@ export default function SignalsPage() {
     loadSignals();
     loadPrefs();
     loadFxRates();
+    loadAutoExecIds();
     const channel = supabase.channel('signals-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'signals' }, () => loadSignals())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'auto_trade_executions' }, () => loadAutoExecIds())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  const loadAutoExecIds = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    const { data } = await supabase
+      .from("auto_trade_executions")
+      .select("signal_id")
+      .eq("user_id", session.user.id)
+      .not("signal_id", "is", null);
+    if (data) {
+      setAutoExecSignalIds(new Set(data.map((r: any) => r.signal_id).filter(Boolean)));
+    }
+  };
 
   const loadFxRates = async () => {
     const { data: { session } } = await supabase.auth.getSession();
