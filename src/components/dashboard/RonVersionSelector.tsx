@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, Brain, X, CheckCircle2 } from "lucide-react";
+import { Sparkles, Brain, Layers, X, CheckCircle2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
 
-type RonVersion = "v1_legacy" | "v2_knowledge";
+type RonVersion = "v1" | "v2" | "v1v2";
 
 interface RonVersionSelectorProps {
   userId: string | undefined;
@@ -13,8 +12,21 @@ interface RonVersionSelectorProps {
 
 const WELCOME_KEY = "ron_version_welcome_dismissed";
 
+// Map any value (including legacy) → canonical RonVersion
+function normalizeVersion(value: string | null | undefined): RonVersion {
+  if (value === "v2" || value === "v2_knowledge") return "v2";
+  if (value === "v1v2") return "v1v2";
+  return "v1"; // default + v1_legacy fallback
+}
+
+const VERSION_LABELS: Record<RonVersion, string> = {
+  v1: "V1 Rules Currently Applied",
+  v2: "V2 Rules Currently Applied",
+  v1v2: "V1 + V2 Combined Rules Applied",
+};
+
 export default function RonVersionSelector({ userId, onVersionChange }: RonVersionSelectorProps) {
-  const [activeVersion, setActiveVersion] = useState<RonVersion>("v1_legacy");
+  const [activeVersion, setActiveVersion] = useState<RonVersion>("v1");
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
@@ -32,7 +44,7 @@ export default function RonVersionSelector({ userId, onVersionChange }: RonVersi
       .maybeSingle()
       .then(({ data }) => {
         if (data?.signal_engine) {
-          const v = data.signal_engine === "v2_knowledge" ? "v2_knowledge" : "v1_legacy";
+          const v = normalizeVersion(data.signal_engine);
           setActiveVersion(v);
           onVersionChange?.(v);
         }
@@ -63,7 +75,7 @@ export default function RonVersionSelector({ userId, onVersionChange }: RonVersi
             <X size={12} />
           </button>
           <span className="text-foreground font-semibold">Welcome!</span> We've set you up with RON V1 Legacy — our proven premium strategy.
-          You can explore V2 Knowledge Base (experimental) anytime, but V1 is recommended while you get familiar with the platform.
+          You can explore V2 Knowledge Base (experimental) or run them combined anytime, but V1 is recommended while you get familiar with the platform.
         </div>
       )}
 
@@ -71,7 +83,7 @@ export default function RonVersionSelector({ userId, onVersionChange }: RonVersi
       <div className="px-4 pt-3 pb-1">
         <div className="flex items-center gap-1.5 text-[10px] font-semibold tracking-wide uppercase" style={{ color: "#00CFA5" }}>
           <CheckCircle2 size={11} />
-          {activeVersion === "v1_legacy" ? "V1 Rules Currently Applied" : "V2 Rules Currently Applied"}
+          {VERSION_LABELS[activeVersion]}
         </div>
       </div>
 
@@ -80,9 +92,9 @@ export default function RonVersionSelector({ userId, onVersionChange }: RonVersi
         <TooltipProvider delayDuration={300}>
           {/* V1 Legacy */}
           <VersionCard
-            active={activeVersion === "v1_legacy"}
-            onClick={() => handleSwitch("v1_legacy")}
-            icon={<Sparkles size={activeVersion === "v1_legacy" ? 16 : 13} />}
+            active={activeVersion === "v1"}
+            onClick={() => handleSwitch("v1")}
+            icon={<Sparkles size={activeVersion === "v1" ? 16 : 13} />}
             title="RON V1 Legacy"
             subtitle="Premium Trading Vision"
             emoji="✨"
@@ -95,9 +107,9 @@ export default function RonVersionSelector({ userId, onVersionChange }: RonVersi
 
           {/* V2 Knowledge Base */}
           <VersionCard
-            active={activeVersion === "v2_knowledge"}
-            onClick={() => handleSwitch("v2_knowledge")}
-            icon={<Brain size={activeVersion === "v2_knowledge" ? 16 : 13} />}
+            active={activeVersion === "v2"}
+            onClick={() => handleSwitch("v2")}
+            icon={<Brain size={activeVersion === "v2" ? 16 : 13} />}
             title="RON V2 Knowledge Base"
             subtitle="Experimental"
             emoji="🧠"
@@ -105,6 +117,21 @@ export default function RonVersionSelector({ userId, onVersionChange }: RonVersi
               "Advanced AI model incorporating Smart Money Concepts, institutional order flow, and live market structure. Currently in active development with a ~50% win rate during training phase. This model continuously improves as more data flows through the platform — results WILL get better over time as RON learns."
             }
             badge="Use with caution. Best for experienced traders"
+            badgeStyle="warning"
+          />
+
+          {/* V1 + V2 Combined */}
+          <VersionCard
+            active={activeVersion === "v1v2"}
+            onClick={() => handleSwitch("v1v2")}
+            icon={<Layers size={activeVersion === "v1v2" ? 16 : 13} />}
+            title="RON V1 + V2 Combined"
+            subtitle="Hybrid Engine"
+            emoji="⚡"
+            description={
+              "Runs both engines in parallel and surfaces signals from each. Use this to compare V1's proven setups against V2's experimental Smart Money signals side-by-side. Best for traders who want maximum coverage and are comfortable filtering signals manually."
+            }
+            badge="Maximum signal coverage"
             badgeStyle="warning"
           />
         </TooltipProvider>

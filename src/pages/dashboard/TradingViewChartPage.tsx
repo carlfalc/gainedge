@@ -28,7 +28,7 @@ export default function TradingViewChartPage() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [livePrices, setLivePrices] = useState<Record<string, number>>({});
-  const [ronVersion, setRonVersion] = useState<RonVersion>("v1_legacy");
+  const [ronVersion, setRonVersion] = useState<RonVersion>("v1");
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
 
   const selectedAvailability = getAvailabilityStatus(selected, selectedBroker);
@@ -168,7 +168,7 @@ export default function TradingViewChartPage() {
             }}
           >
             <Cpu className="w-3 h-3" />
-            {ronVersion === "v1_legacy" ? "RON V1 Legacy" : "RON V2 Knowledge Base"}
+            {ronVersion === "v1" ? "RON V1 Legacy" : ronVersion === "v2" ? "RON V2 Knowledge Base" : "RON V1 + V2 Combined"}
           </div>
           <button
             onClick={handlePopOut}
