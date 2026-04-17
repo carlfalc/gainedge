@@ -519,12 +519,21 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
             <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( RON ) is:</div>
             <div className="flex items-center gap-4 flex-wrap">
               <button
-                onClick={() => setAutoTradeEnabled(!autoTradeEnabled)}
+                onClick={() => {
+                  // Block enabling when broker is not connected
+                  if (!autoTradeEnabled && !isLive) {
+                    toast.error("Connect your broker in Settings before enabling auto-trade");
+                    return;
+                  }
+                  setAutoTradeEnabled(!autoTradeEnabled);
+                }}
+                disabled={!autoTradeEnabled && !isLive}
+                title={!isLive ? "Connect your broker in Settings to enable auto-trade" : undefined}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
                   autoTradeEnabled
                     ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
                     : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
-                }`}
+                } ${!autoTradeEnabled && !isLive ? "opacity-40 cursor-not-allowed" : ""}`}
               >
                 <Zap className="w-3 h-3" />
                 Auto {autoTradeEnabled ? "ON" : "OFF"}
