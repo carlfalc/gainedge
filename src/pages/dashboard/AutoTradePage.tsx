@@ -355,11 +355,11 @@ function Row({
         <select
           value={setting.signal_direction}
           onChange={e => onDirChange(e.target.value as "buy" | "sell" | "both")}
-          className="px-2 py-1 rounded bg-white/[0.04] border border-white/10 text-white text-xs focus:outline-none focus:border-[#00CFA5]/50"
+          className="px-2 py-1 rounded bg-[#0a0a0a] border border-white/10 text-white text-xs focus:outline-none focus:border-[#00CFA5]/50 [&>option]:bg-[#0a0a0a] [&>option]:text-white"
         >
-          <option value="both">Buy & Sell</option>
-          <option value="buy">Buy only</option>
-          <option value="sell">Sell only</option>
+          <option value="both" className="bg-[#0a0a0a] text-white">Buy & Sell</option>
+          <option value="buy" className="bg-[#0a0a0a] text-white">Buy only</option>
+          <option value="sell" className="bg-[#0a0a0a] text-white">Sell only</option>
         </select>
       </td>
       <td className="px-3 py-2.5">
