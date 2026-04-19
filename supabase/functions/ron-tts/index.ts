@@ -54,10 +54,19 @@ serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("ElevenLabs TTS error:", response.status, errText);
-      return new Response(JSON.stringify({ error: "TTS generation failed" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Return 200 with fallback flag so client gracefully falls back to browser TTS
+      // (avoids 500 → blank screen). Propagate upstream status for client logging.
+      return new Response(
+        JSON.stringify({
+          error: "TTS_GENERATION_FAILED",
+          fallback: true,
+          upstream_status: response.status,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const audioBuffer = await response.arrayBuffer();
@@ -70,9 +79,16 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("ron-tts error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Return 200 + fallback so the client doesn't crash on a 500
+    return new Response(
+      JSON.stringify({
+        error: e instanceof Error ? e.message : "Unknown error",
+        fallback: true,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 });

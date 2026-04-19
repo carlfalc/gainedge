@@ -331,6 +331,31 @@ export default function AskRonModal({ open, onClose, context }: AskRonModalProps
   }, [isListening]);
 
   const playTTS = useCallback(async (text: string) => {
+    const speakWithBrowser = () => {
+      try {
+        if (!("speechSynthesis" in window)) {
+          setIsSpeaking(false);
+          setStatus("Ready");
+          return;
+        }
+        const utter = new SpeechSynthesisUtterance(text.slice(0, 4000));
+        utter.rate = 1.05;
+        utter.onend = () => {
+          setIsSpeaking(false);
+          setStatus("Ready");
+        };
+        utter.onerror = () => {
+          setIsSpeaking(false);
+          setStatus("Ready");
+        };
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+      } catch {
+        setIsSpeaking(false);
+        setStatus("Ready");
+      }
+    };
+
     try {
       setIsSpeaking(true);
       setStatus("RON is speaking...");
@@ -342,7 +367,18 @@ export default function AskRonModal({ open, onClose, context }: AskRonModalProps
         },
         body: JSON.stringify({ text: text.slice(0, 4000) }),
       });
-      if (!resp.ok) throw new Error("TTS failed");
+
+      // Detect JSON fallback response from edge function (server returned 200 but TTS upstream failed)
+      const contentType = resp.headers.get("content-type") || "";
+      if (!resp.ok || contentType.includes("application/json")) {
+        if (contentType.includes("application/json")) {
+          const data = await resp.json().catch(() => ({}));
+          console.warn("ron-tts fallback:", data);
+        }
+        speakWithBrowser();
+        return;
+      }
+
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
 
@@ -366,8 +402,7 @@ export default function AskRonModal({ open, onClose, context }: AskRonModalProps
       await audio.play();
     } catch (e) {
       console.error("TTS error:", e);
-      setIsSpeaking(false);
-      setStatus("Ready");
+      speakWithBrowser();
     }
   }, []);
 
