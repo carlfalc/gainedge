@@ -6,8 +6,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import {
-  ChevronUp, ChevronDown, AlertTriangle, X, Loader2, Zap, User,
+  ChevronUp, ChevronDown, AlertTriangle, X, Loader2, Zap, User, ArrowUpRight,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import AutoTradeStatus from "./AutoTradeStatus";
 
