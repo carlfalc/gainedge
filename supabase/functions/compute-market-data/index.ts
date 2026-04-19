@@ -494,8 +494,50 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
   const avgVolume = volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : 0;
   const lastVolume = volumes[volumes.length - 1] || 0;
 
-  // ─── V1 NO-TRADE FILTERS (SKIPPED when useV1Pure) ───
-  if (!useV1Pure) {
+  // ═══════════════════════════════════════════════════════════════════
+  // V1 PURE FAST PATH (Falconer Pine Script port)
+  //   Sole entry trigger: ta.crossover/ta.crossunder of EMA(4)/EMA(17) on
+  //   the latest CLOSED candle. Fixed 55-pip TP and 55-pip SL (1:1 R:R).
+  //   Indicators (RSI/ADX/MACD/StochRSI) are returned for DISPLAY ONLY —
+  //   they never gate signal creation.
+  // ═══════════════════════════════════════════════════════════════════
+  if (useV1Pure) {
+    const lastClose = closes[closes.length - 1];
+    const sym = symbolName || "";
+    const pip = v1PipSize(sym);
+    const dist = pip * 55; // 55 pips, fixed
+
+    if (crossoverStatus === "CONFIRMED" && (crossoverDir === "BULLISH" || crossoverDir === "BEARISH")) {
+      const direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
+      const entry = +lastClose.toFixed(5);
+      const sl = direction === "BUY" ? +(entry - dist).toFixed(5) : +(entry + dist).toFixed(5);
+      const tp = direction === "BUY" ? +(entry + dist).toFixed(5) : +(entry - dist).toFixed(5);
+      return {
+        direction, confidence: 8,
+        entry_price: entry, take_profit: tp, stop_loss: sl,
+        risk_reward: "1.0:1",
+        ema_crossover_status: "CONFIRMED",
+        ema_crossover_direction: crossoverDir,
+        reasoning: `[V1 Legacy] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m candle. Entry ${entry}, TP ${tp} (+55 pips), SL ${sl} (-55 pips). 1:1 R:R per Falconer V1 spec.`,
+        verdict: direction,
+        rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+      };
+    }
+
+    // No crossover this close — WAIT (display-only diagnostics still returned)
+    return {
+      direction: "WAIT", confidence: 1,
+      entry_price: null, take_profit: null, stop_loss: null, risk_reward: null,
+      ema_crossover_status: crossoverStatus,
+      ema_crossover_direction: crossoverDir,
+      reasoning: `[V1 Legacy] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only, do not gate V1 entry.)`,
+      verdict: "WAIT",
+      rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+    };
+  }
+
+  // ─── LEGACY V1 NO-TRADE FILTERS (only used by V1V2 / non-pure paths) ───
+  {
     const reasons: string[] = [];
     let noTrade = false;
 
