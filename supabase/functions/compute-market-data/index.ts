@@ -445,25 +445,24 @@ function v1PipSize(symbol: string): number {
   return 0.0001;
 }
 
-// ─── V1 Legacy Analysis ───
-// V1 PURE (Falconer Pine Script port):
-//   - EMA(4)/EMA(17) crossover on CLOSED 15m candles, raw close prices
-//   - Sole entry trigger: ta.crossover / ta.crossunder event on the latest closed bar
-//   - Fixed 55-pip TP and 55-pip SL (1:1 R:R), per-symbol pip size lookup
-//   - NO MTF / Confluence / Volume / Pattern / RSI / ADX gates
-// LEGACY (non-pure) path keeps the older multi-filter logic for backwards-compat.
-function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
-  // V1 PURE: drop the currently-forming bar so EMAs are computed on CLOSED candles only.
-  // (The caller already gates this function on candle-close events, but this guarantees
-  //  we never include an in-progress candle in the EMA series.)
-  const workCandles = useV1Pure && candles.length > 1 ? candles.slice(0, -1) : candles;
+function normalizeSignalEngine(value: string | null | undefined): "v1" | "v2" | "v1v2" {
+  if (value === "v2" || value === "v2_knowledge") return "v2";
+  if (value === "v1v2") return "v1v2";
+  return "v1";
+}
 
+// ─── V1 Legacy Analysis ───
+// The old ATR/confluence/volume-gated branch has been removed.
+// V1 is now ALWAYS the Falconer Pine Script port:
+//   - EMA(4)/EMA(17) crossover on CLOSED candles using raw close
+//   - Fixed 55-pip TP and 55-pip SL (1:1 R:R)
+//   - RSI / ADX / MACD / StochRSI are display-only diagnostics
+function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbolCategory?: string, symbolName?: string): AnalysisResult {
+  const workCandles = candles.length > 1 ? candles.slice(0, -1) : candles;
   const closes = workCandles.map((c: any) => c.close);
   const highs = workCandles.map((c: any) => c.high);
   const lows = workCandles.map((c: any) => c.low);
-  const volumes = workCandles.map((c: any) => c.tickVolume || 0);
 
-  // EMA 4/17 on raw closes (Pine Script: ta.ema(close, 4) / ta.ema(close, 17))
   const ema4 = calcEMA(closes, 4);
   const ema17 = calcEMA(closes, 17);
   const lastIdx = ema4.length - 1;
@@ -472,246 +471,61 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
   const prevFast = ema4[lastIdx - 1];
   const prevSlow = ema17[lastIdx - 1];
 
-  // Pine Script ta.crossover / ta.crossunder event detection
   let crossoverStatus = "NONE";
   let crossoverDir: string | null = null;
   if (prevFast <= prevSlow && currFast > currSlow) {
-    crossoverStatus = "CONFIRMED"; crossoverDir = "BULLISH";
+    crossoverStatus = "CONFIRMED";
+    crossoverDir = "BULLISH";
   } else if (prevFast >= prevSlow && currFast < currSlow) {
-    crossoverStatus = "CONFIRMED"; crossoverDir = "BEARISH";
-  } else if (!useV1Pure && Math.abs(currFast - currSlow) / currSlow < 0.0003) {
-    // FORMING is a non-pure-only convenience state; V1 Pure fires only on the
-    // exact crossover event, never on "forming".
-    crossoverStatus = "FORMING";
-    crossoverDir = currFast > currSlow ? "BULLISH" : "BEARISH";
+    crossoverStatus = "CONFIRMED";
+    crossoverDir = "BEARISH";
   }
 
   const rsi = calcRSI(closes);
   const adx = calcADX(highs, lows, closes);
   const macd = calcMACDStatus(closes);
   const stochRsi = calcStochRSI(closes);
-  const atr = calcATR(highs, lows, closes);
-  const avgVolume = volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : 0;
-  const lastVolume = volumes[volumes.length - 1] || 0;
 
-  // ═══════════════════════════════════════════════════════════════════
-  // V1 PURE FAST PATH (Falconer Pine Script port)
-  //   Sole entry trigger: ta.crossover/ta.crossunder of EMA(4)/EMA(17) on
-  //   the latest CLOSED candle. Fixed 55-pip TP and 55-pip SL (1:1 R:R).
-  //   Indicators (RSI/ADX/MACD/StochRSI) are returned for DISPLAY ONLY —
-  //   they never gate signal creation.
-  // ═══════════════════════════════════════════════════════════════════
-  if (useV1Pure) {
-    const lastClose = closes[closes.length - 1];
-    const sym = symbolName || "";
-    const pip = v1PipSize(sym);
-    const dist = pip * 55; // 55 pips, fixed
+  if (crossoverStatus === "CONFIRMED" && crossoverDir) {
+    const direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
+    const entry = +closes[closes.length - 1].toFixed(5);
+    const dist = v1PipSize(symbolName || "") * 55;
+    const tp = direction === "BUY" ? +(entry + dist).toFixed(5) : +(entry - dist).toFixed(5);
+    const sl = direction === "BUY" ? +(entry - dist).toFixed(5) : +(entry + dist).toFixed(5);
 
-    if (crossoverStatus === "CONFIRMED" && (crossoverDir === "BULLISH" || crossoverDir === "BEARISH")) {
-      const direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
-      const entry = +lastClose.toFixed(5);
-      const sl = direction === "BUY" ? +(entry - dist).toFixed(5) : +(entry + dist).toFixed(5);
-      const tp = direction === "BUY" ? +(entry + dist).toFixed(5) : +(entry - dist).toFixed(5);
-      return {
-        direction, confidence: 8,
-        entry_price: entry, take_profit: tp, stop_loss: sl,
-        risk_reward: "1.0:1",
-        ema_crossover_status: "CONFIRMED",
-        ema_crossover_direction: crossoverDir,
-        reasoning: `[V1 Legacy] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m candle. Entry ${entry}, TP ${tp} (+55 pips), SL ${sl} (-55 pips). 1:1 R:R per Falconer V1 spec.`,
-        verdict: direction,
-        rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
-      };
-    }
-
-    // No crossover this close — WAIT (display-only diagnostics still returned)
     return {
-      direction: "WAIT", confidence: 1,
-      entry_price: null, take_profit: null, stop_loss: null, risk_reward: null,
-      ema_crossover_status: crossoverStatus,
+      direction,
+      confidence: 8,
+      entry_price: entry,
+      take_profit: tp,
+      stop_loss: sl,
+      risk_reward: "1.0:1",
+      ema_crossover_status: "CONFIRMED",
       ema_crossover_direction: crossoverDir,
-      reasoning: `[V1 Legacy] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only, do not gate V1 entry.)`,
-      verdict: "WAIT",
-      rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+      reasoning: `[V1 Legacy] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m candle. Entry ${entry}, TP ${tp} (+55 pips), SL ${sl} (-55 pips). 1:1 R:R per Falconer V1 spec.`,
+      verdict: direction,
+      rsi,
+      adx,
+      macd_status: macd,
+      stoch_rsi: stochRsi,
     };
   }
 
-  // ─── LEGACY V1 NO-TRADE FILTERS (only used by V1V2 / non-pure paths) ───
-  {
-    const reasons: string[] = [];
-    let noTrade = false;
-
-    if (adx !== null && adx < 20) {
-      noTrade = true;
-      reasons.push(`ADX at ${adx} — no clear trend, staying flat`);
-    }
-
-    if (atr !== null) {
-      const avgAtr = calcATR(highs.slice(0, -14), lows.slice(0, -14), closes.slice(0, -14));
-      if (avgAtr && atr < avgAtr * 0.6) {
-        noTrade = true;
-        reasons.push("Price in tight range — ATR well below average");
-      }
-    }
-
-    if (crossoverStatus === "NONE") {
-      const emaDiff = Math.abs(currFast - currSlow) / currSlow;
-      const prevDiff = Math.abs(prevFast - prevSlow) / prevSlow;
-      if (emaDiff < 0.001 && prevDiff < 0.001) {
-        noTrade = true;
-        reasons.push("EMAs flat and parallel — no crossover forming");
-      }
-    }
-
-    if (noTrade) {
-      return {
-        direction: "NO TRADE", confidence: 1, entry_price: null, take_profit: null,
-        stop_loss: null, risk_reward: null, ema_crossover_status: crossoverStatus,
-        ema_crossover_direction: crossoverDir,
-        reasoning: `[Legacy V1] ${reasons.join(". ")}. No trade conditions met.`,
-        verdict: "NO_TRADE", rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
-      };
-    }
-  }
-
-  // ─── V1 CONFIDENCE SCORING ───
-  // In V1 Pure mode, confidence is informational only — every crossover fires a signal
-  let confidence = 0;
-  const tradeReasons: string[] = [];
-
-  if (crossoverStatus === "CONFIRMED" && crossoverDir === "BULLISH") {
-    confidence += 3; tradeReasons.push("Confirmed bullish EMA crossover on closed candle");
-  } else if (crossoverStatus === "CONFIRMED" && crossoverDir === "BEARISH") {
-    confidence += 3; tradeReasons.push("Confirmed bearish EMA crossover on closed candle");
-  } else if (crossoverStatus === "FORMING") {
-    confidence += 1; tradeReasons.push(`EMA crossover forming (${crossoverDir})`);
-  }
-
-  const isBullish = crossoverDir === "BULLISH" || (crossoverStatus === "NONE" && currFast > currSlow);
-  const isBearish = crossoverDir === "BEARISH" || (crossoverStatus === "NONE" && currFast < currSlow);
-  if (rsi !== null) {
-    if (isBullish && rsi > 55) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bullish momentum`); }
-    else if (isBearish && rsi < 45) { confidence += 1; tradeReasons.push(`RSI ${rsi} supports bearish momentum`); }
-    if (!useV1Pure && rsi >= 45 && rsi <= 55) { confidence -= 2; tradeReasons.push(`RSI ${rsi} in neutral zone — reduced conviction`); }
-  }
-
-  if (macd === "Bullish" && isBullish) { confidence += 1; tradeReasons.push("MACD bullish momentum aligned"); }
-  else if (macd === "Bearish" && isBearish) { confidence += 1; tradeReasons.push("MACD bearish momentum aligned"); }
-
-  if (adx !== null && adx > 25) { confidence += 1; tradeReasons.push(`ADX at ${adx} confirms trend strength`); }
-  else if (adx !== null && adx > 20) { confidence += 1; tradeReasons.push(`ADX at ${adx} above 20`); }
-
-  if (stochRsi !== null) {
-    if (isBullish && stochRsi > 60) { confidence += 1; tradeReasons.push(`StochRSI ${stochRsi} confirms bullish`); }
-    else if (isBearish && stochRsi < 40) { confidence += 1; tradeReasons.push(`StochRSI ${stochRsi} confirms bearish`); }
-  }
-
-  if (lastVolume > avgVolume * 1.2 && crossoverStatus === "CONFIRMED") {
-    confidence += 1; tradeReasons.push("Volume spike on crossover candle");
-  }
-
-  confidence = Math.max(1, Math.min(10, confidence));
-
-  // ─── V1 Pure: every confirmed crossover IS a signal ───
-  let direction: string;
-  let verdict: string;
-
-  if (useV1Pure) {
-    // In pure V1 mode, a confirmed crossover always generates a signal
-    if (crossoverStatus === "CONFIRMED") {
-      direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
-      verdict = direction;
-      // Ensure minimum confidence of 5 so signal is always created
-      confidence = Math.max(5, confidence);
-    } else if (crossoverStatus === "FORMING") {
-      direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
-      verdict = "WAIT";
-      confidence = Math.max(3, confidence);
-    } else {
-      // No crossover at all — WAIT (not NO TRADE)
-      direction = "WAIT";
-      verdict = "WAIT";
-    }
-  } else {
-    // Original V1 logic with confidence gating
-    if (confidence >= 5 && crossoverStatus === "CONFIRMED") {
-      direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
-      verdict = direction;
-    } else if (confidence >= 3 && crossoverStatus !== "NONE") {
-      direction = isBullish ? "BUY" : "SELL";
-      verdict = "WAIT"; confidence = Math.min(confidence, 4);
-    } else {
-      direction = "WAIT"; verdict = "WAIT"; confidence = Math.min(confidence, 3);
-    }
-  }
-
-  // ─── V1 ENTRY / TP / SL (ATR-based, capped to prevent insane distances) ───
-  const lastClose = closes[closes.length - 1];
-  let entry: number | null = null;
-  let tp: number | null = null;
-  let sl: number | null = null;
-  let rr: string | null = null;
-
-  if (direction === "BUY" || direction === "SELL") {
-    entry = +lastClose.toFixed(5);
-    const atrVal = calcATR(highs, lows, closes);
-
-    if (atrVal && atrVal > 0) {
-      // ATR multiplier varies by instrument type
-      const slMult = getAtrSlMultiplier(symbolName || "", symbolCategory);
-      const tpMult = slMult * rrRatio; // TP = SL_mult × user R:R ratio
-
-      const atrSl = atrVal * slMult;
-      const atrTp = atrVal * tpMult;
-
-      if (direction === "BUY") {
-        sl = +(entry - atrSl).toFixed(5);
-        tp = +(entry + atrTp).toFixed(5);
-      } else {
-        sl = +(entry + atrSl).toFixed(5);
-        tp = +(entry - atrTp).toFixed(5);
-      }
-
-      // ─── SANITY CHECK: SL distance > 2% of entry = something wrong ───
-      const slDistPct = Math.abs(entry - sl) / entry;
-      if (slDistPct > 0.02) {
-        // Skip — this would be an insane SL distance
-        entry = null; sl = null; tp = null; rr = null;
-        direction = "WAIT";
-        verdict = "WAIT";
-        tradeReasons.push(`ATR SL distance ${(slDistPct * 100).toFixed(1)}% exceeds 2% safety cap — signal blocked`);
-      } else {
-        const risk = Math.abs(entry - sl);
-        const reward = Math.abs(tp - entry);
-        rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : `${rrRatio.toFixed(1)}:1`;
-        tradeReasons.push(`ATR14=${atrVal.toFixed(5)}, SL=${atrSl.toFixed(5)} (${slMult}xATR), TP=${atrTp.toFixed(5)} (${tpMult.toFixed(1)}xATR, R:R ${rrRatio}:1)`);
-      }
-    } else {
-      // Fallback: percentage-based
-      const pctSl = lastClose * 0.005;
-      const pctTp = lastClose * 0.005 * rrRatio;
-      if (direction === "BUY") {
-        sl = +(entry - pctSl).toFixed(5);
-        tp = +(entry + pctTp).toFixed(5);
-      } else {
-        sl = +(entry + pctSl).toFixed(5);
-        tp = +(entry - pctTp).toFixed(5);
-      }
-      const risk = Math.abs(entry - sl);
-      const reward = Math.abs(tp - entry);
-      rr = risk > 0 ? `${(reward / risk).toFixed(1)}:1` : `${rrRatio.toFixed(1)}:1`;
-    }
-  }
-
-  const reasoningText = tradeReasons.length > 0
-    ? `[Legacy V1] ${tradeReasons.join(". ")}. ${entry ? `Entry at ${entry} with SL at ${sl}. R:R ${rr}.` : ""}`
-    : `[Legacy V1] No clear setup forming. Monitoring price action.`;
-
   return {
-    direction, confidence, entry_price: entry, take_profit: tp, stop_loss: sl,
-    risk_reward: rr, ema_crossover_status: crossoverStatus,
-    ema_crossover_direction: crossoverDir, reasoning: reasoningText, verdict,
-    rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+    direction: "WAIT",
+    confidence: 1,
+    entry_price: null,
+    take_profit: null,
+    stop_loss: null,
+    risk_reward: null,
+    ema_crossover_status: crossoverStatus,
+    ema_crossover_direction: crossoverDir,
+    reasoning: `[V1 Legacy] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only, do not gate V1 entry.)`,
+    verdict: "WAIT",
+    rsi,
+    adx,
+    macd_status: macd,
+    stoch_rsi: stochRsi,
   };
 }
 
@@ -1423,11 +1237,14 @@ serve(async (req) => {
       // User's R:R ratio preference (default 2.0)
       const rrRatio = (profile as any)?.rr_ratio ?? 2.0;
 
-      // Determine engine: v1 = pure V1 (no filters, crossover only), v2 = V2 rules, v1v2 = combined
-      const signalEngine = sigPrefRes.data?.signal_engine || "v1"; // Default to V1
+      // Normalize old saved values so legacy labels still route to the new pure V1 engine.
+      const rawSignalEngine = sigPrefRes.data?.signal_engine;
+      const signalEngine = normalizeSignalEngine(rawSignalEngine);
       const signalDirection = (sigPrefRes.data as any)?.signal_direction || "both";
       const useV2 = signalEngine === "v2" || signalEngine === "v1v2";
-      const useV1Pure = signalEngine === "v1"; // Pure V1: only EMA crossover, no extra filters
+      const isV1OnlySelection = signalEngine === "v1";
+      const useV1Pure = true;
+      console.log(`[EngineRoute] user=${userId.slice(0, 8)} raw=${rawSignalEngine ?? "null"} normalized=${signalEngine} useV2=${useV2} v1Base=pure`);
 
       for (const inst of instList) {
         if (elapsed() > TIME_LIMIT_HARD) {
@@ -1473,7 +1290,7 @@ serve(async (req) => {
 
           // ─── V1 PURE HARD GATE: 15-minute timeframe only ───
           // Falconer Pine Script V1 is defined exclusively on the 15m chart.
-          if (useV1Pure && inst.timeframe !== "15m") {
+          if (isV1OnlySelection && inst.timeframe !== "15m") {
             console.log(`V1 Pure gate: skipping ${inst.symbol} on ${inst.timeframe} (V1 is 15m-only)`);
             continue;
           }
@@ -1482,7 +1299,7 @@ serve(async (req) => {
           // We are inside the "candle close detected" branch (prevTime !== newTime),
           // so the previous bar — the one our EMA evaluation lands on — is now closed.
           // Belt-and-braces: confirm prevTime + 15min <= now (with 30s tolerance).
-          if (useV1Pure && prevTime) {
+          if (isV1OnlySelection && prevTime) {
             const prevMs = new Date(prevTime).getTime();
             if (Number.isFinite(prevMs) && prevMs + 15 * 60_000 > Date.now() + 30_000) {
               console.log(`V1 Pure: previous candle ${prevTime} not yet closed for ${inst.symbol} — skipping`);
