@@ -90,6 +90,11 @@ export default function RonPopout() {
   const abortRef = useRef<AbortController | null>(null);
   const recognitionRef = useRef<any>(null);
 
+  // ─── Sentence-level TTS queue ───
+  const ttsQueueRef = useRef<string[]>([]);
+  const ttsPlayingRef = useRef(false);
+  const ttsBufferRef = useRef("");
+
   useEffect(() => {
     document.title = "Talk to RON";
   }, []);
@@ -98,59 +103,94 @@ export default function RonPopout() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const playTTS = useCallback(async (text: string) => {
-    const speakWithBrowser = () => {
-      try {
-        if (!("speechSynthesis" in window)) {
-          setIsSpeaking(false);
-          setStatus("Ready");
-          return;
-        }
-        const utter = new SpeechSynthesisUtterance(text.slice(0, 4000));
-        utter.rate = 1.05;
-        utter.onend = () => { setIsSpeaking(false); setStatus("Ready"); };
-        utter.onerror = () => { setIsSpeaking(false); setStatus("Ready"); };
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utter);
-      } catch {
-        setIsSpeaking(false);
-        setStatus("Ready");
-      }
+  const speakWithBrowser = useCallback((text: string, onEnd?: () => void) => {
+    try {
+      if (!("speechSynthesis" in window)) { onEnd?.(); return; }
+      const utter = new SpeechSynthesisUtterance(text.slice(0, 4000));
+      utter.rate = 1.18;
+      utter.onend = () => onEnd?.();
+      utter.onerror = () => onEnd?.();
+      window.speechSynthesis.speak(utter);
+    } catch { onEnd?.(); }
+  }, []);
+
+  const playNextInQueue = useCallback(async () => {
+    if (ttsPlayingRef.current) return;
+    const next = ttsQueueRef.current.shift();
+    if (!next) {
+      setIsSpeaking(false);
+      setStatus("Ready");
+      return;
+    }
+    ttsPlayingRef.current = true;
+    setIsSpeaking(true);
+    setStatus("RON is speaking...");
+
+    const finish = () => {
+      ttsPlayingRef.current = false;
+      playNextInQueue();
     };
 
     try {
-      setIsSpeaking(true);
-      setStatus("RON is speaking...");
       const resp = await fetch(TTS_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ text: text.slice(0, 4000) }),
+        body: JSON.stringify({ text: next.slice(0, 4000) }),
       });
 
       const contentType = resp.headers.get("content-type") || "";
       if (!resp.ok || contentType.includes("application/json")) {
-        speakWithBrowser();
+        speakWithBrowser(next, finish);
         return;
       }
 
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.playbackRate = 1.1;
       audioRef.current = audio;
-      audio.onended = () => {
-        setIsSpeaking(false);
-        setStatus("Ready");
-        URL.revokeObjectURL(url);
-      };
+      audio.onended = () => { URL.revokeObjectURL(url); finish(); };
+      audio.onerror = () => { URL.revokeObjectURL(url); finish(); };
       await audio.play();
     } catch (e) {
       console.error("TTS error:", e);
-      speakWithBrowser();
+      speakWithBrowser(next, finish);
     }
-  }, []);
+  }, [speakWithBrowser]);
+
+  const enqueueTTS = useCallback((text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    ttsQueueRef.current.push(trimmed);
+    playNextInQueue();
+  }, [playNextInQueue]);
+
+  // Flush completed sentences from buffer to TTS queue
+  const flushSentences = useCallback((final: boolean) => {
+    const buf = ttsBufferRef.current;
+    if (!buf) return;
+    const re = /[^.!?\n]+[.!?\n]+/g;
+    let match: RegExpExecArray | null;
+    let lastIdx = 0;
+    const sentences: string[] = [];
+    while ((match = re.exec(buf)) !== null) {
+      sentences.push(match[0]);
+      lastIdx = match.index + match[0].length;
+    }
+    ttsBufferRef.current = buf.slice(lastIdx);
+    for (const s of sentences) {
+      const clean = s.replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim();
+      if (clean.length >= 2) enqueueTTS(clean);
+    }
+    if (final && ttsBufferRef.current.trim()) {
+      const tail = ttsBufferRef.current.replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim();
+      if (tail) enqueueTTS(tail);
+      ttsBufferRef.current = "";
+    }
+  }, [enqueueTTS]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isThinking) return;
@@ -165,12 +205,19 @@ export default function RonPopout() {
     const abort = new AbortController();
     abortRef.current = abort;
 
+    // Reset TTS state for new turn
+    ttsBufferRef.current = "";
+    ttsQueueRef.current = [];
+    window.speechSynthesis?.cancel();
+
     try {
       await streamChat(
         newMessages,
         context,
         (chunk) => {
           assistantText += chunk;
+          ttsBufferRef.current += chunk;
+          flushSentences(false);
           setMessages(prev => {
             const last = prev[prev.length - 1];
             if (last?.role === "assistant") {
@@ -181,8 +228,7 @@ export default function RonPopout() {
         },
         () => {
           setIsThinking(false);
-          setStatus("Ready");
-          if (assistantText.trim()) playTTS(assistantText);
+          flushSentences(true);
         },
         abort.signal
       );
@@ -193,7 +239,7 @@ export default function RonPopout() {
       setIsThinking(false);
       setStatus("Ready");
     }
-  }, [messages, isThinking, context, playTTS]);
+  }, [messages, isThinking, context, flushSentences]);
 
   const toggleMic = useCallback(async () => {
     if (isListening) {
