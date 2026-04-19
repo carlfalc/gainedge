@@ -243,7 +243,7 @@ export default function RonPopout() {
       console.error("TTS error:", e);
       speakWithBrowser(next, finish);
     }
-  }, [speakWithBrowser]);
+  }, [speakWithBrowser, attachAnalyser]);
 
   const enqueueTTS = useCallback((text: string) => {
     const trimmed = text.trim();
