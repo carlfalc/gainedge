@@ -368,6 +368,12 @@ export default function RonPopout() {
   const spinSpeed = isSpeaking ? "12s" : isListening ? "18s" : "28s";
   const pulseSpeed = isSpeaking ? "1.8s" : isListening ? "2.5s" : "4s";
 
+  // Voice-reactive multipliers (amplitude is 0..1 from analyser)
+  const ampScale = 1 + amplitude * 0.18;
+  const ampBrightness = 1 + amplitude * 0.55;
+  const ampSaturation = 1.4 + amplitude * 0.8;
+  const ampOpacityBoost = amplitude * 0.35;
+
   return (
     <div
       className="fixed inset-0 flex flex-col overflow-hidden"
@@ -383,9 +389,12 @@ export default function RonPopout() {
             backgroundImage: `url(${ronBg})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: `saturate(1.4) brightness(${0.9 + (intensity - 1) * 0.5})`,
+            filter: `saturate(${ampSaturation}) brightness(${(0.9 + (intensity - 1) * 0.5) * ampBrightness})`,
             animation: `ronHoloSpin ${spinSpeed} linear infinite, ronHoloPulse ${pulseSpeed} ease-in-out infinite`,
             transformOrigin: "center center",
+            transform: `scale(${ampScale})`,
+            transition: "transform 80ms linear, filter 80ms linear",
+            willChange: "transform, filter",
           }}
         />
         {/* Secondary counter-spinning mirrored layer */}
@@ -397,9 +406,12 @@ export default function RonPopout() {
             backgroundSize: "cover",
             backgroundPosition: "center",
             mixBlendMode: "screen",
-            opacity: 0.55,
+            opacity: Math.min(1, 0.55 + ampOpacityBoost),
             animation: `ronHoloSpinReverse ${spinSpeed} linear infinite, ronHoloDrift ${animSpeed} ease-in-out infinite alternate`,
             transformOrigin: "center center",
+            transform: `scale(${1 + amplitude * 0.1})`,
+            transition: "transform 100ms linear, opacity 100ms linear",
+            willChange: "transform, opacity",
           }}
         />
         {/* Third flowing layer with hue shift */}
