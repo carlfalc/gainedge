@@ -233,8 +233,10 @@ export default function RonPopout() {
     window.close();
   }, []);
 
-  const intensity = isSpeaking ? 1.4 : isListening ? 1.15 : isThinking ? 1.1 : 1;
-  const animSpeed = isSpeaking ? "8s" : isListening ? "12s" : "22s";
+  const intensity = isSpeaking ? 1.5 : isListening ? 1.25 : isThinking ? 1.15 : 1.05;
+  const animSpeed = isSpeaking ? "3s" : isListening ? "5s" : "7s";
+  const spinSpeed = isSpeaking ? "12s" : isListening ? "18s" : "28s";
+  const pulseSpeed = isSpeaking ? "1.8s" : isListening ? "2.5s" : "4s";
 
   return (
     <div
