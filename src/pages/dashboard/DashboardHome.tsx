@@ -10,6 +10,7 @@ import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 import MoversShakersWidget from "@/components/dashboard/MoversShakersWidget";
+import InstrumentTrackingPanel from "@/components/dashboard/InstrumentTrackingPanel";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
 import { useLiveMarketData, triggerMarketDataCompute, type LiveMarketRow } from "@/services/broker-data";
 
