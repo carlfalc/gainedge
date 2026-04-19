@@ -12,6 +12,7 @@ import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 import MoversShakersWidget from "@/components/dashboard/MoversShakersWidget";
 import InstrumentTrackingPanel from "@/components/dashboard/InstrumentTrackingPanel";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
+import { VolumeHistoryInline } from "@/components/dashboard/VolumeHistoryInline";
 import { useLiveMarketData, triggerMarketDataCompute, type LiveMarketRow } from "@/services/broker-data";
 
 const adxLabel = (v: number) =>
@@ -302,6 +303,7 @@ export default function DashboardHome() {
       <InstrumentTrackingPanel />
 
       <MostVolumeBar />
+      <VolumeHistoryInline />
 
       {best ? (
         <div style={{
