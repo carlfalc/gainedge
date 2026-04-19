@@ -16,7 +16,7 @@ import ronAvatar from "@/assets/ron-avatar.png";
 export const LightBgContext = createContext<boolean>(false);
 import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 import BrokerModal from "./BrokerModal";
-import AskRonModal from "./AskRonModal";
+import { openRonPopout } from "@/lib/ron-popout";
 import TradeNotificationPopup from "./TradeNotificationPopup";
 
 
@@ -49,7 +49,7 @@ export default function DashboardLayout() {
   const [sessionLabel, setSessionLabel] = useState("London Session");
   const [clockConfigs, setClockConfigs] = useState<ClockConfig[]>(DEFAULT_CLOCKS);
   const [brokerOpen, setBrokerOpen] = useState(false);
-  const [ronOpen, setRonOpen] = useState(false);
+  
   const [lightBg, setLightBg] = useState(() => localStorage.getItem("gainedge_light_bg") === "1");
   const [authReady, setAuthReady] = useState(false);
   const navigate = useNavigate();
@@ -246,7 +246,12 @@ export default function DashboardLayout() {
             <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>{sessionLabel}</span>
             <span style={{ color: C.muted, fontSize: 12 }}>•</span>
             <button
-              onClick={() => setRonOpen(true)}
+              onClick={() => openRonPopout({
+                page: location.pathname,
+                sessionLabel,
+                userName: userName || undefined,
+                userId: userId || undefined,
+              })}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 padding: "4px 12px", borderRadius: 20, border: "none", cursor: "pointer",
@@ -357,16 +362,7 @@ export default function DashboardLayout() {
       </div>
       <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
       
-      <AskRonModal
-        open={ronOpen}
-        onClose={() => setRonOpen(false)}
-        context={{
-          page: location.pathname,
-          sessionLabel,
-          userName: userName || undefined,
-          userId: userId || undefined,
-        }}
-      />
+      
       <TradeNotificationPopup />
     </div>
     </LanguageProvider>

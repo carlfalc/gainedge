@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Zap, TrendingUp, TrendingDown, Loader2, Brain, Mic } from "lucide-react";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
-import AskRonModal from "@/components/dashboard/AskRonModal";
+import { openRonPopout } from "@/lib/ron-popout";
 import RonVersionSelector, { type RonVersion } from "@/components/dashboard/RonVersionSelector";
 
 interface Signal {
@@ -28,7 +28,7 @@ interface ChartSidePanelProps {
 
 export default function ChartSidePanel({ symbol, userId, accountId, positions, onClosePosition, closingId, onVersionChange }: ChartSidePanelProps) {
   const [signals, setSignals] = useState<Signal[]>([]);
-  const [ronOpen, setRonOpen] = useState(false);
+  
 
   const priceDec = symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5;
 
@@ -153,7 +153,7 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
       {/* Ask RON — pinned at bottom */}
       <div className="p-4 border-t border-border shrink-0">
         <button
-          onClick={() => setRonOpen(true)}
+          onClick={() => openRonPopout({ page: "TradingView Chart", instrument: symbol, userId })}
           className="flex items-center justify-center gap-2 w-full py-3 rounded-lg text-xs font-bold transition-all"
           style={{
             background: "linear-gradient(135deg, rgba(0,207,165,0.15) 0%, rgba(14,165,233,0.15) 100%)",
@@ -170,11 +170,7 @@ export default function ChartSidePanel({ symbol, userId, accountId, positions, o
         </div>
       </div>
 
-      <AskRonModal
-        open={ronOpen}
-        onClose={() => setRonOpen(false)}
-        context={{ page: "TradingView Chart", instrument: symbol, userId }}
-      />
+      
     </div>
   );
 }
