@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Calendar, Clock, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Info } from "lucide-react";
+import { Calendar, Clock, ChevronDown, ChevronRight, ChevronUp, TrendingUp, TrendingDown, Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { formatLocalHour, SESSIONS } from "@/lib/session-colors";
