@@ -234,7 +234,13 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
     localStorage.removeItem(HIDDEN_PANES_KEY);
   };
 
-  const visibleScans = scans
+  const trendOf = (s: ScanResult): "BULLISH" | "BEARISH" | "NEUTRAL" => {
+    if (s.direction === "BUY") return "BULLISH";
+    if (s.direction === "SELL") return "BEARISH";
+    return "NEUTRAL";
+  };
+
+  const baseSorted = scans
     .filter((s) => !hiddenPanes.has(s.symbol))
     .sort((a, b) => {
       const ai = cardOrder.indexOf(a.symbol);
@@ -244,6 +250,17 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       if (bi === -1) return -1;
       return ai - bi;
     });
+
+  const trendCounts = {
+    BULLISH: baseSorted.filter((s) => trendOf(s) === "BULLISH").length,
+    BEARISH: baseSorted.filter((s) => trendOf(s) === "BEARISH").length,
+    NEUTRAL: baseSorted.filter((s) => trendOf(s) === "NEUTRAL").length,
+  };
+
+  const visibleScans = trendFilter === "ALL"
+    ? baseSorted
+    : baseSorted.filter((s) => trendOf(s) === trendFilter);
+
 
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
