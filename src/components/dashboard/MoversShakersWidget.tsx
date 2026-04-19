@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { C } from "@/lib/mock-data";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp } from "lucide-react";
 
 interface Mover {
   symbol: string;
@@ -37,6 +37,7 @@ const LOSERS: Mover[] = [
 
 export default function MoversShakersWidget() {
   const [tab, setTab] = useState<"gainers" | "losers">("gainers");
+  const [collapsed, setCollapsed] = useState(false);
   const data = tab === "gainers" ? GAINERS : LOSERS;
 
   return (
@@ -50,7 +51,7 @@ export default function MoversShakersWidget() {
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "14px 20px",
-        borderBottom: `1px solid ${C.border}`,
+        borderBottom: collapsed ? "none" : `1px solid ${C.border}`,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <TrendingUp size={16} style={{ color: C.jade }} />
@@ -61,8 +62,8 @@ export default function MoversShakersWidget() {
             Movers & Shakers
           </span>
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {(["gainers", "losers"] as const).map(t => (
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {!collapsed && (["gainers", "losers"] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -81,9 +82,27 @@ export default function MoversShakersWidget() {
               {t === "gainers" ? "▲ Gainers" : "▼ Losers"}
             </button>
           ))}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            title={collapsed ? "Expand" : "Collapse"}
+            aria-label={collapsed ? "Expand Movers & Shakers" : "Collapse Movers & Shakers"}
+            style={{
+              marginLeft: 6,
+              padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.border}`,
+              cursor: "pointer", background: "transparent", color: C.sec,
+              display: "flex", alignItems: "center", gap: 4,
+              fontSize: 11, fontFamily: "'DM Sans', sans-serif",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = C.text}
+            onMouseLeave={e => e.currentTarget.style.color = C.sec}
+          >
+            {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+          </button>
         </div>
       </div>
 
+      {!collapsed && (<>
       {/* Table */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -175,6 +194,7 @@ export default function MoversShakersWidget() {
           Source: Dukascopy • Updated live
         </span>
       </div>
+      </>)}
     </div>
   );
 }
