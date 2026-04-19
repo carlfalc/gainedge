@@ -104,6 +104,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [trendFilter, setTrendFilter] = useState<"ALL" | "BULLISH" | "BEARISH" | "NEUTRAL">("ALL");
   const { data: liveData } = useLiveMarketData(userId);
   const mergedLiveData = useMemo(() => (liveData.size ? liveData : fallbackLiveData), [liveData, fallbackLiveData]);
 
