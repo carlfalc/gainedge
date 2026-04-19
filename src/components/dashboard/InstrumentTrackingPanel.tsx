@@ -1,19 +1,45 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
 import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
+import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
 
 interface ScanResult {
-  id: string; symbol: string; direction: string; confidence: number;
-  entry_price: number | null; take_profit: number | null; stop_loss: number | null;
-  risk_reward: string | null; adx: number | null; rsi: number | null;
-  macd_status: string | null; stoch_rsi: number | null; reasoning: string;
-  ema_crossover_status: string; verdict: string; scanned_at: string;
+  id: string;
+  symbol: string;
+  direction: string;
+  confidence: number;
+  entry_price: number | null;
+  take_profit: number | null;
+  stop_loss: number | null;
+  risk_reward: string | null;
+  adx: number | null;
+  rsi: number | null;
+  macd_status: string | null;
+  stoch_rsi: number | null;
+  reasoning: string;
+  ema_crossover_status: string;
+  verdict: string;
+  scanned_at: string;
 }
+
+interface InstrumentTrackingSnapshot {
+  scans: ScanResult[];
+  instrumentTfs: [string, string][];
+  liveData: [string, any][];
+  updatedAt: string;
+}
+
+interface InstrumentTrackingPanelProps {
+  showPopOutButton?: boolean;
+}
+
+const SNAPSHOT_KEY = "instrument-tracking-snapshot";
+const HIDDEN_PANES_KEY = "hidden-panes";
+const CARD_ORDER_KEY = "card-order";
 
 const adxLabel = (v: number) =>
   v < 20 ? "weak / no trend" : v < 25 ? "trend waking up" : v < 40 ? "stronger trend" : "very strong trend";
@@ -38,28 +64,48 @@ function generateSparkData(direction: string, confidence: number): number[] {
   const noise = direction === "WAIT" || direction === "NO TRADE" ? 2.5 : 1.2;
   const seed = (i: number) => Math.sin(i * 13.7 + c * 3.1) * noise + Math.cos(i * 7.3) * noise * 0.5;
   let val = 50;
-  return Array.from({ length: len }, (_, i) => { val += slope + seed(i); return val; });
+  return Array.from({ length: len }, (_, i) => {
+    val += slope + seed(i);
+    return val;
+  });
 }
 
-interface InstrumentTrackingPanelProps {
-  /** When true, renders the "Pop Out" button. Hide it on the popout page itself. */
-  showPopOutButton?: boolean;
+function readSnapshot(): InstrumentTrackingSnapshot | null {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function InstrumentTrackingPanel({ showPopOutButton = true }: InstrumentTrackingPanelProps) {
-  const [scans, setScans] = useState<ScanResult[]>([]);
-  const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(new Map());
+  const initialSnapshot = readSnapshot();
+  const [scans, setScans] = useState<ScanResult[]>(() => initialSnapshot?.scans ?? []);
+  const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(() => new Map(initialSnapshot?.instrumentTfs ?? []));
+  const [fallbackLiveData, setFallbackLiveData] = useState<Map<string, any>>(() => new Map(initialSnapshot?.liveData ?? []));
   const [userId, setUserId] = useState<string>();
   const [, setTick] = useState(0);
   const [hiddenPanes, setHiddenPanes] = useState<Set<string>>(() => {
-    try { const s = localStorage.getItem("hidden-panes"); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); }
+    try {
+      const s = localStorage.getItem(HIDDEN_PANES_KEY);
+      return s ? new Set(JSON.parse(s)) : new Set();
+    } catch {
+      return new Set();
+    }
   });
   const [cardOrder, setCardOrder] = useState<string[]>(() => {
-    try { const s = localStorage.getItem("card-order"); return s ? JSON.parse(s) : []; } catch { return []; }
+    try {
+      const s = localStorage.getItem(CARD_ORDER_KEY);
+      return s ? JSON.parse(s) : [];
+    } catch {
+      return [];
+    }
   });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { data: liveData } = useLiveMarketData(userId);
+  const mergedLiveData = useMemo(() => (liveData.size ? liveData : fallbackLiveData), [liveData, fallbackLiveData]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -67,22 +113,42 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
     });
   }, []);
 
-  // 1-second tick for live countdowns
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 1000);
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Cross-tab/window sync for hidden panes & card order (so popout window stays in sync with main dashboard)
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "hidden-panes") {
-        try { setHiddenPanes(e.newValue ? new Set(JSON.parse(e.newValue)) : new Set()); } catch { /* ignore */ }
+      if (e.key === HIDDEN_PANES_KEY) {
+        try {
+          setHiddenPanes(e.newValue ? new Set(JSON.parse(e.newValue)) : new Set());
+        } catch {
+          // ignore malformed storage payloads
+        }
       }
-      if (e.key === "card-order") {
-        try { setCardOrder(e.newValue ? JSON.parse(e.newValue) : []); } catch { /* ignore */ }
+
+      if (e.key === CARD_ORDER_KEY) {
+        try {
+          setCardOrder(e.newValue ? JSON.parse(e.newValue) : []);
+        } catch {
+          // ignore malformed storage payloads
+        }
+      }
+
+      if (e.key === SNAPSHOT_KEY) {
+        try {
+          const snapshot = e.newValue ? (JSON.parse(e.newValue) as InstrumentTrackingSnapshot) : null;
+          if (!snapshot) return;
+          setScans(snapshot.scans ?? []);
+          setInstrumentTfs(new Map(snapshot.instrumentTfs ?? []));
+          setFallbackLiveData(new Map(snapshot.liveData ?? []));
+        } catch {
+          // ignore malformed storage payloads
+        }
       }
     };
+
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
@@ -90,71 +156,85 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
+
     const uid = session.user.id;
 
-    const { data: instData } = await supabase
-      .from("user_instruments")
-      .select("symbol, timeframe")
-      .eq("user_id", uid);
+    const [{ data: instData }, { data: scanData }] = await Promise.all([
+      supabase.from("user_instruments").select("symbol, timeframe").eq("user_id", uid),
+      supabase.from("scan_results").select("*").eq("user_id", uid).order("scanned_at", { ascending: false }),
+    ]);
+
     if (instData) {
       const tfMap = new Map<string, string>();
       instData.forEach((i: any) => tfMap.set(i.symbol, i.timeframe || "15m"));
       setInstrumentTfs(tfMap);
     }
 
-    const { data: scanData } = await supabase
-      .from("scan_results")
-      .select("*")
-      .eq("user_id", uid)
-      .order("scanned_at", { ascending: false });
-
     if (scanData) {
       const latest = new Map<string, ScanResult>();
-      scanData.forEach((s: any) => { if (!latest.has(s.symbol)) latest.set(s.symbol, s); });
+      scanData.forEach((s: any) => {
+        if (!latest.has(s.symbol)) latest.set(s.symbol, s);
+      });
       setScans(Array.from(latest.values()));
     }
   };
 
   useEffect(() => {
     loadData();
-    // Re-load whenever auth state changes (critical for popout windows that may
-    // initialise before the Supabase session is hydrated from localStorage).
+
     const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.id) {
         setUserId(session.user.id);
         loadData();
       }
     });
-    const channel = supabase.channel(`instrument-tracking-${crypto.randomUUID()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scan_results' }, () => loadData())
+
+    const channel = supabase
+      .channel(`instrument-tracking-${crypto.randomUUID()}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "scan_results" }, () => loadData())
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       authSub.subscription.unsubscribe();
     };
   }, []);
 
-  // Re-fetch when userId is established (covers slow session hydration in popout windows)
   useEffect(() => {
     if (userId) loadData();
   }, [userId]);
 
+  useEffect(() => {
+    const snapshot: InstrumentTrackingSnapshot = {
+      scans,
+      instrumentTfs: Array.from(instrumentTfs.entries()),
+      liveData: Array.from(mergedLiveData.entries()),
+      updatedAt: new Date().toISOString(),
+    };
+
+    try {
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch {
+      // ignore storage write failures
+    }
+  }, [scans, instrumentTfs, mergedLiveData]);
+
   const hidePane = (symbol: string) => {
-    setHiddenPanes(prev => {
+    setHiddenPanes((prev) => {
       const next = new Set(prev);
       next.add(symbol);
-      localStorage.setItem("hidden-panes", JSON.stringify([...next]));
+      localStorage.setItem(HIDDEN_PANES_KEY, JSON.stringify([...next]));
       return next;
     });
   };
 
   const showAllPanes = () => {
     setHiddenPanes(new Set());
-    localStorage.removeItem("hidden-panes");
+    localStorage.removeItem(HIDDEN_PANES_KEY);
   };
 
   const visibleScans = scans
-    .filter(s => !hiddenPanes.has(s.symbol))
+    .filter((s) => !hiddenPanes.has(s.symbol))
     .sort((a, b) => {
       const ai = cardOrder.indexOf(a.symbol);
       const bi = cardOrder.indexOf(b.symbol);
@@ -168,24 +248,38 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
     setDragIndex(idx);
     e.dataTransfer.effectAllowed = "move";
   };
-  const handleDragOver = (e: React.DragEvent, idx: number) => { e.preventDefault(); setDragOverIndex(idx); };
-  const handleDragEnd = () => { setDragIndex(null); setDragOverIndex(null); };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDragOverIndex(idx);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
   const handleDrop = (e: React.DragEvent, dropIdx: number) => {
     e.preventDefault();
-    if (dragIndex === null || dragIndex === dropIdx) { setDragIndex(null); setDragOverIndex(null); return; }
-    const ordered = visibleScans.map(s => s.symbol);
+    if (dragIndex === null || dragIndex === dropIdx) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const ordered = visibleScans.map((s) => s.symbol);
     const [moved] = ordered.splice(dragIndex, 1);
     ordered.splice(dropIdx, 0, moved);
-    const allSymbols = [...ordered, ...scans.map(s => s.symbol).filter(s => !ordered.includes(s))];
+
+    const allSymbols = [...ordered, ...scans.map((s) => s.symbol).filter((s) => !ordered.includes(s))];
     setCardOrder(allSymbols);
-    localStorage.setItem("card-order", JSON.stringify(allSymbols));
+    localStorage.setItem(CARD_ORDER_KEY, JSON.stringify(allSymbols));
     setDragIndex(null);
     setDragOverIndex(null);
   };
 
   return (
     <>
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <span style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
@@ -198,9 +292,16 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             style={{
-              display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text,
-              background: "transparent", border: "none", cursor: "grab",
-              fontWeight: 500, opacity: 0.7,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10,
+              color: C.text,
+              background: "transparent",
+              border: "none",
+              cursor: "grab",
+              fontWeight: 500,
+              opacity: 0.7,
             }}
             title="Drag cards to reorder"
           >
@@ -209,10 +310,17 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           <button
             onClick={showAllPanes}
             style={{
-              display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.jade,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10,
+              color: C.jade,
               background: hiddenPanes.size > 0 ? C.jade + "15" : "transparent",
               border: hiddenPanes.size > 0 ? `1px solid ${C.jade}30` : "1px solid transparent",
-              borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontWeight: 600,
+              borderRadius: 6,
+              padding: "3px 10px",
+              cursor: "pointer",
+              fontWeight: 600,
               opacity: hiddenPanes.size > 0 ? 1 : 0.5,
             }}
           >
@@ -220,11 +328,19 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           </button>
           {showPopOutButton && (
             <button
-              onClick={() => window.open("/instruments-popout", "_blank", "noopener,width=1400,height=900")}
+              onClick={() => window.open("/instruments-popout", "_blank", "width=1400,height=900")}
               style={{
-                display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.jade,
-                background: "transparent", border: `1px solid ${C.jade}30`,
-                borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 10,
+                color: C.jade,
+                background: "transparent",
+                border: `1px solid ${C.jade}30`,
+                borderRadius: 6,
+                padding: "3px 10px",
+                cursor: "pointer",
+                fontWeight: 600,
               }}
               title="Pop this section out into a separate window — perfect for multi-monitor setups"
             >
@@ -234,13 +350,12 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         </div>
       </div>
 
-      {/* Cards grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {visibleScans.map((inst, idx) => {
           const tf = instrumentTfs.get(inst.symbol) || "15m";
           const expired = isDynamicallyExpired(inst.scanned_at, tf);
           const countdown = nextScanSeconds(tf);
-          const live = liveData.get(inst.symbol);
+          const live = mergedLiveData.get(inst.symbol);
           const sparkData = live?.sparkline_data?.length ? live.sparkline_data : generateSparkData(inst.direction, inst.confidence);
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
           const color = expired ? "#555F73" : directionColor(inst.direction);
@@ -249,6 +364,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           const liveMacd = live?.macd_status ?? inst.macd_status;
           const liveStoch = live?.stoch_rsi ?? inst.stoch_rsi;
           const isDragOver = dragOverIndex === idx && dragIndex !== idx;
+
           return (
             <div
               key={inst.symbol}
@@ -260,7 +376,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               style={{
                 background: C.card,
                 border: `1px solid ${isDragOver ? C.jade : C.border}`,
-                borderRadius: 14, padding: 18,
+                borderRadius: 14,
+                padding: 18,
                 opacity: dragIndex === idx ? 0.5 : expired ? 0.9 : 1,
                 transition: "opacity 0.3s, border-color 0.2s",
                 cursor: "grab",
@@ -283,7 +400,10 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       {tf}
                     </span>
                     {live && (
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: live.market_open ? "#22C55E" : "#555F73", display: "inline-block" }} title={live.market_open ? "Market open" : "Market closed"} />
+                      <span
+                        style={{ width: 6, height: 6, borderRadius: "50%", background: live.market_open ? "#22C55E" : "#555F73", display: "inline-block" }}
+                        title={live.market_open ? "Market open" : "Market closed"}
+                      />
                     )}
                   </div>
                   {live?.last_price && (
@@ -299,19 +419,34 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{
-                      fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-                      background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
-                      color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
-                    }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "3px 8px",
+                        borderRadius: 6,
+                        background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
+                        color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
+                      }}
+                    >
                       {inst.direction}
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); hidePane(inst.symbol); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        hidePane(inst.symbol);
+                      }}
                       style={{
-                        background: "transparent", border: "none", cursor: "pointer",
-                        padding: 2, display: "flex", alignItems: "center", justifyContent: "center",
-                        borderRadius: 4, opacity: 0.4, transition: "opacity 0.2s",
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 2,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: 4,
+                        opacity: 0.4,
+                        transition: "opacity 0.2s",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
                       onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.4")}
@@ -353,12 +488,6 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 )}
                 <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>RON: </span>{inst.reasoning || "No reasoning available."}
               </div>
-
-              {expired && (
-                <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.sec, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
-                  <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
-                </div>
-              )}
             </div>
           );
         })}
