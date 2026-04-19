@@ -117,11 +117,27 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
 
   useEffect(() => {
     loadData();
+    // Re-load whenever auth state changes (critical for popout windows that may
+    // initialise before the Supabase session is hydrated from localStorage).
+    const { data: authSub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+        loadData();
+      }
+    });
     const channel = supabase.channel(`instrument-tracking-${crypto.randomUUID()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scan_results' }, () => loadData())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+      authSub.subscription.unsubscribe();
+    };
   }, []);
+
+  // Re-fetch when userId is established (covers slow session hydration in popout windows)
+  useEffect(() => {
+    if (userId) loadData();
+  }, [userId]);
 
   const hidePane = (symbol: string) => {
     setHiddenPanes(prev => {
