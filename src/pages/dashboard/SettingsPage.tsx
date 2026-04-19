@@ -295,6 +295,7 @@ export default function SettingsPage() {
       {/* Admin-only sections */}
       {isAdmin && <StrategyConfigAdmin />}
       {isAdmin && <BrokerMappingsAdmin />}
+      {isAdmin && <AdminSessionPerformance />}
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
       {isAdmin && <HistoricalDataImport />}
