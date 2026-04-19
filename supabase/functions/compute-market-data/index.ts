@@ -1614,6 +1614,7 @@ serve(async (req) => {
 
                   // ─── AUTO-TRADE EXECUTION ───
                   if (autoTradeMap[inst.symbol]?.enabled && analysis.confidence >= 7 && !signalsPaused) {
+                    const sessionTagAt = getActiveSessionsAt(new Date()).join("+") || "off-hours";
                     try {
                       const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL")!;
                       const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1638,7 +1639,7 @@ serve(async (req) => {
                       });
                       const tradeResult = await tradeRes.json();
                       if (tradeRes.ok && tradeResult.success) {
-                        console.log(`AUTO-TRADE executed: ${inst.symbol} ${analysis.direction} vol=${userLotSize}`);
+                        console.log(`AUTO-TRADE executed: ${inst.symbol} ${analysis.direction} vol=${userLotSize} session=${sessionTagAt}`);
                         await supabase.from("auto_trade_executions").insert({
                           user_id: userId,
                           signal_id: signalId,
@@ -1649,6 +1650,7 @@ serve(async (req) => {
                           sl: analysis.stop_loss,
                           tp: analysis.take_profit,
                           status: "filled",
+                          session: sessionTagAt,
                           metaapi_position_id: tradeResult.positionId || tradeResult.orderId || null,
                         });
                       } else {
@@ -1664,6 +1666,7 @@ serve(async (req) => {
                           sl: analysis.stop_loss,
                           tp: analysis.take_profit,
                           status: "failed",
+                          session: sessionTagAt,
                           error_message: errMsg,
                         });
                       }
@@ -1679,6 +1682,7 @@ serve(async (req) => {
                         sl: analysis.stop_loss,
                         tp: analysis.take_profit,
                         status: "failed",
+                        session: sessionTagAt,
                         error_message: String(tradeErr?.message || tradeErr),
                       });
                     }
