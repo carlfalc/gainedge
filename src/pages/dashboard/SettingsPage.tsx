@@ -214,8 +214,21 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <Section icon={<Clock size={16} color={C.jade} />} title="Trading Sessions (V1 Enhanced)">
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>
+          V1 Enhanced only fires signals during sessions you enable. Default is all three ON.
+        </div>
+        <Toggle label="🌏 Asian Session (Tokyo / Sydney) — 22:00–07:00 UTC" checked={enableAsian} onChange={(v) => { setEnableAsian(v); persistSession("enable_asian_session", v); }} />
+        <Toggle label="🇬🇧 London Session — 07:00–16:00 UTC" checked={enableLondon} onChange={(v) => { setEnableLondon(v); persistSession("enable_london_session", v); }} />
+        <Toggle label="🇺🇸 New York Session — 12:30–21:00 UTC" checked={enableNy} onChange={(v) => { setEnableNy(v); persistSession("enable_ny_session", v); }} />
+        {!enableAsian && !enableLondon && !enableNy && (
+          <div style={{ fontSize: 11, color: C.red, marginTop: 8, fontWeight: 600 }}>
+            ⚠ All sessions disabled — V1 Enhanced will not fire any signals.
+          </div>
+        )}
+      </Section>
 
-      <Section icon={<AlertTriangle size={16} color={signalsPaused ? C.red : C.jade} />} title="Signal Generation">
+
         <Toggle label="Pause All Signals (Kill Switch)" checked={signalsPaused} onChange={async (val) => {
           setSignalsPaused(val);
           if (userId) {
