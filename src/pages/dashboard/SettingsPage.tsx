@@ -228,7 +228,7 @@ export default function SettingsPage() {
         )}
       </Section>
 
-
+      <Section icon={<AlertTriangle size={16} color={signalsPaused ? C.red : C.jade} />} title="Signal Generation">
         <Toggle label="Pause All Signals (Kill Switch)" checked={signalsPaused} onChange={async (val) => {
           setSignalsPaused(val);
           if (userId) {
