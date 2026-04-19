@@ -39,6 +39,9 @@ export default function SettingsPage() {
   const [pushAlerts, setPushAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [signalsPaused, setSignalsPaused] = useState(false);
+  const [enableAsian, setEnableAsian] = useState(true);
+  const [enableLondon, setEnableLondon] = useState(true);
+  const [enableNy, setEnableNy] = useState(true);
   const [broker, setBroker] = useState("eightcap");
   const [rrRatio, setRrRatio] = useState("2.0");
   const [instruments, setInstruments] = useState<string[]>([]);
@@ -83,6 +86,15 @@ export default function SettingsPage() {
     supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
       if (data) setInstruments(data.map(d => d.symbol));
     });
+    supabase.from("user_signal_preferences")
+      .select("enable_asian_session, enable_london_session, enable_ny_session")
+      .eq("user_id", userId).maybeSingle().then(({ data }) => {
+        if (data) {
+          setEnableAsian((data as any).enable_asian_session ?? true);
+          setEnableLondon((data as any).enable_london_session ?? true);
+          setEnableNy((data as any).enable_ny_session ?? true);
+        }
+      });
   };
 
   const handleSave = async () => {
@@ -95,8 +107,24 @@ export default function SettingsPage() {
       sms_alerts: smsAlerts,
     } as any);
     await supabase.from("profiles").update({ clock_timezones: clockSlots as any, rr_ratio: parseFloat(rrRatio) } as any).eq("id", userId);
+    await supabase.from("user_signal_preferences").upsert({
+      user_id: userId,
+      enable_asian_session: enableAsian,
+      enable_london_session: enableLondon,
+      enable_ny_session: enableNy,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
     await falconerPrefsRef.current?.save();
     toast.success("Settings saved");
+  };
+
+  const persistSession = async (key: "enable_asian_session" | "enable_london_session" | "enable_ny_session", value: boolean) => {
+    if (!userId) return;
+    await supabase.from("user_signal_preferences").upsert({
+      user_id: userId,
+      [key]: value,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
   };
 
   const updateClockSlot = (index: number, timezone: string) => {
