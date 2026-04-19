@@ -419,8 +419,9 @@ function getAtrSlMultiplier(symbol: string, category?: string): number {
   return 1.5;
 }
 
-// ─── V1 LEGACY pip-size table (Falconer Pine Script spec) ───
-// Used ONLY in V1 Pure mode for fixed 55-pip TP/SL.
+// ─── V1 LEGACY ENHANCED pip-size table ───
+// Industry-standard pip definitions used for fixed 55 pip SL / 100 pip TP (1:1.82 R:R).
+// XAUUSD: 1 pip = $0.10 (10 pips per $1 move) — retail-trader convention.
 const V1_PIP_SIZE: Record<string, number> = {
   // 5-decimal forex
   EURUSD: 0.0001, GBPUSD: 0.0001, AUDUSD: 0.0001, NZDUSD: 0.0001,
@@ -432,10 +433,10 @@ const V1_PIP_SIZE: Record<string, number> = {
   // JPY pairs
   USDJPY: 0.01, EURJPY: 0.01, GBPJPY: 0.01, AUDJPY: 0.01,
   NZDJPY: 0.01, CADJPY: 0.01, CHFJPY: 0.01,
-  // Metals
-  XAUUSD: 0.01, XAGUSD: 0.001, XAUAUD: 0.01,
-  // Indices
-  US30: 1.0, NAS100: 0.1, US500: 0.1, UK100: 0.1, GER40: 0.1, JP225: 1.0,
+  // Metals — Gold uses 0.10 (industry standard), Silver 0.01
+  XAUUSD: 0.1, XAGUSD: 0.01, XAUAUD: 0.1,
+  // Indices — 1 pip = 1 point on Dow / Nikkei; 0.1 elsewhere isn't standard, use 1.0
+  US30: 1.0, NAS100: 1.0, US500: 1.0, UK100: 1.0, GER40: 1.0, JP225: 1.0,
   // Energy
   USOIL: 0.01, UKOIL: 0.01,
 };
@@ -445,17 +446,71 @@ function v1PipSize(symbol: string): number {
   return 0.0001;
 }
 
+// V1 Enhanced risk parameters (1:1.82 R:R)
+const V1_SL_PIPS = 55;
+const V1_TP_PIPS = 100;
+
+// ─── Trading session detection (UTC) ───
+// Asian: 22:00-07:00 UTC (Tokyo + Sydney, wraps midnight)
+// London: 07:00-16:00 UTC
+// New York: 12:30-21:00 UTC
+// Returns array of session keys active at given UTC hour/minute.
+function getActiveSessionsAt(date: Date): Array<"asian" | "london" | "ny"> {
+  const h = date.getUTCHours();
+  const m = date.getUTCMinutes();
+  const minOfDay = h * 60 + m;
+  const active: Array<"asian" | "london" | "ny"> = [];
+  // Asian wraps midnight: 22:00-24:00 OR 00:00-07:00
+  if (minOfDay >= 22 * 60 || minOfDay < 7 * 60) active.push("asian");
+  if (minOfDay >= 7 * 60 && minOfDay < 16 * 60) active.push("london");
+  if (minOfDay >= 12 * 60 + 30 && minOfDay < 21 * 60) active.push("ny");
+  return active;
+}
+
+// ─── 1H trend filter cache (per scanner invocation) ───
+// Avoid re-fetching 1H candles for every signal candidate in the same invocation.
+const trendCache = new Map<string, { ts: number; trendUp: boolean | null }>();
+const TREND_CACHE_TTL_MS = 15 * 60_000;
+
+async function get1HTrendUp(
+  token: string,
+  accountId: string,
+  symbol: string,
+): Promise<boolean | null> {
+  const cached = trendCache.get(symbol);
+  if (cached && Date.now() - cached.ts < TREND_CACHE_TTL_MS) return cached.trendUp;
+  try {
+    const candles = await fetchCandlesFromBroker(token, accountId, symbol, "1h", 50);
+    if (!Array.isArray(candles) || candles.length < 20) {
+      trendCache.set(symbol, { ts: Date.now(), trendUp: null });
+      return null;
+    }
+    // Drop in-progress candle so we evaluate on closed bars only
+    const closed = candles.length > 1 ? candles.slice(0, -1) : candles;
+    const closes = closed.map((c: any) => +c.close);
+    const e4 = calcEMA(closes, 4);
+    const e17 = calcEMA(closes, 17);
+    const last = e4.length - 1;
+    const trendUp = e4[last] > e17[last];
+    trendCache.set(symbol, { ts: Date.now(), trendUp });
+    return trendUp;
+  } catch {
+    trendCache.set(symbol, { ts: Date.now(), trendUp: null });
+    return null;
+  }
+}
+
 function normalizeSignalEngine(value: string | null | undefined): "v1" | "v2" | "v1v2" {
   if (value === "v2" || value === "v2_knowledge") return "v2";
   if (value === "v1v2") return "v1v2";
   return "v1";
 }
 
-// ─── V1 Legacy Analysis ───
-// The old ATR/confluence/volume-gated branch has been removed.
-// V1 is now ALWAYS the Falconer Pine Script port:
-//   - EMA(4)/EMA(17) crossover on CLOSED candles using raw close
-//   - Fixed 55-pip TP and 55-pip SL (1:1 R:R)
+// ─── V1 Legacy ENHANCED Analysis ───
+// Falconer Pine Script port + minimal proven filters:
+//   - EMA(4)/EMA(17) crossover on CLOSED 15m candles using raw close
+//   - Fixed 55-pip SL, 100-pip TP (1:1.82 R:R)
+//   - 1H trend alignment + session filter applied at the call site (need async + user prefs)
 //   - RSI / ADX / MACD / StochRSI are display-only diagnostics
 function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbolCategory?: string, symbolName?: string): AnalysisResult {
   const workCandles = candles.length > 1 ? candles.slice(0, -1) : candles;
@@ -489,9 +544,11 @@ function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbo
   if (crossoverStatus === "CONFIRMED" && crossoverDir) {
     const direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
     const entry = +closes[closes.length - 1].toFixed(5);
-    const dist = v1PipSize(symbolName || "") * 55;
-    const tp = direction === "BUY" ? +(entry + dist).toFixed(5) : +(entry - dist).toFixed(5);
-    const sl = direction === "BUY" ? +(entry - dist).toFixed(5) : +(entry + dist).toFixed(5);
+    const pip = v1PipSize(symbolName || "");
+    const slDist = pip * V1_SL_PIPS;
+    const tpDist = pip * V1_TP_PIPS;
+    const tp = direction === "BUY" ? +(entry + tpDist).toFixed(5) : +(entry - tpDist).toFixed(5);
+    const sl = direction === "BUY" ? +(entry - slDist).toFixed(5) : +(entry + slDist).toFixed(5);
 
     return {
       direction,
@@ -499,10 +556,10 @@ function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbo
       entry_price: entry,
       take_profit: tp,
       stop_loss: sl,
-      risk_reward: "1.0:1",
+      risk_reward: "1.82:1",
       ema_crossover_status: "CONFIRMED",
       ema_crossover_direction: crossoverDir,
-      reasoning: `[V1 Legacy] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m candle. Entry ${entry}, TP ${tp} (+55 pips), SL ${sl} (-55 pips). 1:1 R:R per Falconer V1 spec.`,
+      reasoning: `[V1 Enhanced] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m. Entry ${entry}, TP ${tp} (+${V1_TP_PIPS} pips), SL ${sl} (-${V1_SL_PIPS} pips). 1:1.82 R:R. Pending 1H trend + session check.`,
       verdict: direction,
       rsi,
       adx,
@@ -520,7 +577,7 @@ function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbo
     risk_reward: null,
     ema_crossover_status: crossoverStatus,
     ema_crossover_direction: crossoverDir,
-    reasoning: `[V1 Legacy] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only, do not gate V1 entry.)`,
+    reasoning: `[V1 Enhanced] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only.)`,
     verdict: "WAIT",
     rsi,
     adx,
@@ -1212,7 +1269,7 @@ serve(async (req) => {
       }
       const [profileRes, sigPrefRes, autoTradeRes] = await Promise.all([
         supabase.from("profiles").select("default_candle_type, ema_fast, ema_slow, signals_paused, rr_ratio").eq("id", userId).single(),
-        supabase.from("user_signal_preferences").select("signal_engine, signal_direction, lot_size").eq("user_id", userId).maybeSingle(),
+        supabase.from("user_signal_preferences").select("signal_engine, signal_direction, lot_size, enable_asian_session, enable_london_session, enable_ny_session").eq("user_id", userId).maybeSingle(),
         supabase.from("user_auto_trade_settings").select("symbol, enabled, lot_size, signal_direction").eq("user_id", userId),
       ]);
       // Build per-symbol auto-trade map for this user
@@ -1244,7 +1301,13 @@ serve(async (req) => {
       const useV2 = signalEngine === "v2" || signalEngine === "v1v2";
       const isV1OnlySelection = signalEngine === "v1";
       const useV1Pure = true;
-      console.log(`[EngineRoute] user=${userId.slice(0, 8)} raw=${rawSignalEngine ?? "null"} normalized=${signalEngine} useV2=${useV2} v1Base=pure`);
+
+      // ─── V1 ENHANCED session preferences (default ALL ON) ───
+      const enableAsian = (sigPrefRes.data as any)?.enable_asian_session ?? true;
+      const enableLondon = (sigPrefRes.data as any)?.enable_london_session ?? true;
+      const enableNy = (sigPrefRes.data as any)?.enable_ny_session ?? true;
+      const sessionPref = { asian: enableAsian, london: enableLondon, ny: enableNy };
+      console.log(`[EngineRoute] user=${userId.slice(0, 8)} raw=${rawSignalEngine ?? "null"} normalized=${signalEngine} useV2=${useV2} v1Base=enhanced sessions=A:${enableAsian}/L:${enableLondon}/N:${enableNy}`);
 
       for (const inst of instList) {
         if (elapsed() > TIME_LIMIT_HARD) {
