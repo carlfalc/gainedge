@@ -157,8 +157,10 @@ export default function RonPopout() {
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.crossOrigin = "anonymous";
       audio.playbackRate = 1.1;
       audioRef.current = audio;
+      attachAnalyser(audio);
       audio.onended = () => { URL.revokeObjectURL(url); finish(); };
       audio.onerror = () => { URL.revokeObjectURL(url); finish(); };
       await audio.play();
