@@ -144,7 +144,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   useEffect(() => {
     if (!userId) return;
     const ch = supabase
-      .channel(`auto-trade-sync-${userId}`)
+      .channel(`auto-trade-sync-${userId}-${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "user_auto_trade_settings", filter: `user_id=eq.${userId}` },
