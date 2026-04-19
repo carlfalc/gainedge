@@ -45,9 +45,9 @@ const VERSION_COPY: Record<RonRulesVersion, {
   title: string; eyebrow: string; summary: string; description: string; badge: string;
 }> = {
   v1: {
-    title: "RON V1 Legacy", eyebrow: "Premium Trading Vision",
-    summary: "Historical win rate: 82% across 2,600+ backtested trades.",
-    description: "Our proven flagship strategy with consistent high-probability signals. Refined over years of live market analysis.",
+    title: "RON V1 Legacy Enhanced", eyebrow: "EMA 4/17 + 1H Trend + Session Filters",
+    summary: "EMA(4/17) crossover on closed 15m candles, 1H trend alignment, user-selectable sessions. Risk: 55-pip SL / 100-pip TP (1:1.82 R:R). Live performance verified through 90-day backtests with conservative SL-first intrabar resolution.",
+    description: "Falconer Pine Script port with minimal proven filters. Single open position per symbol. Honest backtesting — no inflated win-rate claims.",
     badge: "Recommended for all traders",
   },
   v2: {

@@ -8,6 +8,7 @@ import RonVersionSelector from "@/components/dashboard/RonVersionSelector";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
 import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
 import BrokerMappingsAdmin from "@/components/dashboard/BrokerMappingsAdmin";
+import AdminSessionPerformance from "@/components/dashboard/AdminSessionPerformance";
 import BrokerAvailabilityDot from "@/components/dashboard/BrokerAvailabilityDot";
 import { useProfile } from "@/hooks/use-profile";
 import { useBrokerMappings } from "@/hooks/use-broker-mappings";
@@ -39,6 +40,9 @@ export default function SettingsPage() {
   const [pushAlerts, setPushAlerts] = useState(true);
   const [smsAlerts, setSmsAlerts] = useState(false);
   const [signalsPaused, setSignalsPaused] = useState(false);
+  const [enableAsian, setEnableAsian] = useState(true);
+  const [enableLondon, setEnableLondon] = useState(true);
+  const [enableNy, setEnableNy] = useState(true);
   const [broker, setBroker] = useState("eightcap");
   const [rrRatio, setRrRatio] = useState("2.0");
   const [instruments, setInstruments] = useState<string[]>([]);
@@ -83,6 +87,15 @@ export default function SettingsPage() {
     supabase.from("user_instruments").select("symbol").eq("user_id", userId).then(({ data }) => {
       if (data) setInstruments(data.map(d => d.symbol));
     });
+    supabase.from("user_signal_preferences")
+      .select("enable_asian_session, enable_london_session, enable_ny_session")
+      .eq("user_id", userId).maybeSingle().then(({ data }) => {
+        if (data) {
+          setEnableAsian((data as any).enable_asian_session ?? true);
+          setEnableLondon((data as any).enable_london_session ?? true);
+          setEnableNy((data as any).enable_ny_session ?? true);
+        }
+      });
   };
 
   const handleSave = async () => {
@@ -95,8 +108,24 @@ export default function SettingsPage() {
       sms_alerts: smsAlerts,
     } as any);
     await supabase.from("profiles").update({ clock_timezones: clockSlots as any, rr_ratio: parseFloat(rrRatio) } as any).eq("id", userId);
+    await supabase.from("user_signal_preferences").upsert({
+      user_id: userId,
+      enable_asian_session: enableAsian,
+      enable_london_session: enableLondon,
+      enable_ny_session: enableNy,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
     await falconerPrefsRef.current?.save();
     toast.success("Settings saved");
+  };
+
+  const persistSession = async (key: "enable_asian_session" | "enable_london_session" | "enable_ny_session", value: boolean) => {
+    if (!userId) return;
+    await supabase.from("user_signal_preferences").upsert({
+      user_id: userId,
+      [key]: value,
+      updated_at: new Date().toISOString(),
+    } as any, { onConflict: "user_id" });
   };
 
   const updateClockSlot = (index: number, timezone: string) => {
@@ -186,6 +215,19 @@ export default function SettingsPage() {
         </div>
       </Section>
 
+      <Section icon={<Clock size={16} color={C.jade} />} title="Trading Sessions (V1 Enhanced)">
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 12 }}>
+          V1 Enhanced only fires signals during sessions you enable. Default is all three ON.
+        </div>
+        <Toggle label="🌏 Asian Session (Tokyo / Sydney) — 22:00–07:00 UTC" checked={enableAsian} onChange={(v) => { setEnableAsian(v); persistSession("enable_asian_session", v); }} />
+        <Toggle label="🇬🇧 London Session — 07:00–16:00 UTC" checked={enableLondon} onChange={(v) => { setEnableLondon(v); persistSession("enable_london_session", v); }} />
+        <Toggle label="🇺🇸 New York Session — 12:30–21:00 UTC" checked={enableNy} onChange={(v) => { setEnableNy(v); persistSession("enable_ny_session", v); }} />
+        {!enableAsian && !enableLondon && !enableNy && (
+          <div style={{ fontSize: 11, color: C.red, marginTop: 8, fontWeight: 600 }}>
+            ⚠ All sessions disabled — V1 Enhanced will not fire any signals.
+          </div>
+        )}
+      </Section>
 
       <Section icon={<AlertTriangle size={16} color={signalsPaused ? C.red : C.jade} />} title="Signal Generation">
         <Toggle label="Pause All Signals (Kill Switch)" checked={signalsPaused} onChange={async (val) => {
@@ -253,6 +295,7 @@ export default function SettingsPage() {
       {/* Admin-only sections */}
       {isAdmin && <StrategyConfigAdmin />}
       {isAdmin && <BrokerMappingsAdmin />}
+      {isAdmin && <AdminSessionPerformance />}
       {isAdmin && <FalconerPerformancePanel />}
       {isAdmin && <AdminPanel />}
       {isAdmin && <HistoricalDataImport />}

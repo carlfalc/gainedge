@@ -95,11 +95,11 @@ export default function RonVersionSelector({ userId, onVersionChange }: RonVersi
             active={activeVersion === "v1"}
             onClick={() => handleSwitch("v1")}
             icon={<Sparkles size={activeVersion === "v1" ? 16 : 13} />}
-            title="RON V1 Legacy"
-            subtitle="Premium Trading Vision"
+            title="RON V1 Legacy Enhanced"
+            subtitle="EMA 4/17 + 1H Trend + Sessions"
             emoji="✨"
             description={
-              "Our proven flagship strategy with consistent high-probability signals. Historical win rate: 82% across 2,600+ backtested trades. Refined over years of live market analysis. Uses confluence of multiple confirmations before firing a signal."
+              "Falconer Pine Script port: EMA(4)/EMA(17) crossover on closed 15m candles, 1H trend alignment, user-toggleable sessions. Risk: 55-pip SL / 100-pip TP (1:1.82 R:R). One open position per symbol. Honest 90-day backtests with conservative SL-first intrabar resolution — actual performance shown live, no inflated claims."
             }
             badge="RECOMMENDED for all traders"
             badgeStyle="success"

@@ -1376,6 +1376,46 @@ serve(async (req) => {
           if (candles && candles.length > 20) {
             const instCategory = categoryMap.get(inst.symbol);
             analysis = runAnalysis(candles, activeRules, session, recentSignalCount || 0, useV2, useV1Pure, rrRatio, instCategory, inst.symbol);
+
+            // ─── V1 ENHANCED GATES: 1H trend filter + user session preferences ───
+            // Apply only when we have a real V1 BUY/SELL crossover candidate.
+            if (isV1OnlySelection && (analysis.direction === "BUY" || analysis.direction === "SELL")) {
+              // Session filter — derive active sessions at NOW (UTC) and require at least one is enabled
+              const activeSessions = getActiveSessionsAt(new Date());
+              const sessionAllowed = activeSessions.some(s =>
+                (s === "asian" && sessionPref.asian) ||
+                (s === "london" && sessionPref.london) ||
+                (s === "ny" && sessionPref.ny)
+              );
+              if (activeSessions.length > 0 && !sessionAllowed) {
+                console.log(`[V1 Enhanced] Session gate skip: ${inst.symbol} ${analysis.direction} — active=${activeSessions.join(",")} prefs=A:${sessionPref.asian}/L:${sessionPref.london}/N:${sessionPref.ny}`);
+                analysis.direction = "WAIT";
+                analysis.verdict = "WAIT";
+                analysis.entry_price = null;
+                analysis.take_profit = null;
+                analysis.stop_loss = null;
+                analysis.reasoning = `[V1 Enhanced] Crossover detected but skipped — current session(s) ${activeSessions.join(", ")} disabled in your Settings.`;
+              } else if (METAAPI_TOKEN && accountId) {
+                // 1H trend filter — BUY needs 1H EMA(4)>EMA(17), SELL needs 1H EMA(4)<EMA(17)
+                const trendUp = await get1HTrendUp(METAAPI_TOKEN, accountId, inst.symbol);
+                if (trendUp !== null) {
+                  const trendOk = (analysis.direction === "BUY" && trendUp) || (analysis.direction === "SELL" && !trendUp);
+                  if (!trendOk) {
+                    console.log(`[V1 Enhanced] 1H trend gate skip: ${inst.symbol} ${analysis.direction} — 1H trendUp=${trendUp}`);
+                    analysis.direction = "WAIT";
+                    analysis.verdict = "WAIT";
+                    analysis.entry_price = null;
+                    analysis.take_profit = null;
+                    analysis.stop_loss = null;
+                    analysis.reasoning = `[V1 Enhanced] EMA crossover present but 1H trend (EMA 4/17) not aligned — signal blocked.`;
+                  } else {
+                    // Tag passing signals so the UI/admin can see they cleared both gates
+                    const sessionTag = activeSessions.join("+") || "off-hours";
+                    analysis.reasoning = `[V1 Enhanced] EMA(4/17) ${analysis.direction.toLowerCase()} on closed 15m. 1H trend aligned. Session: ${sessionTag}. TP=+${V1_TP_PIPS}p / SL=-${V1_SL_PIPS}p (1:1.82 R:R).`;
+                  }
+                }
+              }
+            }
           } else {
             // Mock analysis — still apply RON logic
             const mockRsi = data.rsi;
@@ -1574,6 +1614,7 @@ serve(async (req) => {
 
                   // ─── AUTO-TRADE EXECUTION ───
                   if (autoTradeMap[inst.symbol]?.enabled && analysis.confidence >= 7 && !signalsPaused) {
+                    const sessionTagAt = getActiveSessionsAt(new Date()).join("+") || "off-hours";
                     try {
                       const SUPABASE_URL_ENV = Deno.env.get("SUPABASE_URL")!;
                       const SRK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1598,7 +1639,7 @@ serve(async (req) => {
                       });
                       const tradeResult = await tradeRes.json();
                       if (tradeRes.ok && tradeResult.success) {
-                        console.log(`AUTO-TRADE executed: ${inst.symbol} ${analysis.direction} vol=${userLotSize}`);
+                        console.log(`AUTO-TRADE executed: ${inst.symbol} ${analysis.direction} vol=${userLotSize} session=${sessionTagAt}`);
                         await supabase.from("auto_trade_executions").insert({
                           user_id: userId,
                           signal_id: signalId,
@@ -1609,6 +1650,7 @@ serve(async (req) => {
                           sl: analysis.stop_loss,
                           tp: analysis.take_profit,
                           status: "filled",
+                          session: sessionTagAt,
                           metaapi_position_id: tradeResult.positionId || tradeResult.orderId || null,
                         });
                       } else {
@@ -1624,6 +1666,7 @@ serve(async (req) => {
                           sl: analysis.stop_loss,
                           tp: analysis.take_profit,
                           status: "failed",
+                          session: sessionTagAt,
                           error_message: errMsg,
                         });
                       }
@@ -1639,6 +1682,7 @@ serve(async (req) => {
                         sl: analysis.stop_loss,
                         tp: analysis.take_profit,
                         status: "failed",
+                        session: sessionTagAt,
                         error_message: String(tradeErr?.message || tradeErr),
                       });
                     }
