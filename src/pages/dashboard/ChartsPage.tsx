@@ -176,6 +176,28 @@ export default function ChartsPage() {
   const [patternUserStats, setPatternUserStats] = useState<{ total: number; confirmed: number } | null>(null);
   const [realPatternStats, setRealPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; frequency: string }>>({});
   const [platformPatternStats, setPlatformPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; users: number }>>({});
+  const [autoEnabledSymbols, setAutoEnabledSymbols] = useState<Set<string>>(new Set());
+
+  // Track auto-trade enabled instruments (synced realtime with Auto-Trade Control page)
+  useEffect(() => {
+    if (!userId) return;
+    const load = () => {
+      supabase
+        .from("user_auto_trade_settings")
+        .select("symbol,enabled")
+        .eq("user_id", userId)
+        .eq("enabled", true)
+        .then(({ data }) => setAutoEnabledSymbols(new Set((data ?? []).map((r: any) => r.symbol))));
+    };
+    load();
+    const ch = supabase
+      .channel(`charts-auto-sync-${userId}-${crypto.randomUUID()}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "user_auto_trade_settings", filter: `user_id=eq.${userId}` },
+        () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId]);
 
   // Refs to break rebuild chain for order mode / limit prices
   const orderModeRef = useRef<OrderMode>(orderMode);
