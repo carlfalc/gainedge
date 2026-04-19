@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart3, Clock } from "lucide-react";
+import { BarChart3, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { SESSIONS, getActiveSessions, getCurrentSession, formatLocalHour, type SessionDef } from "@/lib/session-colors";
