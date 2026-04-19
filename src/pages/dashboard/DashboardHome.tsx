@@ -326,16 +326,7 @@ export default function DashboardHome() {
             {best.confidence}
           </div>
         </div>
-      ) : (
-        <div style={{
-          background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
-          padding: "16px 20px", marginBottom: 20,
-          display: "flex", alignItems: "center", gap: 10,
-        }}>
-          <Clock size={16} color={C.sec} />
-          <span style={{ fontSize: 12, color: C.sec }}>No active signals — waiting for next scan</span>
-        </div>
-      )}
+      ) : null}
 
 
       {equityCurve.length > 1 && (
