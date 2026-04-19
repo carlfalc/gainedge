@@ -95,6 +95,13 @@ export default function RonPopout() {
   const ttsPlayingRef = useRef(false);
   const ttsBufferRef = useRef("");
 
+  // ─── Audio analyser for voice-reactive background ───
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceMapRef = useRef<WeakMap<HTMLAudioElement, MediaElementAudioSourceNode>>(new WeakMap());
+  const rafRef = useRef<number | null>(null);
+  const [amplitude, setAmplitude] = useState(0);
+
   useEffect(() => {
     document.title = "Talk to RON";
   }, []);
@@ -112,6 +119,81 @@ export default function RonPopout() {
       utter.onerror = () => onEnd?.();
       window.speechSynthesis.speak(utter);
     } catch { onEnd?.(); }
+  }, []);
+
+  // Attach Web Audio analyser to an <audio> element and start RAF loop
+  const attachAnalyser = useCallback((audio: HTMLAudioElement) => {
+    try {
+      if (!audioCtxRef.current) {
+        const Ctx: typeof AudioContext =
+          (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!Ctx) return;
+        audioCtxRef.current = new Ctx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+      if (!analyserRef.current) {
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.7;
+        analyser.connect(ctx.destination);
+        analyserRef.current = analyser;
+      }
+
+      // Each <audio> can only be sourced once — cache to avoid InvalidStateError
+      let source = sourceMapRef.current.get(audio);
+      if (!source) {
+        source = ctx.createMediaElementSource(audio);
+        source.connect(analyserRef.current!);
+        sourceMapRef.current.set(audio, source);
+      }
+
+      // Start RAF loop if not already running
+      if (rafRef.current == null) {
+        const data = new Uint8Array(analyserRef.current!.frequencyBinCount);
+        let smoothed = 0;
+        const tick = () => {
+          const a = analyserRef.current;
+          if (!a) { rafRef.current = null; return; }
+          a.getByteFrequencyData(data);
+          // Voice band (roughly 80Hz-3kHz) → first ~30 bins at 44.1kHz/256
+          let sum = 0;
+          const end = Math.min(40, data.length);
+          for (let i = 2; i < end; i++) sum += data[i];
+          const avg = sum / (end - 2) / 255; // 0..1
+          // Boost & clamp
+          const boosted = Math.min(1, avg * 1.6);
+          smoothed = smoothed * 0.65 + boosted * 0.35;
+          setAmplitude(smoothed);
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    } catch (e) {
+      console.warn("Analyser attach failed (non-fatal):", e);
+    }
+  }, []);
+
+  // Decay amplitude to 0 when not speaking; stop RAF when idle
+  useEffect(() => {
+    if (!isSpeaking && amplitude > 0.001) {
+      const id = setTimeout(() => setAmplitude((a) => a * 0.5), 80);
+      return () => clearTimeout(id);
+    }
+    if (!isSpeaking && rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      setAmplitude(0);
+    }
+  }, [isSpeaking, amplitude]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      audioCtxRef.current?.close().catch(() => {});
+    };
   }, []);
 
   const playNextInQueue = useCallback(async () => {
@@ -150,8 +232,10 @@ export default function RonPopout() {
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
+      audio.crossOrigin = "anonymous";
       audio.playbackRate = 1.1;
       audioRef.current = audio;
+      attachAnalyser(audio);
       audio.onended = () => { URL.revokeObjectURL(url); finish(); };
       audio.onerror = () => { URL.revokeObjectURL(url); finish(); };
       await audio.play();
@@ -159,7 +243,7 @@ export default function RonPopout() {
       console.error("TTS error:", e);
       speakWithBrowser(next, finish);
     }
-  }, [speakWithBrowser]);
+  }, [speakWithBrowser, attachAnalyser]);
 
   const enqueueTTS = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -284,6 +368,12 @@ export default function RonPopout() {
   const spinSpeed = isSpeaking ? "12s" : isListening ? "18s" : "28s";
   const pulseSpeed = isSpeaking ? "1.8s" : isListening ? "2.5s" : "4s";
 
+  // Voice-reactive multipliers (amplitude is 0..1 from analyser)
+  const ampScale = 1 + amplitude * 0.18;
+  const ampBrightness = 1 + amplitude * 0.55;
+  const ampSaturation = 1.4 + amplitude * 0.8;
+  const ampOpacityBoost = amplitude * 0.35;
+
   return (
     <div
       className="fixed inset-0 flex flex-col overflow-hidden"
@@ -299,9 +389,12 @@ export default function RonPopout() {
             backgroundImage: `url(${ronBg})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: `saturate(1.4) brightness(${0.9 + (intensity - 1) * 0.5})`,
+            filter: `saturate(${ampSaturation}) brightness(${(0.9 + (intensity - 1) * 0.5) * ampBrightness})`,
             animation: `ronHoloSpin ${spinSpeed} linear infinite, ronHoloPulse ${pulseSpeed} ease-in-out infinite`,
             transformOrigin: "center center",
+            transform: `scale(${ampScale})`,
+            transition: "transform 80ms linear, filter 80ms linear",
+            willChange: "transform, filter",
           }}
         />
         {/* Secondary counter-spinning mirrored layer */}
@@ -313,9 +406,12 @@ export default function RonPopout() {
             backgroundSize: "cover",
             backgroundPosition: "center",
             mixBlendMode: "screen",
-            opacity: 0.55,
+            opacity: Math.min(1, 0.55 + ampOpacityBoost),
             animation: `ronHoloSpinReverse ${spinSpeed} linear infinite, ronHoloDrift ${animSpeed} ease-in-out infinite alternate`,
             transformOrigin: "center center",
+            transform: `scale(${1 + amplitude * 0.1})`,
+            transition: "transform 100ms linear, opacity 100ms linear",
+            willChange: "transform, opacity",
           }}
         />
         {/* Third flowing layer with hue shift */}
