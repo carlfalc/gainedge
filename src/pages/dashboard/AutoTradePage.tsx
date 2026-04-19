@@ -175,6 +175,16 @@ export default function AutoTradePage() {
         </div>
       </div>
 
+      {/* Sync explainer banner */}
+      <div className="rounded-lg border border-[#00CFA5]/25 bg-[#00CFA5]/[0.04] p-3 flex items-start gap-2.5">
+        <Link2 className="w-4 h-4 text-[#00CFA5] mt-0.5 flex-shrink-0" />
+        <div className="text-xs text-white/70 leading-relaxed">
+          <span className="text-[#00CFA5] font-semibold">Synced in real-time</span> with the per-chart Auto toggles on the{" "}
+          <Link to="/dashboard/charts" className="text-[#00CFA5] hover:underline">Charts page</Link>.
+          Flipping a switch here updates the matching chart tab instantly — and vice versa. One source of truth, two places to manage it.
+        </div>
+      </div>
+
       {/* Broker connection blocker */}
       {!health.hasDefaultConnection && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/[0.08] p-4 flex items-center justify-between gap-3">
