@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import {
-  Activity, AlertTriangle, ArrowRight, CheckCircle2, Plug, Power, Zap, Globe2, Loader2,
+  Activity, AlertTriangle, ArrowRight, CheckCircle2, Plug, Power, Zap, Globe2, Loader2, Link2,
 } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
 import { useAutoTradeSettings, type AutoTradeSettingRow } from "@/hooks/use-auto-trade-settings";
