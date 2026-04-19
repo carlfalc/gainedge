@@ -1531,20 +1531,43 @@ export default function ChartsPage() {
           {connectionStatus === "live" ? <Wifi className="w-3 h-3 text-green-400" /> : <WifiOff className="w-3 h-3 text-white/30" />}
         </div>
 
-        {/* Instrument pills */}
-        {instruments.map(sym => (
-          <button
-            key={sym}
-            onClick={() => setSelected(sym)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all border ${
-              selected === sym
-                ? "bg-[#00CFA5]/20 border-[#00CFA5] text-[#00CFA5] shadow-[0_0_12px_rgba(0,207,165,0.25)]"
-                : "bg-[#111724] border-white/10 text-[#8892A4] hover:border-white/20 hover:text-white"
+        {/* Auto-trade summary pill — shows X of Y instruments running on auto */}
+        {instruments.length > 0 && (
+          <Link
+            to="/dashboard/auto-trade"
+            title="Open Auto-Trade Control Center — toggles sync in real-time with the per-chart Auto switches"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all ${
+              autoEnabledSymbols.size > 0
+                ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/20"
+                : "bg-[#111724] border-white/10 text-white/40 hover:text-white/70"
             }`}
           >
-            {sym}
-          </button>
-        ))}
+            <Zap className="w-3 h-3" />
+            {autoEnabledSymbols.size}/{instruments.length} on auto
+          </Link>
+        )}
+
+        {/* Instrument pills */}
+        {instruments.map(sym => {
+          const autoOn = autoEnabledSymbols.has(sym);
+          return (
+            <button
+              key={sym}
+              onClick={() => setSelected(sym)}
+              title={autoOn ? `${sym} — Auto-trade ON` : sym}
+              className={`relative px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all border ${
+                selected === sym
+                  ? "bg-[#00CFA5]/20 border-[#00CFA5] text-[#00CFA5] shadow-[0_0_12px_rgba(0,207,165,0.25)]"
+                  : "bg-[#111724] border-white/10 text-[#8892A4] hover:border-white/20 hover:text-white"
+              }`}
+            >
+              {sym}
+              {autoOn && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#00CFA5] shadow-[0_0_6px_rgba(0,207,165,0.8)]" />
+              )}
+            </button>
+          );
+        })}
         <div className="w-px h-6 bg-white/10 mx-1" />
         {/* Timeframes */}
         {TIMEFRAMES.map(tf => (
