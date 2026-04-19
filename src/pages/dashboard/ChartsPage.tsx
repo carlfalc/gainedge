@@ -33,8 +33,9 @@ import IndicatorModal, { type ActiveIndicator } from "@/components/dashboard/Ind
 import DrawingToolbar from "@/components/dashboard/DrawingToolbar";
 import {
   Activity, ArrowUpRight, ArrowDownRight, Minus,
-  Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff, ExternalLink, Settings, RotateCcw,
+  Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff, ExternalLink, Settings, RotateCcw, Zap,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position, type TradeExecutionPanelRef } from "@/components/dashboard/TradeExecutionPanel";
