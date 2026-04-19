@@ -298,14 +298,50 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <span style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
             CURRENT INSTRUMENT TRACKING
           </span>
           <span style={{ color: C.sec, fontWeight: 400, fontSize: 10 }}>
             {visibleScans.length}/{scans.length} visible
           </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 2 }}>
+            {([
+              { key: "ALL", label: "All", color: C.text, count: baseSorted.length },
+              { key: "BULLISH", label: "Bullish", color: "#22C55E", count: trendCounts.BULLISH },
+              { key: "BEARISH", label: "Bearish", color: "#EF4444", count: trendCounts.BEARISH },
+              { key: "NEUTRAL", label: "Neutral", color: "#F59E0B", count: trendCounts.NEUTRAL },
+            ] as const).map((tab) => {
+              const active = trendFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setTrendFilter(tab.key)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: "none",
+                    cursor: "pointer",
+                    background: active ? tab.color + "22" : "transparent",
+                    color: active ? tab.color : C.sec,
+                    transition: "background 0.15s, color 0.15s",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                  title={`Show ${tab.label.toLowerCase()} instruments`}
+                >
+                  {tab.label}
+                  <span style={{ fontSize: 9, opacity: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>{tab.count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
