@@ -465,15 +465,38 @@ export default function RonPopout() {
       </footer>
 
       <style>{`
-        @keyframes ronHoloDrift {
-          0% { transform: scale(1) translate(0, 0) rotate(0deg); }
-          50% { transform: scale(1.08) translate(-2%, 1%) rotate(0.5deg); }
-          100% { transform: scale(1.04) translate(2%, -1%) rotate(-0.5deg); }
+        @keyframes ronHoloSpin {
+          0% { transform: rotate(0deg) scale(1.1); }
+          100% { transform: rotate(360deg) scale(1.1); }
         }
-        @keyframes ronHoloDrift2 {
-          0% { transform: scaleX(-1) scale(1) translate(0, 0); }
-          50% { transform: scaleX(-1) scale(1.06) translate(2%, -1%); }
-          100% { transform: scaleX(-1) scale(1.02) translate(-2%, 1%); }
+        @keyframes ronHoloSpinReverse {
+          0% { transform: rotate(360deg) scaleX(-1) scale(1.05); }
+          100% { transform: rotate(0deg) scaleX(-1) scale(1.05); }
+        }
+        @keyframes ronHoloPulse {
+          0%, 100% { transform: scale(1.1); filter: saturate(1.4) brightness(0.95); }
+          50% { transform: scale(1.22); filter: saturate(1.8) brightness(1.15); }
+        }
+        @keyframes ronHoloDrift {
+          0% { transform: scaleX(-1) scale(1.05) translate(-3%, 2%); }
+          50% { transform: scaleX(-1) scale(1.15) translate(3%, -2%) rotate(2deg); }
+          100% { transform: scaleX(-1) scale(1.08) translate(-2%, 3%) rotate(-2deg); }
+        }
+        @keyframes ronHoloFlow {
+          0% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+          25% { transform: scale(1.18) translate(4%, -3%) rotate(3deg); }
+          50% { transform: scale(1.12) translate(-3%, 4%) rotate(-2deg); }
+          75% { transform: scale(1.2) translate(2%, 3%) rotate(4deg); }
+          100% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+        }
+        @keyframes ronHoloHue {
+          0% { filter: hue-rotate(0deg) saturate(1.5); }
+          50% { filter: hue-rotate(40deg) saturate(2); }
+          100% { filter: hue-rotate(0deg) saturate(1.5); }
+        }
+        @keyframes ronVignettePulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.75; }
         }
         @keyframes ronStatusPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
