@@ -461,9 +461,9 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPrompt + "\n\n## Response Length\nKeep replies under 3 short sentences unless the user explicitly asks for detail. Lead with the answer." },
           ...messages,
         ],
         stream: true,

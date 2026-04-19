@@ -30,7 +30,7 @@ serve(async (req) => {
     }
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}?output_format=mp3_44100_128&optimize_streaming_latency=4`,
       {
         method: "POST",
         headers: {
@@ -41,11 +41,11 @@ serve(async (req) => {
           text,
           model_id: "eleven_turbo_v2_5",
           voice_settings: {
-            stability: 0.6,
-            similarity_boost: 0.75,
-            style: 0.3,
+            stability: 0.45,
+            similarity_boost: 0.7,
+            style: 0.25,
             use_speaker_boost: true,
-            speed: 1.05,
+            speed: 1.1,
           },
         }),
       }
