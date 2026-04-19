@@ -1471,6 +1471,25 @@ serve(async (req) => {
             continue;
           }
 
+          // ─── V1 PURE HARD GATE: 15-minute timeframe only ───
+          // Falconer Pine Script V1 is defined exclusively on the 15m chart.
+          if (useV1Pure && inst.timeframe !== "15m") {
+            console.log(`V1 Pure gate: skipping ${inst.symbol} on ${inst.timeframe} (V1 is 15m-only)`);
+            continue;
+          }
+
+          // ─── V1 PURE CLOSED-CANDLE VERIFICATION ───
+          // We are inside the "candle close detected" branch (prevTime !== newTime),
+          // so the previous bar — the one our EMA evaluation lands on — is now closed.
+          // Belt-and-braces: confirm prevTime + 15min <= now (with 30s tolerance).
+          if (useV1Pure && prevTime) {
+            const prevMs = new Date(prevTime).getTime();
+            if (Number.isFinite(prevMs) && prevMs + 15 * 60_000 > Date.now() + 30_000) {
+              console.log(`V1 Pure: previous candle ${prevTime} not yet closed for ${inst.symbol} — skipping`);
+              continue;
+            }
+          }
+
           const candles = symbolCandles.get(inst.symbol);
           let analysis: AnalysisResult;
 
