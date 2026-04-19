@@ -33,8 +33,9 @@ import IndicatorModal, { type ActiveIndicator } from "@/components/dashboard/Ind
 import DrawingToolbar from "@/components/dashboard/DrawingToolbar";
 import {
   Activity, ArrowUpRight, ArrowDownRight, Minus,
-  Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff, ExternalLink, Settings, RotateCcw,
+  Maximize2, Minimize2, ZoomIn, Search, X, MinusIcon, Loader2, Wifi, WifiOff, ExternalLink, Settings, RotateCcw, Zap,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import BrokerModal from "@/components/dashboard/BrokerModal";
 import TradeExecutionPanel, { type OrderMode, type LimitOrderPrices, type Position, type TradeExecutionPanelRef } from "@/components/dashboard/TradeExecutionPanel";
@@ -176,6 +177,28 @@ export default function ChartsPage() {
   const [patternUserStats, setPatternUserStats] = useState<{ total: number; confirmed: number } | null>(null);
   const [realPatternStats, setRealPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; frequency: string }>>({});
   const [platformPatternStats, setPlatformPatternStats] = useState<Record<string, { total: number; wins: number; winRate: number; avgPips: number; users: number }>>({});
+  const [autoEnabledSymbols, setAutoEnabledSymbols] = useState<Set<string>>(new Set());
+
+  // Track auto-trade enabled instruments (synced realtime with Auto-Trade Control page)
+  useEffect(() => {
+    if (!userId) return;
+    const load = () => {
+      supabase
+        .from("user_auto_trade_settings")
+        .select("symbol,enabled")
+        .eq("user_id", userId)
+        .eq("enabled", true)
+        .then(({ data }) => setAutoEnabledSymbols(new Set((data ?? []).map((r: any) => r.symbol))));
+    };
+    load();
+    const ch = supabase
+      .channel(`charts-auto-sync-${userId}-${crypto.randomUUID()}`)
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "user_auto_trade_settings", filter: `user_id=eq.${userId}` },
+        () => load())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [userId]);
 
   // Refs to break rebuild chain for order mode / limit prices
   const orderModeRef = useRef<OrderMode>(orderMode);
@@ -1509,20 +1532,43 @@ export default function ChartsPage() {
           {connectionStatus === "live" ? <Wifi className="w-3 h-3 text-green-400" /> : <WifiOff className="w-3 h-3 text-white/30" />}
         </div>
 
-        {/* Instrument pills */}
-        {instruments.map(sym => (
-          <button
-            key={sym}
-            onClick={() => setSelected(sym)}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all border ${
-              selected === sym
-                ? "bg-[#00CFA5]/20 border-[#00CFA5] text-[#00CFA5] shadow-[0_0_12px_rgba(0,207,165,0.25)]"
-                : "bg-[#111724] border-white/10 text-[#8892A4] hover:border-white/20 hover:text-white"
+        {/* Auto-trade summary pill — shows X of Y instruments running on auto */}
+        {instruments.length > 0 && (
+          <Link
+            to="/dashboard/auto-trade"
+            title="Open Auto-Trade Control Center — toggles sync in real-time with the per-chart Auto switches"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border transition-all ${
+              autoEnabledSymbols.size > 0
+                ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/20"
+                : "bg-[#111724] border-white/10 text-white/40 hover:text-white/70"
             }`}
           >
-            {sym}
-          </button>
-        ))}
+            <Zap className="w-3 h-3" />
+            {autoEnabledSymbols.size}/{instruments.length} on auto
+          </Link>
+        )}
+
+        {/* Instrument pills */}
+        {instruments.map(sym => {
+          const autoOn = autoEnabledSymbols.has(sym);
+          return (
+            <button
+              key={sym}
+              onClick={() => setSelected(sym)}
+              title={autoOn ? `${sym} — Auto-trade ON` : sym}
+              className={`relative px-3 py-1.5 rounded-full text-xs font-bold tracking-wide transition-all border ${
+                selected === sym
+                  ? "bg-[#00CFA5]/20 border-[#00CFA5] text-[#00CFA5] shadow-[0_0_12px_rgba(0,207,165,0.25)]"
+                  : "bg-[#111724] border-white/10 text-[#8892A4] hover:border-white/20 hover:text-white"
+              }`}
+            >
+              {sym}
+              {autoOn && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#00CFA5] shadow-[0_0_6px_rgba(0,207,165,0.8)]" />
+              )}
+            </button>
+          );
+        })}
         <div className="w-px h-6 bg-white/10 mx-1" />
         {/* Timeframes */}
         {TIMEFRAMES.map(tf => (

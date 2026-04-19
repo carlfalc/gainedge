@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import {
-  Activity, AlertTriangle, ArrowRight, CheckCircle2, Plug, Power, Zap, Globe2, Loader2,
+  Activity, AlertTriangle, ArrowRight, CheckCircle2, Plug, Power, Zap, Globe2, Loader2, Link2,
 } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
 import { useAutoTradeSettings, type AutoTradeSettingRow } from "@/hooks/use-auto-trade-settings";
@@ -172,6 +172,16 @@ export default function AutoTradePage() {
           >
             <Power className="w-3.5 h-3.5" /> Master Kill Switch
           </button>
+        </div>
+      </div>
+
+      {/* Sync explainer banner */}
+      <div className="rounded-lg border border-[#00CFA5]/25 bg-[#00CFA5]/[0.04] p-3 flex items-start gap-2.5">
+        <Link2 className="w-4 h-4 text-[#00CFA5] mt-0.5 flex-shrink-0" />
+        <div className="text-xs text-white/70 leading-relaxed">
+          <span className="text-[#00CFA5] font-semibold">Synced in real-time</span> with the per-chart Auto toggles on the{" "}
+          <Link to="/dashboard/charts" className="text-[#00CFA5] hover:underline">Charts page</Link>.
+          Flipping a switch here updates the matching chart tab instantly — and vice versa. One source of truth, two places to manage it.
         </div>
       </div>
 

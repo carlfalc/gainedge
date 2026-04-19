@@ -6,8 +6,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import {
-  ChevronUp, ChevronDown, AlertTriangle, X, Loader2, Zap, User,
+  ChevronUp, ChevronDown, AlertTriangle, X, Loader2, Zap, User, ArrowUpRight,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import AutoTradeStatus from "./AutoTradeStatus";
 
@@ -568,6 +569,15 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                     <User className="w-3 h-3" />
                     My Trades {myTradesEnabled ? "ON" : "OFF"}
                   </button>
+
+                  <Link
+                    to="/dashboard/auto-trade"
+                    className="ml-auto flex items-center gap-1 text-[10px] text-[#00CFA5]/80 hover:text-[#00CFA5] hover:underline"
+                    title="Open the central Auto-Trade Control Center — toggles sync in real-time"
+                  >
+                    Manage all in Auto-Trade Control
+                    <ArrowUpRight className="w-3 h-3" />
+                  </Link>
                 </div>
 
                 <div className="mt-1.5 text-[10px]">
