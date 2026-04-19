@@ -9,6 +9,7 @@ import Signup from "./pages/Signup.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ChartPopout from "./pages/ChartPopout.tsx";
 import LoungePopout from "./pages/LoungePopout.tsx";
+import InstrumentsPopout from "./pages/InstrumentsPopout.tsx";
 import UnsubscribePage from "./pages/UnsubscribePage.tsx";
 import DashboardLayout from "./components/dashboard/DashboardLayout.tsx";
 import DashboardHome from "./pages/dashboard/DashboardHome.tsx";
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/signup" element={<Signup />} />
           <Route path="/chart-popout" element={<ChartPopout />} />
           <Route path="/lounge-popout" element={<LoungePopout />} />
+          <Route path="/instruments-popout" element={<InstrumentsPopout />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
