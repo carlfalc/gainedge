@@ -196,6 +196,7 @@ export default function RonPopout() {
     };
   }, []);
 
+  const playNextInQueue = useCallback(async () => {
     if (ttsPlayingRef.current) return;
     const next = ttsQueueRef.current.shift();
     if (!next) {
