@@ -8,6 +8,7 @@ import RonVersionSelector from "@/components/dashboard/RonVersionSelector";
 import FalconerPerformancePanel from "@/components/dashboard/FalconerPerformancePanel";
 import AddInstrumentModal from "@/components/dashboard/AddInstrumentModal";
 import BrokerMappingsAdmin from "@/components/dashboard/BrokerMappingsAdmin";
+import AdminSessionPerformance from "@/components/dashboard/AdminSessionPerformance";
 import BrokerAvailabilityDot from "@/components/dashboard/BrokerAvailabilityDot";
 import { useProfile } from "@/hooks/use-profile";
 import { useBrokerMappings } from "@/hooks/use-broker-mappings";
