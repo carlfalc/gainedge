@@ -57,6 +57,7 @@ export type Database = {
           error_message: string | null
           id: string
           metaapi_position_id: string | null
+          session: string | null
           signal_id: string | null
           sl: number | null
           status: string
@@ -72,6 +73,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           metaapi_position_id?: string | null
+          session?: string | null
           signal_id?: string | null
           sl?: number | null
           status?: string
@@ -87,6 +89,7 @@ export type Database = {
           error_message?: string | null
           id?: string
           metaapi_position_id?: string | null
+          session?: string | null
           signal_id?: string | null
           sl?: number | null
           status?: string
@@ -1510,6 +1513,9 @@ export type Database = {
         Row: {
           created_at: string
           currency: string
+          enable_asian_session: boolean
+          enable_london_session: boolean
+          enable_ny_session: boolean
           id: string
           instrument_filters: Json
           lot_size: number
@@ -1522,6 +1528,9 @@ export type Database = {
         Insert: {
           created_at?: string
           currency?: string
+          enable_asian_session?: boolean
+          enable_london_session?: boolean
+          enable_ny_session?: boolean
           id?: string
           instrument_filters?: Json
           lot_size?: number
@@ -1534,6 +1543,9 @@ export type Database = {
         Update: {
           created_at?: string
           currency?: string
+          enable_asian_session?: boolean
+          enable_london_session?: boolean
+          enable_ny_session?: boolean
           id?: string
           instrument_filters?: Json
           lot_size?: number
