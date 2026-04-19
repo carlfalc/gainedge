@@ -233,8 +233,10 @@ export default function RonPopout() {
     window.close();
   }, []);
 
-  const intensity = isSpeaking ? 1.4 : isListening ? 1.15 : isThinking ? 1.1 : 1;
-  const animSpeed = isSpeaking ? "8s" : isListening ? "12s" : "22s";
+  const intensity = isSpeaking ? 1.5 : isListening ? 1.25 : isThinking ? 1.15 : 1.05;
+  const animSpeed = isSpeaking ? "3s" : isListening ? "5s" : "7s";
+  const spinSpeed = isSpeaking ? "12s" : isListening ? "18s" : "28s";
+  const pulseSpeed = isSpeaking ? "1.8s" : isListening ? "2.5s" : "4s";
 
   return (
     <div
@@ -243,39 +245,53 @@ export default function RonPopout() {
     >
       {/* ─── Holographic animated background ─── */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Primary image layer */}
+        {/* Primary spinning layer */}
         <div
           className="absolute"
           style={{
-            inset: "-15%",
+            inset: "-25%",
             backgroundImage: `url(${ronBg})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: `saturate(1.2) brightness(${0.85 + (intensity - 1) * 0.4})`,
-            animation: `ronHoloDrift ${animSpeed} ease-in-out infinite alternate`,
-            transform: `scale(${intensity})`,
-            transition: "transform 0.8s ease, filter 0.6s ease",
+            filter: `saturate(1.4) brightness(${0.9 + (intensity - 1) * 0.5})`,
+            animation: `ronHoloSpin ${spinSpeed} linear infinite, ronHoloPulse ${pulseSpeed} ease-in-out infinite`,
+            transformOrigin: "center center",
           }}
         />
-        {/* Secondary mirrored layer for depth */}
+        {/* Secondary counter-spinning mirrored layer */}
         <div
           className="absolute"
           style={{
-            inset: "-15%",
+            inset: "-25%",
             backgroundImage: `url(${ronBg})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             mixBlendMode: "screen",
-            opacity: 0.5,
-            animation: `ronHoloDrift2 ${animSpeed} ease-in-out infinite alternate`,
-            transform: "scaleX(-1)",
+            opacity: 0.55,
+            animation: `ronHoloSpinReverse ${spinSpeed} linear infinite, ronHoloDrift ${animSpeed} ease-in-out infinite alternate`,
+            transformOrigin: "center center",
+          }}
+        />
+        {/* Third flowing layer with hue shift */}
+        <div
+          className="absolute"
+          style={{
+            inset: "-30%",
+            backgroundImage: `url(${ronBg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            mixBlendMode: "color-dodge",
+            opacity: 0.35,
+            animation: `ronHoloFlow ${animSpeed} ease-in-out infinite, ronHoloHue ${spinSpeed} linear infinite`,
+            transformOrigin: "center center",
           }}
         />
         {/* Color shift overlay */}
         <div
           className="absolute inset-0"
           style={{
-            background: "radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0,0,0,0.55) 100%)",
+            background: "radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(0,0,0,0.55) 100%)",
+            animation: `ronVignettePulse ${pulseSpeed} ease-in-out infinite`,
           }}
         />
         {/* Bottom dark gradient for chat legibility */}
@@ -449,15 +465,38 @@ export default function RonPopout() {
       </footer>
 
       <style>{`
-        @keyframes ronHoloDrift {
-          0% { transform: scale(1) translate(0, 0) rotate(0deg); }
-          50% { transform: scale(1.08) translate(-2%, 1%) rotate(0.5deg); }
-          100% { transform: scale(1.04) translate(2%, -1%) rotate(-0.5deg); }
+        @keyframes ronHoloSpin {
+          0% { transform: rotate(0deg) scale(1.1); }
+          100% { transform: rotate(360deg) scale(1.1); }
         }
-        @keyframes ronHoloDrift2 {
-          0% { transform: scaleX(-1) scale(1) translate(0, 0); }
-          50% { transform: scaleX(-1) scale(1.06) translate(2%, -1%); }
-          100% { transform: scaleX(-1) scale(1.02) translate(-2%, 1%); }
+        @keyframes ronHoloSpinReverse {
+          0% { transform: rotate(360deg) scaleX(-1) scale(1.05); }
+          100% { transform: rotate(0deg) scaleX(-1) scale(1.05); }
+        }
+        @keyframes ronHoloPulse {
+          0%, 100% { transform: scale(1.1); filter: saturate(1.4) brightness(0.95); }
+          50% { transform: scale(1.22); filter: saturate(1.8) brightness(1.15); }
+        }
+        @keyframes ronHoloDrift {
+          0% { transform: scaleX(-1) scale(1.05) translate(-3%, 2%); }
+          50% { transform: scaleX(-1) scale(1.15) translate(3%, -2%) rotate(2deg); }
+          100% { transform: scaleX(-1) scale(1.08) translate(-2%, 3%) rotate(-2deg); }
+        }
+        @keyframes ronHoloFlow {
+          0% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+          25% { transform: scale(1.18) translate(4%, -3%) rotate(3deg); }
+          50% { transform: scale(1.12) translate(-3%, 4%) rotate(-2deg); }
+          75% { transform: scale(1.2) translate(2%, 3%) rotate(4deg); }
+          100% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+        }
+        @keyframes ronHoloHue {
+          0% { filter: hue-rotate(0deg) saturate(1.5); }
+          50% { filter: hue-rotate(40deg) saturate(2); }
+          100% { filter: hue-rotate(0deg) saturate(1.5); }
+        }
+        @keyframes ronVignettePulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.75; }
         }
         @keyframes ronStatusPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
