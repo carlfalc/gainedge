@@ -506,11 +506,11 @@ function normalizeSignalEngine(value: string | null | undefined): "v1" | "v2" | 
   return "v1";
 }
 
-// ─── V1 Legacy Analysis ───
-// The old ATR/confluence/volume-gated branch has been removed.
-// V1 is now ALWAYS the Falconer Pine Script port:
-//   - EMA(4)/EMA(17) crossover on CLOSED candles using raw close
-//   - Fixed 55-pip TP and 55-pip SL (1:1 R:R)
+// ─── V1 Legacy ENHANCED Analysis ───
+// Falconer Pine Script port + minimal proven filters:
+//   - EMA(4)/EMA(17) crossover on CLOSED 15m candles using raw close
+//   - Fixed 55-pip SL, 100-pip TP (1:1.82 R:R)
+//   - 1H trend alignment + session filter applied at the call site (need async + user prefs)
 //   - RSI / ADX / MACD / StochRSI are display-only diagnostics
 function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbolCategory?: string, symbolName?: string): AnalysisResult {
   const workCandles = candles.length > 1 ? candles.slice(0, -1) : candles;
@@ -544,9 +544,11 @@ function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbo
   if (crossoverStatus === "CONFIRMED" && crossoverDir) {
     const direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
     const entry = +closes[closes.length - 1].toFixed(5);
-    const dist = v1PipSize(symbolName || "") * 55;
-    const tp = direction === "BUY" ? +(entry + dist).toFixed(5) : +(entry - dist).toFixed(5);
-    const sl = direction === "BUY" ? +(entry - dist).toFixed(5) : +(entry + dist).toFixed(5);
+    const pip = v1PipSize(symbolName || "");
+    const slDist = pip * V1_SL_PIPS;
+    const tpDist = pip * V1_TP_PIPS;
+    const tp = direction === "BUY" ? +(entry + tpDist).toFixed(5) : +(entry - tpDist).toFixed(5);
+    const sl = direction === "BUY" ? +(entry - slDist).toFixed(5) : +(entry + slDist).toFixed(5);
 
     return {
       direction,
@@ -554,10 +556,10 @@ function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbo
       entry_price: entry,
       take_profit: tp,
       stop_loss: sl,
-      risk_reward: "1.0:1",
+      risk_reward: "1.82:1",
       ema_crossover_status: "CONFIRMED",
       ema_crossover_direction: crossoverDir,
-      reasoning: `[V1 Legacy] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m candle. Entry ${entry}, TP ${tp} (+55 pips), SL ${sl} (-55 pips). 1:1 R:R per Falconer V1 spec.`,
+      reasoning: `[V1 Enhanced] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m. Entry ${entry}, TP ${tp} (+${V1_TP_PIPS} pips), SL ${sl} (-${V1_SL_PIPS} pips). 1:1.82 R:R. Pending 1H trend + session check.`,
       verdict: direction,
       rsi,
       adx,
@@ -575,7 +577,7 @@ function runAnalysisV1(candles: any[], _useV1Pure = true, _rrRatio = 2.0, _symbo
     risk_reward: null,
     ema_crossover_status: crossoverStatus,
     ema_crossover_direction: crossoverDir,
-    reasoning: `[V1 Legacy] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only, do not gate V1 entry.)`,
+    reasoning: `[V1 Enhanced] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only.)`,
     verdict: "WAIT",
     rsi,
     adx,
