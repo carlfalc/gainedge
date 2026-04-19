@@ -99,6 +99,7 @@ function buildSessionInsights(
 export function MostVolumeBar() {
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     load();
