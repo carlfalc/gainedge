@@ -22,6 +22,7 @@ import TradeNotificationPopup from "./TradeNotificationPopup";
 
 const NAV_ITEMS = [
   { labelKey: "nav.dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { labelKey: "nav.settings", icon: Settings, path: "/dashboard/settings" },
   { labelKey: "nav.charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
   { labelKey: "nav.signals", icon: Zap, path: "/dashboard/signals" },
   { labelKey: "nav.autoTrade", icon: Zap, path: "/dashboard/auto-trade" },
@@ -30,7 +31,6 @@ const NAV_ITEMS = [
   { labelKey: "nav.insights", icon: Lightbulb, path: "/dashboard/insights" },
   { labelKey: "nav.backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
   { labelKey: "nav.calendar", icon: Calendar, path: "/dashboard/calendar" },
-  { labelKey: "nav.settings", icon: Settings, path: "/dashboard/settings" },
   { labelKey: "nav.clockSettings", icon: Clock, path: "/dashboard/clock-settings" },
   { labelKey: "nav.newsSettings", icon: Newspaper, path: "/dashboard/news-settings" },
   { labelKey: "nav.myNews", icon: Globe, path: "/dashboard/my-news" },
