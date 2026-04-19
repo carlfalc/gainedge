@@ -245,39 +245,53 @@ export default function RonPopout() {
     >
       {/* ─── Holographic animated background ─── */}
       <div className="absolute inset-0 overflow-hidden">
-        {/* Primary image layer */}
+        {/* Primary spinning layer */}
         <div
           className="absolute"
           style={{
-            inset: "-15%",
+            inset: "-25%",
             backgroundImage: `url(${ronBg})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: `saturate(1.2) brightness(${0.85 + (intensity - 1) * 0.4})`,
-            animation: `ronHoloDrift ${animSpeed} ease-in-out infinite alternate`,
-            transform: `scale(${intensity})`,
-            transition: "transform 0.8s ease, filter 0.6s ease",
+            filter: `saturate(1.4) brightness(${0.9 + (intensity - 1) * 0.5})`,
+            animation: `ronHoloSpin ${spinSpeed} linear infinite, ronHoloPulse ${pulseSpeed} ease-in-out infinite`,
+            transformOrigin: "center center",
           }}
         />
-        {/* Secondary mirrored layer for depth */}
+        {/* Secondary counter-spinning mirrored layer */}
         <div
           className="absolute"
           style={{
-            inset: "-15%",
+            inset: "-25%",
             backgroundImage: `url(${ronBg})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             mixBlendMode: "screen",
-            opacity: 0.5,
-            animation: `ronHoloDrift2 ${animSpeed} ease-in-out infinite alternate`,
-            transform: "scaleX(-1)",
+            opacity: 0.55,
+            animation: `ronHoloSpinReverse ${spinSpeed} linear infinite, ronHoloDrift ${animSpeed} ease-in-out infinite alternate`,
+            transformOrigin: "center center",
+          }}
+        />
+        {/* Third flowing layer with hue shift */}
+        <div
+          className="absolute"
+          style={{
+            inset: "-30%",
+            backgroundImage: `url(${ronBg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            mixBlendMode: "color-dodge",
+            opacity: 0.35,
+            animation: `ronHoloFlow ${animSpeed} ease-in-out infinite, ronHoloHue ${spinSpeed} linear infinite`,
+            transformOrigin: "center center",
           }}
         />
         {/* Color shift overlay */}
         <div
           className="absolute inset-0"
           style={{
-            background: "radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(0,0,0,0.55) 100%)",
+            background: "radial-gradient(ellipse at 50% 50%, transparent 25%, rgba(0,0,0,0.55) 100%)",
+            animation: `ronVignettePulse ${pulseSpeed} ease-in-out infinite`,
           }}
         />
         {/* Bottom dark gradient for chat legibility */}
