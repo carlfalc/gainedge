@@ -64,9 +64,9 @@ export function useLiveMarketData(userId: string | undefined) {
   useEffect(() => {
     load();
 
-    // Subscribe to realtime updates
+    // Subscribe to realtime updates (unique channel per hook instance to avoid collisions)
     const channel = supabase
-      .channel("live-market-data")
+      .channel(`live-market-data-${userId ?? "anon"}-${Math.random().toString(36).slice(2, 9)}`)
       .on("postgres_changes", {
         event: "*",
         schema: "public",
