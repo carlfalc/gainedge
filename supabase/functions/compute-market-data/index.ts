@@ -419,17 +419,51 @@ function getAtrSlMultiplier(symbol: string, category?: string): number {
   return 1.5;
 }
 
-// ─── V1 Legacy Analysis (ATR-based SL/TP per instrument) ───
-// When useV1Pure is true, the ONLY entry condition is a confirmed EMA 4/17 crossover.
-// No ADX, ATR-range, or EMA-flatness filters are applied. Confidence is scored by
-// indicator alignment but does NOT gate signal firing.
-function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
-  const closes = candles.map((c: any) => c.close);
-  const highs = candles.map((c: any) => c.high);
-  const lows = candles.map((c: any) => c.low);
-  const volumes = candles.map((c: any) => c.tickVolume || 0);
+// ─── V1 LEGACY pip-size table (Falconer Pine Script spec) ───
+// Used ONLY in V1 Pure mode for fixed 55-pip TP/SL.
+const V1_PIP_SIZE: Record<string, number> = {
+  // 5-decimal forex
+  EURUSD: 0.0001, GBPUSD: 0.0001, AUDUSD: 0.0001, NZDUSD: 0.0001,
+  USDCAD: 0.0001, USDCHF: 0.0001, EURGBP: 0.0001, EURAUD: 0.0001,
+  EURNZD: 0.0001, EURCAD: 0.0001, EURCHF: 0.0001, GBPAUD: 0.0001,
+  GBPNZD: 0.0001, GBPCAD: 0.0001, GBPCHF: 0.0001, AUDCAD: 0.0001,
+  AUDCHF: 0.0001, AUDNZD: 0.0001, NZDCAD: 0.0001, NZDCHF: 0.0001,
+  CADCHF: 0.0001,
+  // JPY pairs
+  USDJPY: 0.01, EURJPY: 0.01, GBPJPY: 0.01, AUDJPY: 0.01,
+  NZDJPY: 0.01, CADJPY: 0.01, CHFJPY: 0.01,
+  // Metals
+  XAUUSD: 0.01, XAGUSD: 0.001, XAUAUD: 0.01,
+  // Indices
+  US30: 1.0, NAS100: 0.1, US500: 0.1, UK100: 0.1, GER40: 0.1, JP225: 1.0,
+  // Energy
+  USOIL: 0.01, UKOIL: 0.01,
+};
+function v1PipSize(symbol: string): number {
+  if (V1_PIP_SIZE[symbol] !== undefined) return V1_PIP_SIZE[symbol];
+  if (symbol.includes("JPY")) return 0.01;
+  return 0.0001;
+}
 
-  // EMA 4/17 crossover — use CLOSED candle
+// ─── V1 Legacy Analysis ───
+// V1 PURE (Falconer Pine Script port):
+//   - EMA(4)/EMA(17) crossover on CLOSED 15m candles, raw close prices
+//   - Sole entry trigger: ta.crossover / ta.crossunder event on the latest closed bar
+//   - Fixed 55-pip TP and 55-pip SL (1:1 R:R), per-symbol pip size lookup
+//   - NO MTF / Confluence / Volume / Pattern / RSI / ADX gates
+// LEGACY (non-pure) path keeps the older multi-filter logic for backwards-compat.
+function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
+  // V1 PURE: drop the currently-forming bar so EMAs are computed on CLOSED candles only.
+  // (The caller already gates this function on candle-close events, but this guarantees
+  //  we never include an in-progress candle in the EMA series.)
+  const workCandles = useV1Pure && candles.length > 1 ? candles.slice(0, -1) : candles;
+
+  const closes = workCandles.map((c: any) => c.close);
+  const highs = workCandles.map((c: any) => c.high);
+  const lows = workCandles.map((c: any) => c.low);
+  const volumes = workCandles.map((c: any) => c.tickVolume || 0);
+
+  // EMA 4/17 on raw closes (Pine Script: ta.ema(close, 4) / ta.ema(close, 17))
   const ema4 = calcEMA(closes, 4);
   const ema17 = calcEMA(closes, 17);
   const lastIdx = ema4.length - 1;
@@ -438,13 +472,16 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
   const prevFast = ema4[lastIdx - 1];
   const prevSlow = ema17[lastIdx - 1];
 
+  // Pine Script ta.crossover / ta.crossunder event detection
   let crossoverStatus = "NONE";
   let crossoverDir: string | null = null;
   if (prevFast <= prevSlow && currFast > currSlow) {
     crossoverStatus = "CONFIRMED"; crossoverDir = "BULLISH";
   } else if (prevFast >= prevSlow && currFast < currSlow) {
     crossoverStatus = "CONFIRMED"; crossoverDir = "BEARISH";
-  } else if (Math.abs(currFast - currSlow) / currSlow < 0.0003) {
+  } else if (!useV1Pure && Math.abs(currFast - currSlow) / currSlow < 0.0003) {
+    // FORMING is a non-pure-only convenience state; V1 Pure fires only on the
+    // exact crossover event, never on "forming".
     crossoverStatus = "FORMING";
     crossoverDir = currFast > currSlow ? "BULLISH" : "BEARISH";
   }
