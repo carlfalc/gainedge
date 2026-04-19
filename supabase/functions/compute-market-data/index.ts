@@ -1301,7 +1301,13 @@ serve(async (req) => {
       const useV2 = signalEngine === "v2" || signalEngine === "v1v2";
       const isV1OnlySelection = signalEngine === "v1";
       const useV1Pure = true;
-      console.log(`[EngineRoute] user=${userId.slice(0, 8)} raw=${rawSignalEngine ?? "null"} normalized=${signalEngine} useV2=${useV2} v1Base=pure`);
+
+      // ─── V1 ENHANCED session preferences (default ALL ON) ───
+      const enableAsian = (sigPrefRes.data as any)?.enable_asian_session ?? true;
+      const enableLondon = (sigPrefRes.data as any)?.enable_london_session ?? true;
+      const enableNy = (sigPrefRes.data as any)?.enable_ny_session ?? true;
+      const sessionPref = { asian: enableAsian, london: enableLondon, ny: enableNy };
+      console.log(`[EngineRoute] user=${userId.slice(0, 8)} raw=${rawSignalEngine ?? "null"} normalized=${signalEngine} useV2=${useV2} v1Base=enhanced sessions=A:${enableAsian}/L:${enableLondon}/N:${enableNy}`);
 
       for (const inst of instList) {
         if (elapsed() > TIME_LIMIT_HARD) {
