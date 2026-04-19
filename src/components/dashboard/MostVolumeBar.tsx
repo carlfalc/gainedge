@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart3, Clock } from "lucide-react";
+import { BarChart3, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { SESSIONS, getActiveSessions, getCurrentSession, formatLocalHour, type SessionDef } from "@/lib/session-colors";
@@ -99,6 +99,7 @@ function buildSessionInsights(
 export function MostVolumeBar() {
   const [rows, setRows] = useState<SessionRow[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
     load();
@@ -173,30 +174,50 @@ export function MostVolumeBar() {
 
   return (
     <>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 18px", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: 10, gap: 8 }}>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: collapsed ? "10px 18px" : "14px 18px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: collapsed ? 0 : 10, gap: 8 }}>
             <BarChart3 size={16} color="#34D399" />
             <span style={{ fontSize: 13, fontWeight: 700, color: "#34D399" }}>
               Most Volume Today
-              {currentSession && (
+              {!collapsed && currentSession && (
                 <span style={{ color: currentSession.color, marginLeft: 6 }}>— {currentSession.label} Session</span>
               )}
             </span>
+            {!collapsed && (
+              <button
+                onClick={() => setHistoryOpen(true)}
+                style={{
+                  background: "#34D39915", border: `1px solid #34D39940`, cursor: "pointer",
+                  fontSize: 10, fontWeight: 700, color: "#34D399",
+                  padding: "3px 12px", borderRadius: 20,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#34D39930")}
+                onMouseLeave={e => (e.currentTarget.style.background = "#34D39915")}
+              >
+                History
+              </button>
+            )}
             <button
-              onClick={() => setHistoryOpen(true)}
+              onClick={() => setCollapsed(c => !c)}
+              title={collapsed ? "Expand" : "Collapse"}
+              aria-label={collapsed ? "Expand Most Volume Today" : "Collapse Most Volume Today"}
               style={{
-                background: "#34D39915", border: `1px solid #34D39940`, cursor: "pointer",
-                fontSize: 10, fontWeight: 700, color: "#34D399",
-                padding: "3px 12px", borderRadius: 20,
-                transition: "background 0.15s",
+                marginLeft: "auto",
+                padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.border}`,
+                cursor: "pointer", background: "transparent", color: C.sec,
+                display: "flex", alignItems: "center", gap: 4,
+                fontSize: 11, fontFamily: "'DM Sans', sans-serif",
+                transition: "all 0.2s",
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#34D39930")}
-              onMouseLeave={e => (e.currentTarget.style.background = "#34D39915")}
+              onMouseEnter={e => (e.currentTarget.style.color = C.text)}
+              onMouseLeave={e => (e.currentTarget.style.color = C.sec)}
             >
-              History
+              {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
             </button>
         </div>
 
+        {!collapsed && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {rows.map((row) => {
             const color = row.session.color;
@@ -280,6 +301,7 @@ export function MostVolumeBar() {
             );
           })}
         </div>
+        )}
       </div>
 
       <VolumeHistoryModal open={historyOpen} onClose={() => setHistoryOpen(false)} />
