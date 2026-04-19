@@ -419,17 +419,51 @@ function getAtrSlMultiplier(symbol: string, category?: string): number {
   return 1.5;
 }
 
-// ─── V1 Legacy Analysis (ATR-based SL/TP per instrument) ───
-// When useV1Pure is true, the ONLY entry condition is a confirmed EMA 4/17 crossover.
-// No ADX, ATR-range, or EMA-flatness filters are applied. Confidence is scored by
-// indicator alignment but does NOT gate signal firing.
-function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
-  const closes = candles.map((c: any) => c.close);
-  const highs = candles.map((c: any) => c.high);
-  const lows = candles.map((c: any) => c.low);
-  const volumes = candles.map((c: any) => c.tickVolume || 0);
+// ─── V1 LEGACY pip-size table (Falconer Pine Script spec) ───
+// Used ONLY in V1 Pure mode for fixed 55-pip TP/SL.
+const V1_PIP_SIZE: Record<string, number> = {
+  // 5-decimal forex
+  EURUSD: 0.0001, GBPUSD: 0.0001, AUDUSD: 0.0001, NZDUSD: 0.0001,
+  USDCAD: 0.0001, USDCHF: 0.0001, EURGBP: 0.0001, EURAUD: 0.0001,
+  EURNZD: 0.0001, EURCAD: 0.0001, EURCHF: 0.0001, GBPAUD: 0.0001,
+  GBPNZD: 0.0001, GBPCAD: 0.0001, GBPCHF: 0.0001, AUDCAD: 0.0001,
+  AUDCHF: 0.0001, AUDNZD: 0.0001, NZDCAD: 0.0001, NZDCHF: 0.0001,
+  CADCHF: 0.0001,
+  // JPY pairs
+  USDJPY: 0.01, EURJPY: 0.01, GBPJPY: 0.01, AUDJPY: 0.01,
+  NZDJPY: 0.01, CADJPY: 0.01, CHFJPY: 0.01,
+  // Metals
+  XAUUSD: 0.01, XAGUSD: 0.001, XAUAUD: 0.01,
+  // Indices
+  US30: 1.0, NAS100: 0.1, US500: 0.1, UK100: 0.1, GER40: 0.1, JP225: 1.0,
+  // Energy
+  USOIL: 0.01, UKOIL: 0.01,
+};
+function v1PipSize(symbol: string): number {
+  if (V1_PIP_SIZE[symbol] !== undefined) return V1_PIP_SIZE[symbol];
+  if (symbol.includes("JPY")) return 0.01;
+  return 0.0001;
+}
 
-  // EMA 4/17 crossover — use CLOSED candle
+// ─── V1 Legacy Analysis ───
+// V1 PURE (Falconer Pine Script port):
+//   - EMA(4)/EMA(17) crossover on CLOSED 15m candles, raw close prices
+//   - Sole entry trigger: ta.crossover / ta.crossunder event on the latest closed bar
+//   - Fixed 55-pip TP and 55-pip SL (1:1 R:R), per-symbol pip size lookup
+//   - NO MTF / Confluence / Volume / Pattern / RSI / ADX gates
+// LEGACY (non-pure) path keeps the older multi-filter logic for backwards-compat.
+function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolCategory?: string, symbolName?: string): AnalysisResult {
+  // V1 PURE: drop the currently-forming bar so EMAs are computed on CLOSED candles only.
+  // (The caller already gates this function on candle-close events, but this guarantees
+  //  we never include an in-progress candle in the EMA series.)
+  const workCandles = useV1Pure && candles.length > 1 ? candles.slice(0, -1) : candles;
+
+  const closes = workCandles.map((c: any) => c.close);
+  const highs = workCandles.map((c: any) => c.high);
+  const lows = workCandles.map((c: any) => c.low);
+  const volumes = workCandles.map((c: any) => c.tickVolume || 0);
+
+  // EMA 4/17 on raw closes (Pine Script: ta.ema(close, 4) / ta.ema(close, 17))
   const ema4 = calcEMA(closes, 4);
   const ema17 = calcEMA(closes, 17);
   const lastIdx = ema4.length - 1;
@@ -438,13 +472,16 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
   const prevFast = ema4[lastIdx - 1];
   const prevSlow = ema17[lastIdx - 1];
 
+  // Pine Script ta.crossover / ta.crossunder event detection
   let crossoverStatus = "NONE";
   let crossoverDir: string | null = null;
   if (prevFast <= prevSlow && currFast > currSlow) {
     crossoverStatus = "CONFIRMED"; crossoverDir = "BULLISH";
   } else if (prevFast >= prevSlow && currFast < currSlow) {
     crossoverStatus = "CONFIRMED"; crossoverDir = "BEARISH";
-  } else if (Math.abs(currFast - currSlow) / currSlow < 0.0003) {
+  } else if (!useV1Pure && Math.abs(currFast - currSlow) / currSlow < 0.0003) {
+    // FORMING is a non-pure-only convenience state; V1 Pure fires only on the
+    // exact crossover event, never on "forming".
     crossoverStatus = "FORMING";
     crossoverDir = currFast > currSlow ? "BULLISH" : "BEARISH";
   }
@@ -457,8 +494,50 @@ function runAnalysisV1(candles: any[], useV1Pure = false, rrRatio = 2.0, symbolC
   const avgVolume = volumes.length > 0 ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length : 0;
   const lastVolume = volumes[volumes.length - 1] || 0;
 
-  // ─── V1 NO-TRADE FILTERS (SKIPPED when useV1Pure) ───
-  if (!useV1Pure) {
+  // ═══════════════════════════════════════════════════════════════════
+  // V1 PURE FAST PATH (Falconer Pine Script port)
+  //   Sole entry trigger: ta.crossover/ta.crossunder of EMA(4)/EMA(17) on
+  //   the latest CLOSED candle. Fixed 55-pip TP and 55-pip SL (1:1 R:R).
+  //   Indicators (RSI/ADX/MACD/StochRSI) are returned for DISPLAY ONLY —
+  //   they never gate signal creation.
+  // ═══════════════════════════════════════════════════════════════════
+  if (useV1Pure) {
+    const lastClose = closes[closes.length - 1];
+    const sym = symbolName || "";
+    const pip = v1PipSize(sym);
+    const dist = pip * 55; // 55 pips, fixed
+
+    if (crossoverStatus === "CONFIRMED" && (crossoverDir === "BULLISH" || crossoverDir === "BEARISH")) {
+      const direction = crossoverDir === "BULLISH" ? "BUY" : "SELL";
+      const entry = +lastClose.toFixed(5);
+      const sl = direction === "BUY" ? +(entry - dist).toFixed(5) : +(entry + dist).toFixed(5);
+      const tp = direction === "BUY" ? +(entry + dist).toFixed(5) : +(entry - dist).toFixed(5);
+      return {
+        direction, confidence: 8,
+        entry_price: entry, take_profit: tp, stop_loss: sl,
+        risk_reward: "1.0:1",
+        ema_crossover_status: "CONFIRMED",
+        ema_crossover_direction: crossoverDir,
+        reasoning: `[V1 Legacy] EMA(4)/EMA(17) ${crossoverDir.toLowerCase()} crossover on closed 15m candle. Entry ${entry}, TP ${tp} (+55 pips), SL ${sl} (-55 pips). 1:1 R:R per Falconer V1 spec.`,
+        verdict: direction,
+        rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+      };
+    }
+
+    // No crossover this close — WAIT (display-only diagnostics still returned)
+    return {
+      direction: "WAIT", confidence: 1,
+      entry_price: null, take_profit: null, stop_loss: null, risk_reward: null,
+      ema_crossover_status: crossoverStatus,
+      ema_crossover_direction: crossoverDir,
+      reasoning: `[V1 Legacy] No EMA(4)/EMA(17) crossover on this 15m close. Monitoring. (RSI ${rsi}, ADX ${adx}, MACD ${macd} — display only, do not gate V1 entry.)`,
+      verdict: "WAIT",
+      rsi, adx, macd_status: macd, stoch_rsi: stochRsi,
+    };
+  }
+
+  // ─── LEGACY V1 NO-TRADE FILTERS (only used by V1V2 / non-pure paths) ───
+  {
     const reasons: string[] = [];
     let noTrade = false;
 
@@ -1390,6 +1469,25 @@ serve(async (req) => {
           if (mockSymbols.has(inst.symbol)) {
             console.warn(`Skipping signal generation for ${inst.symbol} — using mock data`);
             continue;
+          }
+
+          // ─── V1 PURE HARD GATE: 15-minute timeframe only ───
+          // Falconer Pine Script V1 is defined exclusively on the 15m chart.
+          if (useV1Pure && inst.timeframe !== "15m") {
+            console.log(`V1 Pure gate: skipping ${inst.symbol} on ${inst.timeframe} (V1 is 15m-only)`);
+            continue;
+          }
+
+          // ─── V1 PURE CLOSED-CANDLE VERIFICATION ───
+          // We are inside the "candle close detected" branch (prevTime !== newTime),
+          // so the previous bar — the one our EMA evaluation lands on — is now closed.
+          // Belt-and-braces: confirm prevTime + 15min <= now (with 30s tolerance).
+          if (useV1Pure && prevTime) {
+            const prevMs = new Date(prevTime).getTime();
+            if (Number.isFinite(prevMs) && prevMs + 15 * 60_000 > Date.now() + 30_000) {
+              console.log(`V1 Pure: previous candle ${prevTime} not yet closed for ${inst.symbol} — skipping`);
+              continue;
+            }
           }
 
           const candles = symbolCandles.get(inst.symbol);
