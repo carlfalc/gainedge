@@ -235,7 +235,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   };
 
   const trendOf = (s: ScanResult): "BULLISH" | "BEARISH" | "NEUTRAL" => {
-    const liveMacd = liveData?.find((l) => l.symbol === s.symbol)?.macd_status;
+    const liveMacd = liveData?.get(s.symbol)?.macd_status;
     const macd = (liveMacd ?? s.macd_status ?? "").toString().toLowerCase();
     if (macd.includes("bull")) return "BULLISH";
     if (macd.includes("bear")) return "BEARISH";
