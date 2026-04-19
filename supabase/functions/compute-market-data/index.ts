@@ -419,8 +419,9 @@ function getAtrSlMultiplier(symbol: string, category?: string): number {
   return 1.5;
 }
 
-// ─── V1 LEGACY pip-size table (Falconer Pine Script spec) ───
-// Used ONLY in V1 Pure mode for fixed 55-pip TP/SL.
+// ─── V1 LEGACY ENHANCED pip-size table ───
+// Industry-standard pip definitions used for fixed 55 pip SL / 100 pip TP (1:1.82 R:R).
+// XAUUSD: 1 pip = $0.10 (10 pips per $1 move) — retail-trader convention.
 const V1_PIP_SIZE: Record<string, number> = {
   // 5-decimal forex
   EURUSD: 0.0001, GBPUSD: 0.0001, AUDUSD: 0.0001, NZDUSD: 0.0001,
@@ -432,10 +433,10 @@ const V1_PIP_SIZE: Record<string, number> = {
   // JPY pairs
   USDJPY: 0.01, EURJPY: 0.01, GBPJPY: 0.01, AUDJPY: 0.01,
   NZDJPY: 0.01, CADJPY: 0.01, CHFJPY: 0.01,
-  // Metals
-  XAUUSD: 0.01, XAGUSD: 0.001, XAUAUD: 0.01,
-  // Indices
-  US30: 1.0, NAS100: 0.1, US500: 0.1, UK100: 0.1, GER40: 0.1, JP225: 1.0,
+  // Metals — Gold uses 0.10 (industry standard), Silver 0.01
+  XAUUSD: 0.1, XAGUSD: 0.01, XAUAUD: 0.1,
+  // Indices — 1 pip = 1 point on Dow / Nikkei; 0.1 elsewhere isn't standard, use 1.0
+  US30: 1.0, NAS100: 1.0, US500: 1.0, UK100: 1.0, GER40: 1.0, JP225: 1.0,
   // Energy
   USOIL: 0.01, UKOIL: 0.01,
 };
@@ -443,6 +444,60 @@ function v1PipSize(symbol: string): number {
   if (V1_PIP_SIZE[symbol] !== undefined) return V1_PIP_SIZE[symbol];
   if (symbol.includes("JPY")) return 0.01;
   return 0.0001;
+}
+
+// V1 Enhanced risk parameters (1:1.82 R:R)
+const V1_SL_PIPS = 55;
+const V1_TP_PIPS = 100;
+
+// ─── Trading session detection (UTC) ───
+// Asian: 22:00-07:00 UTC (Tokyo + Sydney, wraps midnight)
+// London: 07:00-16:00 UTC
+// New York: 12:30-21:00 UTC
+// Returns array of session keys active at given UTC hour/minute.
+function getActiveSessionsAt(date: Date): Array<"asian" | "london" | "ny"> {
+  const h = date.getUTCHours();
+  const m = date.getUTCMinutes();
+  const minOfDay = h * 60 + m;
+  const active: Array<"asian" | "london" | "ny"> = [];
+  // Asian wraps midnight: 22:00-24:00 OR 00:00-07:00
+  if (minOfDay >= 22 * 60 || minOfDay < 7 * 60) active.push("asian");
+  if (minOfDay >= 7 * 60 && minOfDay < 16 * 60) active.push("london");
+  if (minOfDay >= 12 * 60 + 30 && minOfDay < 21 * 60) active.push("ny");
+  return active;
+}
+
+// ─── 1H trend filter cache (per scanner invocation) ───
+// Avoid re-fetching 1H candles for every signal candidate in the same invocation.
+const trendCache = new Map<string, { ts: number; trendUp: boolean | null }>();
+const TREND_CACHE_TTL_MS = 15 * 60_000;
+
+async function get1HTrendUp(
+  token: string,
+  accountId: string,
+  symbol: string,
+): Promise<boolean | null> {
+  const cached = trendCache.get(symbol);
+  if (cached && Date.now() - cached.ts < TREND_CACHE_TTL_MS) return cached.trendUp;
+  try {
+    const candles = await fetchCandlesFromBroker(token, accountId, symbol, "1h", 50);
+    if (!Array.isArray(candles) || candles.length < 20) {
+      trendCache.set(symbol, { ts: Date.now(), trendUp: null });
+      return null;
+    }
+    // Drop in-progress candle so we evaluate on closed bars only
+    const closed = candles.length > 1 ? candles.slice(0, -1) : candles;
+    const closes = closed.map((c: any) => +c.close);
+    const e4 = calcEMA(closes, 4);
+    const e17 = calcEMA(closes, 17);
+    const last = e4.length - 1;
+    const trendUp = e4[last] > e17[last];
+    trendCache.set(symbol, { ts: Date.now(), trendUp });
+    return trendUp;
+  } catch {
+    trendCache.set(symbol, { ts: Date.now(), trendUp: null });
+    return null;
+  }
 }
 
 function normalizeSignalEngine(value: string | null | undefined): "v1" | "v2" | "v1v2" {
