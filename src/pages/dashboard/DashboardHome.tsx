@@ -303,6 +303,7 @@ export default function DashboardHome() {
       <InstrumentTrackingPanel />
 
       <MostVolumeBar />
+      <VolumeHistoryInline />
 
       {best ? (
         <div style={{
