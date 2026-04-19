@@ -104,6 +104,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [trendFilter, setTrendFilter] = useState<"ALL" | "BULLISH" | "BEARISH" | "NEUTRAL">("ALL");
   const { data: liveData } = useLiveMarketData(userId);
   const mergedLiveData = useMemo(() => (liveData.size ? liveData : fallbackLiveData), [liveData, fallbackLiveData]);
 
@@ -233,7 +234,13 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
     localStorage.removeItem(HIDDEN_PANES_KEY);
   };
 
-  const visibleScans = scans
+  const trendOf = (s: ScanResult): "BULLISH" | "BEARISH" | "NEUTRAL" => {
+    if (s.direction === "BUY") return "BULLISH";
+    if (s.direction === "SELL") return "BEARISH";
+    return "NEUTRAL";
+  };
+
+  const baseSorted = scans
     .filter((s) => !hiddenPanes.has(s.symbol))
     .sort((a, b) => {
       const ai = cardOrder.indexOf(a.symbol);
@@ -243,6 +250,17 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       if (bi === -1) return -1;
       return ai - bi;
     });
+
+  const trendCounts = {
+    BULLISH: baseSorted.filter((s) => trendOf(s) === "BULLISH").length,
+    BEARISH: baseSorted.filter((s) => trendOf(s) === "BEARISH").length,
+    NEUTRAL: baseSorted.filter((s) => trendOf(s) === "NEUTRAL").length,
+  };
+
+  const visibleScans = trendFilter === "ALL"
+    ? baseSorted
+    : baseSorted.filter((s) => trendOf(s) === trendFilter);
+
 
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
@@ -280,14 +298,50 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <span style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
             CURRENT INSTRUMENT TRACKING
           </span>
           <span style={{ color: C.sec, fontWeight: 400, fontSize: 10 }}>
             {visibleScans.length}/{scans.length} visible
           </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 4, background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: 2 }}>
+            {([
+              { key: "ALL", label: "All", color: C.text, count: baseSorted.length },
+              { key: "BULLISH", label: "Bullish", color: "#22C55E", count: trendCounts.BULLISH },
+              { key: "BEARISH", label: "Bearish", color: "#EF4444", count: trendCounts.BEARISH },
+              { key: "NEUTRAL", label: "Neutral", color: "#F59E0B", count: trendCounts.NEUTRAL },
+            ] as const).map((tab) => {
+              const active = trendFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setTrendFilter(tab.key)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: "none",
+                    cursor: "pointer",
+                    background: active ? tab.color + "22" : "transparent",
+                    color: active ? tab.color : C.sec,
+                    transition: "background 0.15s, color 0.15s",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                  title={`Show ${tab.label.toLowerCase()} instruments`}
+                >
+                  {tab.label}
+                  <span style={{ fontSize: 9, opacity: 0.8, fontFamily: "'JetBrains Mono', monospace" }}>{tab.count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
