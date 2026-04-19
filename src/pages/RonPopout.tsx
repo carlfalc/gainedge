@@ -121,7 +121,81 @@ export default function RonPopout() {
     } catch { onEnd?.(); }
   }, []);
 
-  const playNextInQueue = useCallback(async () => {
+  // Attach Web Audio analyser to an <audio> element and start RAF loop
+  const attachAnalyser = useCallback((audio: HTMLAudioElement) => {
+    try {
+      if (!audioCtxRef.current) {
+        const Ctx: typeof AudioContext =
+          (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (!Ctx) return;
+        audioCtxRef.current = new Ctx();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+      if (!analyserRef.current) {
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.7;
+        analyser.connect(ctx.destination);
+        analyserRef.current = analyser;
+      }
+
+      // Each <audio> can only be sourced once — cache to avoid InvalidStateError
+      let source = sourceMapRef.current.get(audio);
+      if (!source) {
+        source = ctx.createMediaElementSource(audio);
+        source.connect(analyserRef.current!);
+        sourceMapRef.current.set(audio, source);
+      }
+
+      // Start RAF loop if not already running
+      if (rafRef.current == null) {
+        const data = new Uint8Array(analyserRef.current!.frequencyBinCount);
+        let smoothed = 0;
+        const tick = () => {
+          const a = analyserRef.current;
+          if (!a) { rafRef.current = null; return; }
+          a.getByteFrequencyData(data);
+          // Voice band (roughly 80Hz-3kHz) → first ~30 bins at 44.1kHz/256
+          let sum = 0;
+          const end = Math.min(40, data.length);
+          for (let i = 2; i < end; i++) sum += data[i];
+          const avg = sum / (end - 2) / 255; // 0..1
+          // Boost & clamp
+          const boosted = Math.min(1, avg * 1.6);
+          smoothed = smoothed * 0.65 + boosted * 0.35;
+          setAmplitude(smoothed);
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    } catch (e) {
+      console.warn("Analyser attach failed (non-fatal):", e);
+    }
+  }, []);
+
+  // Decay amplitude to 0 when not speaking; stop RAF when idle
+  useEffect(() => {
+    if (!isSpeaking && amplitude > 0.001) {
+      const id = setTimeout(() => setAmplitude((a) => a * 0.5), 80);
+      return () => clearTimeout(id);
+    }
+    if (!isSpeaking && rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      setAmplitude(0);
+    }
+  }, [isSpeaking, amplitude]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      audioCtxRef.current?.close().catch(() => {});
+    };
+  }, []);
+
     if (ttsPlayingRef.current) return;
     const next = ttsQueueRef.current.shift();
     if (!next) {
