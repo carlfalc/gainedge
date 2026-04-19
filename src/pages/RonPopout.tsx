@@ -95,6 +95,13 @@ export default function RonPopout() {
   const ttsPlayingRef = useRef(false);
   const ttsBufferRef = useRef("");
 
+  // ─── Audio analyser for voice-reactive background ───
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceMapRef = useRef<WeakMap<HTMLAudioElement, MediaElementAudioSourceNode>>(new WeakMap());
+  const rafRef = useRef<number | null>(null);
+  const [amplitude, setAmplitude] = useState(0);
+
   useEffect(() => {
     document.title = "Talk to RON";
   }, []);
