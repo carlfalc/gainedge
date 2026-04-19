@@ -159,22 +159,29 @@ export function VolumeHistoryInline() {
       marginTop: -8,
       marginBottom: 16,
     }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          background: "none", border: "none", cursor: "pointer", padding: 0,
-          width: "100%", display: "flex", alignItems: "center", gap: 8,
-        }}
-      >
-        {open ? <ChevronDown size={14} color="#34D399" /> : <ChevronRight size={14} color="#34D399" />}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
         <Calendar size={13} color="#34D399" />
         <span style={{ fontSize: 12, fontWeight: 700, color: "#34D399" }}>
           Historical Volume Patterns — Last 14 & 30 Days
         </span>
-        <span style={{ fontSize: 10, color: C.muted, fontWeight: 500, marginLeft: "auto" }}>
-          {open ? "Hide" : "Show"} optimum sessions, timeframes & best buy/sell windows
-        </span>
-      </button>
+        <button
+          onClick={() => setOpen(o => !o)}
+          title={open ? "Collapse" : "Expand"}
+          aria-label={open ? "Collapse Historical Volume Patterns" : "Expand Historical Volume Patterns"}
+          style={{
+            marginLeft: "auto",
+            padding: "5px 8px", borderRadius: 8, border: `1px solid ${C.border}`,
+            cursor: "pointer", background: "transparent", color: C.sec,
+            display: "flex", alignItems: "center", gap: 4,
+            fontSize: 11, fontFamily: "'DM Sans', sans-serif",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = C.text)}
+          onMouseLeave={e => (e.currentTarget.style.color = C.sec)}
+        >
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      </div>
 
       {open && (
         <div style={{ marginTop: 12 }}>
