@@ -14,3 +14,8 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
+[functions.ron-auto-trade]
+verify_jwt = false
+
+[functions.v2-precision-backtest]
+verify_jwt = false
