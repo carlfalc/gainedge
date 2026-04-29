@@ -954,6 +954,63 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_auto_trades: {
+        Row: {
+          closed_at: string | null
+          direction: string
+          entry_price: number | null
+          id: string
+          metaapi_trade_id: string | null
+          opened_at: string
+          pips: number | null
+          result: string | null
+          ron_probability: number | null
+          signal_id: string | null
+          sl_price: number | null
+          status: string | null
+          symbol: string
+          tp_price: number | null
+          user_id: string
+          volume: number
+        }
+        Insert: {
+          closed_at?: string | null
+          direction: string
+          entry_price?: number | null
+          id?: string
+          metaapi_trade_id?: string | null
+          opened_at?: string
+          pips?: number | null
+          result?: string | null
+          ron_probability?: number | null
+          signal_id?: string | null
+          sl_price?: number | null
+          status?: string | null
+          symbol: string
+          tp_price?: number | null
+          user_id: string
+          volume: number
+        }
+        Update: {
+          closed_at?: string | null
+          direction?: string
+          entry_price?: number | null
+          id?: string
+          metaapi_trade_id?: string | null
+          opened_at?: string
+          pips?: number | null
+          result?: string | null
+          ron_probability?: number | null
+          signal_id?: string | null
+          sl_price?: number | null
+          status?: string | null
+          symbol?: string
+          tp_price?: number | null
+          user_id?: string
+          volume?: number
+        }
+        Relationships: []
+      }
       ron_calibration: {
         Row: {
           calibrated_at: string
@@ -1090,6 +1147,57 @@ export type Database = {
           recovery_time_hours?: number | null
           risk_mode?: string
           symbol?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ron_settings: {
+        Row: {
+          atr_sl_mult: number | null
+          atr_tp_mult: number | null
+          created_at: string
+          id: string
+          max_open_trades: number | null
+          min_ron_probability: number | null
+          risk_per_trade_pct: number | null
+          ron_enabled: boolean
+          sl_mode: string | null
+          sl_pips: number | null
+          symbols: string[] | null
+          tp_pips: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          atr_sl_mult?: number | null
+          atr_tp_mult?: number | null
+          created_at?: string
+          id?: string
+          max_open_trades?: number | null
+          min_ron_probability?: number | null
+          risk_per_trade_pct?: number | null
+          ron_enabled?: boolean
+          sl_mode?: string | null
+          sl_pips?: number | null
+          symbols?: string[] | null
+          tp_pips?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          atr_sl_mult?: number | null
+          atr_tp_mult?: number | null
+          created_at?: string
+          id?: string
+          max_open_trades?: number | null
+          min_ron_probability?: number | null
+          risk_per_trade_pct?: number | null
+          ron_enabled?: boolean
+          sl_mode?: string | null
+          sl_pips?: number | null
+          symbols?: string[] | null
+          tp_pips?: number | null
           updated_at?: string
           user_id?: string
         }
