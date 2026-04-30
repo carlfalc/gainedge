@@ -1011,6 +1011,72 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_backtest_runs: {
+        Row: {
+          combined: Json | null
+          config: Json
+          created_at: string
+          data_window: Json | null
+          equity_curve: Json | null
+          htf_timeframe: string
+          id: string
+          in_sample: Json | null
+          in_sample_split: string | null
+          issues: Json | null
+          out_of_sample: Json | null
+          period_end: string
+          period_start: string
+          ron_ml_version: string | null
+          run_label: string | null
+          symbol: string
+          timeframe: string
+          trades: Json | null
+          verdict: string | null
+        }
+        Insert: {
+          combined?: Json | null
+          config?: Json
+          created_at?: string
+          data_window?: Json | null
+          equity_curve?: Json | null
+          htf_timeframe?: string
+          id?: string
+          in_sample?: Json | null
+          in_sample_split?: string | null
+          issues?: Json | null
+          out_of_sample?: Json | null
+          period_end: string
+          period_start: string
+          ron_ml_version?: string | null
+          run_label?: string | null
+          symbol: string
+          timeframe?: string
+          trades?: Json | null
+          verdict?: string | null
+        }
+        Update: {
+          combined?: Json | null
+          config?: Json
+          created_at?: string
+          data_window?: Json | null
+          equity_curve?: Json | null
+          htf_timeframe?: string
+          id?: string
+          in_sample?: Json | null
+          in_sample_split?: string | null
+          issues?: Json | null
+          out_of_sample?: Json | null
+          period_end?: string
+          period_start?: string
+          ron_ml_version?: string | null
+          run_label?: string | null
+          symbol?: string
+          timeframe?: string
+          trades?: Json | null
+          verdict?: string | null
+        }
+        Relationships: []
+      }
       ron_calibration: {
         Row: {
           calibrated_at: string
