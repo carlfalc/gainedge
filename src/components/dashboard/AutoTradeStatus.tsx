@@ -168,7 +168,7 @@ export default function AutoTradeStatus({
         <div className="flex items-center gap-2 text-[11px] text-[#00CFA5]">
           <Activity className="w-3.5 h-3.5" />
           <span>
-            🟢 RON is ON — Monitoring {symbol} ({dirLabel}, confidence ≥ 7)
+            🟢 RON v3 ON — Monitoring {symbol} ({dirLabel}) · DLO + Squeeze + HA + EMA 12/69 · Tier A/B only
           </span>
         </div>
       );
