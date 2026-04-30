@@ -19,3 +19,6 @@ verify_jwt = false
 
 [functions.v2-precision-backtest]
 verify_jwt = false
+
+[functions.ron-backtest]
+verify_jwt = false
