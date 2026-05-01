@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { C } from "@/lib/mock-data";
 import { Sparkline } from "@/components/dashboard/Sparkline";
-import { Play, Loader2, Lock, Settings2, X, ShieldCheck, Database, AlertTriangle } from "lucide-react";
+import { Play, Loader2, Lock, Settings2, X, ShieldCheck, Database, AlertTriangle, Download, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -31,6 +31,20 @@ interface BacktestMetrics {
 }
 
 const SYMBOLS = ["XAUUSD", "NAS100", "US30", "AUDUSD", "NZDUSD", "EURUSD", "GBPUSD", "USDJPY"];
+const DUKASCOPY_SYMBOLS = new Set([
+  "XAUUSD","XAUAUD","XAGUSD","EURUSD","GBPUSD","USDJPY","AUDUSD","NZDUSD",
+  "USDCAD","EURJPY","GBPJPY","AUDJPY","EURGBP","EURNZD","GBPCAD","AUDCAD","AUDNZD","NZDCAD",
+]);
+
+interface Coverage {
+  earliest: string | null;
+  latest:   string | null;
+  count:    number;
+}
+
+function isoDaysAgo(days: number) {
+  return new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
+}
 
 export default function BacktestingPage() {
   // Options-mode state
@@ -50,12 +64,103 @@ export default function BacktestingPage() {
   const [v3End, setV3End] = useState("2025-01-01");
 
   const [running, setRunning] = useState(false);
-  const [ingesting, setIngesting] = useState(false);
   const [lastError, setLastError] = useState<{ msg: string; hint?: string } | null>(null);
   const [runs, setRuns] = useState<BacktestRun[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Data coverage + Dukascopy backfill
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(false);
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [bfStart, setBfStart] = useState(isoDaysAgo(180));
+  const [bfEnd, setBfEnd]   = useState(isoDaysAgo(0));
+  const [bfRunning, setBfRunning] = useState(false);
+  const [bfProgress, setBfProgress] = useState<{ chunk: number; total: number; stored: number } | null>(null);
+
   useEffect(() => { void loadRuns(); }, []);
+  useEffect(() => { void loadCoverage(instrument); }, [instrument]);
+
+  const loadCoverage = async (symbol: string) => {
+    setCoverageLoading(true);
+    try {
+      const [{ data: minRow }, { data: maxRow }, { count }] = await Promise.all([
+        supabase.from("candle_history").select("timestamp")
+          .eq("symbol", symbol).eq("timeframe", "1m")
+          .order("timestamp", { ascending: true }).limit(1).maybeSingle(),
+        supabase.from("candle_history").select("timestamp")
+          .eq("symbol", symbol).eq("timeframe", "1m")
+          .order("timestamp", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("candle_history").select("*", { count: "exact", head: true })
+          .eq("symbol", symbol).eq("timeframe", "1m"),
+      ]);
+      setCoverage({
+        earliest: (minRow?.timestamp as string) ?? null,
+        latest:   (maxRow?.timestamp as string) ?? null,
+        count:    count ?? 0,
+      });
+    } catch (e) {
+      console.error("coverage load failed", e);
+      setCoverage({ earliest: null, latest: null, count: 0 });
+    } finally {
+      setCoverageLoading(false);
+    }
+  };
+
+  const runBackfill = async () => {
+    const start = new Date(bfStart);
+    const end   = new Date(bfEnd);
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+      toast.error("Invalid backfill date range"); return;
+    }
+    if (!DUKASCOPY_SYMBOLS.has(instrument)) {
+      toast.error(`${instrument} is not supported by Dukascopy direct ingest`); return;
+    }
+
+    // Build 14-day chunks
+    const CHUNK_DAYS = 14;
+    const chunks: { start: string; end: string }[] = [];
+    let cursor = new Date(start);
+    while (cursor < end) {
+      const next = new Date(Math.min(cursor.getTime() + CHUNK_DAYS * 86400_000, end.getTime()));
+      chunks.push({
+        start: cursor.toISOString().slice(0, 10),
+        end:   next.toISOString().slice(0, 10),
+      });
+      cursor = next;
+    }
+
+    setBfRunning(true);
+    setBfProgress({ chunk: 0, total: chunks.length, stored: 0 });
+    let totalStored = 0;
+    let failures = 0;
+
+    try {
+      await supabase.auth.refreshSession();
+      for (let i = 0; i < chunks.length; i++) {
+        const c = chunks[i];
+        setBfProgress({ chunk: i + 1, total: chunks.length, stored: totalStored });
+        try {
+          const { data, error } = await supabase.functions.invoke("ron-ingest-dukascopy", {
+            body: { symbol: instrument, start: c.start, end: c.end, max_days: 31 },
+          });
+          if (error) throw new Error(error.message);
+          const stored = Number((data as { candles_stored?: number })?.candles_stored ?? 0);
+          totalStored += stored;
+          setBfProgress({ chunk: i + 1, total: chunks.length, stored: totalStored });
+        } catch (e) {
+          failures++;
+          console.error(`chunk ${i + 1} failed`, e);
+        }
+      }
+      toast.success(`Backfill complete — ${totalStored.toLocaleString()} candles added${failures ? ` (${failures} chunk${failures > 1 ? "s" : ""} failed)` : ""}`);
+      setLastError(null);
+      await loadCoverage(instrument);
+      setBackfillOpen(false);
+    } finally {
+      setBfRunning(false);
+      setBfProgress(null);
+    }
+  };
 
   const loadRuns = async () => {
     const { data, error } = await supabase
@@ -126,31 +231,13 @@ export default function BacktestingPage() {
       toast.success(`${isV3 ? "V3" : "Options"} backtest complete`);
       const newId = (data as { run_id?: string })?.run_id ?? null;
       await loadRuns();
+      await loadCoverage(symbol);
       if (newId) setSelectedId(newId);
       if (isV3) setV3Open(false);
     } catch (e) {
       toast.error(`Backtest failed: ${(e as Error).message}`);
     } finally {
       setRunning(false);
-    }
-  };
-
-  const ingestHistory = async (symbol: string) => {
-    setIngesting(true);
-    try {
-      await supabase.auth.refreshSession();
-      const { data, error } = await supabase.functions.invoke("ron-ingest-history", {
-        body: { symbol, timeframe: "1m" },
-      });
-      if (error) throw new Error(error.message);
-      const rows = (data as { rows?: number; ingested?: number })?.rows
-                ?? (data as { ingested?: number })?.ingested;
-      toast.success(`Ingested ${symbol} 1m history${rows != null ? ` (${rows} rows)` : ""}`);
-      setLastError(null);
-    } catch (e) {
-      toast.error(`Ingest failed: ${(e as Error).message}`);
-    } finally {
-      setIngesting(false);
     }
   };
 
@@ -210,20 +297,60 @@ export default function BacktestingPage() {
             )}
           </div>
           <button
-            onClick={() => void ingestHistory(v3Open ? v3Symbol : instrument)}
-            disabled={ingesting}
+            onClick={() => setBackfillOpen(true)}
             style={{
               display: "inline-flex", alignItems: "center", gap: 6,
               padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
               background: C.card, color: C.text, fontSize: 11, fontWeight: 700,
-              cursor: ingesting ? "wait" : "pointer", whiteSpace: "nowrap",
+              cursor: "pointer", whiteSpace: "nowrap",
             }}
           >
-            {ingesting ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
-            {ingesting ? "Ingesting…" : `Ingest ${v3Open ? v3Symbol : instrument} 1m`}
+            <Download size={12} /> Backfill from Dukascopy
           </button>
         </div>
       )}
+
+      {/* Data Coverage */}
+      <div style={{ ...cardStyle, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Database size={14} color={C.jade} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+              Data Coverage — {instrument} (1m)
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => void loadCoverage(instrument)}
+              disabled={coverageLoading}
+              style={iconBtn}
+              title="Refresh coverage"
+            >
+              <RefreshCw size={13} className={coverageLoading ? "animate-spin" : ""} />
+            </button>
+            <button
+              onClick={() => setBackfillOpen(true)}
+              disabled={!DUKASCOPY_SYMBOLS.has(instrument)}
+              title={DUKASCOPY_SYMBOLS.has(instrument) ? "" : `${instrument} not available on Dukascopy`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 14px", borderRadius: 8, border: "none",
+                background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`,
+                color: C.bg, fontSize: 12, fontWeight: 800,
+                cursor: DUKASCOPY_SYMBOLS.has(instrument) ? "pointer" : "not-allowed",
+                opacity: DUKASCOPY_SYMBOLS.has(instrument) ? 1 : 0.5,
+              }}
+            >
+              <Download size={12} /> Backfill from Dukascopy
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <CoverageStat label="Earliest" value={coverage?.earliest ? new Date(coverage.earliest).toLocaleString() : "—"} />
+          <CoverageStat label="Latest"   value={coverage?.latest   ? new Date(coverage.latest).toLocaleString()   : "—"} />
+          <CoverageStat label="Total candles" value={coverage ? coverage.count.toLocaleString() : "—"} highlight />
+        </div>
+      </div>
 
       {/* Options config */}
       <div style={cardStyle}>
@@ -361,6 +488,107 @@ export default function BacktestingPage() {
           onRun={() => void runBacktest("v3")}
         />
       )}
+
+      {/* Backfill modal */}
+      {backfillOpen && (
+        <BackfillModal
+          symbol={instrument}
+          start={bfStart} setStart={setBfStart}
+          end={bfEnd} setEnd={setBfEnd}
+          running={bfRunning}
+          progress={bfProgress}
+          onClose={() => { if (!bfRunning) setBackfillOpen(false); }}
+          onRun={() => void runBackfill()}
+        />
+      )}
+    </div>
+  );
+}
+
+function BackfillModal(props: {
+  symbol: string;
+  start: string; setStart: (s: string) => void;
+  end: string;   setEnd:   (s: string) => void;
+  running: boolean;
+  progress: { chunk: number; total: number; stored: number } | null;
+  onClose: () => void; onRun: () => void;
+}) {
+  const pct = props.progress ? Math.round((props.progress.chunk / props.progress.total) * 100) : 0;
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 1000, padding: 20,
+    }} onClick={props.onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        width: "min(560px, 100%)", background: C.card,
+        border: `1px solid ${C.border}`, borderRadius: 16, padding: 24,
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Download size={18} color={C.jade} />
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: C.text, margin: 0 }}>
+                Backfill from Dukascopy
+              </h2>
+            </div>
+            <div style={{ fontSize: 12, color: C.sec, marginTop: 4 }}>
+              Direct 1m candle download for <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{props.symbol}</span>
+              . Ranges are split into 14-day chunks and ingested sequentially.
+            </div>
+          </div>
+          <button onClick={props.onClose} disabled={props.running} style={iconBtn}><X size={16} /></button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+          <Field label="Start date">
+            <input type="date" value={props.start} disabled={props.running}
+              onChange={e => props.setStart(e.target.value)} style={inputStyle} />
+          </Field>
+          <Field label="End date">
+            <input type="date" value={props.end} disabled={props.running}
+              onChange={e => props.setEnd(e.target.value)} style={inputStyle} />
+          </Field>
+        </div>
+
+        {props.progress && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.sec, marginBottom: 6 }}>
+              <span>Downloading chunk {props.progress.chunk} of {props.progress.total}…</span>
+              <span style={{ color: C.jade, fontFamily: "'JetBrains Mono', monospace" }}>
+                {props.progress.stored.toLocaleString()} candles stored
+              </span>
+            </div>
+            <div style={{ height: 8, borderRadius: 999, background: C.bg, overflow: "hidden", border: `1px solid ${C.border}` }}>
+              <div style={{
+                width: `${pct}%`, height: "100%",
+                background: `linear-gradient(90deg, ${C.jade}, ${C.teal})`,
+                transition: "width 0.3s ease",
+              }} />
+            </div>
+          </div>
+        )}
+
+        <button onClick={props.onRun} disabled={props.running} style={runBtn(props.running)}>
+          {props.running ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+          {props.running ? "Backfilling…" : "Start Backfill"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CoverageStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div style={{
+      background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12,
+    }}>
+      <div style={{ fontSize: 10, color: C.sec, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+      <div style={{
+        fontSize: 14, fontWeight: 700, marginTop: 4,
+        color: highlight ? C.jade : C.text,
+        fontFamily: "'JetBrains Mono', monospace",
+      }}>{value}</div>
     </div>
   );
 }
