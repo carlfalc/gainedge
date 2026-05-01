@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { C } from "@/lib/mock-data";
 import { Sparkline } from "@/components/dashboard/Sparkline";
-import { Play, Loader2, Lock, Settings2, X, ShieldCheck } from "lucide-react";
+import { Play, Loader2, Lock, Settings2, X, ShieldCheck, Database, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -50,6 +50,8 @@ export default function BacktestingPage() {
   const [v3End, setV3End] = useState("2025-01-01");
 
   const [running, setRunning] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
+  const [lastError, setLastError] = useState<{ msg: string; hint?: string } | null>(null);
   const [runs, setRuns] = useState<BacktestRun[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -103,7 +105,24 @@ export default function BacktestingPage() {
       // V3: no config overrides — Render uses locked defaults
 
       const { data, error } = await supabase.functions.invoke("ron-backtest", { body });
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Try to extract upstream JSON ({error, body, hint, ...}) for a clearer message
+        const ctx = (error as { context?: Response }).context;
+        let upstreamMsg = error.message;
+        let hint: string | undefined;
+        try {
+          if (ctx) {
+            const txt = await ctx.text();
+            const j = JSON.parse(txt);
+            const inner = typeof j.body === "string" ? safeJson(j.body) : null;
+            upstreamMsg = inner?.error ?? j.error ?? upstreamMsg;
+            hint = inner?.hint ?? j.hint;
+          }
+        } catch { /* ignore */ }
+        setLastError({ msg: upstreamMsg, hint });
+        throw new Error(upstreamMsg);
+      }
+      setLastError(null);
       toast.success(`${isV3 ? "V3" : "Options"} backtest complete`);
       const newId = (data as { run_id?: string })?.run_id ?? null;
       await loadRuns();
@@ -113,6 +132,25 @@ export default function BacktestingPage() {
       toast.error(`Backtest failed: ${(e as Error).message}`);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const ingestHistory = async (symbol: string) => {
+    setIngesting(true);
+    try {
+      await supabase.auth.refreshSession();
+      const { data, error } = await supabase.functions.invoke("ron-ingest-history", {
+        body: { symbol, timeframe: "1m" },
+      });
+      if (error) throw new Error(error.message);
+      const rows = (data as { rows?: number; ingested?: number })?.rows
+                ?? (data as { ingested?: number })?.ingested;
+      toast.success(`Ingested ${symbol} 1m history${rows != null ? ` (${rows} rows)` : ""}`);
+      setLastError(null);
+    } catch (e) {
+      toast.error(`Ingest failed: ${(e as Error).message}`);
+    } finally {
+      setIngesting(false);
     }
   };
 
@@ -153,6 +191,39 @@ export default function BacktestingPage() {
           <ShieldCheck size={14} /> Backtesting V3 (Production)
         </button>
       </div>
+
+      {/* Upstream error / hint banner */}
+      {lastError && (
+        <div style={{
+          background: `${C.red}15`, border: `1px solid ${C.red}55`, borderRadius: 12,
+          padding: 14, marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 10,
+        }}>
+          <AlertTriangle size={16} color={C.red} style={{ marginTop: 2, flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 12, color: C.text }}>
+            <div style={{ fontWeight: 700, color: C.red, marginBottom: 4 }}>
+              Backtest failed: {lastError.msg}
+            </div>
+            {lastError.hint && (
+              <div style={{ color: C.sec }}>
+                Hint: <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{lastError.hint}</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => void ingestHistory(v3Open ? v3Symbol : instrument)}
+            disabled={ingesting}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`,
+              background: C.card, color: C.text, fontSize: 11, fontWeight: 700,
+              cursor: ingesting ? "wait" : "pointer", whiteSpace: "nowrap",
+            }}
+          >
+            {ingesting ? <Loader2 size={12} className="animate-spin" /> : <Database size={12} />}
+            {ingesting ? "Ingesting…" : `Ingest ${v3Open ? v3Symbol : instrument} 1m`}
+          </button>
+        </div>
+      )}
 
       {/* Options config */}
       <div style={cardStyle}>
@@ -441,6 +512,10 @@ function fmtPct(v: number | undefined | null): string {
 function fmtNum(v: number | undefined | null): string {
   if (v == null || Number.isNaN(v)) return "—";
   return v.toFixed(2);
+}
+
+function safeJson(s: string): Record<string, unknown> | null {
+  try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
 }
 
 const cardStyle: React.CSSProperties = {

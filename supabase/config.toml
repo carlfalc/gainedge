@@ -22,3 +22,6 @@ verify_jwt = false
 
 [functions.ron-backtest]
 verify_jwt = false
+
+[functions.ron-ingest-history]
+verify_jwt = false
