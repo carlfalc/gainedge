@@ -19,6 +19,7 @@ import JournalPage from "./pages/dashboard/JournalPage.tsx";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage.tsx";
 import InsightsPage from "./pages/dashboard/InsightsPage.tsx";
 import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
+import BacktestsAdminPage from "./pages/dashboard/BacktestsAdminPage.tsx";
 import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="insights" element={<InsightsPage />} />
             <Route path="backtesting" element={<BacktestingPage />} />
+            <Route path="backtests" element={<BacktestsAdminPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="clock-settings" element={<ClockSettingsPage />} />

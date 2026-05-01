@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { labelKey: "nav.analytics", icon: BarChart3, path: "/dashboard/analytics" },
   { labelKey: "nav.insights", icon: Lightbulb, path: "/dashboard/insights" },
   { labelKey: "nav.backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
+  { labelKey: "nav.backtestsAdmin", icon: RefreshCw, path: "/dashboard/backtests" },
   { labelKey: "nav.calendar", icon: Calendar, path: "/dashboard/calendar" },
   { labelKey: "nav.clockSettings", icon: Clock, path: "/dashboard/clock-settings" },
   { labelKey: "nav.newsSettings", icon: Newspaper, path: "/dashboard/news-settings" },
