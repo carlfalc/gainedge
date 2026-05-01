@@ -1028,6 +1028,7 @@ export type Database = {
           period_start: string
           ron_ml_version: string | null
           run_label: string | null
+          run_type: string
           symbol: string
           timeframe: string
           trades: Json | null
@@ -1049,6 +1050,7 @@ export type Database = {
           period_start: string
           ron_ml_version?: string | null
           run_label?: string | null
+          run_type?: string
           symbol: string
           timeframe?: string
           trades?: Json | null
@@ -1070,6 +1072,7 @@ export type Database = {
           period_start?: string
           ron_ml_version?: string | null
           run_label?: string | null
+          run_type?: string
           symbol?: string
           timeframe?: string
           trades?: Json | null
