@@ -24,6 +24,9 @@ export default function BacktestingPage() {
   const [emaFast, setEmaFast] = useState("4");
   const [emaSlow, setEmaSlow] = useState("17");
   const [period, setPeriod] = useState("6");
+  const [rangeMode, setRangeMode] = useState<"months" | "custom">("custom");
+  const [startDate, setStartDate] = useState("2016-01-01");
+  const [endDate, setEndDate] = useState("2016-01-31");
 
   useEffect(() => {
     loadResults();
@@ -48,6 +51,20 @@ export default function BacktestingPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setRunning(false); return; }
 
+    // Resolve effective period from custom range if active
+    let effectivePeriodMonths = parseInt(period);
+    if (rangeMode === "custom") {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) {
+        toast.error("Invalid date range");
+        setRunning(false);
+        return;
+      }
+      const days = (e.getTime() - s.getTime()) / 86400_000;
+      effectivePeriodMonths = Math.max(1, Math.round(days / 30));
+    }
+
     // Generate mock backtest result
     const totalTrades = Math.floor(Math.random() * 100) + 60;
     const winRate = Math.floor(Math.random() * 25) + 55;
@@ -64,7 +81,7 @@ export default function BacktestingPage() {
       candle_type: candleType,
       ema_fast: parseInt(emaFast),
       ema_slow: parseInt(emaSlow),
-      period_months: parseInt(period),
+      period_months: effectivePeriodMonths,
       total_trades: totalTrades,
       win_rate: winRate,
       profit_factor: parseFloat((1 + Math.random()).toFixed(2)),
@@ -80,7 +97,11 @@ export default function BacktestingPage() {
     if (data) {
       setSelectedResult(data as BacktestResult);
       setResults(prev => [data as BacktestResult, ...prev]);
-      toast.success("Backtest complete");
+      toast.success(
+        rangeMode === "custom"
+          ? `Backtest complete (${startDate} → ${endDate})`
+          : "Backtest complete",
+      );
     }
     setRunning(false);
   };
@@ -92,7 +113,27 @@ export default function BacktestingPage() {
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 20 }}>Backtesting</h1>
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 16 }}>Configuration</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Configuration</div>
+          <div style={{ display: "inline-flex", border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
+            {(["months", "custom"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setRangeMode(m)}
+                style={{
+                  padding: "6px 12px", fontSize: 11, fontWeight: 700,
+                  background: rangeMode === m ? C.jade : "transparent",
+                  color: rangeMode === m ? C.bg : C.sec,
+                  border: "none", cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                  textTransform: "uppercase", letterSpacing: 0.5,
+                }}
+              >
+                {m === "months" ? "Period" : "Custom range"}
+              </button>
+            ))}
+          </div>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
           <Field label="Instrument">
             <select value={instrument} onChange={e => setInstrument(e.target.value)} style={inputStyle}>
@@ -117,11 +158,22 @@ export default function BacktestingPage() {
           <Field label="EMA Slow">
             <input value={emaSlow} onChange={e => setEmaSlow(e.target.value)} style={inputStyle} type="number" />
           </Field>
-          <Field label="Period (months)">
-            <select value={period} onChange={e => setPeriod(e.target.value)} style={inputStyle}>
-              {["1", "3", "6", "12", "24"].map(p => <option key={p} value={p}>{p}mo</option>)}
-            </select>
-          </Field>
+          {rangeMode === "months" ? (
+            <Field label="Period (months)">
+              <select value={period} onChange={e => setPeriod(e.target.value)} style={inputStyle}>
+                {["1", "3", "6", "12", "24"].map(p => <option key={p} value={p}>{p}mo</option>)}
+              </select>
+            </Field>
+          ) : (
+            <>
+              <Field label="Start date">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="End date">
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={inputStyle} />
+              </Field>
+            </>
+          )}
         </div>
         <button onClick={handleRun} disabled={running} style={{
           display: "flex", alignItems: "center", gap: 10, padding: "12px 28px",
