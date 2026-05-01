@@ -514,6 +514,10 @@ function fmtNum(v: number | undefined | null): string {
   return v.toFixed(2);
 }
 
+function safeJson(s: string): Record<string, unknown> | null {
+  try { return JSON.parse(s) as Record<string, unknown>; } catch { return null; }
+}
+
 const cardStyle: React.CSSProperties = {
   background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20,
 };
