@@ -25,3 +25,6 @@ verify_jwt = false
 
 [functions.ron-ingest-history]
 verify_jwt = false
+
+[functions.ron-ingest-dukascopy]
+verify_jwt = false
