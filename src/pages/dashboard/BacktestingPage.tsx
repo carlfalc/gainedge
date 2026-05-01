@@ -64,7 +64,6 @@ export default function BacktestingPage() {
   const [v3End, setV3End] = useState("2025-01-01");
 
   const [running, setRunning] = useState(false);
-  const [ingesting, setIngesting] = useState(false);
   const [lastError, setLastError] = useState<{ msg: string; hint?: string } | null>(null);
   const [runs, setRuns] = useState<BacktestRun[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
