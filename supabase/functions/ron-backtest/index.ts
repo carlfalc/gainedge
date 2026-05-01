@@ -28,6 +28,7 @@ interface BacktestRequest {
   in_sample_split?: string;
   warmup_bars?: number;
   run_label?: string;
+  run_type?: "v3" | "options";
   config?: Record<string, unknown>;
 }
 
@@ -73,12 +74,18 @@ Deno.serve(async (req: Request) => {
   const end              = body.end              ?? now.toISOString();
   const in_sample_split  = body.in_sample_split  ?? oneYearAgo.toISOString();
   const warmup_bars      = body.warmup_bars      ?? 400;
-  const config           = { ...DEFAULT_CONFIG, ...(body.config ?? {}) };
+  // V3 runs send NO overrides — Render uses locked V3 defaults.
+  // Options runs merge user overrides on top of our defaults.
+  const run_type = body.run_type ?? "options";
+  const config   = run_type === "v3"
+    ? (body.config ?? {})  // pass-through (should be empty)
+    : { ...DEFAULT_CONFIG, ...(body.config ?? {}) };
 
   // Forward to Render. Long timeout — backtests can take a few minutes.
   const upstreamPayload = {
     symbol, timeframe, htf_timeframe,
     start, end, in_sample_split, warmup_bars, config,
+    run_type,
   };
 
   let upstream: Response;
@@ -132,6 +139,7 @@ Deno.serve(async (req: Request) => {
     .from("ron_backtest_runs")
     .insert({
       run_label:       body.run_label ?? null,
+      run_type,
       symbol,
       timeframe,
       htf_timeframe,
