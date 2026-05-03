@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { C } from "@/lib/mock-data";
 import { Sparkline } from "@/components/dashboard/Sparkline";
-import { Play, Loader2, RefreshCw, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Play, Loader2, RefreshCw, AlertTriangle, CheckCircle2, XCircle, Database, Download, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -50,6 +50,17 @@ const DEFAULT_CONFIG = {
   entry_mode: "next_open",
 };
 
+const DUKASCOPY_SYMBOLS = new Set([
+  "XAUUSD","XAUAUD","XAGUSD","EURUSD","GBPUSD","USDJPY","AUDUSD","NZDUSD",
+  "USDCAD","EURJPY","GBPJPY","AUDJPY","EURGBP","EURNZD","GBPCAD","AUDCAD","AUDNZD","NZDCAD",
+]);
+
+interface Coverage {
+  earliest: string | null;
+  latest:   string | null;
+  count:    number;
+}
+
 function isoDaysAgo(days: number) {
   return new Date(Date.now() - days * 86400_000).toISOString().slice(0, 10);
 }
@@ -70,9 +81,98 @@ export default function BacktestsAdminPage() {
   const [runLabel, setRunLabel] = useState("");
   const [configText, setConfigText] = useState(JSON.stringify(DEFAULT_CONFIG, null, 2));
 
+  // Coverage + Dukascopy backfill
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(false);
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [bfStart, setBfStart] = useState("2023-01-01");
+  const [bfEnd, setBfEnd]   = useState("2024-12-31");
+  const [bfRunning, setBfRunning] = useState(false);
+  const [bfProgress, setBfProgress] = useState<{ chunk: number; total: number; stored: number } | null>(null);
+
   useEffect(() => {
     void loadRuns();
   }, []);
+  useEffect(() => { void loadCoverage(symbol); }, [symbol]);
+
+  const loadCoverage = async (sym: string) => {
+    setCoverageLoading(true);
+    try {
+      const [{ data: minRow }, { data: maxRow }, { count }] = await Promise.all([
+        supabase.from("candle_history").select("timestamp")
+          .eq("symbol", sym).eq("timeframe", "1m")
+          .order("timestamp", { ascending: true }).limit(1).maybeSingle(),
+        supabase.from("candle_history").select("timestamp")
+          .eq("symbol", sym).eq("timeframe", "1m")
+          .order("timestamp", { ascending: false }).limit(1).maybeSingle(),
+        supabase.from("candle_history").select("*", { count: "exact", head: true })
+          .eq("symbol", sym).eq("timeframe", "1m"),
+      ]);
+      setCoverage({
+        earliest: (minRow?.timestamp as string) ?? null,
+        latest:   (maxRow?.timestamp as string) ?? null,
+        count:    count ?? 0,
+      });
+    } catch (e) {
+      console.error("coverage load failed", e);
+      setCoverage({ earliest: null, latest: null, count: 0 });
+    } finally {
+      setCoverageLoading(false);
+    }
+  };
+
+  const runBackfill = async () => {
+    const s = new Date(bfStart); const e = new Date(bfEnd);
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || e <= s) {
+      toast.error("Invalid backfill date range"); return;
+    }
+    if (!DUKASCOPY_SYMBOLS.has(symbol)) {
+      toast.error(`${symbol} not supported by Dukascopy direct ingest`); return;
+    }
+    const CHUNK_DAYS = 14;
+    const chunks: { start: string; end: string }[] = [];
+    let cursor = new Date(s);
+    while (cursor < e) {
+      const next = new Date(Math.min(cursor.getTime() + CHUNK_DAYS * 86400_000, e.getTime()));
+      chunks.push({ start: cursor.toISOString().slice(0,10), end: next.toISOString().slice(0,10) });
+      cursor = next;
+    }
+    setBfRunning(true);
+    setBfProgress({ chunk: 0, total: chunks.length, stored: 0 });
+    let totalStored = 0; let failures = 0;
+    try {
+      await supabase.auth.refreshSession();
+      for (let i = 0; i < chunks.length; i++) {
+        const c = chunks[i];
+        setBfProgress({ chunk: i + 1, total: chunks.length, stored: totalStored });
+        try {
+          const { data, error } = await supabase.functions.invoke("ron-ingest-dukascopy", {
+            body: { symbol, start: c.start, end: c.end, max_days: 31 },
+          });
+          if (error) throw new Error(error.message);
+          const stored = Number((data as { candles_stored?: number })?.candles_stored ?? 0);
+          totalStored += stored;
+          setBfProgress({ chunk: i + 1, total: chunks.length, stored: totalStored });
+        } catch (err) {
+          failures++;
+          console.error(`chunk ${i+1} failed`, err);
+        }
+      }
+      toast.success(`Backfill complete — ${totalStored.toLocaleString()} candles added${failures ? ` (${failures} chunk${failures>1?"s":""} failed)` : ""}`);
+      await loadCoverage(symbol);
+      setBackfillOpen(false);
+    } finally {
+      setBfRunning(false);
+      setBfProgress(null);
+    }
+  };
+
+  // Date validation against coverage
+  const coverageEarliestDay = coverage?.earliest ? coverage.earliest.slice(0, 10) : null;
+  const coverageLatestDay   = coverage?.latest   ? coverage.latest.slice(0, 10)   : null;
+  const startInvalid = coverageEarliestDay && start < coverageEarliestDay;
+  const endInvalid   = coverageLatestDay   && end   > coverageLatestDay;
+  const datesInvalid = !!(startInvalid || endInvalid);
 
   const loadRuns = async () => {
     setLoading(true);
@@ -91,6 +191,10 @@ export default function BacktestsAdminPage() {
   };
 
   const handleRun = async () => {
+    if (datesInvalid) {
+      toast.error("Date range is outside available data — adjust dates or backfill more history.");
+      return;
+    }
     let parsedConfig: Record<string, unknown> = {};
     try {
       parsedConfig = configText.trim() ? JSON.parse(configText) : {};
@@ -159,6 +263,56 @@ export default function BacktestsAdminPage() {
         </button>
       </div>
 
+      {/* Data Coverage */}
+      <div style={{ ...cardStyle, marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Database size={14} color={C.jade} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+              Data Coverage — {symbol} (1m)
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => void loadCoverage(symbol)} disabled={coverageLoading} style={iconBtnStyle} title="Refresh coverage">
+              <RefreshCw size={13} className={coverageLoading ? "animate-spin" : ""} />
+            </button>
+            <button
+              onClick={() => setBackfillOpen(true)}
+              disabled={!DUKASCOPY_SYMBOLS.has(symbol)}
+              title={DUKASCOPY_SYMBOLS.has(symbol) ? "" : `${symbol} not on Dukascopy`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 14px", borderRadius: 8, border: "none",
+                background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`,
+                color: C.bg, fontSize: 12, fontWeight: 800,
+                cursor: DUKASCOPY_SYMBOLS.has(symbol) ? "pointer" : "not-allowed",
+                opacity: DUKASCOPY_SYMBOLS.has(symbol) ? 1 : 0.5,
+              }}
+            >
+              <Download size={12} /> Backfill from Dukascopy
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <CovStat label="Earliest" value={coverage?.earliest ? new Date(coverage.earliest).toLocaleString() : "—"} />
+          <CovStat label="Latest"   value={coverage?.latest   ? new Date(coverage.latest).toLocaleString()   : "—"} />
+          <CovStat label="Total candles" value={coverage ? coverage.count.toLocaleString() : "—"} highlight />
+        </div>
+        {datesInvalid && (
+          <div style={{
+            marginTop: 12, padding: "10px 12px", borderRadius: 8,
+            background: `${C.amber}15`, border: `1px solid ${C.amber}55`,
+            fontSize: 12, color: C.text, display: "flex", alignItems: "flex-start", gap: 8,
+          }}>
+            <AlertTriangle size={14} color={C.amber} style={{ marginTop: 2, flexShrink: 0 }} />
+            <span>
+              {startInvalid && coverageEarliestDay && <>No data before <b>{coverageEarliestDay}</b> — adjust start date or backfill more history. </>}
+              {endInvalid   && coverageLatestDay   && <>No data after <b>{coverageLatestDay}</b> — adjust end date.</>}
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Run form */}
       <div style={cardStyle}>
         <div style={sectionTitleStyle}>Run new backtest</div>
@@ -183,16 +337,28 @@ export default function BacktestsAdminPage() {
             <input value={runLabel} onChange={e => setRunLabel(e.target.value)} style={inputStyle} placeholder="e.g. v3-baseline" />
           </Field>
           <Field label="Start date">
-            <input type="date" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} />
+            <input
+              type="date" value={start}
+              min={coverageEarliestDay ?? undefined}
+              max={coverageLatestDay ?? undefined}
+              onChange={e => setStart(e.target.value)}
+              style={{ ...inputStyle, borderColor: startInvalid ? C.amber : C.border }}
+            />
           </Field>
           <Field label="In-sample / OOS split">
             <input type="date" value={splitDate} onChange={e => setSplitDate(e.target.value)} style={inputStyle} />
           </Field>
           <Field label="End date">
-            <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} />
+            <input
+              type="date" value={end}
+              min={coverageEarliestDay ?? undefined}
+              max={coverageLatestDay ?? undefined}
+              onChange={e => setEnd(e.target.value)}
+              style={{ ...inputStyle, borderColor: endInvalid ? C.amber : C.border }}
+            />
           </Field>
           <Field label=" ">
-            <button onClick={() => void handleRun()} disabled={running} style={runBtnStyle(running)}>
+            <button onClick={() => void handleRun()} disabled={running || datesInvalid} style={runBtnStyle(running || datesInvalid)}>
               {running ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
               {running ? "Running…" : "Run Backtest"}
             </button>
@@ -310,6 +476,79 @@ export default function BacktestsAdminPage() {
           </div>
         </>
       )}
+
+      {/* Backfill Modal */}
+      {backfillOpen && (
+        <div
+          onClick={() => !bfRunning && setBackfillOpen(false)}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+            display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
+              padding: 24, width: 480, maxWidth: "90vw",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Download size={16} color={C.jade} />
+                <div style={{ fontSize: 15, fontWeight: 800, color: C.text }}>Backfill {symbol} 1m from Dukascopy</div>
+              </div>
+              {!bfRunning && (
+                <button onClick={() => setBackfillOpen(false)} style={{ background: "transparent", border: "none", color: C.sec, cursor: "pointer" }}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: C.sec, marginBottom: 14, lineHeight: 1.5 }}>
+              Downloads tick data direct from Dukascopy in 14-day chunks and stores 1m candles.
+              A 2-year range may take ~25 minutes. Keep this tab open until it finishes.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <Field label="Start (YYYY-MM-DD)">
+                <input type="date" value={bfStart} onChange={e => setBfStart(e.target.value)} disabled={bfRunning} style={inputStyle} />
+              </Field>
+              <Field label="End (YYYY-MM-DD)">
+                <input type="date" value={bfEnd} onChange={e => setBfEnd(e.target.value)} disabled={bfRunning} style={inputStyle} />
+              </Field>
+            </div>
+            {bfProgress && (
+              <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 12, color: C.text, marginBottom: 6, fontFamily: "'JetBrains Mono', monospace" }}>
+                  Chunk {bfProgress.chunk} / {bfProgress.total} • {bfProgress.stored.toLocaleString()} candles stored
+                </div>
+                <div style={{ height: 6, background: C.border, borderRadius: 4, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", width: `${(bfProgress.chunk / bfProgress.total) * 100}%`,
+                    background: `linear-gradient(90deg, ${C.jade}, ${C.teal})`, transition: "width 0.3s",
+                  }} />
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => void runBackfill()}
+              disabled={bfRunning}
+              style={runBtnStyle(bfRunning)}
+            >
+              {bfRunning ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {bfRunning ? "Backfilling…" : "Start Backfill"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CovStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div style={{ padding: 12, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}` }}>
+      <div style={{ fontSize: 10, color: C.sec, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: highlight ? C.jade : C.text, marginTop: 4, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
     </div>
   );
 }
