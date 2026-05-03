@@ -1813,6 +1813,7 @@ export type Database = {
       }
     }
     Functions: {
+      bulk_insert_candles: { Args: { candles: Json }; Returns: number }
       cleanup_old_candles: { Args: never; Returns: undefined }
       delete_email: {
         Args: { message_id: number; queue_name: string }
