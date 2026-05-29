@@ -49,136 +49,6 @@ export type Database = {
           },
         ]
       }
-      auto_trade_executions: {
-        Row: {
-          created_at: string
-          direction: string
-          entry_price: number | null
-          error_message: string | null
-          id: string
-          metaapi_position_id: string | null
-          session: string | null
-          signal_id: string | null
-          sl: number | null
-          status: string
-          symbol: string
-          tp: number | null
-          user_id: string
-          volume: number
-        }
-        Insert: {
-          created_at?: string
-          direction: string
-          entry_price?: number | null
-          error_message?: string | null
-          id?: string
-          metaapi_position_id?: string | null
-          session?: string | null
-          signal_id?: string | null
-          sl?: number | null
-          status?: string
-          symbol: string
-          tp?: number | null
-          user_id: string
-          volume: number
-        }
-        Update: {
-          created_at?: string
-          direction?: string
-          entry_price?: number | null
-          error_message?: string | null
-          id?: string
-          metaapi_position_id?: string | null
-          session?: string | null
-          signal_id?: string | null
-          sl?: number | null
-          status?: string
-          symbol?: string
-          tp?: number | null
-          user_id?: string
-          volume?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "auto_trade_executions_signal_id_fkey"
-            columns: ["signal_id"]
-            isOneToOne: false
-            referencedRelation: "signals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      backtest_results: {
-        Row: {
-          avg_rr: number
-          candle_type: string
-          created_at: string
-          ema_fast: number
-          ema_slow: number
-          equity_curve: Json | null
-          expectancy: number
-          id: string
-          max_drawdown: number
-          net_pnl: number
-          period_months: number
-          profit_factor: number
-          sharpe_ratio: number | null
-          symbol: string
-          timeframe: string
-          total_trades: number
-          user_id: string
-          win_rate: number
-        }
-        Insert: {
-          avg_rr: number
-          candle_type: string
-          created_at?: string
-          ema_fast: number
-          ema_slow: number
-          equity_curve?: Json | null
-          expectancy: number
-          id?: string
-          max_drawdown: number
-          net_pnl: number
-          period_months: number
-          profit_factor: number
-          sharpe_ratio?: number | null
-          symbol: string
-          timeframe: string
-          total_trades: number
-          user_id: string
-          win_rate: number
-        }
-        Update: {
-          avg_rr?: number
-          candle_type?: string
-          created_at?: string
-          ema_fast?: number
-          ema_slow?: number
-          equity_curve?: Json | null
-          expectancy?: number
-          id?: string
-          max_drawdown?: number
-          net_pnl?: number
-          period_months?: number
-          profit_factor?: number
-          sharpe_ratio?: number | null
-          symbol?: string
-          timeframe?: string
-          total_trades?: number
-          user_id?: string
-          win_rate?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "backtest_results_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       broker_connections: {
         Row: {
           account_type: string
@@ -446,36 +316,237 @@ export type Database = {
         }
         Relationships: []
       }
-      falconer_knowledge: {
+      falconer_backtest_runs: {
         Row: {
-          category: string
+          completed_at: string | null
+          config: Json
           created_at: string
+          equity_curve: Json | null
+          error_message: string | null
           id: string
-          is_active: boolean
-          priority: number
-          rule_name: string
-          rule_text: string
-          version: string
+          losses: number | null
+          max_drawdown_pct: number | null
+          net_pnl_pct: number | null
+          net_pnl_usd: number | null
+          period_end: string
+          period_start: string
+          profit_factor: number | null
+          status: string
+          symbol: string
+          timeframe: string
+          total_trades: number | null
+          user_id: string
+          win_rate: number | null
+          wins: number | null
         }
         Insert: {
-          category: string
+          completed_at?: string | null
+          config?: Json
           created_at?: string
+          equity_curve?: Json | null
+          error_message?: string | null
           id?: string
-          is_active?: boolean
-          priority?: number
-          rule_name: string
-          rule_text: string
-          version?: string
+          losses?: number | null
+          max_drawdown_pct?: number | null
+          net_pnl_pct?: number | null
+          net_pnl_usd?: number | null
+          period_end: string
+          period_start: string
+          profit_factor?: number | null
+          status?: string
+          symbol: string
+          timeframe?: string
+          total_trades?: number | null
+          user_id: string
+          win_rate?: number | null
+          wins?: number | null
         }
         Update: {
-          category?: string
+          completed_at?: string | null
+          config?: Json
           created_at?: string
+          equity_curve?: Json | null
+          error_message?: string | null
           id?: string
-          is_active?: boolean
-          priority?: number
-          rule_name?: string
-          rule_text?: string
-          version?: string
+          losses?: number | null
+          max_drawdown_pct?: number | null
+          net_pnl_pct?: number | null
+          net_pnl_usd?: number | null
+          period_end?: string
+          period_start?: string
+          profit_factor?: number | null
+          status?: string
+          symbol?: string
+          timeframe?: string
+          total_trades?: number | null
+          user_id?: string
+          win_rate?: number | null
+          wins?: number | null
+        }
+        Relationships: []
+      }
+      falconer_settings: {
+        Row: {
+          be_r: number
+          created_at: string
+          enabled: boolean
+          execution_path: string
+          id: string
+          max_atr_pct: number
+          min_atr_pct: number
+          pct1: number
+          pct2: number
+          pineconnector_license: string | null
+          pineconnector_risk: number
+          pineconnector_symbol_override: Json
+          pineconnector_webhook_url: string | null
+          pullback_tol: number
+          risk_usd: number
+          rr_tp1: number
+          rr_tp2: number
+          rr_tp3: number
+          symbols: string[]
+          timeframe: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          be_r?: number
+          created_at?: string
+          enabled?: boolean
+          execution_path?: string
+          id?: string
+          max_atr_pct?: number
+          min_atr_pct?: number
+          pct1?: number
+          pct2?: number
+          pineconnector_license?: string | null
+          pineconnector_risk?: number
+          pineconnector_symbol_override?: Json
+          pineconnector_webhook_url?: string | null
+          pullback_tol?: number
+          risk_usd?: number
+          rr_tp1?: number
+          rr_tp2?: number
+          rr_tp3?: number
+          symbols?: string[]
+          timeframe?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          be_r?: number
+          created_at?: string
+          enabled?: boolean
+          execution_path?: string
+          id?: string
+          max_atr_pct?: number
+          min_atr_pct?: number
+          pct1?: number
+          pct2?: number
+          pineconnector_license?: string | null
+          pineconnector_risk?: number
+          pineconnector_symbol_override?: Json
+          pineconnector_webhook_url?: string | null
+          pullback_tol?: number
+          risk_usd?: number
+          rr_tp1?: number
+          rr_tp2?: number
+          rr_tp3?: number
+          symbols?: string[]
+          timeframe?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      falconer_trades: {
+        Row: {
+          backtest_run_id: string | null
+          be_done: boolean
+          be_level: number
+          closed_at: string | null
+          direction: string
+          entry_price: number
+          execution_path: string
+          id: string
+          metaapi_position_ids: Json | null
+          mode: string
+          opened_at: string
+          pnl_usd: number | null
+          qty: number
+          qty1: number
+          qty2: number
+          qty3: number
+          raw_alert_payload: Json | null
+          sl_price: number
+          status: string
+          symbol: string
+          timeframe: string
+          tp1_price: number
+          tp2_price: number
+          tp3_price: number
+          trigger_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backtest_run_id?: string | null
+          be_done?: boolean
+          be_level: number
+          closed_at?: string | null
+          direction?: string
+          entry_price: number
+          execution_path?: string
+          id?: string
+          metaapi_position_ids?: Json | null
+          mode?: string
+          opened_at?: string
+          pnl_usd?: number | null
+          qty: number
+          qty1: number
+          qty2: number
+          qty3: number
+          raw_alert_payload?: Json | null
+          sl_price: number
+          status?: string
+          symbol: string
+          timeframe?: string
+          tp1_price: number
+          tp2_price: number
+          tp3_price: number
+          trigger_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backtest_run_id?: string | null
+          be_done?: boolean
+          be_level?: number
+          closed_at?: string | null
+          direction?: string
+          entry_price?: number
+          execution_path?: string
+          id?: string
+          metaapi_position_ids?: Json | null
+          mode?: string
+          opened_at?: string
+          pnl_usd?: number | null
+          qty?: number
+          qty1?: number
+          qty2?: number
+          qty3?: number
+          raw_alert_payload?: Json | null
+          sl_price?: number
+          status?: string
+          symbol?: string
+          timeframe?: string
+          tp1_price?: number
+          tp2_price?: number
+          tp3_price?: number
+          trigger_type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -621,51 +692,6 @@ export type Database = {
           },
         ]
       }
-      liquidity_zones: {
-        Row: {
-          created_at: string
-          created_at_candle: string
-          id: string
-          price_high: number
-          price_low: number
-          respected: boolean | null
-          status: string
-          symbol: string
-          tested_count: number
-          timeframe: string
-          updated_at: string
-          zone_type: string
-        }
-        Insert: {
-          created_at?: string
-          created_at_candle: string
-          id?: string
-          price_high: number
-          price_low: number
-          respected?: boolean | null
-          status?: string
-          symbol: string
-          tested_count?: number
-          timeframe?: string
-          updated_at?: string
-          zone_type: string
-        }
-        Update: {
-          created_at?: string
-          created_at_candle?: string
-          id?: string
-          price_high?: number
-          price_low?: number
-          respected?: boolean | null
-          status?: string
-          symbol?: string
-          tested_count?: number
-          timeframe?: string
-          updated_at?: string
-          zone_type?: string
-        }
-        Relationships: []
-      }
       live_market_data: {
         Row: {
           adx: number | null
@@ -810,45 +836,6 @@ export type Database = {
         }
         Relationships: []
       }
-      pattern_weights: {
-        Row: {
-          avg_pips: number | null
-          id: string
-          pattern_name: string
-          session: string | null
-          symbol: string
-          total: number
-          updated_at: string
-          weight_adjustment: number | null
-          win_rate: number
-          wins: number
-        }
-        Insert: {
-          avg_pips?: number | null
-          id?: string
-          pattern_name: string
-          session?: string | null
-          symbol: string
-          total?: number
-          updated_at?: string
-          weight_adjustment?: number | null
-          win_rate?: number
-          wins?: number
-        }
-        Update: {
-          avg_pips?: number | null
-          id?: string
-          pattern_name?: string
-          session?: string | null
-          symbol?: string
-          total?: number
-          updated_at?: string
-          weight_adjustment?: number | null
-          win_rate?: number
-          wins?: number
-        }
-        Relationships: []
-      }
       platform_config: {
         Row: {
           created_at: string
@@ -954,416 +941,6 @@ export type Database = {
         }
         Relationships: []
       }
-      ron_auto_trades: {
-        Row: {
-          closed_at: string | null
-          direction: string
-          entry_price: number | null
-          id: string
-          metaapi_trade_id: string | null
-          opened_at: string
-          pips: number | null
-          result: string | null
-          ron_probability: number | null
-          signal_id: string | null
-          sl_price: number | null
-          status: string | null
-          symbol: string
-          tp_price: number | null
-          user_id: string
-          volume: number
-        }
-        Insert: {
-          closed_at?: string | null
-          direction: string
-          entry_price?: number | null
-          id?: string
-          metaapi_trade_id?: string | null
-          opened_at?: string
-          pips?: number | null
-          result?: string | null
-          ron_probability?: number | null
-          signal_id?: string | null
-          sl_price?: number | null
-          status?: string | null
-          symbol: string
-          tp_price?: number | null
-          user_id: string
-          volume: number
-        }
-        Update: {
-          closed_at?: string | null
-          direction?: string
-          entry_price?: number | null
-          id?: string
-          metaapi_trade_id?: string | null
-          opened_at?: string
-          pips?: number | null
-          result?: string | null
-          ron_probability?: number | null
-          signal_id?: string | null
-          sl_price?: number | null
-          status?: string | null
-          symbol?: string
-          tp_price?: number | null
-          user_id?: string
-          volume?: number
-        }
-        Relationships: []
-      }
-      ron_backtest_runs: {
-        Row: {
-          combined: Json | null
-          config: Json
-          created_at: string
-          data_window: Json | null
-          equity_curve: Json | null
-          htf_timeframe: string
-          id: string
-          in_sample: Json | null
-          in_sample_split: string | null
-          issues: Json | null
-          out_of_sample: Json | null
-          period_end: string
-          period_start: string
-          ron_ml_version: string | null
-          run_label: string | null
-          run_type: string
-          symbol: string
-          timeframe: string
-          trades: Json | null
-          verdict: string | null
-        }
-        Insert: {
-          combined?: Json | null
-          config?: Json
-          created_at?: string
-          data_window?: Json | null
-          equity_curve?: Json | null
-          htf_timeframe?: string
-          id?: string
-          in_sample?: Json | null
-          in_sample_split?: string | null
-          issues?: Json | null
-          out_of_sample?: Json | null
-          period_end: string
-          period_start: string
-          ron_ml_version?: string | null
-          run_label?: string | null
-          run_type?: string
-          symbol: string
-          timeframe?: string
-          trades?: Json | null
-          verdict?: string | null
-        }
-        Update: {
-          combined?: Json | null
-          config?: Json
-          created_at?: string
-          data_window?: Json | null
-          equity_curve?: Json | null
-          htf_timeframe?: string
-          id?: string
-          in_sample?: Json | null
-          in_sample_split?: string | null
-          issues?: Json | null
-          out_of_sample?: Json | null
-          period_end?: string
-          period_start?: string
-          ron_ml_version?: string | null
-          run_label?: string | null
-          run_type?: string
-          symbol?: string
-          timeframe?: string
-          trades?: Json | null
-          verdict?: string | null
-        }
-        Relationships: []
-      }
-      ron_calibration: {
-        Row: {
-          calibrated_at: string
-          confidence_level: number
-          id: string
-          notes: string | null
-          recommended_action: string | null
-          total_signals: number
-          win_rate: number
-          wins: number
-        }
-        Insert: {
-          calibrated_at?: string
-          confidence_level: number
-          id?: string
-          notes?: string | null
-          recommended_action?: string | null
-          total_signals?: number
-          win_rate?: number
-          wins?: number
-        }
-        Update: {
-          calibrated_at?: string
-          confidence_level?: number
-          id?: string
-          notes?: string | null
-          recommended_action?: string | null
-          total_signals?: number
-          win_rate?: number
-          wins?: number
-        }
-        Relationships: []
-      }
-      ron_platform_intelligence: {
-        Row: {
-          avg_pips_lost: number | null
-          avg_pips_won: number | null
-          best_day_of_week: number | null
-          best_hour_utc: number | null
-          calculated_at: string
-          direction: string | null
-          expired: number
-          id: string
-          losses: number
-          metric_type: string
-          pattern: string | null
-          profit_factor: number | null
-          sample_size_users: number
-          session: string | null
-          symbol: string
-          timeframe: string
-          total_signals: number
-          win_rate: number
-          wins: number
-        }
-        Insert: {
-          avg_pips_lost?: number | null
-          avg_pips_won?: number | null
-          best_day_of_week?: number | null
-          best_hour_utc?: number | null
-          calculated_at?: string
-          direction?: string | null
-          expired?: number
-          id?: string
-          losses?: number
-          metric_type?: string
-          pattern?: string | null
-          profit_factor?: number | null
-          sample_size_users?: number
-          session?: string | null
-          symbol: string
-          timeframe?: string
-          total_signals?: number
-          win_rate?: number
-          wins?: number
-        }
-        Update: {
-          avg_pips_lost?: number | null
-          avg_pips_won?: number | null
-          best_day_of_week?: number | null
-          best_hour_utc?: number | null
-          calculated_at?: string
-          direction?: string | null
-          expired?: number
-          id?: string
-          losses?: number
-          metric_type?: string
-          pattern?: string | null
-          profit_factor?: number | null
-          sample_size_users?: number
-          session?: string | null
-          symbol?: string
-          timeframe?: string
-          total_signals?: number
-          win_rate?: number
-          wins?: number
-        }
-        Relationships: []
-      }
-      ron_risk_metrics: {
-        Row: {
-          consecutive_losses: number
-          current_drawdown_pips: number | null
-          equity_current: number | null
-          equity_peak: number | null
-          id: string
-          max_drawdown_pips: number | null
-          recovery_time_hours: number | null
-          risk_mode: string
-          symbol: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          consecutive_losses?: number
-          current_drawdown_pips?: number | null
-          equity_current?: number | null
-          equity_peak?: number | null
-          id?: string
-          max_drawdown_pips?: number | null
-          recovery_time_hours?: number | null
-          risk_mode?: string
-          symbol?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          consecutive_losses?: number
-          current_drawdown_pips?: number | null
-          equity_current?: number | null
-          equity_peak?: number | null
-          id?: string
-          max_drawdown_pips?: number | null
-          recovery_time_hours?: number | null
-          risk_mode?: string
-          symbol?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      ron_settings: {
-        Row: {
-          atr_sl_mult: number | null
-          atr_tp_mult: number | null
-          created_at: string
-          id: string
-          max_open_trades: number | null
-          min_ron_probability: number | null
-          risk_per_trade_pct: number | null
-          ron_enabled: boolean
-          sl_mode: string | null
-          sl_pips: number | null
-          symbols: string[] | null
-          tp_pips: number | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          atr_sl_mult?: number | null
-          atr_tp_mult?: number | null
-          created_at?: string
-          id?: string
-          max_open_trades?: number | null
-          min_ron_probability?: number | null
-          risk_per_trade_pct?: number | null
-          ron_enabled?: boolean
-          sl_mode?: string | null
-          sl_pips?: number | null
-          symbols?: string[] | null
-          tp_pips?: number | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          atr_sl_mult?: number | null
-          atr_tp_mult?: number | null
-          created_at?: string
-          id?: string
-          max_open_trades?: number | null
-          min_ron_probability?: number | null
-          risk_per_trade_pct?: number | null
-          ron_enabled?: boolean
-          sl_mode?: string | null
-          sl_pips?: number | null
-          symbols?: string[] | null
-          tp_pips?: number | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      scan_results: {
-        Row: {
-          adx: number | null
-          candle_type: string
-          confidence: number
-          direction: string
-          ema_crossover_direction: string | null
-          ema_crossover_status: string
-          ema_fast_value: number | null
-          ema_slow_value: number | null
-          entry_price: number | null
-          id: string
-          macd_status: string | null
-          reasoning: string
-          risk_reward: string | null
-          rsi: number | null
-          scanned_at: string
-          session: string
-          stoch_rsi: number | null
-          stop_loss: number | null
-          supertrend_status: string | null
-          symbol: string
-          take_profit: number | null
-          timeframe: string
-          user_id: string
-          verdict: string
-          volume: number | null
-        }
-        Insert: {
-          adx?: number | null
-          candle_type: string
-          confidence: number
-          direction: string
-          ema_crossover_direction?: string | null
-          ema_crossover_status?: string
-          ema_fast_value?: number | null
-          ema_slow_value?: number | null
-          entry_price?: number | null
-          id?: string
-          macd_status?: string | null
-          reasoning: string
-          risk_reward?: string | null
-          rsi?: number | null
-          scanned_at?: string
-          session: string
-          stoch_rsi?: number | null
-          stop_loss?: number | null
-          supertrend_status?: string | null
-          symbol: string
-          take_profit?: number | null
-          timeframe: string
-          user_id: string
-          verdict: string
-          volume?: number | null
-        }
-        Update: {
-          adx?: number | null
-          candle_type?: string
-          confidence?: number
-          direction?: string
-          ema_crossover_direction?: string | null
-          ema_crossover_status?: string
-          ema_fast_value?: number | null
-          ema_slow_value?: number | null
-          entry_price?: number | null
-          id?: string
-          macd_status?: string | null
-          reasoning?: string
-          risk_reward?: string | null
-          rsi?: number | null
-          scanned_at?: string
-          session?: string
-          stoch_rsi?: number | null
-          stop_loss?: number | null
-          supertrend_status?: string | null
-          symbol?: string
-          take_profit?: number | null
-          timeframe?: string
-          user_id?: string
-          verdict?: string
-          volume?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "scan_results_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       session_volume_summary: {
         Row: {
           buyer_volume: number | null
@@ -1399,173 +976,6 @@ export type Database = {
           total_volume?: number | null
         }
         Relationships: []
-      }
-      signal_outcomes: {
-        Row: {
-          adx_at_entry: number | null
-          confidence: number
-          created_at: string
-          day_of_week: number | null
-          direction: string
-          entry_price: number
-          hour_utc: number | null
-          id: string
-          macd_status: string | null
-          mtf_alignment: string | null
-          pattern_active: string | null
-          pnl_currency: number | null
-          pnl_pips: number | null
-          resolved_at: string | null
-          result: string
-          ron_version: string
-          rsi_at_entry: number | null
-          session: string | null
-          signal_id: string | null
-          sl_price: number
-          stoch_rsi: number | null
-          symbol: string
-          timeframe: string
-          tp_price: number
-          user_id: string
-        }
-        Insert: {
-          adx_at_entry?: number | null
-          confidence?: number
-          created_at?: string
-          day_of_week?: number | null
-          direction: string
-          entry_price: number
-          hour_utc?: number | null
-          id?: string
-          macd_status?: string | null
-          mtf_alignment?: string | null
-          pattern_active?: string | null
-          pnl_currency?: number | null
-          pnl_pips?: number | null
-          resolved_at?: string | null
-          result: string
-          ron_version?: string
-          rsi_at_entry?: number | null
-          session?: string | null
-          signal_id?: string | null
-          sl_price: number
-          stoch_rsi?: number | null
-          symbol: string
-          timeframe?: string
-          tp_price: number
-          user_id: string
-        }
-        Update: {
-          adx_at_entry?: number | null
-          confidence?: number
-          created_at?: string
-          day_of_week?: number | null
-          direction?: string
-          entry_price?: number
-          hour_utc?: number | null
-          id?: string
-          macd_status?: string | null
-          mtf_alignment?: string | null
-          pattern_active?: string | null
-          pnl_currency?: number | null
-          pnl_pips?: number | null
-          resolved_at?: string | null
-          result?: string
-          ron_version?: string
-          rsi_at_entry?: number | null
-          session?: string | null
-          signal_id?: string | null
-          sl_price?: number
-          stoch_rsi?: number | null
-          symbol?: string
-          timeframe?: string
-          tp_price?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "signal_outcomes_signal_id_fkey"
-            columns: ["signal_id"]
-            isOneToOne: false
-            referencedRelation: "signals"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      signals: {
-        Row: {
-          closed_at: string | null
-          confidence: number
-          created_at: string
-          direction: string
-          entry_price: number
-          id: string
-          notes: string | null
-          pnl: number | null
-          pnl_pips: number | null
-          resolved_at: string | null
-          result: string
-          risk_reward: string
-          scan_result_id: string | null
-          stop_loss: number
-          symbol: string
-          take_profit: number
-          user_id: string
-        }
-        Insert: {
-          closed_at?: string | null
-          confidence: number
-          created_at?: string
-          direction: string
-          entry_price: number
-          id?: string
-          notes?: string | null
-          pnl?: number | null
-          pnl_pips?: number | null
-          resolved_at?: string | null
-          result?: string
-          risk_reward: string
-          scan_result_id?: string | null
-          stop_loss: number
-          symbol: string
-          take_profit: number
-          user_id: string
-        }
-        Update: {
-          closed_at?: string | null
-          confidence?: number
-          created_at?: string
-          direction?: string
-          entry_price?: number
-          id?: string
-          notes?: string | null
-          pnl?: number | null
-          pnl_pips?: number | null
-          resolved_at?: string | null
-          result?: string
-          risk_reward?: string
-          scan_result_id?: string | null
-          stop_loss?: number
-          symbol?: string
-          take_profit?: number
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "signals_scan_result_id_fkey"
-            columns: ["scan_result_id"]
-            isOneToOne: false
-            referencedRelation: "scan_results"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "signals_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       suppressed_emails: {
         Row: {
@@ -1772,45 +1182,7 @@ export type Database = {
       }
     }
     Views: {
-      ron_platform_stats: {
-        Row: {
-          avg_confidence: number | null
-          avg_loss_pips: number | null
-          avg_win_pips: number | null
-          losses: number | null
-          pattern_name: string | null
-          session: string | null
-          symbol: string | null
-          total: number | null
-          win_rate: number | null
-          wins: number | null
-        }
-        Insert: {
-          avg_confidence?: never
-          avg_loss_pips?: number | null
-          avg_win_pips?: number | null
-          losses?: never
-          pattern_name?: string | null
-          session?: string | null
-          symbol?: string | null
-          total?: never
-          win_rate?: number | null
-          wins?: never
-        }
-        Update: {
-          avg_confidence?: never
-          avg_loss_pips?: number | null
-          avg_win_pips?: number | null
-          losses?: never
-          pattern_name?: string | null
-          session?: string | null
-          symbol?: string | null
-          total?: never
-          win_rate?: number | null
-          wins?: never
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       bulk_insert_candles: { Args: { candles: Json }; Returns: number }
@@ -1840,7 +1212,6 @@ export type Database = {
           read_ct: number
         }[]
       }
-      refresh_ron_intelligence: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never
