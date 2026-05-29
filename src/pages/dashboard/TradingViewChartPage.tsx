@@ -39,7 +39,7 @@ export default function TradingViewChartPage() {
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "live" | "demo">("disconnected");
-  const [ronVersion] = useState<RonVersion>("v1");
+  const [ronVersion] = useState<RonVersion>("falconer_v7");
   const [showAdd, setShowAdd] = useState(false);
 
   const initial = loadTabs();
@@ -158,7 +158,7 @@ export default function TradingViewChartPage() {
             style={{ background: "rgba(0,207,165,0.1)", border: "1px solid rgba(0,207,165,0.3)", color: "#00CFA5" }}
           >
             <Cpu className="w-3 h-3" />
-            {ronVersion === "v1" ? "RON V1" : ronVersion === "v2" ? "RON V2" : "V1+V2"}
+            Falconer v7
           </div>
           <button
             onClick={handlePopOut}
