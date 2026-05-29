@@ -6,7 +6,7 @@ import { C } from "@/lib/mock-data";
 import { AlertTriangle, Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMarketClosed, secondsUntilMarketOpen } from "@/lib/expiry";
-import { LiveTradeAlert } from "@/components/dashboard/LiveTradeAlert";
+// LiveTradeAlert removed with legacy auto-trade engine
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 import MoversShakersWidget from "@/components/dashboard/MoversShakersWidget";
@@ -97,10 +97,8 @@ export default function DashboardHome() {
       triggerMarketDataCompute();
     }, 30 * 1000);
 
-    const channel = supabase.channel('dashboard-scans')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scan_results' }, () => loadData())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'signals' }, () => loadData())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'signals' }, () => loadData())
+    const channel = supabase.channel('dashboard-falconer')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'falconer_trades' }, () => loadData())
       .subscribe();
     return () => {
       clearInterval(newsInterval);
@@ -124,15 +122,36 @@ export default function DashboardHome() {
       setInstrumentTfs(tfMap);
     }
 
+    // scan_results table was removed with the legacy strategy wipe.
+    // Falconer v7 trades flow into falconer_trades; we surface the latest open one
+    // per symbol as a lightweight stand-in for the old scan card.
     const { data: scanData } = await supabase
-      .from("scan_results")
+      .from("falconer_trades")
       .select("*")
       .eq("user_id", uid)
-      .order("scanned_at", { ascending: false });
+      .eq("mode", "live")
+      .order("opened_at", { ascending: false });
 
     if (scanData) {
       const latest = new Map<string, ScanResult>();
-      scanData.forEach((s: any) => { if (!latest.has(s.symbol)) latest.set(s.symbol, s); });
+      scanData.forEach((s: any) => {
+        if (latest.has(s.symbol)) return;
+        latest.set(s.symbol, {
+          id: s.id,
+          symbol: s.symbol,
+          direction: s.direction,
+          confidence: 8,
+          entry_price: s.entry_price,
+          take_profit: s.tp3_price,
+          stop_loss: s.sl_price,
+          risk_reward: "1:5",
+          adx: null, rsi: null, macd_status: null, stoch_rsi: null,
+          reasoning: `Falconer v7 ${s.trigger_type}`,
+          ema_crossover_status: "",
+          verdict: s.status,
+          scanned_at: s.opened_at,
+        });
+      });
       setScans(Array.from(latest.values()));
     }
 
@@ -181,9 +200,23 @@ export default function DashboardHome() {
       return usdAmount / rate;
     };
 
-    const { data: signals } = await supabase.from("signals").select("*").eq("user_id", uid);
+    const { data: signals } = await supabase
+      .from("falconer_trades")
+      .select("*")
+      .eq("user_id", uid)
+      .eq("mode", "live");
     if (signals) {
-      const closed = signals.filter((s: any) => s.result === "win" || s.result === "loss");
+      const closed = signals
+        .filter((s: any) => s.closed_at)
+        .map((s: any) => ({
+          ...s,
+          result: (s.pnl_usd ?? 0) > 0 ? "win" : "loss",
+          pnl: s.pnl_usd ?? 0,
+          pnl_pips: 0,
+          closed_at: s.closed_at,
+          resolved_at: s.closed_at,
+          created_at: s.opened_at,
+        }));
       const wins = closed.filter((s: any) => s.result === "win");
       const losses = closed.filter((s: any) => s.result === "loss");
       const totalPnl = closed.reduce((sum: number, s: any) => sum + Number(s.pnl ?? 0), 0);
@@ -295,7 +328,7 @@ export default function DashboardHome() {
         <SpinCard front={{ label: "Profit Factor", value: String(stats.profitFactor) }} back={{ label: "Win/Loss Detail", value: `Avg win: $${Math.round(stats.profitFactor * 100)} vs Avg loss: $${Math.round(100)} | Target: >1.5` }} color={C.blue} />
         <SpinCard front={{ label: "Avg R:R", value: `${stats.avgRR}:1` }} back={{ label: "R:R Detail", value: `${totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 80) : 0}% of trades met 2:1 minimum | Best R:R achieved: ${Math.max(stats.avgRR * 1.8, 3.2).toFixed(1)}:1` }} color={C.purple} />
       </div>
-      <LiveTradeAlert />
+      {/* LiveTradeAlert removed with legacy engine */}
       <BreakingNewsTicker />
       <NewsSentimentPanel />
       <MoversShakersWidget />
