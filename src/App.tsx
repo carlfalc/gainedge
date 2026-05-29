@@ -10,7 +10,6 @@ import NotFound from "./pages/NotFound.tsx";
 import ChartPopout from "./pages/ChartPopout.tsx";
 import LoungePopout from "./pages/LoungePopout.tsx";
 import InstrumentsPopout from "./pages/InstrumentsPopout.tsx";
-import RonPopout from "./pages/RonPopout.tsx";
 import UnsubscribePage from "./pages/UnsubscribePage.tsx";
 import DashboardLayout from "./components/dashboard/DashboardLayout.tsx";
 import DashboardHome from "./pages/dashboard/DashboardHome.tsx";
@@ -19,7 +18,6 @@ import JournalPage from "./pages/dashboard/JournalPage.tsx";
 import AnalyticsPage from "./pages/dashboard/AnalyticsPage.tsx";
 import InsightsPage from "./pages/dashboard/InsightsPage.tsx";
 import BacktestingPage from "./pages/dashboard/BacktestingPage.tsx";
-import BacktestsAdminPage from "./pages/dashboard/BacktestsAdminPage.tsx";
 import CalendarPage from "./pages/dashboard/CalendarPage.tsx";
 import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
@@ -27,7 +25,7 @@ import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
 import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
 import TradingViewChartPage from "./pages/dashboard/TradingViewChartPage.tsx";
 import WhiskyCigarLoungePage from "./pages/dashboard/WhiskyCigarLoungePage.tsx";
-import AutoTradePage from "./pages/dashboard/AutoTradePage.tsx";
+import StrategyPage from "./pages/dashboard/StrategyPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -44,7 +42,6 @@ const App = () => (
           <Route path="/chart-popout" element={<ChartPopout />} />
           <Route path="/lounge-popout" element={<LoungePopout />} />
           <Route path="/instruments-popout" element={<InstrumentsPopout />} />
-          <Route path="/ron-popout" element={<RonPopout />} />
           <Route path="/unsubscribe" element={<UnsubscribePage />} />
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
@@ -53,14 +50,13 @@ const App = () => (
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="insights" element={<InsightsPage />} />
             <Route path="backtesting" element={<BacktestingPage />} />
-            <Route path="backtests" element={<BacktestsAdminPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="clock-settings" element={<ClockSettingsPage />} />
             <Route path="news-settings" element={<NewsSettingsPage />} />
             <Route path="my-news" element={<MyNewsPage />} />
             <Route path="charts" element={<TradingViewChartPage />} />
-            <Route path="auto-trade" element={<AutoTradePage />} />
+            <Route path="strategy" element={<StrategyPage />} />
             <Route path="whisky-cigar-lounge" element={<WhiskyCigarLoungePage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
