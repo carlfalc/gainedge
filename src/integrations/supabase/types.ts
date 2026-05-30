@@ -469,6 +469,9 @@ export type Database = {
           direction: string
           entry_price: number
           execution_path: string
+          filled1: boolean
+          filled2: boolean
+          filled3: boolean
           id: string
           metaapi_position_ids: Json | null
           mode: string
@@ -498,6 +501,9 @@ export type Database = {
           direction?: string
           entry_price: number
           execution_path?: string
+          filled1?: boolean
+          filled2?: boolean
+          filled3?: boolean
           id?: string
           metaapi_position_ids?: Json | null
           mode?: string
@@ -527,6 +533,9 @@ export type Database = {
           direction?: string
           entry_price?: number
           execution_path?: string
+          filled1?: boolean
+          filled2?: boolean
+          filled3?: boolean
           id?: string
           metaapi_position_ids?: Json | null
           mode?: string
