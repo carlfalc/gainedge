@@ -102,17 +102,40 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       setInstrumentTfs(tfMap);
     }
 
-    const { data: scanData } = await supabase
-      .from("scan_results")
+    // scan_results was removed in the Falconer wipe. Build a card per tracked
+    // instrument, overlaying the latest Falconer trade (if any) for direction/levels.
+    const { data: tradeData } = await supabase
+      .from("falconer_trades")
       .select("*")
       .eq("user_id", uid)
-      .order("scanned_at", { ascending: false });
+      .eq("mode", "live")
+      .order("opened_at", { ascending: false });
 
-    if (scanData) {
-      const latest = new Map<string, ScanResult>();
-      scanData.forEach((s: any) => { if (!latest.has(s.symbol)) latest.set(s.symbol, s); });
-      setScans(Array.from(latest.values()));
-    }
+    const latestTrade = new Map<string, any>();
+    (tradeData || []).forEach((t: any) => {
+      if (!latestTrade.has(t.symbol)) latestTrade.set(t.symbol, t);
+    });
+
+    const rows: ScanResult[] = [];
+    (instData || []).forEach((i: any) => {
+      const t = latestTrade.get(i.symbol);
+      rows.push({
+        id: t?.id ?? `placeholder-${i.symbol}`,
+        symbol: i.symbol,
+        direction: t?.direction ?? "WAIT",
+        confidence: t ? 8 : 5,
+        entry_price: t?.entry_price ?? null,
+        take_profit: t?.tp3_price ?? null,
+        stop_loss: t?.sl_price ?? null,
+        risk_reward: t ? "1:5" : null,
+        adx: null, rsi: null, macd_status: null, stoch_rsi: null,
+        reasoning: t ? `Falconer v7 ${t.trigger_type}` : "Awaiting setup",
+        ema_crossover_status: "",
+        verdict: t?.status ?? "PENDING",
+        scanned_at: t?.opened_at ?? new Date().toISOString(),
+      });
+    });
+    setScans(rows);
   };
 
   useEffect(() => {
@@ -126,7 +149,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       }
     });
     const channel = supabase.channel(`instrument-tracking-${crypto.randomUUID()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'scan_results' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'falconer_trades' }, () => loadData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_instruments' }, () => loadData())
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
