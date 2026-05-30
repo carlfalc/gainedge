@@ -767,6 +767,30 @@ export type Database = {
         }
         Relationships: []
       }
+      lounge_messages: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       news_impact_results: {
         Row: {
           created_at: string
