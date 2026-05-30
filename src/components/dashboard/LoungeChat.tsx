@@ -1,33 +1,47 @@
 import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { useProfile } from "@/hooks/use-profile";
+import { supabase } from "@/integrations/supabase/client";
 import LoungeProfileDialog from "./LoungeProfileDialog";
 import LoungeProfilePrompt from "./LoungeProfilePrompt";
 
 interface ChatMessage {
   id: string;
+  userId: string;
   sender: string;
   text: string;
   timestamp: Date;
-  isOwn: boolean;
 }
 
-const MOCK_MESSAGES: ChatMessage[] = [
-  { id: "1", sender: "TraderMike", text: "Great session today, closed 3 winners on gold 🥃", timestamp: new Date(Date.now() - 300000), isOwn: false },
-  { id: "2", sender: "You", text: "Nice one! I caught that EURUSD reversal too", timestamp: new Date(Date.now() - 240000), isOwn: true },
-  { id: "3", sender: "SarahFX", text: "Cheers everyone, what a week 🎯", timestamp: new Date(Date.now() - 120000), isOwn: false },
-];
+interface LoungeRow {
+  id: string;
+  user_id: string;
+  display_name: string;
+  text: string;
+  created_at: string;
+}
 
+const MESSAGE_LIMIT = 100;
 const LOUNGE_PROFILE_GATE_VERSION = "v2";
 const getLoungeProfileGateKey = (uid: string) => `lounge-profile-ready:${LOUNGE_PROFILE_GATE_VERSION}:${uid}`;
 
+const rowToMessage = (r: LoungeRow): ChatMessage => ({
+  id: r.id,
+  userId: r.user_id,
+  sender: r.display_name,
+  text: r.text,
+  timestamp: new Date(r.created_at),
+});
+
 export default function LoungeChat() {
   const { profile, loading, userId, updateProfile, refetch } = useProfile();
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [hasCompletedLoungeProfile, setHasCompletedLoungeProfile] = useState(false);
   const [gateLoaded, setGateLoaded] = useState(false);
+  const [latestNews, setLatestNews] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,10 +52,68 @@ export default function LoungeChat() {
     setGateLoaded(true);
   }, [loading, userId]);
 
+  // Load chat history + subscribe to new messages in realtime.
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+
+    (async () => {
+      const { data } = await (supabase.from("lounge_messages" as any) as any)
+        .select("id, user_id, display_name, text, created_at")
+        .order("created_at", { ascending: false })
+        .limit(MESSAGE_LIMIT);
+      if (!active || !data) return;
+      const ordered = (data as LoungeRow[]).slice().reverse().map(rowToMessage);
+      setMessages(ordered);
+    })();
+
+    const channel = supabase
+      .channel("lounge-messages")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "lounge_messages" },
+        (payload: any) => {
+          const msg = rowToMessage(payload.new as LoungeRow);
+          setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
+        },
+      )
+      .subscribe();
+
+    return () => { active = false; supabase.removeChannel(channel); };
+  }, [userId]);
+
+  // Stream the latest market news headline into the room.
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+
+    (async () => {
+      const { data } = await supabase
+        .from("news_items")
+        .select("headline")
+        .order("published_at", { ascending: false })
+        .limit(1);
+      if (active && data?.[0]?.headline) setLatestNews(data[0].headline as string);
+    })();
+
+    const channel = supabase
+      .channel("lounge-news")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "news_items" },
+        (payload: any) => {
+          if (payload.new?.headline) setLatestNews(payload.new.headline as string);
+        },
+      )
+      .subscribe();
+
+    return () => { active = false; supabase.removeChannel(channel); };
+  }, [userId]);
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const isProfileComplete = hasCompletedLoungeProfile;
-  const isChatLocked = loading || !gateLoaded || !userId || !isProfileComplete;
+  const isChatLocked = loading || !gateLoaded || !userId || !isProfileComplete || sending;
 
   const displayName = profile?.show_nickname && profile?.nickname?.trim()
     ? profile.nickname.trim()
@@ -49,11 +121,23 @@ export default function LoungeChat() {
 
   const showPrompt = gateLoaded && !showProfileDialog && !isProfileComplete;
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = input.trim();
-    if (!trimmed || isChatLocked) return;
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), sender: displayName, text: trimmed, timestamp: new Date(), isOwn: true }]);
+    if (!trimmed || isChatLocked || !userId) return;
+    setSending(true);
     setInput("");
+    const { data, error } = await (supabase.from("lounge_messages" as any) as any)
+      .insert({ user_id: userId, display_name: displayName, text: trimmed.slice(0, 1000) })
+      .select("id, user_id, display_name, text, created_at")
+      .single();
+    if (error) {
+      // Restore the text so the user can retry.
+      setInput(trimmed);
+    } else if (data) {
+      const msg = rowToMessage(data as LoungeRow);
+      setMessages(prev => (prev.some(m => m.id === msg.id) ? prev : [...prev, msg]));
+    }
+    setSending(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -103,22 +187,42 @@ export default function LoungeChat() {
           }}>My Profile</button>
         </div>
 
+        {/* Live news strip */}
+        {latestNews && (
+          <div style={{
+            padding: "7px 16px", borderBottom: "1px solid hsl(0 0% 100% / 0.06)",
+            background: "hsl(32 52% 64% / 0.07)", display: "flex", alignItems: "center", gap: 7,
+            fontSize: 11, color: "hsl(0 0% 100% / 0.78)",
+          }}>
+            <span style={{ color: "hsl(32 52% 64%)", fontWeight: 700, flexShrink: 0 }}>📰 NEWS</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{latestNews}</span>
+          </div>
+        )}
+
         {/* Messages */}
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-          {messages.map(msg => (
-            <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.isOwn ? "flex-end" : "flex-start" }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: msg.isOwn ? "hsl(32 52% 64%)" : "hsl(0 0% 100% / 0.6)", marginBottom: 2 }}>
-                {msg.sender}
-              </span>
-              <div style={{
-                maxWidth: "85%", padding: "8px 12px", borderRadius: 10, fontSize: 13, lineHeight: 1.45,
-                color: "hsl(0 0% 100%)",
-                background: msg.isOwn ? "hsl(32 52% 64% / 0.2)" : "hsl(0 0% 100% / 0.08)",
-                border: msg.isOwn ? "1px solid hsl(32 52% 64% / 0.25)" : "1px solid hsl(0 0% 100% / 0.06)",
-              }}>{msg.text}</div>
-              <span style={{ fontSize: 10, color: "hsl(0 0% 100% / 0.35)", marginTop: 2 }}>{formatTime(msg.timestamp)}</span>
+          {messages.map(msg => {
+            const isOwn = msg.userId === userId;
+            return (
+              <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: isOwn ? "flex-end" : "flex-start" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: isOwn ? "hsl(32 52% 64%)" : "hsl(0 0% 100% / 0.6)", marginBottom: 2 }}>
+                  {msg.sender}
+                </span>
+                <div style={{
+                  maxWidth: "85%", padding: "8px 12px", borderRadius: 10, fontSize: 13, lineHeight: 1.45,
+                  color: "hsl(0 0% 100%)",
+                  background: isOwn ? "hsl(32 52% 64% / 0.2)" : "hsl(0 0% 100% / 0.08)",
+                  border: isOwn ? "1px solid hsl(32 52% 64% / 0.25)" : "1px solid hsl(0 0% 100% / 0.06)",
+                }}>{msg.text}</div>
+                <span style={{ fontSize: 10, color: "hsl(0 0% 100% / 0.35)", marginTop: 2 }}>{formatTime(msg.timestamp)}</span>
+              </div>
+            );
+          })}
+          {messages.length === 0 && (
+            <div style={{ color: "hsl(0 0% 100% / 0.4)", fontSize: 12, textAlign: "center", marginTop: 24 }}>
+              No messages yet — start the conversation 🥃
             </div>
-          ))}
+          )}
           <div ref={bottomRef} />
         </div>
 
