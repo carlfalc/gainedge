@@ -202,14 +202,23 @@ Deno.serve(async (req: Request) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Server-to-server calls (e.g. falconer-engine refreshing candles) pass the
+    // service-role key. Those are trusted and skip the per-user claims check —
+    // the data actions below (candles/price/symbols) don't need a user identity.
+    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const isServiceCall = SERVICE_ROLE_KEY.length > 0 && token === SERVICE_ROLE_KEY;
+
+    let userId: string | undefined;
+    if (!isServiceCall) {
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = claimsData.claims.sub;
     }
-    const userId = claimsData.claims.sub;
 
     const body = await req.json();
     const { action, symbol, timeframe, startTime, limit } = body;
@@ -223,6 +232,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "provision") {
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "provision requires a user token" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       // Store the hardcoded account ID in profile and return immediately
       await supabase
         .from("profiles")

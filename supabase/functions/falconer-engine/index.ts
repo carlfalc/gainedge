@@ -67,6 +67,58 @@ async function loadCandles(supabase: ReturnType<typeof createClient>, symbol: st
   }));
 }
 
+// Pull the latest candles from MetaApi (via metaapi-candles) and upsert them into
+// candle_history so the strategy always evaluates on fresh bars. Returns rows inserted.
+// Skips MOCK fallback data (data.fallback === true) so we never pollute history with synthetic candles.
+async function refreshCandles(
+  supabase: ReturnType<typeof createClient>,
+  symbol: string,
+  timeframe: string,
+  limit = 500,
+): Promise<number> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/metaapi-candles`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SERVICE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action: "candles", symbol, timeframe, limit }),
+    });
+    if (!res.ok) {
+      console.error(`refreshCandles ${symbol}/${timeframe}: http ${res.status}`);
+      return 0;
+    }
+    const data = await res.json().catch(() => null);
+    if (!data?.success || data?.fallback || !Array.isArray(data.candles) || data.candles.length === 0) {
+      // fallback === true means metaapi-candles returned mock data — do not persist it
+      return 0;
+    }
+    const rows = data.candles
+      .map((c: any) => ({
+        symbol,
+        timeframe,
+        timestamp: c.time ?? c.timestamp ?? c.brokerTime ?? null,
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        volume: Math.round(Number(c.tickVolume ?? c.volume ?? 0)),
+      }))
+      .filter((r: any) => r.timestamp && Number.isFinite(r.open) && Number.isFinite(r.close));
+    if (rows.length === 0) return 0;
+    const { data: inserted, error } = await supabase.rpc("bulk_insert_candles", { candles: rows });
+    if (error) {
+      console.error(`bulk_insert_candles ${symbol}/${timeframe}: ${error.message}`);
+      return 0;
+    }
+    return Number(inserted ?? 0);
+  } catch (e) {
+    console.error(`refreshCandles ${symbol}/${timeframe} failed: ${(e as Error).message}`);
+    return 0;
+  }
+}
+
 async function postWebhook(url: string, message: string): Promise<{ ok: boolean; status: number; body: string }> {
   try {
     const res = await fetch(url, {
@@ -109,7 +161,7 @@ async function processUserSymbol(
     .eq("user_id", s.user_id)
     .eq("symbol", symbol)
     .eq("mode", "live")
-    .in("status", ["open", "tp1_hit", "tp2_hit", "be_done"])
+    .in("status", ["open", "tp1_hit", "tp2_hit", "be_active"])
     .limit(1);
   if (openRows && openRows.length > 0) return { symbol, fired: false, reason: "position_open" };
 
@@ -207,7 +259,7 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
     .from("falconer_trades")
     .select("*")
     .eq("mode", "live")
-    .in("status", ["open", "tp1_hit", "tp2_hit", "be_done"]);
+    .in("status", ["open", "tp1_hit", "tp2_hit", "be_active"]);
   if (!open) return;
 
   for (const t of open as any[]) {
@@ -216,9 +268,9 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
     const last = candles[candles.length - 1];
     const updates: Record<string, unknown> = {};
 
-    // SL hit
+    // SL hit (whether the SL is the original or moved to breakeven, it closes via stop)
     if (last.low <= Number(t.sl_price)) {
-      updates.status = t.be_done ? "be_stop" : "sl";
+      updates.status = "closed_sl";
       updates.closed_at = new Date().toISOString();
     } else {
       let status = t.status;
@@ -239,10 +291,10 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
         }
       }
       if (last.high >= Number(t.tp3_price)) {
-        updates.status = "tp3";
+        updates.status = "closed_tp3";
         updates.closed_at = new Date().toISOString();
       } else {
-        updates.status = beDone ? "be_done" : status;
+        updates.status = beDone ? "be_active" : status;
         updates.be_done = beDone;
         updates.sl_price = sl;
       }
@@ -258,14 +310,38 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
   try {
-    await manageOpenPositions(supabase);
-
     const { data: allSettings } = await supabase
       .from("falconer_settings")
       .select("*")
       .eq("enabled", true);
+
+    // Refresh candle_history with fresh bars BEFORE managing positions or scanning,
+    // so both operate on live data. Collect every (symbol, timeframe) pair we care about:
+    // every enabled user's configured symbols + any symbol/timeframe with an open trade.
+    const pairs = new Map<string, { symbol: string; timeframe: string }>();
+    for (const s of (allSettings ?? []) as Settings[]) {
+      for (const sym of s.symbols ?? []) {
+        pairs.set(`${sym}|${s.timeframe}`, { symbol: sym, timeframe: s.timeframe });
+      }
+    }
+    const { data: openForRefresh } = await supabase
+      .from("falconer_trades")
+      .select("symbol, timeframe")
+      .eq("mode", "live")
+      .in("status", ["open", "tp1_hit", "tp2_hit", "be_active"]);
+    for (const t of (openForRefresh ?? []) as any[]) {
+      pairs.set(`${t.symbol}|${t.timeframe}`, { symbol: t.symbol, timeframe: t.timeframe });
+    }
+    const refreshed: { symbol: string; timeframe: string; inserted: number }[] = [];
+    for (const { symbol, timeframe } of pairs.values()) {
+      const inserted = await refreshCandles(supabase, symbol, timeframe);
+      refreshed.push({ symbol, timeframe, inserted });
+    }
+
+    await manageOpenPositions(supabase);
+
     if (!allSettings) {
-      return new Response(JSON.stringify({ scanned: 0 }), {
+      return new Response(JSON.stringify({ scanned: 0, refreshed }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -278,7 +354,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ scanned: results.length, results }), {
+    return new Response(JSON.stringify({ scanned: results.length, results, refreshed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
