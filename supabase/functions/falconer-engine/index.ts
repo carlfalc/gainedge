@@ -170,6 +170,15 @@ async function sendPineConnector(
   await postWebhook(s.pineconnector_webhook_url as string, msg);
 }
 
+// UTC trading-session bucket (approx) used as a RON feature.
+function sessionFromHour(h: number): string {
+  if (h >= 0 && h < 7) return "asian";
+  if (h >= 7 && h < 12) return "london";
+  if (h >= 12 && h < 16) return "overlap";
+  if (h >= 16 && h < 21) return "ny";
+  return "off";
+}
+
 async function processUserSymbol(
   supabase: ReturnType<typeof createClient>,
   s: Settings,
@@ -257,6 +266,28 @@ async function processUserSymbol(
     payload = { metaapi: r.json ?? r.text };
   }
 
+  // Capture entry-time market features for RON model training (see migration
+  // 20260530110000). These are Falconer-native features available at the signal bar.
+  const entryBar = candles[i];
+  const entryHour = new Date(entryBar.time).getUTCHours();
+  const featureSet = {
+    trigger_type: trig.type,
+    symbol,
+    timeframe: s.timeframe,
+    hour_utc: entryHour,
+    day_of_week: new Date(entryBar.time).getUTCDay(),
+    session: sessionFromHour(entryHour),
+    atr_pct: Number(atrPct.toFixed(4)),
+    ema_spread_pct: Number((((e9[i] - e21[i]) / entryBar.close) * 100).toFixed(4)),
+    ema9_above_21: e9[i] > e21[i] ? 1 : 0,
+    squeeze_on: squeezeOn ? 1 : 0,
+    ha_green: ha[i].close > ha[i].open ? 1 : 0,
+    rr_tp3: cfg.rrTp3,
+    risk_usd: cfg.riskUsd,
+    entry: pos.entry,
+    sl: pos.sl,
+  };
+
   // Record trade
   await supabase.from("falconer_trades").insert({
     user_id: s.user_id,
@@ -265,6 +296,7 @@ async function processUserSymbol(
     symbol,
     timeframe: s.timeframe,
     direction: "long",
+    features: featureSet,
     entry_price: pos.entry,
     sl_price: pos.sl,
     tp1_price: pos.tp1,
@@ -317,6 +349,7 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
     //    record it and send a safety-net close.
     if (last.low <= Number(t.sl_price)) {
       updates.status = "closed_sl";
+      updates.exit_price = Number(t.sl_price);
       updates.closed_at = new Date().toISOString();
       if (isMeta && posId) await callMetaApi({ action: "close", user_id: t.user_id, positionId: posId });
       else if (isPine) await sendPineConnector(supabase, t.user_id, t.symbol, "close");
@@ -356,6 +389,7 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
     // 5) TP3 hit → final close of any remainder (broker TP also closes it)
     if (last.high >= tp3) {
       updates.status = "closed_tp3";
+      updates.exit_price = tp3;
       updates.closed_at = new Date().toISOString();
       updates.filled1 = true;
       updates.filled2 = true;
@@ -371,6 +405,7 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
     // 6) HA-flip exit (only after breakeven): two consecutive red HA bars
     if (beDone && haN.close < haN.open && haPrev.close < haPrev.open) {
       updates.status = "closed_ha_flip";
+      updates.exit_price = last.close;
       updates.closed_at = new Date().toISOString();
       updates.filled1 = filled1;
       updates.filled2 = filled2;
