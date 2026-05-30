@@ -82,6 +82,31 @@ async function resolveBrokerSymbol(
   return variants;
 }
 
+/** Look up the broker's minimum lot / lot step for a symbol (defaults to 0.01). */
+async function getLotStep(
+  adminSupabase: ReturnType<typeof createClient>,
+  brokerName: string | null,
+  canonicalSymbol: string,
+): Promise<number> {
+  if (!brokerName) return 0.01;
+  const brokerKey = brokerName.toLowerCase().replace(/\s+/g, "");
+  const { data } = await adminSupabase
+    .from("broker_symbol_mappings")
+    .select("min_lot_size")
+    .eq("broker", brokerKey)
+    .eq("canonical_symbol", canonicalSymbol)
+    .limit(1);
+  const min = data?.[0]?.min_lot_size as number | undefined;
+  return min && min > 0 ? min : 0.01;
+}
+
+/** Round a volume to the broker lot step (e.g. 0.01) so MetaApi won't reject it. */
+function roundToStep(volume: number, step: number): number {
+  if (!Number.isFinite(volume) || volume <= 0) return 0;
+  const stepDecimals = (String(step).split(".")[1] || "").length || 2;
+  return Number((Math.round(volume / step) * step).toFixed(stepDecimals));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -171,12 +196,14 @@ Deno.serve(async (req: Request) => {
       }
 
       const variants = await resolveBrokerSymbol(adminSupabase, brokerName, symbol);
+      const step = await getLotStep(adminSupabase, brokerName, symbol);
+      const roundedVolume = Math.max(step, roundToStep(parseFloat(volume), step));
 
       for (const variant of variants) {
         const tradeBody: Record<string, unknown> = {
           actionType,
           symbol: variant,
-          volume: parseFloat(volume),
+          volume: roundedVolume,
         };
         if (stopLoss != null && stopLoss !== "") tradeBody.stopLoss = parseFloat(stopLoss);
         if (takeProfit != null && takeProfit !== "") tradeBody.takeProfit = parseFloat(takeProfit);
@@ -271,15 +298,23 @@ Deno.serve(async (req: Request) => {
 
     // ─── PARTIAL CLOSE (scale out a portion of an open position) ───
     if (action === "partial-close") {
-      const { positionId, volume } = body;
+      const { positionId, volume, symbol } = body;
       if (!positionId || volume == null) {
         return new Response(JSON.stringify({ error: "positionId and volume required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const step = symbol ? await getLotStep(adminSupabase, brokerName, symbol) : 0.01;
+      const partialVolume = roundToStep(parseFloat(volume), step);
+      if (partialVolume < step) {
+        // Slice too small to close at this broker's lot step — skip rather than error.
+        return new Response(JSON.stringify({ success: true, skipped: "below_min_lot", step }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const res = await fetch(`${baseUrl}/trade`, {
         method: "POST", headers: metaHeaders,
-        body: JSON.stringify({ actionType: "POSITION_PARTIAL", positionId, volume: parseFloat(volume) }),
+        body: JSON.stringify({ actionType: "POSITION_PARTIAL", positionId, volume: partialVolume }),
       });
       const data = await res.json();
       if (!res.ok) {

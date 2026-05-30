@@ -334,14 +334,14 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
     if (!filled1 && last.high >= tp1) {
       filled1 = true;
       if (isMeta && posId) {
-        await callMetaApi({ action: "partial-close", user_id: t.user_id, positionId: posId, volume: Number(t.qty1) });
+        await callMetaApi({ action: "partial-close", user_id: t.user_id, positionId: posId, symbol: t.symbol, volume: Number(t.qty1) });
       }
     }
     // 3) TP2 partial scale-out (qty2)
     if (!filled2 && last.high >= tp2) {
       filled2 = true;
       if (isMeta && posId) {
-        await callMetaApi({ action: "partial-close", user_id: t.user_id, positionId: posId, volume: Number(t.qty2) });
+        await callMetaApi({ action: "partial-close", user_id: t.user_id, positionId: posId, symbol: t.symbol, volume: Number(t.qty2) });
       }
     }
     // 4) Breakeven: move stop to entry once price reaches beLevel
