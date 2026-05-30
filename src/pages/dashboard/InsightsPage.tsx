@@ -51,10 +51,24 @@ export default function InsightsPage() {
   const [keyInsights, setKeyInsights] = useState<Insight[]>([]);
   const [patterns, setPatterns] = useState<Insight[]>([]);
   const [weeklyDigest, setWeeklyDigest] = useState<Insight[]>([]);
+  const [briefing, setBriefing] = useState<any>(null);
+  const [briefingState, setBriefingState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     loadInsights();
+    loadBriefing();
   }, []);
+
+  const loadBriefing = async () => {
+    setBriefingState("loading");
+    const { data, error } = await supabase.functions.invoke("ron-briefing");
+    if (error || !data?.ok || !data?.briefing) {
+      setBriefingState("error");
+      return;
+    }
+    setBriefing(data.briefing);
+    setBriefingState("ready");
+  };
 
   const loadInsights = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -84,6 +98,82 @@ export default function InsightsPage() {
           <h1 className="text-3xl font-sans font-semibold text-white">RONS Insights</h1>
         </div>
         <p style={{ color: C.text, fontSize: 14 }}>Compiled from your trading data and market analysis</p>
+      </div>
+
+      {/* RON Live Market Briefing (from the ron-ml brain) */}
+      <div style={labelStyle}>RON Live Market Briefing</div>
+      <div style={{ ...cardStyle, marginBottom: 32, borderColor: C.jade + "30" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.jade + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Brain size={18} style={{ color: C.jade }} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15 }}>RON — Adaptive Market Intelligence</div>
+              <div style={{ fontSize: 12, color: C.text }}>Live from the RON brain</div>
+            </div>
+          </div>
+          {briefingState === "ready" && (
+            <span style={{
+              padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
+              background: briefing?.ml_model_loaded ? C.green + "20" : C.amber + "20",
+              color: briefing?.ml_model_loaded ? C.green : C.amber,
+            }}>
+              {briefing?.ml_model_loaded ? "Model: trained" : "Model: learning"}
+            </span>
+          )}
+        </div>
+
+        {briefingState === "loading" && (
+          <div style={{ fontSize: 13, color: C.text }}>Waking the RON brain… (first call can take ~30s)</div>
+        )}
+        {briefingState === "error" && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 13, color: C.text }}>RON briefing unavailable right now.</span>
+            <button onClick={loadBriefing} style={{
+              padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
+              background: C.jade + "18", color: C.jade, border: `1px solid ${C.jade}30`,
+            }}>Retry</button>
+          </div>
+        )}
+        {briefingState === "ready" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+            {/* Economic */}
+            <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <Zap size={13} style={{ color: C.jade }} />
+                <span style={{ color: C.text, fontSize: 11, fontWeight: 700 }}>ECONOMIC</span>
+              </div>
+              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+                {briefing?.sections?.economic?.ron_insight ?? "No economic insight available."}
+              </div>
+            </div>
+            {/* Fear & Greed */}
+            <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <Activity size={13} style={{ color: C.jade }} />
+                <span style={{ color: C.text, fontSize: 11, fontWeight: 700 }}>FEAR & GREED</span>
+              </div>
+              <div style={{ fontSize: 13, color: C.text }}>
+                {briefing?.sections?.fear_greed && briefing.sections.fear_greed.status !== "unavailable"
+                  ? JSON.stringify(briefing.sections.fear_greed.value ?? briefing.sections.fear_greed)
+                  : "Source not configured yet."}
+              </div>
+            </div>
+            {/* Sentiment */}
+            <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                <TrendingUp size={13} style={{ color: C.jade }} />
+                <span style={{ color: C.text, fontSize: 11, fontWeight: 700 }}>NEWS SENTIMENT</span>
+              </div>
+              <div style={{ fontSize: 13, color: C.text }}>
+                {briefing?.sections?.sentiment?.articles_analysed
+                  ? `${briefing.sections.sentiment.articles_analysed} articles analysed`
+                  : "Awaiting news ingestion."}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Key Discoveries */}
