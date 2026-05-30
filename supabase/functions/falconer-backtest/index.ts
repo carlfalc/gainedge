@@ -124,7 +124,16 @@ Deno.serve(async (req) => {
       equity_curve: sampledCurve as unknown as Record<string, unknown>,
     }).eq("id", runRow.id);
 
-    // Persist individual trades (mode = backtest)
+    // Persist individual trades (mode = backtest). Map the backtest exitReason onto the
+    // falconer_trades status enum (CHECK allows open/tp*_hit/be_active/closed_*); the raw
+    // exitReason values (tp3/sl/ha_flip/be_stop) would violate the constraint and the rows
+    // would silently fail to insert.
+    const STATUS_BY_EXIT: Record<string, string> = {
+      tp3: "closed_tp3",
+      sl: "closed_sl",
+      be_stop: "closed_sl",
+      ha_flip: "closed_ha_flip",
+    };
     if (result.trades.length > 0) {
       const rows = result.trades.map((t) => ({
         user_id: body.user_id,
@@ -142,7 +151,7 @@ Deno.serve(async (req) => {
         be_level: t.entry,
         qty: 0, qty1: 0, qty2: 0, qty3: 0,
         trigger_type: t.trigger,
-        status: t.exitReason,
+        status: STATUS_BY_EXIT[t.exitReason] ?? "closed_sl",
         pnl_usd: t.pnlUsd,
         opened_at: new Date(t.openedAt).toISOString(),
         closed_at: new Date(t.closedAt).toISOString(),

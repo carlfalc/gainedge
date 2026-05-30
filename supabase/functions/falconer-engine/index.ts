@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
-  asianSessionHigh,
+  asianLockedSeries,
   atr,
   bb,
   buildPineConnectorBreakeven,
@@ -10,14 +10,18 @@ import {
   buildPineConnectorEntry,
   buildPosition,
   type Candle,
+  computeDailySeries,
+  dailyContextFor,
   DEFAULT_CONFIG,
   ema,
   evaluateLongTrigger,
-  kc,
-  previousDayLow,
+  squeezeSeries,
   type StrategyConfig,
   toHA,
 } from "../_shared/falconer-strategy.ts";
+
+// How many daily bars to fetch/keep so the strategy can warm a 200-period daily EMA.
+const DAILY_LOOKBACK = 320;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -75,6 +79,7 @@ async function refreshCandles(
   symbol: string,
   timeframe: string,
   limit = 500,
+  startTime?: string,
 ): Promise<number> {
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/metaapi-candles`, {
@@ -83,7 +88,7 @@ async function refreshCandles(
         "Authorization": `Bearer ${SERVICE_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ action: "candles", symbol, timeframe, limit }),
+      body: JSON.stringify({ action: "candles", symbol, timeframe, limit, startTime }),
     });
     if (!res.ok) {
       console.error(`refreshCandles ${symbol}/${timeframe}: http ${res.status}`);
@@ -198,14 +203,23 @@ async function processUserSymbol(
     .limit(1);
   if (openRows && openRows.length > 0) return { symbol, fired: false, reason: "position_open" };
 
+  // Daily higher-timeframe context (EMA50/EMA200 trend + previous-day low). The Pine
+  // strategy's trend filter lives on the DAILY chart, so the engine loads a dedicated
+  // ~320-bar daily series — the 15m window is far too short to warm a daily EMA200.
+  const dailyCandles = await loadCandles(supabase, symbol, "1d", DAILY_LOOKBACK);
+  if (dailyCandles.length < 2) {
+    return { symbol, fired: false, reason: "insufficient_daily_candles" };
+  }
+  const dailySeries = computeDailySeries(dailyCandles);
+
   const cfg = cfgFromSettings(s);
   const closes = candles.map(c => c.close);
-  const e9 = ema(closes, 9);
   const e21 = ema(closes, 21);
   const atrArr = atr(candles, 14);
   const bbB = bb(closes, 20, 2);
-  const kcB = kc(candles, 20, 1.5);
+  const sqz = squeezeSeries(candles, 20, 2, 1.5);
   const ha = toHA(candles);
+  const asian = asianLockedSeries(candles, cfg);
   const i = candles.length - 1;
 
   const atrPct = (atrArr[i] / candles[i].close) * 100;
@@ -213,19 +227,22 @@ async function processUserSymbol(
     return { symbol, fired: false, reason: `atr_pct_${atrPct.toFixed(3)}` };
   }
 
-  const squeezeOn = bbB.upper[i] < kcB.upper[i] && bbB.lower[i] > kcB.lower[i];
-  const squeezeOnPrev = bbB.upper[i - 1] < kcB.upper[i - 1] && bbB.lower[i - 1] > kcB.lower[i - 1];
+  const dctx = dailyContextFor(dailySeries, candles[i].time);
+  if (!dctx) return { symbol, fired: false, reason: "no_daily_context" };
 
   const trig = evaluateLongTrigger({
-    i,
     haGreen: ha[i].close > ha[i].open,
     haGreenPrev: ha[i - 1].close > ha[i - 1].open,
-    close: candles[i].close, closePrev: candles[i - 1].close, low: candles[i].low,
-    ema9: e9[i], ema21: e21[i], ema9Prev: e9[i - 1], ema21Prev: e21[i - 1],
-    atrVal: atrArr[i],
-    squeezeOn, squeezeOnPrev,
-    asianHigh: asianSessionHigh(candles, i, cfg),
-    pdl: previousDayLow(candles, i),
+    haRedPrev: ha[i - 1].close < ha[i - 1].open,
+    close: candles[i].close, closePrev: candles[i - 1].close,
+    low: candles[i].low, lowPrev: candles[i - 1].low,
+    ema21: e21[i],
+    atrPct,
+    upBBPrev: bbB.upper[i - 1],
+    sqzReleased: (sqz[i - 2] ?? false) && !sqz[i],
+    emaD50: dctx.emaD50, emaD50Prev: dctx.emaD50Prev, emaD200: dctx.emaD200,
+    pdl: dctx.pdl,
+    lockedLo: asian.lockedLo[i],
     cfg,
   });
   if (!trig.fired || !trig.type) return { symbol, fired: false, reason: "no_trigger" };
@@ -278,10 +295,13 @@ async function processUserSymbol(
     day_of_week: new Date(entryBar.time).getUTCDay(),
     session: sessionFromHour(entryHour),
     atr_pct: Number(atrPct.toFixed(4)),
-    ema_spread_pct: Number((((e9[i] - e21[i]) / entryBar.close) * 100).toFixed(4)),
-    ema9_above_21: e9[i] > e21[i] ? 1 : 0,
-    squeeze_on: squeezeOn ? 1 : 0,
+    ema21_spread_pct: Number((((entryBar.close - e21[i]) / entryBar.close) * 100).toFixed(4)),
+    daily_trend_up: dctx.emaD50 > dctx.emaD50Prev ? 1 : 0,
+    above_d50: entryBar.close > dctx.emaD50 ? 1 : 0,
+    above_d200: entryBar.close > dctx.emaD200 ? 1 : 0,
+    squeeze_on: sqz[i] ? 1 : 0,
     ha_green: ha[i].close > ha[i].open ? 1 : 0,
+    ha_green_prev: ha[i - 1].close > ha[i - 1].open ? 1 : 0,
     rr_tp3: cfg.rrTp3,
     risk_usd: cfg.riskUsd,
     entry: pos.entry,
@@ -459,6 +479,16 @@ Deno.serve(async (req) => {
     for (const { symbol, timeframe } of pairs.values()) {
       const inserted = await refreshCandles(supabase, symbol, timeframe);
       refreshed.push({ symbol, timeframe, inserted });
+    }
+
+    // Also keep a daily series fresh for every symbol so the strategy's DAILY trend
+    // filter (EMA50 rising, close>EMA50, close>EMA200) has warmed inputs. One fetch per
+    // symbol covering ~DAILY_LOOKBACK days back.
+    const dailyStart = new Date(Date.now() - (DAILY_LOOKBACK + 10) * 24 * 60 * 60 * 1000).toISOString();
+    const dailySymbols = new Set([...pairs.values()].map(p => p.symbol));
+    for (const symbol of dailySymbols) {
+      const inserted = await refreshCandles(supabase, symbol, "1d", DAILY_LOOKBACK, dailyStart);
+      refreshed.push({ symbol, timeframe: "1d", inserted });
     }
 
     await manageOpenPositions(supabase);
