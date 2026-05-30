@@ -133,7 +133,8 @@ async function postWebhook(url: string, message: string): Promise<{ ok: boolean;
   }
 }
 
-async function callMetaApiTrade(supabase: ReturnType<typeof createClient>, payload: Record<string, unknown>) {
+// Call metaapi-trade server-to-server (service-role). Returns parsed JSON when possible.
+async function callMetaApi(payload: Record<string, unknown>): Promise<{ ok: boolean; json: any; text: string }> {
   const url = `${SUPABASE_URL}/functions/v1/metaapi-trade`;
   const res = await fetch(url, {
     method: "POST",
@@ -143,7 +144,30 @@ async function callMetaApiTrade(supabase: ReturnType<typeof createClient>, paylo
     },
     body: JSON.stringify(payload),
   });
-  return { ok: res.ok, body: await res.text() };
+  const text = await res.text();
+  let json: any = null;
+  try { json = JSON.parse(text); } catch { /* non-JSON body */ }
+  return { ok: res.ok, json, text };
+}
+
+// Send a PineConnector breakeven / close instruction for a user's configured webhook.
+async function sendPineConnector(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  symbol: string,
+  kind: "be" | "close",
+) {
+  const { data: s } = await supabase
+    .from("falconer_settings")
+    .select("pineconnector_license, pineconnector_webhook_url, pineconnector_symbol_override")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!s?.pineconnector_license || !s?.pineconnector_webhook_url) return;
+  const brokerSym = (s.pineconnector_symbol_override as Record<string, string> | null)?.[symbol] ?? symbol;
+  const msg = kind === "be"
+    ? buildPineConnectorBreakeven(s.pineconnector_license as string, brokerSym)
+    : buildPineConnectorClose(s.pineconnector_license as string, brokerSym);
+  await postWebhook(s.pineconnector_webhook_url as string, msg);
 }
 
 async function processUserSymbol(
@@ -203,6 +227,7 @@ async function processUserSymbol(
   // Route execution
   let executionPath = s.execution_path;
   let payload: Record<string, unknown> = {};
+  let metaapiPositionId: string | null = null;
 
   if (executionPath === "pineconnector") {
     const license = s.pineconnector_license;
@@ -217,16 +242,19 @@ async function processUserSymbol(
       payload = { pineconnector_message: message, webhook_result: result };
     }
   } else if (executionPath === "metaapi") {
-    const r = await callMetaApiTrade(supabase, {
+    // Open the full position with the protective SL and the final TP3. The engine
+    // scales out qty1/qty2 via partial-close at TP1/TP2 and moves SL to breakeven below.
+    const r = await callMetaApi({
+      action: "trade",
       user_id: s.user_id,
       symbol,
-      direction: "buy",
+      actionType: "ORDER_TYPE_BUY",
       volume: pos.qty,
-      sl: pos.sl,
-      tp: pos.tp3, // single TP via metaapi bridge; partials managed by engine via subsequent calls
-      comment: `v7TP3_${trig.type}`,
+      stopLoss: pos.sl,
+      takeProfit: pos.tp3,
     });
-    payload = { metaapi: r };
+    metaapiPositionId = r.json?.result?.positionId ?? r.json?.result?.orderId ?? null;
+    payload = { metaapi: r.json ?? r.text };
   }
 
   // Record trade
@@ -247,6 +275,9 @@ async function processUserSymbol(
     qty1: pos.qty1, qty2: pos.qty2, qty3: pos.qty3,
     trigger_type: trig.type,
     status: "open",
+    filled1: false, filled2: false, filled3: false,
+    be_done: false,
+    metaapi_position_ids: metaapiPositionId ? { entry: metaapiPositionId } : null,
     opened_at: new Date(pos.openedAt).toISOString(),
     raw_alert_payload: payload as Record<string, unknown>,
   });
@@ -263,43 +294,100 @@ async function manageOpenPositions(supabase: ReturnType<typeof createClient>) {
   if (!open) return;
 
   for (const t of open as any[]) {
-    const candles = await loadCandles(supabase, t.symbol, t.timeframe, 5);
-    if (candles.length === 0) continue;
+    // Load enough bars to compute Heiken-Ashi for the HA-flip exit.
+    const candles = await loadCandles(supabase, t.symbol, t.timeframe, 50);
+    if (candles.length < 2) continue;
     const last = candles[candles.length - 1];
+    const ha = toHA(candles);
+    const haN = ha[ha.length - 1];
+    const haPrev = ha[ha.length - 2];
+
+    const entry = Number(t.entry_price);
+    const tp1 = Number(t.tp1_price);
+    const tp2 = Number(t.tp2_price);
+    const tp3 = Number(t.tp3_price);
+    const beLevel = Number(t.be_level);
+    const isMeta = t.execution_path === "metaapi";
+    const isPine = t.execution_path === "pineconnector";
+    const posId = (t.metaapi_position_ids as { entry?: string } | null)?.entry ?? null;
+
     const updates: Record<string, unknown> = {};
 
-    // SL hit (whether the SL is the original or moved to breakeven, it closes via stop)
+    // 1) SL hit first (conservative). Broker auto-closes via the protective stop; we
+    //    record it and send a safety-net close.
     if (last.low <= Number(t.sl_price)) {
       updates.status = "closed_sl";
       updates.closed_at = new Date().toISOString();
-    } else {
-      let status = t.status;
-      let beDone = t.be_done;
-      let sl = Number(t.sl_price);
-      if (last.high >= Number(t.tp1_price) && status === "open") status = "tp1_hit";
-      if (last.high >= Number(t.tp2_price) && (status === "open" || status === "tp1_hit")) status = "tp2_hit";
-      if (!beDone && last.high >= Number(t.be_level)) {
-        beDone = true;
-        sl = Number(t.entry_price);
-        // Notify PineConnector breakeven
-        if (t.execution_path === "pineconnector") {
-          const { data: s } = await supabase.from("falconer_settings").select("pineconnector_license, pineconnector_webhook_url, pineconnector_symbol_override").eq("user_id", t.user_id).maybeSingle();
-          if (s?.pineconnector_license && s?.pineconnector_webhook_url) {
-            const brokerSym = (s.pineconnector_symbol_override as Record<string, string> | null)?.[t.symbol] ?? t.symbol;
-            await postWebhook(s.pineconnector_webhook_url, buildPineConnectorBreakeven(s.pineconnector_license, brokerSym));
-          }
-        }
-      }
-      if (last.high >= Number(t.tp3_price)) {
-        updates.status = "closed_tp3";
-        updates.closed_at = new Date().toISOString();
-      } else {
-        updates.status = beDone ? "be_active" : status;
-        updates.be_done = beDone;
-        updates.sl_price = sl;
-      }
+      if (isMeta && posId) await callMetaApi({ action: "close", user_id: t.user_id, positionId: posId });
+      else if (isPine) await sendPineConnector(supabase, t.user_id, t.symbol, "close");
+      await supabase.from("falconer_trades").update(updates).eq("id", t.id);
+      continue;
     }
 
+    let filled1 = !!t.filled1;
+    let filled2 = !!t.filled2;
+    let beDone = !!t.be_done;
+    let sl = Number(t.sl_price);
+
+    // 2) TP1 partial scale-out (qty1). PineConnector EAs handle partials from the
+    //    entry message, so only MetaApi needs an explicit partial close.
+    if (!filled1 && last.high >= tp1) {
+      filled1 = true;
+      if (isMeta && posId) {
+        await callMetaApi({ action: "partial-close", user_id: t.user_id, positionId: posId, volume: Number(t.qty1) });
+      }
+    }
+    // 3) TP2 partial scale-out (qty2)
+    if (!filled2 && last.high >= tp2) {
+      filled2 = true;
+      if (isMeta && posId) {
+        await callMetaApi({ action: "partial-close", user_id: t.user_id, positionId: posId, volume: Number(t.qty2) });
+      }
+    }
+    // 4) Breakeven: move stop to entry once price reaches beLevel
+    if (!beDone && last.high >= beLevel) {
+      beDone = true;
+      sl = entry;
+      // Re-assert tp3 so POSITION_MODIFY doesn't clear the take-profit when only SL is sent.
+      if (isMeta && posId) await callMetaApi({ action: "modify", user_id: t.user_id, positionId: posId, stopLoss: entry, takeProfit: tp3 });
+      else if (isPine) await sendPineConnector(supabase, t.user_id, t.symbol, "be");
+    }
+
+    // 5) TP3 hit → final close of any remainder (broker TP also closes it)
+    if (last.high >= tp3) {
+      updates.status = "closed_tp3";
+      updates.closed_at = new Date().toISOString();
+      updates.filled1 = true;
+      updates.filled2 = true;
+      updates.filled3 = true;
+      updates.be_done = beDone;
+      updates.sl_price = sl;
+      if (isMeta && posId) await callMetaApi({ action: "close", user_id: t.user_id, positionId: posId });
+      else if (isPine) await sendPineConnector(supabase, t.user_id, t.symbol, "close");
+      await supabase.from("falconer_trades").update(updates).eq("id", t.id);
+      continue;
+    }
+
+    // 6) HA-flip exit (only after breakeven): two consecutive red HA bars
+    if (beDone && haN.close < haN.open && haPrev.close < haPrev.open) {
+      updates.status = "closed_ha_flip";
+      updates.closed_at = new Date().toISOString();
+      updates.filled1 = filled1;
+      updates.filled2 = filled2;
+      updates.be_done = beDone;
+      updates.sl_price = sl;
+      if (isMeta && posId) await callMetaApi({ action: "close", user_id: t.user_id, positionId: posId });
+      else if (isPine) await sendPineConnector(supabase, t.user_id, t.symbol, "close");
+      await supabase.from("falconer_trades").update(updates).eq("id", t.id);
+      continue;
+    }
+
+    // 7) Still open — persist progress
+    updates.filled1 = filled1;
+    updates.filled2 = filled2;
+    updates.be_done = beDone;
+    updates.sl_price = sl;
+    updates.status = beDone ? "be_active" : (filled2 ? "tp2_hit" : (filled1 ? "tp1_hit" : "open"));
     await supabase.from("falconer_trades").update(updates).eq("id", t.id);
   }
 }

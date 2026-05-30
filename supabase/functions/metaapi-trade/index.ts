@@ -244,6 +244,54 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // ─── MODIFY SL/TP (e.g. move stop to breakeven) ───
+    if (action === "modify") {
+      const { positionId, stopLoss, takeProfit } = body;
+      if (!positionId) {
+        return new Response(JSON.stringify({ error: "positionId required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const modifyBody: Record<string, unknown> = { actionType: "POSITION_MODIFY", positionId };
+      if (stopLoss != null && stopLoss !== "") modifyBody.stopLoss = parseFloat(stopLoss);
+      if (takeProfit != null && takeProfit !== "") modifyBody.takeProfit = parseFloat(takeProfit);
+      const res = await fetch(`${baseUrl}/trade`, {
+        method: "POST", headers: metaHeaders, body: JSON.stringify(modifyBody),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return new Response(JSON.stringify({ error: data.message || "Modify failed", details: data }), {
+          status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true, result: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ─── PARTIAL CLOSE (scale out a portion of an open position) ───
+    if (action === "partial-close") {
+      const { positionId, volume } = body;
+      if (!positionId || volume == null) {
+        return new Response(JSON.stringify({ error: "positionId and volume required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const res = await fetch(`${baseUrl}/trade`, {
+        method: "POST", headers: metaHeaders,
+        body: JSON.stringify({ actionType: "POSITION_PARTIAL", positionId, volume: parseFloat(volume) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return new Response(JSON.stringify({ error: data.message || "Partial close failed", details: data }), {
+          status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true, result: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ─── HISTORY ───
     if (action === "history") {
       const startTime = new Date(); startTime.setHours(0, 0, 0, 0);
