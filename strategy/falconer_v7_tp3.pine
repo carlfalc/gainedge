@@ -1,0 +1,155 @@
+//@version=5
+// Falconer v7 + TP3 — Longs Only Safety Mode with 5R runner
+// TP1 33% @ 1.5R · TP2 33% @ 3R · TP3 34% @ 5R
+// Backtest XAU 15m Dec 1 2025 - May 14 2026:
+//   +$5,473.67 (+54.74%) — +7.5% uplift over clean v7
+//   Max DD 1.94% — effectively unchanged
+//
+// Adds PineConnector webhook alerts (2026-05-24) for Eightcap MT5 automation
+//
+// ⚠️ CANONICAL SOURCE OF TRUTH for the GainEdge "Take Profit Falconer" strategy.
+// The TypeScript port at supabase/functions/_shared/falconer-strategy.ts MUST
+// match this logic. Provided by the owner 2026-05-30.
+strategy("Falconer v7 TP3 33-33-34", overlay=true, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, process_orders_on_close=true, calc_on_every_tick=false, commission_type=strategy.commission.percent, commission_value=0.0)
+
+useDateFilter = input.bool(true, "Restrict")
+startD = input.time(timestamp("2025-12-01T00:00:00"), "Start")
+endD   = input.time(timestamp("2026-05-14T23:59:00"), "End")
+
+riskUSD = input.float(200.0, "Risk per Trade $")
+rrTP1   = input.float(1.5, "TP1 R", step=0.1)
+rrTP2   = input.float(3.0, "TP2 R", step=0.1)
+rrTP3   = input.float(5.0, "TP3 R (runner)", step=0.1)
+beR     = input.float(1.0, "BE at R", step=0.1)
+pct1    = input.float(33,  "TP1 %", step=1)
+pct2    = input.float(33,  "TP2 %", step=1)
+dpu     = input.float(1.0)
+
+grpPC      = "PineConnector (Eightcap MT5 automation)"
+pcEnable   = input.bool(false, "Enable PineConnector webhook", group=grpPC, tooltip="Turn on once your TV alert is wired to PineConnector's webhook URL")
+pcLicense  = input.string("REPLACE_WITH_YOUR_LICENSE_ID", "License ID", group=grpPC)
+pcSymbol   = input.string("XAUUSD", "Broker symbol (Eightcap MT5)", group=grpPC, tooltip="Eightcap MT5 may use XAUUSD or XAUUSD.x - check your MT5 Market Watch")
+pcRisk     = input.float(0.5, "Risk % per trade (PC-side sizing)", group=grpPC, step=0.1, minval=0.01, maxval=10, tooltip="This is PineConnector's risk %, independent of the Pine $ risk input above")
+
+useTP = true
+useSQZ = true
+useSW = true
+useSESS = true
+fastLen = 9
+slowLen = 21
+atrLen = 14
+useHA = true
+useTrend = true
+useStrongTrend = true
+useStrongHA = true
+minATRp = 0.05
+maxATRp = 0.80
+pullbackTol = 0.0015
+allowL = true
+
+inWindow = not useDateFilter or (time >= startD and time <= endD)
+
+haC = (open + high + low + close) / 4.0
+var float haO = na
+haO := na(haO[1]) ? (open + close) / 2.0 : (nz(haO[1]) + nz(haC[1])) / 2.0
+haGreen = haC > haO
+haRed   = haC < haO
+
+emaSlow = ta.ema(close, slowLen)
+atr     = ta.atr(atrLen)
+atrPct  = atr / close * 100.0
+emaD50  = request.security(syminfo.tickerid, "D", ta.ema(close, 50), lookahead=barmerge.lookahead_off)
+emaD200 = request.security(syminfo.tickerid, "D", ta.ema(close, 200), lookahead=barmerge.lookahead_off)
+dTrendUp = emaD50 > emaD50[1]
+
+bbLen = 20
+basis = ta.sma(close, bbLen)
+sd    = 2.0 * ta.stdev(close, bbLen)
+upBB  = basis + sd
+loBB  = basis - sd
+rng   = ta.atr(bbLen)
+upKC  = basis + rng * 1.5
+loKC  = basis - rng * 1.5
+sqzOn = loBB > loKC and upBB < upKC
+sqzReleased = sqzOn[2] and not sqzOn
+
+pdl = request.security(syminfo.tickerid, "D", low[1], lookahead=barmerge.lookahead_off)
+
+inAsian = not na(time(timeframe.period, "2200-0600", "UTC"))
+var float aHi = na
+var float aLo = na
+if inAsian and not inAsian[1]
+    aHi := high
+    aLo := low
+else if inAsian
+    aHi := math.max(nz(aHi, high), high)
+    aLo := math.min(nz(aLo, low),  low)
+var float lockedHi = na
+var float lockedLo = na
+if not inAsian and inAsian[1]
+    lockedHi := aHi
+    lockedLo := aLo
+
+trendUp = close > emaD50 and dTrendUp
+tolDist = close * pullbackTol
+pullbackLow = low <= emaSlow + tolDist and low >= emaSlow - tolDist
+haFlipG = haGreen and haRed[1]
+tpLong = useTP and trendUp and pullbackLow and haGreen and (haFlipG or haGreen[1])
+sqzUp = useSQZ and sqzReleased and close > upBB[1] and haGreen
+swPDL = useSW and low[1] < pdl and close[1] > pdl and close > close[1] and haGreen
+swAL = useSESS and not na(lockedLo) and low[1] < lockedLo and close[1] > lockedLo and close > close[1] and haGreen
+
+longSig = tpLong or sqzUp or swPDL or swAL
+
+atrOK = atrPct >= minATRp and atrPct <= maxATRp
+haOKlong       = not useHA or haGreen
+haOKlongStrong = not useStrongHA or (haGreen and haGreen[1])
+trendOKlong       = not useTrend or dTrendUp
+trendOKlongStrong = not useStrongTrend or (dTrendUp and close > emaD200)
+
+longOK = inWindow and allowL and longSig and atrOK and haOKlong and haOKlongStrong and trendOKlong and trendOKlongStrong
+
+var float entryP = na
+var float slP    = na
+var float tp1P   = na
+var float tp2P   = na
+var float tp3P   = na
+var float beLvl  = na
+var bool  beDone = false
+slBufATR = 0.25 * atr
+
+if longOK and strategy.position_size == 0
+    entryP := close
+    slP    := math.min(low, low[1]) - slBufATR
+    riskD  = entryP - slP
+    if riskD > 0
+        tp1P := entryP + riskD * rrTP1
+        tp2P := entryP + riskD * rrTP2
+        tp3P := entryP + riskD * rrTP3
+        beLvl := entryP + riskD * beR
+        qty  = math.max(riskUSD / (riskD * dpu), 1.0)
+        qty1 = qty * pct1 / 100.0
+        qty2 = qty * pct2 / 100.0
+        qty3 = qty - qty1 - qty2
+        strategy.entry("L", strategy.long, qty=qty)
+        strategy.exit("L-TP1", from_entry="L", stop=slP, limit=tp1P, qty=qty1)
+        strategy.exit("L-TP2", from_entry="L", stop=slP, limit=tp2P, qty=qty2)
+        strategy.exit("L-TP3", from_entry="L", stop=slP, limit=tp3P, qty=qty3)
+        beDone := false
+        if pcEnable
+            pcEntryMsg = pcLicense + ",buy," + pcSymbol + ",risk=" + str.tostring(pcRisk) + ",sl=" + str.tostring(slP, format.mintick) + ",tp1=" + str.tostring(tp1P, format.mintick) + ",tp1size=33,tp2=" + str.tostring(tp2P, format.mintick) + ",tp2size=33,tp3=" + str.tostring(tp3P, format.mintick) + ",tp3size=34,comment=v7TP3_entry"
+            alert(pcEntryMsg, alert.freq_once_per_bar_close)
+
+if strategy.position_size > 0 and not beDone and not na(beLvl) and high >= beLvl
+    strategy.exit("L-BE2", from_entry="L", stop=entryP, limit=tp2P)
+    strategy.exit("L-BE3", from_entry="L", stop=entryP, limit=tp3P)
+    beDone := true
+    if pcEnable
+        pcBEMsg = pcLicense + ",breakeven," + pcSymbol + ",comment=v7TP3_BE"
+        alert(pcBEMsg, alert.freq_once_per_bar_close)
+
+if strategy.position_size > 0 and beDone and haRed and haRed[1]
+    strategy.close("L", comment="HA flip")
+    if pcEnable
+        pcCloseMsg = pcLicense + ",closelong," + pcSymbol + ",comment=v7TP3_HAflip"
+        alert(pcCloseMsg, alert.freq_once_per_bar_close)
