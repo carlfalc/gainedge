@@ -143,7 +143,7 @@ export default function InsightsPage() {
   );
 }
 
-function Breakdown({ title, icon: Icon, rows }: { title: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>; rows: Bucket[] }) {
+function Breakdown({ title, icon: Icon, rows }: { title: string; icon: import("lucide-react").LucideIcon; rows: Bucket[] }) {
   return <div style={card}>
     <div style={{ display: "flex", gap: 7, alignItems: "center", marginBottom: 12 }}>
       <Icon size={15} style={{ color: C.jade }} /><strong style={{ fontSize: 13 }}>{title}</strong>
