@@ -387,18 +387,13 @@ export type Database = {
       }
       falconer_settings: {
         Row: {
-          allow_live_execution: boolean
           be_r: number
           created_at: string
           enabled: boolean
           execution_path: string
           id: string
-          last_evaluated_candles: Json
-          max_daily_loss_usd: number
-          max_open_positions: number
           max_atr_pct: number
           min_atr_pct: number
-          min_setup_score: number
           pct1: number
           pct2: number
           pineconnector_license: string | null
@@ -416,18 +411,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          allow_live_execution?: boolean
           be_r?: number
           created_at?: string
           enabled?: boolean
           execution_path?: string
           id?: string
-          last_evaluated_candles?: Json
-          max_daily_loss_usd?: number
-          max_open_positions?: number
           max_atr_pct?: number
           min_atr_pct?: number
-          min_setup_score?: number
           pct1?: number
           pct2?: number
           pineconnector_license?: string | null
@@ -445,18 +435,13 @@ export type Database = {
           user_id: string
         }
         Update: {
-          allow_live_execution?: boolean
           be_r?: number
           created_at?: string
           enabled?: boolean
           execution_path?: string
           id?: string
-          last_evaluated_candles?: Json
-          max_daily_loss_usd?: number
-          max_open_positions?: number
           max_atr_pct?: number
           min_atr_pct?: number
-          min_setup_score?: number
           pct1?: number
           pct2?: number
           pineconnector_license?: string | null
@@ -477,27 +462,19 @@ export type Database = {
       }
       falconer_trades: {
         Row: {
-          actual_entry_price: number | null
-          actual_exit_price: number | null
           backtest_run_id: string | null
           be_done: boolean
           be_level: number
           closed_at: string | null
-          commission_usd: number
           direction: string
           entry_price: number
-          exit_price: number | null
           execution_path: string
           filled1: boolean
           filled2: boolean
           filled3: boolean
           id: string
-          broker_deal_ids: Json
-          features: Json | null
           metaapi_position_ids: Json | null
           mode: string
-          notes: string | null
-          notify_user: boolean
           opened_at: string
           pnl_usd: number | null
           qty: number
@@ -505,43 +482,31 @@ export type Database = {
           qty2: number
           qty3: number
           raw_alert_payload: Json | null
-          setup_score: number | null
           sl_price: number
           status: string
-          swap_usd: number
           symbol: string
           timeframe: string
-          tags: string[]
           tp1_price: number
           tp2_price: number
           tp3_price: number
           trigger_type: string
           updated_at: string
           user_id: string
-          slippage_points: number | null
         }
         Insert: {
-          actual_entry_price?: number | null
-          actual_exit_price?: number | null
           backtest_run_id?: string | null
           be_done?: boolean
           be_level: number
           closed_at?: string | null
-          commission_usd?: number
           direction?: string
           entry_price: number
-          exit_price?: number | null
           execution_path?: string
           filled1?: boolean
           filled2?: boolean
           filled3?: boolean
           id?: string
-          broker_deal_ids?: Json
-          features?: Json | null
           metaapi_position_ids?: Json | null
           mode?: string
-          notes?: string | null
-          notify_user?: boolean
           opened_at?: string
           pnl_usd?: number | null
           qty: number
@@ -549,43 +514,31 @@ export type Database = {
           qty2: number
           qty3: number
           raw_alert_payload?: Json | null
-          setup_score?: number | null
           sl_price: number
           status?: string
-          swap_usd?: number
           symbol: string
           timeframe?: string
-          tags?: string[]
           tp1_price: number
           tp2_price: number
           tp3_price: number
           trigger_type: string
           updated_at?: string
           user_id: string
-          slippage_points?: number | null
         }
         Update: {
-          actual_entry_price?: number | null
-          actual_exit_price?: number | null
           backtest_run_id?: string | null
           be_done?: boolean
           be_level?: number
           closed_at?: string | null
-          commission_usd?: number
           direction?: string
           entry_price?: number
-          exit_price?: number | null
           execution_path?: string
           filled1?: boolean
           filled2?: boolean
           filled3?: boolean
           id?: string
-          broker_deal_ids?: Json
-          features?: Json | null
           metaapi_position_ids?: Json | null
           mode?: string
-          notes?: string | null
-          notify_user?: boolean
           opened_at?: string
           pnl_usd?: number | null
           qty?: number
@@ -593,82 +546,15 @@ export type Database = {
           qty2?: number
           qty3?: number
           raw_alert_payload?: Json | null
-          setup_score?: number | null
           sl_price?: number
           status?: string
-          swap_usd?: number
           symbol?: string
           timeframe?: string
-          tags?: string[]
           tp1_price?: number
           tp2_price?: number
           tp3_price?: number
           trigger_type?: string
           updated_at?: string
-          user_id?: string
-          slippage_points?: number | null
-        }
-        Relationships: []
-      }
-      falconer_engine_events: {
-        Row: {
-          context: Json
-          created_at: string
-          event_type: string
-          id: string
-          message: string
-          severity: string
-          symbol: string | null
-          user_id: string | null
-        }
-        Insert: {
-          context?: Json
-          created_at?: string
-          event_type: string
-          id?: string
-          message: string
-          severity?: string
-          symbol?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          context?: Json
-          created_at?: string
-          event_type?: string
-          id?: string
-          message?: string
-          severity?: string
-          symbol?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      gainedge_ai_conversations: {
-        Row: {
-          answer: string
-          created_at: string
-          evidence: Json
-          id: string
-          model: string | null
-          question: string
-          user_id: string
-        }
-        Insert: {
-          answer: string
-          created_at?: string
-          evidence?: Json
-          id?: string
-          model?: string | null
-          question: string
-          user_id: string
-        }
-        Update: {
-          answer?: string
-          created_at?: string
-          evidence?: Json
-          id?: string
-          model?: string | null
-          question?: string
           user_id?: string
         }
         Relationships: []
