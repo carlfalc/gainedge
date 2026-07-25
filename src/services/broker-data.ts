@@ -103,13 +103,7 @@ export function useLiveMarketData(userId: string | undefined) {
   return { data, loading, refresh: load };
 }
 
-/**
- * Trigger the background compute job manually (e.g., on page load).
- * Fire-and-forget: don't await the response since the function can take 60-120s.
- */
+/** Falconer owns market-data refreshes. Kept as a no-op for legacy callers. */
 export function triggerMarketDataCompute() {
-  supabase.functions.invoke("compute-market-data", { method: "POST" }).catch((e) => {
-    // Silently ignore — this is a background job, the data arrives via realtime/polling
-    console.debug("Market data compute trigger:", e?.message || "timeout (expected)");
-  });
+  return;
 }

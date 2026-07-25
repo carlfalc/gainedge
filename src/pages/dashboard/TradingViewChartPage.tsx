@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useProfile } from "@/hooks/use-profile";
-import { provisionAccount } from "@/services/metaapi-client";
+import { supabase } from "@/integrations/supabase/client";
 import ChartTabPane from "@/components/dashboard/ChartTabPane";
 import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import AddChartTabModal, { type ChartMode } from "@/components/dashboard/AddChartTabModal";
-import type { RonVersion } from "@/components/dashboard/RonVersionSelector";
 import { ExternalLink, Cpu, Plus, X, Zap, User } from "lucide-react";
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
@@ -39,7 +38,6 @@ export default function TradingViewChartPage() {
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
   const [accountId, setAccountId] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "live" | "demo">("disconnected");
-  const [ronVersion] = useState<RonVersion>("falconer_v7");
   const [showAdd, setShowAdd] = useState(false);
 
   const initial = loadTabs();
@@ -60,9 +58,20 @@ export default function TradingViewChartPage() {
   useEffect(() => {
     if (!userId) return;
     setConnectionStatus("connecting");
-    provisionAccount()
-      .then(({ accountId: aid }) => { setAccountId(aid); setConnectionStatus("live"); })
-      .catch(() => setConnectionStatus("demo"));
+    supabase.from("broker_connections")
+      .select("metaapi_account_id,account_type,status")
+      .eq("user_id", userId)
+      .eq("is_default", true)
+      .limit(1)
+      .then(({ data }) => {
+        const broker = data?.[0];
+        if (broker?.metaapi_account_id && broker.status === "connected") {
+          setAccountId(broker.metaapi_account_id);
+          setConnectionStatus(broker.account_type === "demo" ? "demo" : "live");
+        } else {
+          setConnectionStatus("disconnected");
+        }
+      });
   }, [userId]);
 
   const handleAddTab = useCallback((symbol: string, mode: ChartMode) => {
@@ -199,7 +208,6 @@ export default function TradingViewChartPage() {
               positions={[]}
               onClosePosition={() => {}}
               closingId={null}
-              onVersionChange={() => {}}
             />
           )}
         </div>

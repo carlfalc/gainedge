@@ -447,16 +447,14 @@ export interface BacktestResult {
 /**
  * Bar-by-bar replay using the faithful entry logic.
  *
- * NOTE on daily warmup: the daily series is aggregated from the same intraday window.
- * EMA50 converges within ~50 trading days; EMA200 needs ~200 and will be under-warmed
- * early in a short backtest window, so the close>emaD200 strong filter is approximate at
- * the start. The LIVE engine avoids this by fetching ~300 dedicated daily bars. Treat the
- * backtest as directional validation, not an exact reproduction of the TradingView report.
+ * Pass a warmed daily series to reproduce the live daily EMA50/EMA200/PDL context.
+ * The intraday aggregation fallback remains available for isolated pure-function tests.
  */
 export function runBacktest(
   candles: Candle[],
   cfg: StrategyConfig,
   initialEquity = 10_000,
+  dailyCandles?: Candle[],
 ): BacktestResult {
   const closes = candles.map(c => c.close);
   const ema21 = ema(closes, 21);
@@ -465,7 +463,7 @@ export function runBacktest(
   const sqz = squeezeSeries(candles, 20, 2, 1.5);
   const ha = toHA(candles);
   const asian = asianLockedSeries(candles, cfg);
-  const ds = computeDailySeries(candles);
+  const ds = computeDailySeries(dailyCandles?.length ? dailyCandles : candles);
 
   const trades: BacktestTrade[] = [];
   const equityCurve: { t: number; equity: number }[] = [];

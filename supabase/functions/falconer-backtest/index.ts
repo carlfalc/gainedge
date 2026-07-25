@@ -10,9 +10,9 @@ import {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 interface Req {
-  user_id: string;
   symbol: string;
   timeframe?: string;
   period_start: string; // ISO
@@ -25,8 +25,26 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const authClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await authClient.auth.getClaims(token);
+    const userId = claimsData?.claims?.sub as string | undefined;
+    if (claimsError || !userId) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = (await req.json()) as Req;
-    if (!body.user_id || !body.symbol || !body.period_start || !body.period_end) {
+    if (!body.symbol || !body.period_start || !body.period_end) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -41,7 +59,7 @@ Deno.serve(async (req) => {
     const { data: runRow, error: runErr } = await supabase
       .from("falconer_backtest_runs")
       .insert({
-        user_id: body.user_id,
+        user_id: userId,
         symbol: body.symbol,
         timeframe,
         period_start: body.period_start,
@@ -72,7 +90,7 @@ Deno.serve(async (req) => {
         .limit(1000);
       if (error) {
         await supabase.from("falconer_backtest_runs").update({
-          status: "error", error_message: error.message, completed_at: new Date().toISOString(),
+          status: "failed", error_message: error.message, completed_at: new Date().toISOString(),
         }).eq("id", runRow.id);
         return new Response(JSON.stringify({ error: error.message }), {
           status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -95,7 +113,7 @@ Deno.serve(async (req) => {
 
     if (candles.length < 50) {
       await supabase.from("falconer_backtest_runs").update({
-        status: "error",
+        status: "failed",
         error_message: `Insufficient candles (${candles.length}). Backfill required.`,
         completed_at: new Date().toISOString(),
       }).eq("id", runRow.id);
@@ -104,14 +122,53 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const result = runBacktest(candles, cfg, equity0);
+    // Load a dedicated daily warmup window so EMA50/EMA200/PDL context matches
+    // the live engine instead of being approximated from the selected test window.
+    const dailyCandles: Candle[] = [];
+    let dailyCursor = new Date(new Date(body.period_start).getTime() - 330 * 24 * 60 * 60 * 1000).toISOString();
+    while (true) {
+      const { data, error } = await supabase
+        .from("candle_history")
+        .select("timestamp, open, high, low, close, volume")
+        .eq("symbol", body.symbol)
+        .eq("timeframe", "1d")
+        .gte("timestamp", dailyCursor)
+        .lte("timestamp", body.period_end)
+        .order("timestamp", { ascending: true })
+        .limit(1000);
+      if (error || !data?.length) break;
+      for (const row of data) {
+        dailyCandles.push({
+          time: new Date(row.timestamp as string).getTime(),
+          open: Number(row.open), high: Number(row.high),
+          low: Number(row.low), close: Number(row.close),
+          volume: Number(row.volume ?? 0),
+        });
+      }
+      if (data.length < 1000) break;
+      dailyCursor = new Date(new Date(data[data.length - 1].timestamp as string).getTime() + 1).toISOString();
+    }
+    if (dailyCandles.length < 250) {
+      await supabase.from("falconer_backtest_runs").update({
+        status: "failed",
+        error_message: `Insufficient daily warmup (${dailyCandles.length}/250). Backfill required.`,
+        completed_at: new Date().toISOString(),
+      }).eq("id", runRow.id);
+      return new Response(JSON.stringify({
+        error: "insufficient_daily_data",
+        candle_count: candles.length,
+        daily_candle_count: dailyCandles.length,
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const result = runBacktest(candles, cfg, equity0, dailyCandles);
 
     // Persist run summary + sample of equity curve (every Nth point to keep payload small)
     const stride = Math.max(1, Math.floor(result.equityCurve.length / 500));
     const sampledCurve = result.equityCurve.filter((_, i) => i % stride === 0);
 
     await supabase.from("falconer_backtest_runs").update({
-      status: "completed",
+      status: "complete",
       completed_at: new Date().toISOString(),
       total_trades: result.trades.length,
       wins: result.wins,
@@ -136,7 +193,7 @@ Deno.serve(async (req) => {
     };
     if (result.trades.length > 0) {
       const rows = result.trades.map((t) => ({
-        user_id: body.user_id,
+        user_id: userId,
         backtest_run_id: runRow.id,
         mode: "backtest",
         execution_path: "signal_only",
@@ -166,6 +223,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       run_id: runRow.id,
       candle_count: candles.length,
+      daily_candle_count: dailyCandles.length,
       ...result,
       equityCurve: sampledCurve,
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });

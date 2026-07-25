@@ -1,354 +1,169 @@
-import { useState, useEffect } from "react";
-import { C } from "@/lib/mock-data";
-import {
-  Clock, TrendingUp, Target, AlertTriangle, ChevronDown, ChevronUp,
-  Brain, Zap, Calendar, Activity, AlignCenterVertical
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Brain, CalendarDays, Clock, Target } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { C } from "@/lib/mock-data";
 
-const cardStyle: React.CSSProperties = {
-  background: C.card, borderRadius: 16, border: `1px solid ${C.border}`,
-  padding: 24, transition: "border-color 0.2s",
-};
-
-const labelStyle: React.CSSProperties = {
-  color: C.text, fontSize: 11, fontWeight: 600, textTransform: "uppercase" as const,
-  letterSpacing: 1, marginBottom: 8,
-};
-
-const iconMap: Record<string, any> = {
-  best_time: Clock, biggest_moves: TrendingUp, edge: Target, risk_alert: AlertTriangle,
-};
-const colorMap: Record<string, string> = {
-  best_time: C.jade, biggest_moves: C.blue, edge: C.green, risk_alert: C.red,
-};
-
-interface Insight {
-  id: string; insight_type: string; symbol: string | null; title: string;
-  description: string; data: any; severity: string | null;
-  estimated_impact: number | null; week_start: string | null;
+interface Trade {
+  id: string;
+  symbol: string;
+  trigger_type: string;
+  status: string;
+  pnl_usd: number | null;
+  setup_score: number | null;
+  features: { session?: string; day_of_week?: number } | null;
+  opened_at: string;
 }
 
-// Static data for instrument intelligence & market conditions (would come from AI backend later)
-const INSTRUMENT_INSIGHTS = [
-  { symbol: "NAS100", color: C.green, bestSession: "New York (14:30–21:00 UTC)", optimalEMA: "Fast: 4 / Slow: 17 on 15m HA", avgMove: { london: "85 pts", ny: "142 pts", asian: "38 pts" }, winByDay: { Mon: "65%", Tue: "72%", Wed: "68%", Thu: "78%", Fri: "60%" }, correlations: "Strong positive with US30 (r=0.92).", recommendation: "Focus on NY session. Thursday shows consistently highest win rate." },
-  { symbol: "US30", color: C.blue, bestSession: "London/NY Overlap (13:00–16:00 UTC)", optimalEMA: "Fast: 5 / Slow: 20 on 15m HA", avgMove: { london: "95 pts", ny: "120 pts", asian: "42 pts" }, winByDay: { Mon: "60%", Tue: "68%", Wed: "74%", Thu: "70%", Fri: "55%" }, correlations: "Strong positive with NAS100 (r=0.92).", recommendation: "Prefer over NAS100 on Wednesdays." },
-  { symbol: "AUDUSD", color: C.amber, bestSession: "Asian Session (00:00–06:00 UTC)", optimalEMA: "Fast: 8 / Slow: 21 on 15m HA", avgMove: { london: "22 pips", ny: "18 pips", asian: "35 pips" }, winByDay: { Mon: "70%", Tue: "65%", Wed: "62%", Thu: "68%", Fri: "58%" }, correlations: "Strong positive with NZDUSD (r=0.88).", recommendation: "Best during Asian session Mondays." },
-  { symbol: "NZDUSD", color: C.cyan, bestSession: "Asian Session (00:00–06:00 UTC)", optimalEMA: "Fast: 8 / Slow: 21 on 15m HA", avgMove: { london: "18 pips", ny: "15 pips", asian: "28 pips" }, winByDay: { Mon: "62%", Tue: "68%", Wed: "60%", Thu: "65%", Fri: "55%" }, correlations: "Strong positive with AUDUSD (r=0.88).", recommendation: "Consider replacing with AUDUSD for better volatility." },
-  { symbol: "XAUUSD", color: C.orange, bestSession: "London/NY Overlap (13:00–16:00 UTC)", optimalEMA: "Fast: 5 / Slow: 13 on 15m HA", avgMove: { london: "180 pips", ny: "220 pips", asian: "65 pips" }, winByDay: { Mon: "55%", Tue: "62%", Wed: "70%", Thu: "72%", Fri: "48%" }, correlations: "Inverse with USD (r=-0.78).", recommendation: "⚠ Avoid Asian session — your win rate drops to 35%." },
-];
+interface Bucket {
+  key: string;
+  trades: number;
+  wins: number;
+  pnl: number;
+  avgScore: number | null;
+}
 
-const MARKET_CONDITIONS = [
-  { symbol: "NAS100", regime: "Trending", direction: "Bullish", volatility: "+18%", volLabel: "Above avg", forecast: "Continuation likely", news: "FOMC Minutes Wed 18:00 UTC" },
-  { symbol: "US30", regime: "Trending", direction: "Bullish", volatility: "+12%", volLabel: "Above avg", forecast: "Watch for pullback", news: "NFP Fri 12:30 UTC" },
-  { symbol: "AUDUSD", regime: "Ranging", direction: "Neutral", volatility: "-8%", volLabel: "Below avg", forecast: "Breakout pending", news: "RBA Rate Decision Tue 03:30 UTC" },
-  { symbol: "NZDUSD", regime: "Ranging", direction: "Neutral", volatility: "-12%", volLabel: "Below avg", forecast: "Follow AUDUSD lead", news: "None this week" },
-  { symbol: "XAUUSD", regime: "Volatile", direction: "Mixed", volatility: "+32%", volLabel: "High", forecast: "Caution — event risk", news: "CPI Thu 12:30 UTC" },
-];
+interface EngineEvent {
+  id: string;
+  symbol: string | null;
+  event_type: string;
+  severity: string;
+  message: string;
+  context: unknown;
+  created_at: string;
+}
+
+const CLOSED = ["closed_tp3", "closed_sl", "closed_ha_flip"];
+const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function group(trades: Trade[], keyOf: (trade: Trade) => string): Bucket[] {
+  const buckets = new Map<string, { trades: number; wins: number; pnl: number; scoreTotal: number; scoreN: number }>();
+  for (const trade of trades) {
+    const key = keyOf(trade) || "Unknown";
+    const row = buckets.get(key) ?? { trades: 0, wins: 0, pnl: 0, scoreTotal: 0, scoreN: 0 };
+    row.trades += 1;
+    row.pnl += Number(trade.pnl_usd ?? 0);
+    if (Number(trade.pnl_usd ?? 0) > 0) row.wins += 1;
+    if (trade.setup_score != null) {
+      row.scoreTotal += Number(trade.setup_score);
+      row.scoreN += 1;
+    }
+    buckets.set(key, row);
+  }
+  return [...buckets.entries()].map(([key, value]) => ({
+    key,
+    trades: value.trades,
+    wins: value.wins,
+    pnl: value.pnl,
+    avgScore: value.scoreN ? value.scoreTotal / value.scoreN : null,
+  })).sort((a, b) => b.trades - a.trades);
+}
 
 export default function InsightsPage() {
-  const [expandedInstrument, setExpandedInstrument] = useState<string | null>(null);
-  const [keyInsights, setKeyInsights] = useState<Insight[]>([]);
-  const [patterns, setPatterns] = useState<Insight[]>([]);
-  const [weeklyDigest, setWeeklyDigest] = useState<Insight[]>([]);
-  const [briefing, setBriefing] = useState<any>(null);
-  const [briefingState, setBriefingState] = useState<"loading" | "ready" | "error">("loading");
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [events, setEvents] = useState<EngineEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadInsights();
-    loadBriefing();
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setLoading(false); return; }
+      const [{ data: tradeRows }, { data: eventRows }] = await Promise.all([
+        supabase.from("falconer_trades")
+          .select("id,symbol,trigger_type,status,pnl_usd,setup_score,features,opened_at")
+          .eq("user_id", session.user.id)
+          .in("status", CLOSED)
+          .order("opened_at", { ascending: false })
+          .limit(3000),
+        supabase.from("falconer_engine_events")
+          .select("id,symbol,event_type,severity,message,context,created_at")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(30),
+      ]);
+      setTrades((tradeRows as unknown as Trade[]) ?? []);
+      setEvents((eventRows as EngineEvent[]) ?? []);
+      setLoading(false);
+    })();
   }, []);
 
-  const loadBriefing = async () => {
-    setBriefingState("loading");
-    const { data, error } = await supabase.functions.invoke("ron-briefing");
-    if (error || !data?.ok || !data?.briefing) {
-      setBriefingState("error");
-      return;
-    }
-    setBriefing(data.briefing);
-    setBriefingState("ready");
-  };
-
-  const loadInsights = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-    const { data } = await supabase.from("insights").select("*").eq("user_id", session.user.id);
-    if (!data) return;
-
-    const insights = data as Insight[];
-    setKeyInsights(insights.filter(i => ["best_time", "biggest_moves", "edge", "risk_alert"].includes(i.insight_type)));
-    setPatterns(insights.filter(i => i.insight_type === "pattern"));
-    setWeeklyDigest(insights.filter(i => i.insight_type === "weekly_digest"));
-  };
-
-  // Group key insights by type
-  const grouped = new Map<string, Insight[]>();
-  keyInsights.forEach(i => {
-    const arr = grouped.get(i.insight_type) || [];
-    arr.push(i);
-    grouped.set(i.insight_type, arr);
-  });
+  const insights = useMemo(() => ({
+    bySymbol: group(trades, trade => trade.symbol),
+    byTrigger: group(trades, trade => trade.trigger_type),
+    bySession: group(trades, trade => String(trade.features?.session ?? "Unknown")),
+    byDay: group(trades, trade => dayNames[Number(trade.features?.day_of_week)] ?? "Unknown"),
+  }), [trades]);
 
   return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", color: C.text }}>
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-          <AlignCenterVertical size={28} className="text-destructive" />
-          <h1 className="text-3xl font-sans font-semibold text-white">RONS Insights</h1>
-        </div>
-        <p style={{ color: C.text, fontSize: 14 }}>Compiled from your trading data and market analysis</p>
+    <div style={{ padding: 24, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 6 }}>
+        <Brain size={25} style={{ color: C.jade }} />
+        <h1 style={{ fontSize: 24, fontWeight: 800 }}>Falconer Intelligence</h1>
       </div>
+      <p style={{ color: C.sec, fontSize: 13, marginBottom: 20 }}>
+        Calculated from your completed Falconer trades. No demo win rates or invented recommendations.
+      </p>
 
-      {/* RON Live Market Briefing (from the ron-ml brain) */}
-      <div style={labelStyle}>RON Live Market Briefing</div>
-      <div style={{ ...cardStyle, marginBottom: 32, borderColor: C.jade + "30" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.jade + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Brain size={18} style={{ color: C.jade }} />
+      {loading ? <div style={{ color: C.sec }}>Loading evidence…</div> : trades.length === 0 ? (
+        <div style={card}>No completed trades yet. Insights will appear after Falconer has measurable outcomes.</div>
+      ) : (
+        <>
+          <div style={{ ...card, marginBottom: 16, borderColor: trades.length < 30 ? `${C.amber}55` : `${C.jade}55` }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", color: trades.length < 30 ? C.amber : C.jade, fontWeight: 800, fontSize: 13 }}>
+              {trades.length < 30 ? <AlertTriangle size={16} /> : <Target size={16} />}
+              {trades.length} completed trades
             </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>RON — Adaptive Market Intelligence</div>
-              <div style={{ fontSize: 12, color: C.text }}>Live from the RON brain</div>
-            </div>
+            <p style={{ color: C.sec, fontSize: 12, marginTop: 7 }}>
+              {trades.length < 30
+                ? "Results are preliminary. GainEdge will avoid treating small samples as a proven edge."
+                : "The sample is large enough for initial comparisons, but walk-forward validation is still required."}
+            </p>
           </div>
-          {briefingState === "ready" && (
-            <span style={{
-              padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-              background: briefing?.ml_model_loaded ? C.green + "20" : C.amber + "20",
-              color: briefing?.ml_model_loaded ? C.green : C.amber,
-            }}>
-              {briefing?.ml_model_loaded ? "Model: trained" : "Model: learning"}
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(290px,1fr))", gap: 16 }}>
+            <Breakdown title="By instrument" icon={Target} rows={insights.bySymbol} />
+            <Breakdown title="By trigger" icon={Brain} rows={insights.byTrigger} />
+            <Breakdown title="By session" icon={Clock} rows={insights.bySession} />
+            <Breakdown title="By weekday (UTC)" icon={CalendarDays} rows={insights.byDay} />
+          </div>
+        </>
+      )}
+
+      <h2 style={{ fontSize: 15, fontWeight: 800, margin: "24px 0 10px" }}>Engine observations</h2>
+      <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
+        {events.length === 0 ? <span style={{ color: C.sec, fontSize: 12 }}>No engine observations yet.</span> : events.map(event => (
+          <div key={event.id} style={{ padding: 9, borderRadius: 7, background: C.bg2, fontSize: 12 }}>
+            <span style={{ color: event.severity === "error" ? C.red : event.severity === "warning" ? C.amber : C.jade, fontWeight: 700 }}>
+              {event.symbol ? `${event.symbol} · ` : ""}{event.event_type}
             </span>
-          )}
-        </div>
-
-        {briefingState === "loading" && (
-          <div style={{ fontSize: 13, color: C.text }}>Waking the RON brain… (first call can take ~30s)</div>
-        )}
-        {briefingState === "error" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 13, color: C.text }}>RON briefing unavailable right now.</span>
-            <button onClick={loadBriefing} style={{
-              padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
-              background: C.jade + "18", color: C.jade, border: `1px solid ${C.jade}30`,
-            }}>Retry</button>
+            <span style={{ color: C.sec }}> — {event.message}</span>
           </div>
-        )}
-        {briefingState === "ready" && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
-            {/* Economic */}
-            <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                <Zap size={13} style={{ color: C.jade }} />
-                <span style={{ color: C.text, fontSize: 11, fontWeight: 700 }}>ECONOMIC</span>
-              </div>
-              <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-                {briefing?.sections?.economic?.ron_insight ?? "No economic insight available."}
-              </div>
-            </div>
-            {/* Fear & Greed */}
-            <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                <Activity size={13} style={{ color: C.jade }} />
-                <span style={{ color: C.text, fontSize: 11, fontWeight: 700 }}>FEAR & GREED</span>
-              </div>
-              <div style={{ fontSize: 13, color: C.text }}>
-                {briefing?.sections?.fear_greed && briefing.sections.fear_greed.status !== "unavailable"
-                  ? JSON.stringify(briefing.sections.fear_greed.value ?? briefing.sections.fear_greed)
-                  : "Source not configured yet."}
-              </div>
-            </div>
-            {/* Sentiment */}
-            <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                <TrendingUp size={13} style={{ color: C.jade }} />
-                <span style={{ color: C.text, fontSize: 11, fontWeight: 700 }}>NEWS SENTIMENT</span>
-              </div>
-              <div style={{ fontSize: 13, color: C.text }}>
-                {briefing?.sections?.sentiment?.articles_analysed
-                  ? `${briefing.sections.sentiment.articles_analysed} articles analysed`
-                  : "Awaiting news ingestion."}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Key Discoveries */}
-      <div style={labelStyle}>Key Discoveries</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 32 }}>
-        {Array.from(grouped.entries()).map(([type, items]) => {
-          const IconComp = iconMap[type] || Activity;
-          const color = colorMap[type] || C.jade;
-          return (
-            <div key={type} style={cardStyle}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: color + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <IconComp size={18} style={{ color }} />
-                </div>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>{items[0].title}</span>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {items.map(item => (
-                  <div key={item.id} style={{ padding: "10px 12px", borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    {item.symbol && <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, fontFamily: "'JetBrains Mono', monospace", color }}>{item.symbol}</div>}
-                    <div style={{ fontSize: 12, color: C.text }}>{item.description}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Instrument Intelligence */}
-      <div style={labelStyle}>Instrument Intelligence</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 32 }}>
-        {INSTRUMENT_INSIGHTS.map(inst => {
-          const open = expandedInstrument === inst.symbol;
-          return (
-            <div key={inst.symbol} style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-              <button onClick={() => setExpandedInstrument(open ? null : inst.symbol)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", background: "none", border: "none", cursor: "pointer", color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: inst.color }} />
-                  <span style={{ fontWeight: 700, fontSize: 15, fontFamily: "'JetBrains Mono', monospace" }}>{inst.symbol}</span>
-                  <span style={{ color: C.text, fontSize: 13 }}>— {inst.bestSession}</span>
-                </div>
-                {open ? <ChevronUp size={18} style={{ color: C.text }} /> : <ChevronDown size={18} style={{ color: C.text }} />}
-              </button>
-              {open && (
-                <div style={{ padding: "0 20px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-                  <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>OPTIMAL EMA</div>
-                    <div style={{ fontSize: 13, fontFamily: "'JetBrains Mono', monospace" }}>{inst.optimalEMA}</div>
-                  </div>
-                  <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>AVG MOVE BY SESSION</div>
-                    <div style={{ fontSize: 12, display: "flex", gap: 12, fontFamily: "'JetBrains Mono', monospace" }}>
-                      <span>LDN: {inst.avgMove.london}</span>
-                      <span>NY: {inst.avgMove.ny}</span>
-                      <span>ASIA: {inst.avgMove.asian}</span>
-                    </div>
-                  </div>
-                  <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>WIN RATE BY DAY</div>
-                    <div style={{ fontSize: 12, display: "flex", gap: 8, flexWrap: "wrap", fontFamily: "'JetBrains Mono', monospace" }}>
-                      {Object.entries(inst.winByDay).map(([day, rate]) => (
-                        <span key={day} style={{ color: parseInt(rate) >= 70 ? C.green : parseInt(rate) >= 60 ? C.text : C.red }}>{day}: {rate}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ padding: 14, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                    <div style={{ color: C.text, fontSize: 11, fontWeight: 600, marginBottom: 6 }}>CORRELATIONS</div>
-                    <div style={{ fontSize: 12, color: C.text }}>{inst.correlations}</div>
-                  </div>
-                  <div style={{ padding: 14, borderRadius: 10, background: C.jade + "10", border: `1px solid ${C.jade}30`, gridColumn: "1 / -1" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <Brain size={14} style={{ color: C.jade }} />
-                      <span style={{ color: C.jade, fontSize: 11, fontWeight: 700 }}>AI RECOMMENDATION</span>
-                    </div>
-                    <div style={{ fontSize: 13, color: C.text }}>{inst.recommendation}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Weekly Digest */}
-      {weeklyDigest.length > 0 && (
-        <>
-          <div style={labelStyle}>Weekly Digest</div>
-          <div style={{ ...cardStyle, marginBottom: 32, borderColor: C.jade + "30" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: C.jade + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Calendar size={18} style={{ color: C.jade }} />
-              </div>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>Weekly Summary</div>
-                <div style={{ fontSize: 12, color: C.text }}>AI-generated summary</div>
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {weeklyDigest.map(item => (
-                <div key={item.id} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 10, background: C.bg, border: `1px solid ${C.border}` }}>
-                  <TrendingUp size={16} style={{ color: C.jade, marginTop: 2, flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{item.description}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Pattern Detection */}
-      {patterns.length > 0 && (
-        <>
-          <div style={labelStyle}>Pattern Detection</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16, marginBottom: 32 }}>
-            {patterns.map(p => (
-              <div key={p.id} style={{ ...cardStyle, borderColor: p.severity === "critical" ? C.red + "30" : C.amber + "30" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <div style={{
-                    padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700, textTransform: "uppercase" as const,
-                    background: p.severity === "critical" ? C.red + "20" : C.amber + "20",
-                    color: p.severity === "critical" ? C.red : C.amber,
-                  }}>
-                    {p.severity}
-                  </div>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{p.title}</span>
-                </div>
-                <p style={{ fontSize: 13, color: C.text, lineHeight: 1.6, marginBottom: 12 }}>{p.description}</p>
-                {p.estimated_impact && (
-                  <div style={{ fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: p.severity === "critical" ? C.red : C.amber }}>
-                    Estimated cost: ${p.estimated_impact.toLocaleString()}/month
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Market Conditions */}
-      <div style={labelStyle}>Market Conditions</div>
-      <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                {["Instrument", "Regime", "Direction", "Volatility vs 30d", "Forecast", "Upcoming News"].map(h => (
-                  <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: C.text, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {MARKET_CONDITIONS.map(m => (
-                <tr key={m.symbol} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "12px 16px", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>{m.symbol}</td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <span style={{
-                      padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700,
-                      background: m.regime === "Trending" ? C.green + "20" : m.regime === "Ranging" ? C.amber + "20" : C.red + "20",
-                      color: m.regime === "Trending" ? C.green : m.regime === "Ranging" ? C.amber : C.red,
-                    }}>{m.regime}</span>
-                  </td>
-                  <td style={{ padding: "12px 16px", color: m.direction === "Bullish" ? C.green : m.direction === "Mixed" ? C.amber : C.sec }}>{m.direction}</td>
-                  <td style={{ padding: "12px 16px", fontFamily: "'JetBrains Mono', monospace" }}>
-                    <span style={{ color: m.volatility.startsWith("+") ? C.amber : C.green }}>{m.volatility}</span>
-                    <span style={{ color: C.text, fontSize: 11, marginLeft: 6 }}>{m.volLabel}</span>
-                  </td>
-                  <td style={{ padding: "12px 16px", color: C.text }}>{m.forecast}</td>
-                  <td style={{ padding: "12px 16px", color: C.amber, fontSize: 12 }}>{m.news}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        ))}
       </div>
     </div>
   );
 }
+
+function Breakdown({ title, icon: Icon, rows }: { title: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>; rows: Bucket[] }) {
+  return <div style={card}>
+    <div style={{ display: "flex", gap: 7, alignItems: "center", marginBottom: 12 }}>
+      <Icon size={15} style={{ color: C.jade }} /><strong style={{ fontSize: 13 }}>{title}</strong>
+    </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      {rows.map(row => {
+        const winRate = row.trades ? row.wins / row.trades * 100 : 0;
+        return <div key={row.key} style={{ padding: 9, borderRadius: 7, background: C.bg2 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+            <strong>{row.key}</strong>
+            <span style={{ color: C.sec }}>{row.trades} trades · {winRate.toFixed(0)}% wins</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginTop: 5 }}>
+            <span style={{ color: row.pnl >= 0 ? C.green : C.red }}>${row.pnl.toFixed(2)}</span>
+            <span style={{ color: C.muted }}>{row.avgScore == null ? "No setup score" : `Avg score ${row.avgScore.toFixed(0)}`}</span>
+          </div>
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+const card: React.CSSProperties = { padding: 16, borderRadius: 10, background: C.card, border: `1px solid ${C.border}` };

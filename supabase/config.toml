@@ -14,17 +14,20 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
-[functions.ron-auto-trade]
-verify_jwt = false
+[functions.falconer-engine]
+verify_jwt = true
 
-[functions.v2-precision-backtest]
-verify_jwt = false
+[functions.falconer-backtest]
+verify_jwt = true
 
-[functions.ron-backtest]
-verify_jwt = false
+[functions.metaapi-candles]
+verify_jwt = true
 
-[functions.ron-ingest-history]
-verify_jwt = false
+[functions.metaapi-trade]
+verify_jwt = true
 
-[functions.ron-ingest-dukascopy]
-verify_jwt = false
+[functions.gainedge-ai]
+verify_jwt = true
+
+[functions.connect-metaapi]
+verify_jwt = true

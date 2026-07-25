@@ -8,23 +8,14 @@ const corsHeaders = {
 const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const MARKET_DATA_ACCOUNT_ID = Deno.env.get("METAAPI_MARKET_DATA_ACCOUNT_ID") ?? "";
 
 // MetaApi REST API base URLs
 const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
 
-// HARDCODED account ID — do NOT provision new accounts
-const METAAPI_ACCOUNT_ID = "ea940a26-d263-4017-ad2c-0412f8399b69";
 const METAAPI_TIMEOUT_MS = 30_000;
-
-const TIMEFRAME_MS: Record<string, number> = {
-  "1m": 60_000,
-  "5m": 5 * 60_000,
-  "15m": 15 * 60_000,
-  "1h": 60 * 60_000,
-  "4h": 4 * 60 * 60_000,
-  "1d": 24 * 60 * 60_000,
-};
 
 // Hard price ranges for validation — catches decimal errors from MetaApi
 const PRICE_RANGES: Record<string, { min: number; max: number }> = {
@@ -78,19 +69,6 @@ function filterByPriceRange<T extends { open: number; high: number; low: number;
   );
 }
 
-const MOCK_BASE_PRICES: Record<string, number> = {
-  XAUUSD: 4720,
-  EURUSD: 1.085,
-  GBPUSD: 1.265,
-  AUDUSD: 0.645,
-  NZDUSD: 0.595,
-  USDJPY: 155.5,
-  NAS100: 21200,
-  US30: 42500,
-};
-
-const DEFAULT_SYMBOLS = Object.keys(MOCK_BASE_PRICES);
-
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -114,59 +92,6 @@ async function fetchWithTimeout(url: string, init: RequestInit) {
   }
 }
 
-function getTimeframeMs(timeframe: string) {
-  return TIMEFRAME_MS[timeframe] ?? TIMEFRAME_MS["15m"];
-}
-
-function getMockBasePrice(symbol: string) {
-  return MOCK_BASE_PRICES[symbol] ?? 100;
-}
-
-function generateMockCandles(symbol: string, timeframe: string, startTime?: string, limit = 500) {
-  const candleCount = Number.isFinite(limit) ? Math.max(10, Math.min(limit, 1000)) : 500;
-  const timeframeMs = getTimeframeMs(timeframe);
-  const startTs = startTime
-    ? new Date(startTime).getTime()
-    : Date.now() - candleCount * timeframeMs;
-
-  let price = getMockBasePrice(symbol);
-
-  return Array.from({ length: candleCount }, (_, index) => {
-    const time = new Date(startTs + index * timeframeMs).toISOString();
-    const drift = (Math.random() - 0.5) * price * 0.0015;
-    const open = price;
-    const close = Math.max(0.00001, open + drift);
-    const wick = Math.abs((Math.random() - 0.5) * price * 0.0008);
-    const high = Math.max(open, close) + wick;
-    const low = Math.max(0.00001, Math.min(open, close) - wick);
-    price = close;
-
-    return {
-      time,
-      open: +open.toFixed(5),
-      high: +high.toFixed(5),
-      low: +low.toFixed(5),
-      close: +close.toFixed(5),
-      tickVolume: Math.floor(50 + Math.random() * 250),
-    };
-  });
-}
-
-function generateMockPrice(symbol: string) {
-  const midpoint = getMockBasePrice(symbol);
-  const spread = midpoint >= 100
-    ? Math.max(0.1, midpoint * 0.00003)
-    : Math.max(0.0001, midpoint * 0.0002);
-
-  return {
-    symbol,
-    bid: +(midpoint - spread / 2).toFixed(5),
-    ask: +(midpoint + spread / 2).toFixed(5),
-    time: new Date().toISOString(),
-    fallback: true,
-  };
-}
-
 function filterSpikeCandles<T extends { high: number }>(candles: T[]) {
   return candles.filter((candle, index, source) => {
     if (index < 50) return true;
@@ -184,8 +109,6 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
-
-  console.log("metaapi-candles called with accountId:", METAAPI_ACCOUNT_ID);
 
   try {
     // Authenticate user
@@ -205,11 +128,12 @@ Deno.serve(async (req: Request) => {
     // Server-to-server calls (e.g. falconer-engine refreshing candles) pass the
     // service-role key. Those are trusted and skip the per-user claims check —
     // the data actions below (candles/price/symbols) don't need a user identity.
-    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const isServiceCall = SERVICE_ROLE_KEY.length > 0 && token === SERVICE_ROLE_KEY;
 
     let userId: string | undefined;
-    if (!isServiceCall) {
+    if (isServiceCall) {
+      userId = undefined;
+    } else {
       const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
       if (claimsError || !claimsData?.claims) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -222,7 +146,37 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     const { action, symbol, timeframe, startTime, limit } = body;
-    const accountId = METAAPI_ACCOUNT_ID;
+
+    // Market-data requests must resolve to either the authenticated user's default
+    // broker connection or the explicitly configured service data account. There is
+    // deliberately no shared account baked into source and no synthetic fallback.
+    const admin = SERVICE_ROLE_KEY
+      ? createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+      : supabase;
+    const requestedUserId = isServiceCall && typeof body.user_id === "string"
+      ? body.user_id
+      : userId;
+    let accountId = "";
+    if (requestedUserId) {
+      const { data: connections } = await admin
+        .from("broker_connections")
+        .select("metaapi_account_id")
+        .eq("user_id", requestedUserId)
+        .eq("is_default", true)
+        .eq("status", "connected")
+        .limit(1);
+      accountId = connections?.[0]?.metaapi_account_id ?? "";
+    }
+    if (!accountId && isServiceCall) accountId = MARKET_DATA_ACCOUNT_ID;
+    if (!accountId) {
+      return new Response(JSON.stringify({
+        error: "NO_MARKET_DATA_ACCOUNT",
+        message: "Connect a default MetaApi broker account before requesting live data.",
+      }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (!action) {
       return new Response(JSON.stringify({ error: "Missing action parameter" }), {
@@ -232,23 +186,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "provision") {
-      if (!userId) {
-        return new Response(JSON.stringify({ error: "provision requires a user token" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      // Store the hardcoded account ID in profile and return immediately
-      await supabase
-        .from("profiles")
-        .update({ metaapi_account_id: METAAPI_ACCOUNT_ID })
-        .eq("id", userId);
-
       return new Response(JSON.stringify({
-        success: true,
-        accountId: METAAPI_ACCOUNT_ID,
-        state: "DEPLOYED",
+        error: "PROVISIONING_MOVED",
+        message: "Create and test the broker connection in Settings.",
       }), {
+        status: 410,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -323,15 +265,15 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!res || !Array.isArray(candles) || candles.length === 0) {
-        // All variants failed — return mock data
-        console.error(`All candle variants failed for ${symbol}, returning mock data`);
+        console.error(`All candle variants failed for ${symbol}`);
         return new Response(JSON.stringify({
-          success: true,
-          fallback: true,
+          error: "MARKET_DATA_UNAVAILABLE",
           accountId,
-          candles: generateMockCandles(symbol, timeframe, start, candleLimit),
-          error: "SERVICE_UNAVAILABLE",
+          symbol,
+          timeframe,
+          details: lastError,
         }), {
+          status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -412,13 +354,13 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // All variants failed — always fall back to mock price instead of 404
-      console.error(`All price variants failed for ${symbol}, returning mock price`);
+      console.error(`All price variants failed for ${symbol}`);
       return new Response(JSON.stringify({
-        success: true,
-        fallback: true,
-        price: generateMockPrice(symbol),
+        error: "PRICE_UNAVAILABLE",
+        symbol,
+        details: lastError,
       }), {
+        status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -435,11 +377,10 @@ Deno.serve(async (req: Request) => {
       } catch (fetchErr) {
         console.error("Symbols fetch network error:", getErrorMessage(fetchErr));
         return new Response(JSON.stringify({
-          success: true,
-          error: "SERVICE_UNAVAILABLE",
-          fallback: true,
-          symbols: DEFAULT_SYMBOLS,
+          error: "SYMBOLS_UNAVAILABLE",
+          message: getErrorMessage(fetchErr),
         }), {
+          status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
