@@ -150,7 +150,7 @@ export default function SettingsPage() {
   );
 }
 
-function Section({ title, icon: Icon, children }: { title: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>; children: React.ReactNode }) {
+function Section({ title, icon: Icon, children }: { title: string; icon: import("lucide-react").LucideIcon; children: React.ReactNode }) {
   return <section style={{ padding: 16, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16 }}>
     <h2 style={{ display: "flex", alignItems: "center", gap: 7, color: C.jade, fontSize: 13, marginBottom: 13 }}><Icon size={15} />{title}</h2>
     {children}

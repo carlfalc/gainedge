@@ -9,9 +9,8 @@ interface TradeRow {
   status: string;
   trigger_type: string | null;
   entry_price: number | null;
-  exit_price: number | null;
+  actual_exit_price: number | null;
   pnl_usd: number | null;
-  features: any;
   opened_at: string | null;
   closed_at: string | null;
 }
@@ -27,7 +26,7 @@ const labelStyle: React.CSSProperties = {
 
 // A Falconer trade is long-only: a win is an exit above entry. Fall back to pnl sign.
 function isWin(t: TradeRow): boolean {
-  if (t.exit_price != null && t.entry_price != null) return Number(t.exit_price) > Number(t.entry_price);
+  if (t.actual_exit_price != null && t.entry_price != null) return Number(t.actual_exit_price) > Number(t.entry_price);
   if (t.pnl_usd != null) return Number(t.pnl_usd) > 0;
   return t.status === "closed_tp3";
 }
@@ -46,12 +45,12 @@ export default function AnalyticsPage() {
       if (!session) { setLoading(false); return; }
       const { data } = await supabase
         .from("falconer_trades")
-        .select("id, symbol, status, trigger_type, entry_price, exit_price, pnl_usd, features, opened_at, closed_at")
+        .select("id, symbol, status, trigger_type, entry_price, actual_exit_price, pnl_usd, opened_at, closed_at")
         .eq("user_id", session.user.id)
         .in("status", CLOSED)
         .order("closed_at", { ascending: false })
         .limit(2000);
-      setTrades((data as TradeRow[]) ?? []);
+      setTrades(((data as unknown) as TradeRow[]) ?? []);
       setLoading(false);
     })();
   }, []);
@@ -84,7 +83,6 @@ export default function AnalyticsPage() {
       total, wins, losses, netPnl, profitFactor, hasPnl: pnlTrades.length > 0,
       byTrigger: by(t => t.trigger_type),
       bySymbol: by(t => t.symbol),
-      bySession: by(t => t.features?.session),
     };
   }, [trades]);
 
@@ -154,7 +152,6 @@ export default function AnalyticsPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
             <Breakdown title="By Trigger" icon={Target} rows={stats.byTrigger} />
             <Breakdown title="By Instrument" icon={Layers} rows={stats.bySymbol} />
-            <Breakdown title="By Session" icon={TrendingUp} rows={stats.bySession} />
           </div>
         </>
       )}
