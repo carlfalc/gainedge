@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic, Wine
+  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic, Wine, Brain
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { useSeedData } from "@/hooks/use-seed-data";
@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   { labelKey: "nav.charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
   { labelKey: "nav.signals", icon: Zap, path: "/dashboard/signals" },
   { labelKey: "nav.strategy", icon: Zap, path: "/dashboard/strategy", gold: true },
+  { labelKey: "GainEdge AI", icon: Brain, path: "/dashboard/ai", gold: true },
   { labelKey: "nav.journal", icon: BookOpen, path: "/dashboard/journal" },
   { labelKey: "nav.analytics", icon: BarChart3, path: "/dashboard/analytics" },
   { labelKey: "nav.insights", icon: Lightbulb, path: "/dashboard/insights" },
@@ -200,7 +201,7 @@ export default function DashboardLayout() {
                 onMouseLeave={e => { if (!isActive(item.path)) { e.currentTarget.style.color = defaultColor; e.currentTarget.style.background = "transparent"; } }}
               >
                 <item.icon size={18} strokeWidth={1.8} />
-                <span>{t(item.labelKey)}</span>
+                <span>{item.labelKey.includes(".") ? t(item.labelKey) : item.labelKey}</span>
               </button>
             );
           })}

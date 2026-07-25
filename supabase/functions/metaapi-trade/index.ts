@@ -10,29 +10,38 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
-// Fallback shared account (legacy) — used only when user has no broker connected
-const FALLBACK_ACCOUNT_ID = "ea940a26-d263-4017-ad2c-0412f8399b69";
 
 /** Resolve the MetaApi accountId to use for a given user.
- *  Priority: explicit body.accountId → user's default broker_connections.metaapi_account_id → FALLBACK
+ *  Only the user's connected default broker is accepted. An explicit account id
+ *  must still belong to that user.
  */
 async function resolveAccountId(
   adminSupabase: ReturnType<typeof createClient>,
   userId: string,
   bodyAccountId?: string,
-): Promise<{ accountId: string; brokerName: string | null; source: "explicit" | "user_default" | "fallback" }> {
-  if (bodyAccountId) return { accountId: bodyAccountId, brokerName: null, source: "explicit" };
-  const { data } = await adminSupabase
+): Promise<{ accountId: string; brokerName: string | null; accountType: string }> {
+  let query = adminSupabase
     .from("broker_connections")
-    .select("metaapi_account_id, broker_name")
+    .select("metaapi_account_id, broker_name, account_type")
     .eq("user_id", userId)
-    .eq("is_default", true)
-    .limit(1);
-  const conn = data?.[0] as { metaapi_account_id?: string; broker_name?: string } | undefined;
-  if (conn?.metaapi_account_id) {
-    return { accountId: conn.metaapi_account_id, brokerName: conn.broker_name ?? null, source: "user_default" };
+    .eq("status", "connected");
+  query = bodyAccountId
+    ? query.eq("metaapi_account_id", bodyAccountId)
+    : query.eq("is_default", true);
+  const { data } = await query.limit(1);
+  const conn = data?.[0] as {
+    metaapi_account_id?: string;
+    broker_name?: string;
+    account_type?: string;
+  } | undefined;
+  if (!conn?.metaapi_account_id) {
+    throw new Error("NO_CONNECTED_BROKER");
   }
-  return { accountId: FALLBACK_ACCOUNT_ID, brokerName: null, source: "fallback" };
+  return {
+    accountId: conn.metaapi_account_id,
+    brokerName: conn.broker_name ?? null,
+    accountType: conn.account_type ?? "demo",
+  };
 }
 
 /** Resolve broker-specific symbol via broker_symbol_mappings table */
@@ -143,7 +152,7 @@ Deno.serve(async (req: Request) => {
       userId = claimsData.claims.sub as string;
     }
 
-    const { accountId, brokerName, source } = await resolveAccountId(adminSupabase, userId, body.accountId);
+    const { accountId, brokerName, accountType } = await resolveAccountId(adminSupabase, userId, body.accountId);
     const metaHeaders = { "auth-token": METAAPI_TOKEN, "Content-Type": "application/json" };
     const baseUrl = `${CLIENT_URL}/users/current/accounts/${accountId}`;
 
@@ -155,20 +164,18 @@ Deno.serve(async (req: Request) => {
       const latency = Date.now() - t0;
       const ok = res.ok && data?.balance != null;
       // Persist health snapshot if this is the user's own connection
-      if (source === "user_default") {
-        await adminSupabase.from("broker_connections")
-          .update({
-            status: ok ? "connected" : "error",
-            last_health_check: new Date().toISOString(),
-            last_error: ok ? null : (data?.message || `HTTP ${res.status}`),
-            balance: ok ? data.balance : null,
-            equity: ok ? data.equity : null,
-          })
-          .eq("user_id", userId)
-          .eq("is_default", true);
-      }
+      await adminSupabase.from("broker_connections")
+        .update({
+          status: ok ? "connected" : "error",
+          last_health_check: new Date().toISOString(),
+          last_error: ok ? null : (data?.message || `HTTP ${res.status}`),
+          balance: ok ? data.balance : null,
+          equity: ok ? data.equity : null,
+        })
+        .eq("user_id", userId)
+        .eq("metaapi_account_id", accountId);
       return new Response(JSON.stringify({
-        ok, latency_ms: latency, accountId, source,
+        ok, latency_ms: latency, accountId, accountType,
         balance: data?.balance ?? null, equity: data?.equity ?? null,
         currency: data?.currency ?? null, error: ok ? null : (data?.message || `HTTP ${res.status}`),
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -179,7 +186,7 @@ Deno.serve(async (req: Request) => {
       const res = await fetch(`${baseUrl}/accountInformation`, { headers: metaHeaders });
       const data = await res.json();
       return new Response(JSON.stringify({
-        ok: res.ok, accountId, source,
+        ok: res.ok, accountId, accountType,
         balance: data?.balance ?? null, equity: data?.equity ?? null,
         currency: data?.currency ?? null, leverage: data?.leverage ?? null,
         freeMargin: data?.freeMargin ?? null,
@@ -188,7 +195,7 @@ Deno.serve(async (req: Request) => {
 
     // ─── TRADE ───
     if (action === "trade") {
-      const { symbol, actionType, volume, stopLoss, takeProfit } = body;
+      const { symbol, actionType, volume, stopLoss, takeProfit, clientId } = body;
       if (!symbol || !actionType || !volume) {
         return new Response(JSON.stringify({ error: "symbol, actionType, volume required" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -205,6 +212,7 @@ Deno.serve(async (req: Request) => {
           symbol: variant,
           volume: roundedVolume,
         };
+        if (clientId) tradeBody.clientId = String(clientId).slice(0, 64);
         if (stopLoss != null && stopLoss !== "") tradeBody.stopLoss = parseFloat(stopLoss);
         if (takeProfit != null && takeProfit !== "") tradeBody.takeProfit = parseFloat(takeProfit);
 
@@ -213,8 +221,8 @@ Deno.serve(async (req: Request) => {
         });
         const data = await res.json();
         if (res.ok) {
-          console.log(`Trade ok ${symbol} → ${variant} on account ${accountId} (${source})`);
-          return new Response(JSON.stringify({ success: true, result: data, accountId, source }), {
+          console.log(`Trade ok ${symbol} → ${variant} on account ${accountId} (${accountType})`);
+          return new Response(JSON.stringify({ success: true, result: data, accountId, accountType }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -243,7 +251,7 @@ Deno.serve(async (req: Request) => {
         stopLoss: p.stopLoss, takeProfit: p.takeProfit,
         profit: p.profit ?? p.unrealizedProfit ?? 0,
       })) : [];
-      return new Response(JSON.stringify({ positions: mapped, accountId, source }), {
+      return new Response(JSON.stringify({ positions: mapped, accountId, accountType }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -329,14 +337,24 @@ Deno.serve(async (req: Request) => {
 
     // ─── HISTORY ───
     if (action === "history") {
-      const startTime = new Date(); startTime.setHours(0, 0, 0, 0);
-      const endTime = new Date();
+      const endTime = body.endTime ? new Date(body.endTime) : new Date();
+      const startTime = body.startTime ? new Date(body.startTime) : new Date(endTime.getTime() - 7 * 24 * 60 * 60 * 1000);
+      if (!Number.isFinite(startTime.getTime()) || !Number.isFinite(endTime.getTime())) {
+        return new Response(JSON.stringify({ error: "Invalid history date range" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (endTime.getTime() - startTime.getTime() > 31 * 24 * 60 * 60 * 1000) {
+        return new Response(JSON.stringify({ error: "History range cannot exceed 31 days" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const res = await fetch(
         `${baseUrl}/history-deals/time/${startTime.toISOString()}/${endTime.toISOString()}`,
         { headers: metaHeaders },
       );
       const data = await res.json();
-      return new Response(JSON.stringify({ deals: Array.isArray(data) ? data : [] }), {
+      return new Response(JSON.stringify({ deals: Array.isArray(data) ? data : [], accountId, accountType }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

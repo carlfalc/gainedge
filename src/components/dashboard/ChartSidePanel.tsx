@@ -1,6 +1,5 @@
 import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
-import type { RonVersion } from "@/components/dashboard/RonVersionSelector";
 
 interface Props {
   symbol: string;
@@ -9,7 +8,6 @@ interface Props {
   positions: Position[];
   onClosePosition: (positionId: string) => void;
   closingId: string | null;
-  onVersionChange?: (version: RonVersion) => void;
 }
 
 export default function ChartSidePanel({ symbol, positions, onClosePosition, closingId }: Props) {

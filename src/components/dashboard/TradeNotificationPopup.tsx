@@ -10,6 +10,8 @@ interface Notification {
   entry_price: number;
   sl_price: number;
   tp1_price: number;
+  setup_score: number | null;
+  execution_path: string;
   timestamp: string;
 }
 
@@ -23,17 +25,19 @@ export default function TradeNotificationPopup() {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "falconer_trades" },
-        (payload: any) => {
-          const row = payload.new;
-          if (row.mode !== "live") return;
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          if (row.mode !== "live" || row.notify_user === false) return;
           setNotes(prev => [{
-            id: row.id,
-            symbol: row.symbol,
-            trigger_type: row.trigger_type,
+            id: String(row.id),
+            symbol: String(row.symbol),
+            trigger_type: String(row.trigger_type),
             entry_price: Number(row.entry_price),
             sl_price: Number(row.sl_price),
             tp1_price: Number(row.tp1_price),
-            timestamp: row.opened_at,
+            setup_score: row.setup_score == null ? null : Number(row.setup_score),
+            execution_path: String(row.execution_path),
+            timestamp: String(row.opened_at),
           }, ...prev]);
         }
       )
@@ -56,9 +60,10 @@ export default function TradeNotificationPopup() {
             border: "none", borderRadius: 6, padding: 4, cursor: "pointer", color: C.muted,
           }}><X size={14} /></button>
           <div style={{ fontSize: 10, fontWeight: 800, color: C.jade, letterSpacing: 1, marginBottom: 6 }}>
-            ⚡ FALCONER ENTRY · {n.trigger_type}
+            ⚡ FALCONER ENTRY · {n.trigger_type} · {n.setup_score == null ? "UNSCORED" : `${n.setup_score}/100`}
           </div>
           <div style={{ fontSize: 14, fontWeight: 700, color: C.jade }}>{n.symbol} BUY</div>
+          <div style={{ fontSize: 10, color: C.sec, marginTop: 3, textTransform: "uppercase" }}>{n.execution_path}</div>
           <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
             <span>Entry: <span style={{ color: C.text }}>{n.entry_price}</span></span>
             <span>TP1: <span style={{ color: C.jade }}>{n.tp1_price}</span></span>
