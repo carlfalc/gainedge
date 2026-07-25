@@ -899,6 +899,60 @@ export type Database = {
         }
         Relationships: []
       }
+      market_data_backfill_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          cursor_time: string | null
+          id: string
+          last_error: string | null
+          metaapi_account_id: string
+          pages_completed: number
+          requested_end: string
+          requested_start: string
+          rows_inserted: number
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          cursor_time?: string | null
+          id?: string
+          last_error?: string | null
+          metaapi_account_id: string
+          pages_completed?: number
+          requested_end: string
+          requested_start: string
+          rows_inserted?: number
+          status?: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          cursor_time?: string | null
+          id?: string
+          last_error?: string | null
+          metaapi_account_id?: string
+          pages_completed?: number
+          requested_end?: string
+          requested_start?: string
+          rows_inserted?: number
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       news_impact_results: {
         Row: {
           created_at: string
@@ -1337,6 +1391,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      falconer_cron_tick: { Args: never; Returns: undefined }
       move_to_dlq: {
         Args: {
           dlq_name: string

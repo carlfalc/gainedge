@@ -31,3 +31,6 @@ verify_jwt = true
 
 [functions.connect-metaapi]
 verify_jwt = true
+
+[functions.metaapi-backfill]
+verify_jwt = true
