@@ -270,10 +270,13 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           const sparkData = live?.sparkline_data?.length ? live.sparkline_data : null;
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
           const color = expired ? "#555F73" : directionColor(inst.direction);
-          const liveRsi = live?.rsi ?? (f?.rsi14 ?? null);
-          const liveAdx = live?.adx ?? (f?.adx14 ?? null);
-          const liveMacd = live?.macd_status ?? (f?.macd_state ?? null);
-          const liveStoch = live?.stoch_rsi ?? (f?.stoch_rsi ?? null);
+          // Prefer the live feed only while it is actually fresh; otherwise fall back to the
+          // RON snapshot so the indicator row can never contradict RON's own reasoning.
+          const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
+          const liveRsi = (liveFresh ? live?.rsi : null) ?? (f?.rsi14 ?? null);
+          const liveAdx = (liveFresh ? live?.adx : null) ?? (f?.adx14 ?? null);
+          const liveMacd = (liveFresh ? live?.macd_status : null) ?? (f?.macd_state ?? null);
+          const liveStoch = (liveFresh ? live?.stoch_rsi : null) ?? (f?.stoch_rsi ?? null);
           const isDragOver = dragOverIndex === idx && dragIndex !== idx;
           return (
             <div
