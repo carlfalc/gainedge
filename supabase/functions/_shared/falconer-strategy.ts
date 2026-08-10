@@ -41,13 +41,18 @@ export interface StrategyConfig {
   // Asian session (UTC hours); start>end means the window wraps past midnight (Pine "2200-0600")
   asianStartHour: number;   // 22
   asianEndHour: number;     // 6
-  // symbol meta
-  pipValuePerLot: number;   // USD per 1.0 lot per 1 unit price move (gold = 100)
-  // Pine parity knobs
-  dollarPerUnit?: number;   // Pine `dpu` (default 1.0) — USD per contract per 1 unit price move
+  // symbol meta — units bridge ONLY (never used in P&L; see below)
+  /** Contracts per 1.0 broker lot (XAUUSD = 100 oz per lot). Used solely to convert Pine
+   *  contracts into MT5 lots for order routing. */
+  pipValuePerLot: number;
+  // Pine parity knobs — P&L unit definition
+  /** Pine `dpu`: USD per contract per 1.0 unit of price move. Canonical script uses 1.0, so
+   *  every P&L in this engine is (exit - entry) * contracts * dpu, exactly like Pine. */
+  dollarPerUnit?: number;
   minQty?: number;          // Pine `math.max(qty, 1.0)` floor (default 1.0)
-  /** UTC hour at which the broker/exchange DAILY session opens (MT5 gold/indices ≈ 21:00 or 22:00). */
-  dailySessionOffsetHour?: number;
+  /** UTC hour at which the broker DAILY session opens, or "auto" for the DST-aware
+   *  17:00 New York boundary (21:00 UTC in EDT, 22:00 UTC in EST). */
+  dailySessionOffsetHour?: SessionOffset;
 }
 
 export const DEFAULT_CONFIG: StrategyConfig = {
@@ -66,7 +71,7 @@ export const DEFAULT_CONFIG: StrategyConfig = {
   pipValuePerLot: 100, // gold default
   dollarPerUnit: 1.0,
   minQty: 1.0,
-  dailySessionOffsetHour: 21,
+  dailySessionOffsetHour: "auto",
 };
 
 /* ──────────── Indicators ──────────── */
