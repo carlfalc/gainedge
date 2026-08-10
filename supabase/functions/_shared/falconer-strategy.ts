@@ -462,6 +462,8 @@ export interface OpenPosition {
   filled2: boolean;
   filled3: boolean;
   beDone: boolean;
+  /** realized P&L accumulated from partially closed legs */
+  realized: number;
   trigger: TriggerType;
   openedAt: number;
 }
@@ -491,7 +493,7 @@ export function buildPosition(
   return {
     entry, sl: rawSL, slLeg1: rawSL, tp1, tp2, tp3, beLevel,
     qty: totalQty, lots, qty1, qty2, qty3,
-    filled1: false, filled2: false, filled3: false, beDone: false,
+    filled1: false, filled2: false, filled3: false, beDone: false, realized: 0,
     trigger, openedAt,
   };
 }
@@ -542,7 +544,8 @@ export function runBacktest(
   const sqz = squeezeSeries(candles, 20, 2, 1.5);
   const ha = toHA(candles);
   const asian = asianLockedSeries(candles, cfg);
-  const ds = computeDailySeries(dailyCandles?.length ? dailyCandles : candles);
+  const ds = computeDailySeries(dailyCandles?.length ? dailyCandles : candles, cfg.dailySessionOffsetHour);
+  const dpu = cfg.dollarPerUnit ?? 1;
 
   const trades: BacktestTrade[] = [];
   const equityCurve: { t: number; equity: number }[] = [];
@@ -560,7 +563,7 @@ export function runBacktest(
       const p = pos;
       let realized = 0;
       // stops first (conservative intrabar assumption)
-      if (!p.filled1 && c.low <= p.slLeg1) { realized += (p.slLeg1 - p.entry) * p.qty1 * dpu; p.filled1 = true; p.exitedLeg1 = true; }
+      if (!p.filled1 && c.low <= p.slLeg1) { realized += (p.slLeg1 - p.entry) * p.qty1 * dpu; p.filled1 = true; }
       const restStop = p.beDone ? p.entry : p.sl;
       if (c.low <= restStop) {
         if (!p.filled2) realized += (restStop - p.entry) * p.qty2 * dpu;
