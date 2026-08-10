@@ -34,3 +34,6 @@ verify_jwt = true
 
 [functions.metaapi-backfill]
 verify_jwt = true
+
+[functions.ingest-candles]
+verify_jwt = true
