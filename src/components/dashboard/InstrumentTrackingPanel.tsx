@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { Sparkline } from "@/components/dashboard/Sparkline";
-import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
 import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
+import { useRonSnapshots, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
 
 interface ScanResult {
-  id: string; symbol: string; direction: string; confidence: number;
+  id: string; symbol: string; direction: string;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
   macd_status: string | null; stoch_rsi: number | null; reasoning: string;
@@ -31,15 +31,11 @@ const directionColor = (dir: string) => {
   return "#555F73";
 };
 
-function generateSparkData(direction: string, confidence: number): number[] {
-  const len = 20;
-  const c = Math.max(1, Math.min(10, confidence));
-  const slope = direction === "BUY" ? c * 0.3 : direction === "SELL" ? -c * 0.3 : 0;
-  const noise = direction === "WAIT" || direction === "NO TRADE" ? 2.5 : 1.2;
-  const seed = (i: number) => Math.sin(i * 13.7 + c * 3.1) * noise + Math.cos(i * 7.3) * noise * 0.5;
-  let val = 50;
-  return Array.from({ length: len }, (_, i) => { val += slope + seed(i); return val; });
-}
+const num = (v: unknown, dp = 1): string =>
+  v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(dp);
+
+const macdLabel = (s: string | null | undefined) =>
+  !s ? "—" : s.replace("_", " ");
 
 interface InstrumentTrackingPanelProps {
   /** When true, renders the "Pop Out" button. Hide it on the popout page itself. */
@@ -60,6 +56,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { data: liveData } = useLiveMarketData(userId);
+  const { snapshots } = useRonSnapshots();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -123,13 +120,14 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         id: t?.id ?? `placeholder-${i.symbol}`,
         symbol: i.symbol,
         direction: t?.direction ?? "WAIT",
-        confidence: t ? 8 : 5,
         entry_price: t?.entry_price ?? null,
         take_profit: t?.tp3_price ?? null,
         stop_loss: t?.sl_price ?? null,
-        risk_reward: t ? "1:5" : null,
+        risk_reward: t && t.entry_price != null && t.sl_price != null && t.tp3_price != null && t.entry_price !== t.sl_price
+          ? `1:${(Math.abs(t.tp3_price - t.entry_price) / Math.abs(t.entry_price - t.sl_price)).toFixed(2)}`
+          : null,
         adx: null, rsi: null, macd_status: null, stoch_rsi: null,
-        reasoning: t ? `Falconer v7 ${t.trigger_type}` : "Awaiting setup",
+        reasoning: t ? `Falconer v7 ${t.trigger_type}` : "",
         ema_crossover_status: "",
         verdict: t?.status ?? "PENDING",
         scanned_at: t?.opened_at ?? new Date().toISOString(),
@@ -265,13 +263,20 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           const expired = isDynamicallyExpired(inst.scanned_at, tf);
           const countdown = nextScanSeconds(tf);
           const live = liveData.get(inst.symbol);
-          const sparkData = live?.sparkline_data?.length ? live.sparkline_data : generateSparkData(inst.direction, inst.confidence);
+          const snap = snapshots.get(inst.symbol);
+          const f = snap?.features ?? null;
+          const ron = ronStateFrom(f);
+          // Truthfulness: only real price paths are plotted. No synthetic sparkline.
+          const sparkData = live?.sparkline_data?.length ? live.sparkline_data : null;
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
           const color = expired ? "#555F73" : directionColor(inst.direction);
-          const liveRsi = live?.rsi ?? inst.rsi;
-          const liveAdx = live?.adx ?? inst.adx;
-          const liveMacd = live?.macd_status ?? inst.macd_status;
-          const liveStoch = live?.stoch_rsi ?? inst.stoch_rsi;
+          // Prefer the live feed only while it is actually fresh; otherwise fall back to the
+          // RON snapshot so the indicator row can never contradict RON's own reasoning.
+          const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
+          const liveRsi = (liveFresh ? live?.rsi : null) ?? (f?.rsi14 ?? null);
+          const liveAdx = (liveFresh ? live?.adx : null) ?? (f?.adx14 ?? null);
+          const liveMacd = (liveFresh ? live?.macd_status : null) ?? (f?.macd_state ?? null);
+          const liveStoch = (liveFresh ? live?.stoch_rsi : null) ?? (f?.stoch_rsi ?? null);
           const isDragOver = dragOverIndex === idx && dragIndex !== idx;
           return (
             <div
@@ -350,16 +355,31 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 </div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <Gauge value={inst.confidence} color={color} size={44} />
-                <Sparkline data={sparkData} color={live ? sparkColor : color} w={120} h={32} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 9, color: C.sec, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: ron ? ronStateColor(ron.state) : C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                    {ron ? ron.state : "NO DATA"}
+                  </div>
+                  {snap && (
+                    <div style={{ fontSize: 9, color: snap.data_health === "healthy" ? C.sec : "#F59E0B" }}>
+                      {snap.timeframe} bar {new Date(snap.bar_time).toISOString().slice(5, 16).replace("T", " ")}Z
+                      {snap.data_health !== "healthy" ? ` · ${snap.data_health}` : ""}
+                    </div>
+                  )}
+                </div>
+                {sparkData ? (
+                  <Sparkline data={sparkData} color={sparkColor} w={120} h={32} />
+                ) : (
+                  <span style={{ fontSize: 9, color: C.muted, fontStyle: "italic" }}>No live price feed</span>
+                )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
-                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveAdx ?? "—"}</span>{liveAdx != null && <span style={{ color: C.muted, fontSize: 10 }}> - {adxLabel(liveAdx)}</span>}</span>
-                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveRsi ?? "—"}</span>{liveRsi != null && <span style={{ color: C.muted, fontSize: 10 }}> - {rsiLabel(liveRsi)}</span>}</span>
-                <span>MACD <span style={{ color: liveMacd === "Bullish" ? C.green : liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{liveMacd ?? "—"}</span></span>
-                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{liveStoch ?? "—"}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(liveStoch)}</span>}</span>
+                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveAdx)}</span>{liveAdx != null && <span style={{ color: C.muted, fontSize: 10 }}> - {adxLabel(Number(liveAdx))}</span>}</span>
+                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveRsi)}</span>{liveRsi != null && <span style={{ color: C.muted, fontSize: 10 }}> - {rsiLabel(Number(liveRsi))}</span>}</span>
+                <span>MACD <span style={{ color: String(liveMacd).startsWith("bullish") || liveMacd === "Bullish" ? C.green : String(liveMacd).startsWith("bearish") || liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{macdLabel(liveMacd)}</span></span>
+                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
@@ -375,7 +395,16 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     (Expired — {formatAge(inst.scanned_at)})
                   </div>
                 )}
-                <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>RON: </span>{inst.reasoning || "No reasoning available."}
+                <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>RON: </span>
+                {ron ? (
+                  <>
+                    {ron.why}
+                    <div style={{ marginTop: 4, color: C.muted }}>What would change it: {ron.next}</div>
+                    {inst.reasoning && <div style={{ marginTop: 4 }}>{inst.reasoning}</div>}
+                  </>
+                ) : (
+                  inst.reasoning || "No RON snapshot for this instrument yet."
+                )}
               </div>
 
               {expired && (
