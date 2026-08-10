@@ -183,23 +183,50 @@ export function toHA(candles: Candle[]): Candle[] {
 
 export interface DailyBar { time: number; date: string; open: number; high: number; low: number; close: number; }
 
-function utcDateKey(ms: number): string {
-  const d = new Date(ms);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+const DAY_MS = 86_400_000;
+
+/**
+ * M3 — session-aligned daily bucketing.
+ * A broker daily candle stamped at 21:00 UTC belongs to the session [21:00, next 21:00),
+ * NOT to the prior UTC calendar day. `sessionIndex` is the integer index of that session.
+ */
+export function sessionIndexOf(ms: number, offsetHour: number): number {
+  return Math.floor((ms - offsetHour * 3_600_000) / DAY_MS);
 }
 
-/** Aggregate intraday candles into UTC-day bars (ascending). */
-export function aggregateDaily(candles: Candle[]): DailyBar[] {
+function sessionKey(ms: number, offsetHour: number): string {
+  const start = sessionIndexOf(ms, offsetHour) * DAY_MS + offsetHour * 3_600_000;
+  return new Date(start).toISOString().slice(0, 10);
+}
+
+/** Infer the daily-session opening UTC hour from the modal timestamp hour of daily bars. */
+export function inferSessionOffsetHour(bars: { time: number }[], fallback = 21): number {
+  if (!bars.length) return fallback;
+  const counts = new Map<number, number>();
+  for (const b of bars) {
+    const h = new Date(b.time).getUTCHours();
+    counts.set(h, (counts.get(h) ?? 0) + 1);
+  }
+  let best = fallback, bestN = -1;
+  for (const [h, n] of counts) if (n > bestN) { best = h; bestN = n; }
+  return best;
+}
+
+/** Aggregate intraday candles into session-aligned daily bars (ascending). */
+export function aggregateDaily(candles: Candle[], offsetHour = 21): DailyBar[] {
   const days: DailyBar[] = [];
   let cur: DailyBar | null = null;
+  let curIdx = NaN;
   for (const c of candles) {
-    const key = utcDateKey(c.time);
-    if (!cur || cur.date !== key) {
+    const idx = sessionIndexOf(c.time, offsetHour);
+    if (!cur || idx !== curIdx) {
       if (cur) days.push(cur);
-      cur = { time: c.time, date: key, open: c.open, high: c.high, low: c.low, close: c.close };
+      curIdx = idx;
+      cur = {
+        time: idx * DAY_MS + offsetHour * 3_600_000,
+        date: sessionKey(c.time, offsetHour),
+        open: c.open, high: c.high, low: c.low, close: c.close,
+      };
     } else {
       cur.high = Math.max(cur.high, c.high);
       cur.low = Math.min(cur.low, c.low);
@@ -214,47 +241,85 @@ export interface DailySeries {
   bars: DailyBar[];
   ema50: number[];
   ema200: number[];
+  /** session index per daily bar */
+  sessionIdx: number[];
+  offsetHour: number;
 }
 
-/** Build a daily series from already-daily bars (live engine) or pass intraday and aggregate. */
-export function computeDailySeries(input: DailyBar[] | Candle[]): DailySeries {
-  const bars: DailyBar[] = (input.length > 0 && "date" in (input[0] as DailyBar))
-    ? (input as DailyBar[])
-    : aggregateDaily(input as Candle[]);
+/**
+ * Build a daily series from already-daily broker bars (live engine) or from intraday candles.
+ * When daily bars are supplied their stamps define the session offset (M3); intraday
+ * aggregation uses `offsetHour` (default = broker session open, 21:00 UTC).
+ */
+export function computeDailySeries(input: DailyBar[] | Candle[], offsetHour?: number): DailySeries {
+  const isDaily = input.length > 0 && "date" in (input[0] as DailyBar);
+  let bars: DailyBar[];
+  let off: number;
+  if (isDaily) {
+    bars = input as DailyBar[];
+    off = offsetHour ?? inferSessionOffsetHour(bars);
+  } else {
+    // treat "daily-spaced" plain candles as daily bars too
+    const cs = input as Candle[];
+    const dailySpaced = cs.length > 1 && (cs[1].time - cs[0].time) >= DAY_MS - 3_600_000;
+    off = offsetHour ?? inferSessionOffsetHour(cs);
+    if (dailySpaced) {
+      bars = cs.map(c => ({ time: c.time, date: sessionKey(c.time, off), open: c.open, high: c.high, low: c.low, close: c.close }));
+    } else {
+      off = offsetHour ?? 21;
+      bars = aggregateDaily(cs, off);
+    }
+  }
   const closes = bars.map(b => b.close);
   return {
     bars,
     ema50: closes.length ? ema(closes, 50) : [],
     ema200: closes.length ? ema(closes, 200) : [],
+    sessionIdx: bars.map(b => sessionIndexOf(b.time, off)),
+    offsetHour: off,
   };
 }
 
 export interface DailyContext {
   emaD50: number;
-  emaD50Prev: number;
+  emaD50Prev: number;   // value of the SECURITY SERIES on the previous intraday bar (Pine emaD50[1])
   emaD200: number;
-  pdl: number;     // previous completed day's low
+  pdl: number;          // request.security("D", low[1]) → low of the bar BEFORE the last completed daily bar
+}
+
+/** Index of the last COMPLETED daily bar for an intraday bar time (lookahead_off, session-aligned). */
+export function lastCompletedDailyIndex(ds: DailySeries, barTimeMs: number): number {
+  const cur = sessionIndexOf(barTimeMs, ds.offsetHour);
+  let k = -1;
+  for (let i = ds.bars.length - 1; i >= 0; i--) {
+    if (ds.sessionIdx[i] < cur) { k = i; break; }
+  }
+  return k;
 }
 
 /**
- * Daily context for an intraday bar, using only COMPLETED daily bars (the last daily bar
- * whose UTC date is strictly before the intraday bar's UTC date). This is the
- * non-repainting, lookahead-off equivalent of Pine's request.security("D", …).
- * Returns null when there is not enough daily history (need ≥2 completed days).
+ * Pine `request.security(tf="D", …, lookahead_off)` emulation for an intraday bar.
+ *
+ * M1: `emaD50[1]` in Pine is the previous value of the MAPPED (intraday-indexed) series,
+ * not the previous daily bar's EMA. It only steps at the daily rollover bar, so
+ * `dTrendUp = emaD50 > emaD50[1]` can only be true on the first intraday bar of a new
+ * session. `prevBarTimeMs` supplies that previous-intraday-bar mapping.
+ *
+ * M2: `pdl = request.security("D", low[1])` is the low of the daily bar BEFORE the last
+ * completed daily bar (`bars[k-1].low`), not the last completed day's low.
+ *
+ * M3: bucketing/completion is session-aligned; a still-forming daily session is never read.
  */
-export function dailyContextFor(ds: DailySeries, barTimeMs: number): DailyContext | null {
-  const today = utcDateKey(barTimeMs);
-  // last index with date < today
-  let k = -1;
-  for (let i = ds.bars.length - 1; i >= 0; i--) {
-    if (ds.bars[i].date < today) { k = i; break; }
-  }
+export function dailyContextFor(ds: DailySeries, barTimeMs: number, prevBarTimeMs?: number): DailyContext | null {
+  const k = lastCompletedDailyIndex(ds, barTimeMs);
   if (k < 1) return null;
+  const kPrev = prevBarTimeMs === undefined ? k : lastCompletedDailyIndex(ds, prevBarTimeMs);
+  if (kPrev < 0) return null;
   return {
     emaD50: ds.ema50[k],
-    emaD50Prev: ds.ema50[k - 1],
+    emaD50Prev: ds.ema50[kPrev],
     emaD200: ds.ema200[k],
-    pdl: ds.bars[k].low,
+    pdl: ds.bars[k - 1].low,
   };
 }
 
