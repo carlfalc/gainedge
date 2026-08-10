@@ -25,7 +25,7 @@ const stochLabel = (v: number) =>
   v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
 
 interface ScanResult {
-  id: string; symbol: string; direction: string; confidence: number;
+  id: string; symbol: string; direction: string;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
   macd_status: string | null; stoch_rsi: number | null; reasoning: string;
@@ -43,16 +43,6 @@ const directionColor = (dir: string) => {
   if (dir === "WAIT") return "#F59E0B";
   return "#555F73";
 };
-
-function generateSparkData(direction: string, confidence: number): number[] {
-  const len = 20;
-  const c = Math.max(1, Math.min(10, confidence));
-  const slope = direction === "BUY" ? c * 0.3 : direction === "SELL" ? -c * 0.3 : 0;
-  const noise = direction === "WAIT" || direction === "NO TRADE" ? 2.5 : 1.2;
-  const seed = (i: number) => Math.sin(i * 13.7 + c * 3.1) * noise + Math.cos(i * 7.3) * noise * 0.5;
-  let val = 50;
-  return Array.from({ length: len }, (_, i) => { val += slope + seed(i); return val; });
-}
 
 export default function DashboardHome() {
   const [scans, setScans] = useState<ScanResult[]>([]);
@@ -140,11 +130,13 @@ export default function DashboardHome() {
           id: s.id,
           symbol: s.symbol,
           direction: s.direction,
-          confidence: 8,
           entry_price: s.entry_price,
           take_profit: s.tp3_price,
           stop_loss: s.sl_price,
-          risk_reward: "1:5",
+          risk_reward:
+            s.entry_price != null && s.sl_price != null && s.tp3_price != null && s.entry_price !== s.sl_price
+              ? `1:${(Math.abs(s.tp3_price - s.entry_price) / Math.abs(s.entry_price - s.sl_price)).toFixed(2)}`
+              : null,
           adx: null, rsi: null, macd_status: null, stoch_rsi: null,
           reasoning: `Falconer v7 ${s.trigger_type}`,
           ema_crossover_status: "",
@@ -285,7 +277,10 @@ export default function DashboardHome() {
 
   // Highest conviction: only from last 20 minutes
   const recentScans = scans.filter(s => !isDynamicallyExpired(s.scanned_at, instrumentTfs.get(s.symbol) || "15m"));
-  const best = recentScans.length ? recentScans.reduce((a, b) => a.confidence > b.confidence ? a : b) : null;
+  // No invented conviction score: surface the most recent live setup instead.
+  const best = recentScans.length
+    ? recentScans.reduce((a, b) => (new Date(a.scanned_at) > new Date(b.scanned_at) ? a : b))
+    : null;
   const totalTrades = stats.wins + stats.losses;
   const winRate = totalTrades > 0 ? Math.round((stats.wins / totalTrades) * 100) : 0;
 
@@ -346,17 +341,17 @@ export default function DashboardHome() {
           boxShadow: `0 0 30px ${C.jade}10`,
         }}>
           <div>
-            <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>HIGHEST CONVICTION</div>
+            <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>LATEST LIVE SETUP</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {best.symbol} {best.direction} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> Entry {best.entry_price ?? "N/A"} → TP {best.take_profit ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> SL {best.stop_loss ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> R:R {best.risk_reward ?? "N/A"}
             </div>
           </div>
           <div style={{
-            width: 48, height: 48, borderRadius: 12, background: C.jade + "18",
+            padding: "8px 12px", borderRadius: 12, background: C.jade + "18",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 18, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: C.jade,
+            fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: C.jade,
           }}>
-            {best.confidence}
+            {best.verdict || "OPEN"}
           </div>
         </div>
       ) : null}

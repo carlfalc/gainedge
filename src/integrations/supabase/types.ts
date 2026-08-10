@@ -1139,6 +1139,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_market_snapshots: {
+        Row: {
+          bar_time: string
+          close: number
+          computed_at: string
+          data_health: string
+          feature_version: number
+          features: Json
+          high: number
+          id: string
+          low: number
+          model_signals: Json
+          open: number
+          patterns: Json
+          source: string | null
+          spread: number | null
+          symbol: string
+          timeframe: string
+          volume: number | null
+        }
+        Insert: {
+          bar_time: string
+          close: number
+          computed_at?: string
+          data_health?: string
+          feature_version?: number
+          features?: Json
+          high: number
+          id?: string
+          low: number
+          model_signals?: Json
+          open: number
+          patterns?: Json
+          source?: string | null
+          spread?: number | null
+          symbol: string
+          timeframe: string
+          volume?: number | null
+        }
+        Update: {
+          bar_time?: string
+          close?: number
+          computed_at?: string
+          data_health?: string
+          feature_version?: number
+          features?: Json
+          high?: number
+          id?: string
+          low?: number
+          model_signals?: Json
+          open?: number
+          patterns?: Json
+          source?: string | null
+          spread?: number | null
+          symbol?: string
+          timeframe?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
       session_volume_summary: {
         Row: {
           buyer_volume: number | null
@@ -1412,6 +1472,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      ron_snapshot_cron_tick: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
