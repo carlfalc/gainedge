@@ -598,18 +598,17 @@ async function processUserSymbol(
 
 function estimatedPnl(t: any, exitPrice: number, filled1: boolean, filled2: boolean): number {
   const entry = Number(t.entry_price);
-  const initialSl = Number(t.features?.sl ?? t.sl_price);
-  const qty = Number(t.qty);
-  const riskUsd = Number(t.features?.risk_usd ?? 0);
-  const priceRisk = Math.max(entry - initialSl, 1e-9);
-  const pipValue = qty > 0 && riskUsd > 0 ? riskUsd / (priceRisk * qty) : 1;
+  // Pine unit definition: P&L = (exit - entry) * contracts * dpu. Deriving the value per
+  // contract from riskUsd/(risk*qty) diverges whenever Pine's math.max(qty, 1.0) floor bites,
+  // so use dpu directly (DEFAULT_CONFIG.dollarPerUnit = 1.0, matching the canonical script).
+  const dpu = Number(t.features?.dpu ?? DEFAULT_CONFIG.dollarPerUnit ?? 1);
   const q1 = Number(t.qty1);
   const q2 = Number(t.qty2);
   const q3 = Number(t.qty3);
-  const realised1 = filled1 ? (Number(t.tp1_price) - entry) * q1 * pipValue : 0;
-  const realised2 = filled2 ? (Number(t.tp2_price) - entry) * q2 * pipValue : 0;
+  const realised1 = filled1 ? (Number(t.tp1_price) - entry) * q1 * dpu : 0;
+  const realised2 = filled2 ? (Number(t.tp2_price) - entry) * q2 * dpu : 0;
   const remaining = (filled1 ? 0 : q1) + (filled2 ? 0 : q2) + q3;
-  const gross = realised1 + realised2 + (exitPrice - entry) * remaining * pipValue;
+  const gross = realised1 + realised2 + (exitPrice - entry) * remaining * dpu;
   return Number((gross - Number(t.commission_usd ?? 0) - Number(t.swap_usd ?? 0)).toFixed(2));
 }
 
