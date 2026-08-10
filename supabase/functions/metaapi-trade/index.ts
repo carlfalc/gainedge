@@ -9,7 +9,7 @@ const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
+const CLIENT_URL = "https://mt-client-api-v1.london.agiliumtrade.ai";
 
 /** Resolve the MetaApi accountId to use for a given user.
  *  Only the user's connected default broker is accepted. An explicit account id

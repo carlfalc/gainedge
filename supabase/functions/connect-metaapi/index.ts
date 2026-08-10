@@ -9,7 +9,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN")!;
-const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
+const CLIENT_URL = "https://mt-client-api-v1.london.agiliumtrade.ai";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

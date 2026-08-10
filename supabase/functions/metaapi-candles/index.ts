@@ -12,8 +12,8 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const MARKET_DATA_ACCOUNT_ID = Deno.env.get("METAAPI_MARKET_DATA_ACCOUNT_ID") ?? "";
 
 // MetaApi REST API base URLs
-const CLIENT_URL = "https://mt-client-api-v1.new-york.agiliumtrade.ai";
-const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
+const CLIENT_URL = "https://mt-client-api-v1.london.agiliumtrade.ai";
+const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.london.agiliumtrade.ai";
 
 const METAAPI_TIMEOUT_MS = 30_000;
 

@@ -11,7 +11,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const METAAPI_TOKEN = Deno.env.get("METAAPI_TOKEN")!;
-const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.new-york.agiliumtrade.ai";
+const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.london.agiliumtrade.ai";
 
 const TIMEFRAME_MS: Record<string, number> = {
   "1m": 60_000, "5m": 5*60_000, "15m": 15*60_000, "30m": 30*60_000,
