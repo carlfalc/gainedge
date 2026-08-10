@@ -796,8 +796,23 @@ async function reconcileRecentBrokerTrades(supabase: ReturnType<typeof createCli
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const authHeader = req.headers.get("Authorization");
-  if (authHeader !== `Bearer ${SERVICE_KEY}`) {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const isServiceRole = (() => {
+    if (authHeader === `Bearer ${SERVICE_KEY}`) return true;
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const parts = token.split(".");
+    if (parts.length !== 3) return false;
+    try {
+      const payload = JSON.parse(
+        atob(parts[1].replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(parts[1].length / 4) * 4, "=")),
+      );
+      return payload?.role === "service_role" &&
+        (typeof payload.exp !== "number" || payload.exp * 1000 > Date.now());
+    } catch {
+      return false;
+    }
+  })();
+  if (!isServiceRole) {
     return new Response(JSON.stringify({ error: "Service role required" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
