@@ -446,11 +446,15 @@ export function evaluateLongTrigger(ctx: BarContext): TriggerResult {
 export interface OpenPosition {
   entry: number;
   sl: number;
+  /** Pine keeps L-TP1's original stop when BE fires; only TP2/TP3 legs move to entry. */
+  slLeg1: number;
   tp1: number;
   tp2: number;
   tp3: number;
   beLevel: number;
   qty: number;
+  /** Broker lots = qty * dpu / pipValuePerLot (documented unit conversion). */
+  lots: number;
   qty1: number;
   qty2: number;
   qty3: number;
@@ -475,16 +479,18 @@ export function buildPosition(
   const tp3 = entry + cfg.rrTp3 * r;
   const beLevel = entry + cfg.beR * r;
 
-  // lots = risk_usd / (R * pip_value_per_lot)
-  const totalQty = cfg.riskUsd / (r * cfg.pipValuePerLot);
-  const pct3 = Math.max(0, 100 - cfg.pct1 - cfg.pct2);
+  // Pine: qty = math.max(riskUSD / (riskD * dpu), 1.0); qty3 = qty - qty1 - qty2
+  const dpu = cfg.dollarPerUnit ?? 1;
+  const minQty = cfg.minQty ?? 1;
+  const totalQty = Math.max(cfg.riskUsd / (r * dpu), minQty);
   const qty1 = totalQty * (cfg.pct1 / 100);
   const qty2 = totalQty * (cfg.pct2 / 100);
-  const qty3 = totalQty * (pct3 / 100);
+  const qty3 = totalQty - qty1 - qty2;
+  const lots = cfg.pipValuePerLot > 0 ? (totalQty * dpu) / cfg.pipValuePerLot : totalQty;
 
   return {
-    entry, sl: rawSL, tp1, tp2, tp3, beLevel,
-    qty: totalQty, qty1, qty2, qty3,
+    entry, sl: rawSL, slLeg1: rawSL, tp1, tp2, tp3, beLevel,
+    qty: totalQty, lots, qty1, qty2, qty3,
     filled1: false, filled2: false, filled3: false, beDone: false,
     trigger, openedAt,
   };
