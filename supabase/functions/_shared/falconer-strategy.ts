@@ -43,6 +43,11 @@ export interface StrategyConfig {
   asianEndHour: number;     // 6
   // symbol meta
   pipValuePerLot: number;   // USD per 1.0 lot per 1 unit price move (gold = 100)
+  // Pine parity knobs
+  dollarPerUnit?: number;   // Pine `dpu` (default 1.0) — USD per contract per 1 unit price move
+  minQty?: number;          // Pine `math.max(qty, 1.0)` floor (default 1.0)
+  /** UTC hour at which the broker/exchange DAILY session opens (MT5 gold/indices ≈ 21:00 or 22:00). */
+  dailySessionOffsetHour?: number;
 }
 
 export const DEFAULT_CONFIG: StrategyConfig = {
@@ -59,6 +64,9 @@ export const DEFAULT_CONFIG: StrategyConfig = {
   asianStartHour: 22,
   asianEndHour: 6,
   pipValuePerLot: 100, // gold default
+  dollarPerUnit: 1.0,
+  minQty: 1.0,
+  dailySessionOffsetHour: 21,
 };
 
 /* ──────────── Indicators ──────────── */
