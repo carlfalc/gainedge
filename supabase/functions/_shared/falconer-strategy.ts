@@ -288,7 +288,7 @@ export interface DailySeries {
   ema200: number[];
   /** session index per daily bar */
   sessionIdx: number[];
-  offsetHour: number;
+  offsetHour: SessionOffset;
 }
 
 /**
@@ -296,22 +296,21 @@ export interface DailySeries {
  * When daily bars are supplied their stamps define the session offset (M3); intraday
  * aggregation uses `offsetHour` (default = broker session open, 21:00 UTC).
  */
-export function computeDailySeries(input: DailyBar[] | Candle[], offsetHour?: number): DailySeries {
+export function computeDailySeries(input: DailyBar[] | Candle[], offsetHour?: SessionOffset): DailySeries {
   const isDaily = input.length > 0 && "date" in (input[0] as DailyBar);
   let bars: DailyBar[];
-  let off: number;
+  let off: SessionOffset;
   if (isDaily) {
     bars = input as DailyBar[];
-    off = offsetHour ?? inferSessionOffsetHour(bars);
+    off = offsetHour ?? "auto";
   } else {
     // treat "daily-spaced" plain candles as daily bars too
     const cs = input as Candle[];
     const dailySpaced = cs.length > 1 && (cs[1].time - cs[0].time) >= DAY_MS - 3_600_000;
-    off = offsetHour ?? inferSessionOffsetHour(cs);
+    off = offsetHour ?? "auto";
     if (dailySpaced) {
       bars = cs.map(c => ({ time: c.time, date: sessionKey(c.time, off), open: c.open, high: c.high, low: c.low, close: c.close }));
     } else {
-      off = offsetHour ?? 21;
       bars = aggregateDaily(cs, off);
     }
   }
