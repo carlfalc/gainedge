@@ -349,12 +349,13 @@ export function lastCompletedDailyIndex(ds: DailySeries, barTimeMs: number): num
 /**
  * Pine `request.security(tf="D", …, lookahead_off)` emulation for an intraday bar.
  *
- * M1 — TRUE Pine HTF semantics: with lookahead OFF, `request.security` does NOT return the
- * previous completed daily value all day. It returns the value of the CURRENTLY DEVELOPING
- * daily bar, recomputed on every intraday bar (it simply never peeks into the future).
- * So `emaD50` on bar i = EMA50 seeded on completed daily closes and advanced one step with
- * the developing session close = close[i]; `emaD50[1]` is the same expression evaluated on
- * intraday bar i-1. That makes `dTrendUp` a genuine intraday-updating series.
+ * M1 — Historical Pine HTF semantics: with lookahead OFF, on HISTORICAL bars
+ * `request.security` returns the value of the LAST CLOSED daily bar and holds it constant
+ * for every intraday bar of the developing session. The series is therefore a step function
+ * that only changes on the first intraday bar of a new session.
+ * `emaD50[1]` is that same projected series evaluated on intraday bar i-1, so
+ * `dTrendUp = emaD50 > emaD50[1]` can only be TRUE on the session-rollover bar.
+ * (The developing-close variant repaints and does NOT reproduce the canonical backtest.)
  *
  * M2 — `pdl = request.security("D", low[1])`: index [1] is taken INSIDE the daily series, so
  * relative to the developing daily bar it is the LAST COMPLETED daily bar's low.
@@ -373,23 +374,19 @@ export function dailyContextFor(
   const k = lastCompletedDailyIndex(ds, barTimeMs);
   if (k < 0 || !Number.isFinite(ds.ema50[k]) || !Number.isFinite(ds.ema200[k])) return null;
 
-  const step = (base: number, close: number, period: number) => base + (2 / (period + 1)) * (close - base);
+  const emaD50 = ds.ema50[k];
+  const emaD200 = ds.ema200[k];
 
-  if (developingClose === undefined) {
-    // completed-bar fallback (pure-function tests / no intraday context available)
-    if (k < 1) return null;
-    return { emaD50: ds.ema50[k], emaD50Prev: ds.ema50[k - 1], emaD200: ds.ema200[k], pdl: ds.bars[k].low };
-  }
-
-  const emaD50 = step(ds.ema50[k], developingClose, 50);
-  const emaD200 = step(ds.ema200[k], developingClose, 200);
-
+  // emaD50[1] = projected series on the PREVIOUS intraday bar → same last-closed-daily value
+  // unless that previous bar belonged to an earlier session (rollover).
   let emaD50Prev = emaD50;
-  if (prevBarTimeMs !== undefined && prevDevelopingClose !== undefined) {
+  if (prevBarTimeMs !== undefined) {
     const kPrev = lastCompletedDailyIndex(ds, prevBarTimeMs);
-    if (kPrev >= 0 && Number.isFinite(ds.ema50[kPrev])) {
-      emaD50Prev = step(ds.ema50[kPrev], prevDevelopingClose, 50);
-    }
+    if (kPrev >= 0 && Number.isFinite(ds.ema50[kPrev])) emaD50Prev = ds.ema50[kPrev];
+    else if (kPrev < 0) return null;
+  } else {
+    if (k < 1) return null;
+    emaD50Prev = ds.ema50[k - 1];
   }
 
   return { emaD50, emaD50Prev, emaD200, pdl: ds.bars[k].low };
