@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useRonSnapshots, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
+import { assessDataHealth } from "@/lib/market-hours";
 
 interface ScanResult {
   id: string; symbol: string; direction: string;
@@ -266,13 +267,15 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           const snap = snapshots.get(inst.symbol);
           const f = snap?.features ?? null;
           const ron = ronStateFrom(f);
-          // Truthfulness: only real price paths are plotted. No synthetic sparkline.
-          const sparkData = live?.sparkline_data?.length ? live.sparkline_data : null;
+          const health = assessDataHealth(snap?.bar_time ?? null, 15);
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
           const color = expired ? "#555F73" : directionColor(inst.direction);
           // Prefer the live feed only while it is actually fresh; otherwise fall back to the
           // RON snapshot so the indicator row can never contradict RON's own reasoning.
           const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
+          // Truthfulness: only real AND fresh price paths are plotted. No synthetic sparkline,
+          // and never a stale series presented as live.
+          const sparkData = liveFresh && live?.sparkline_data?.length ? live.sparkline_data : null;
           const liveRsi = (liveFresh ? live?.rsi : null) ?? (f?.rsi14 ?? null);
           const liveAdx = (liveFresh ? live?.adx : null) ?? (f?.adx14 ?? null);
           const liveMacd = (liveFresh ? live?.macd_status : null) ?? (f?.macd_state ?? null);
@@ -359,7 +362,18 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 <div>
                   <div style={{ fontSize: 9, color: C.sec, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: ron ? ronStateColor(ron.state) : C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
-                    {ron ? ron.state : "NO DATA"}
+                    {ron ? ron.state : "DATA BUILDING"}
+                  </div>
+                  <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
+                    Probability: {ron ? "Not calibrated yet · building evidence" : "Not calibrated yet"}
+                  </div>
+                  <div style={{
+                    fontSize: 9, marginTop: 2, fontWeight: 600,
+                    color: health.label === "LIVE" ? C.jade
+                      : health.label === "STALE / FEED BEHIND" ? "#EF4444"
+                        : "#F59E0B",
+                  }} title={health.detail}>
+                    {health.label}{snap ? ` · ${formatAge(snap.bar_time)}` : ""}
                   </div>
                   {snap && (
                     <div style={{ fontSize: 9, color: snap.data_health === "healthy" ? C.sec : "#F59E0B" }}>
