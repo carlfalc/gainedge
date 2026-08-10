@@ -559,6 +559,8 @@ export function runBacktest(
   cfg: StrategyConfig,
   initialEquity = 10_000,
   dailyCandles?: Candle[],
+  /** First bar index to trade from — exclude indicator warm-up (default 25). */
+  startIndex = 25,
 ): BacktestResult {
   const closes = candles.map(c => c.close);
   const ema21 = ema(closes, 21);
@@ -577,7 +579,7 @@ export function runBacktest(
   let maxDD = 0;
   let pos: OpenPosition | null = null;
 
-  for (let i = 25; i < candles.length; i++) {
+  for (let i = Math.max(1, startIndex); i < candles.length; i++) {
     const c = candles[i];
 
     // Manage existing position (Pine leg semantics: L-TP1 keeps its ORIGINAL stop after BE;
