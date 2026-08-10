@@ -16,10 +16,13 @@ describe("Falconer v7 TP3 position construction", () => {
     expect(position.tp2).toBe(130);
     expect(position.tp3).toBe(150);
     expect(position.beLevel).toBe(110);
-    expect(position.qty).toBe(0.2);
-    expect(position.qty1).toBeCloseTo(0.066);
-    expect(position.qty2).toBeCloseTo(0.066);
-    expect(position.qty3).toBeCloseTo(0.068);
+    // Pine: qty = max(riskUSD / (riskD * dpu), 1.0) with dpu = 1 → 200/10 = 20 contracts.
+    expect(position.qty).toBe(20);
+    expect(position.qty1).toBeCloseTo(6.6);
+    expect(position.qty2).toBeCloseTo(6.6);
+    expect(position.qty3).toBeCloseTo(6.8);
+    // documented broker conversion: lots = qty * dpu / pipValuePerLot (gold 100)
+    expect(position.lots).toBeCloseTo(0.2);
   });
 
   it("emits the exact PineConnector contract", () => {

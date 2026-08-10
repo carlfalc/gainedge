@@ -367,7 +367,7 @@ async function processUserSymbol(
     return { symbol, fired: false, reason: `atr_pct_${atrPct.toFixed(3)}` };
   }
 
-  const dctx = dailyContextFor(dailySeries, candles[i].time);
+  const dctx = dailyContextFor(dailySeries, candles[i].time, candles[i - 1].time, candles[i].close, candles[i - 1].close);
   if (!dctx) return { symbol, fired: false, reason: "no_daily_context" };
 
   const trig = evaluateLongTrigger({
@@ -467,9 +467,9 @@ async function processUserSymbol(
     // This lets each take-profit rest at the broker instead of relying on a later
     // partial-close request after price has already crossed the target.
     const legs = [
-      { key: "tp1", volume: pos.qty1, takeProfit: pos.tp1 },
-      { key: "tp2", volume: pos.qty2, takeProfit: pos.tp2 },
-      { key: "tp3", volume: pos.qty3, takeProfit: pos.tp3 },
+      { key: "tp1", volume: pos.lots * (cfg.pct1 / 100), takeProfit: pos.tp1 },
+      { key: "tp2", volume: pos.lots * (cfg.pct2 / 100), takeProfit: pos.tp2 },
+      { key: "tp3", volume: pos.lots * ((100 - cfg.pct1 - cfg.pct2) / 100), takeProfit: pos.tp3 },
     ];
     const results: Record<string, unknown> = {};
     let failed = false;

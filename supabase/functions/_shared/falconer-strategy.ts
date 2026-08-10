@@ -43,6 +43,11 @@ export interface StrategyConfig {
   asianEndHour: number;     // 6
   // symbol meta
   pipValuePerLot: number;   // USD per 1.0 lot per 1 unit price move (gold = 100)
+  // Pine parity knobs
+  dollarPerUnit?: number;   // Pine `dpu` (default 1.0) — USD per contract per 1 unit price move
+  minQty?: number;          // Pine `math.max(qty, 1.0)` floor (default 1.0)
+  /** UTC hour at which the broker/exchange DAILY session opens (MT5 gold/indices ≈ 21:00 or 22:00). */
+  dailySessionOffsetHour?: number;
 }
 
 export const DEFAULT_CONFIG: StrategyConfig = {
@@ -59,6 +64,9 @@ export const DEFAULT_CONFIG: StrategyConfig = {
   asianStartHour: 22,
   asianEndHour: 6,
   pipValuePerLot: 100, // gold default
+  dollarPerUnit: 1.0,
+  minQty: 1.0,
+  dailySessionOffsetHour: 21,
 };
 
 /* ──────────── Indicators ──────────── */
@@ -175,23 +183,50 @@ export function toHA(candles: Candle[]): Candle[] {
 
 export interface DailyBar { time: number; date: string; open: number; high: number; low: number; close: number; }
 
-function utcDateKey(ms: number): string {
-  const d = new Date(ms);
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+const DAY_MS = 86_400_000;
+
+/**
+ * M3 — session-aligned daily bucketing.
+ * A broker daily candle stamped at 21:00 UTC belongs to the session [21:00, next 21:00),
+ * NOT to the prior UTC calendar day. `sessionIndex` is the integer index of that session.
+ */
+export function sessionIndexOf(ms: number, offsetHour: number): number {
+  return Math.floor((ms - offsetHour * 3_600_000) / DAY_MS);
 }
 
-/** Aggregate intraday candles into UTC-day bars (ascending). */
-export function aggregateDaily(candles: Candle[]): DailyBar[] {
+function sessionKey(ms: number, offsetHour: number): string {
+  const start = sessionIndexOf(ms, offsetHour) * DAY_MS + offsetHour * 3_600_000;
+  return new Date(start).toISOString().slice(0, 10);
+}
+
+/** Infer the daily-session opening UTC hour from the modal timestamp hour of daily bars. */
+export function inferSessionOffsetHour(bars: { time: number }[], fallback = 21): number {
+  if (!bars.length) return fallback;
+  const counts = new Map<number, number>();
+  for (const b of bars) {
+    const h = new Date(b.time).getUTCHours();
+    counts.set(h, (counts.get(h) ?? 0) + 1);
+  }
+  let best = fallback, bestN = -1;
+  for (const [h, n] of counts) if (n > bestN) { best = h; bestN = n; }
+  return best;
+}
+
+/** Aggregate intraday candles into session-aligned daily bars (ascending). */
+export function aggregateDaily(candles: Candle[], offsetHour = 21): DailyBar[] {
   const days: DailyBar[] = [];
   let cur: DailyBar | null = null;
+  let curIdx = NaN;
   for (const c of candles) {
-    const key = utcDateKey(c.time);
-    if (!cur || cur.date !== key) {
+    const idx = sessionIndexOf(c.time, offsetHour);
+    if (!cur || idx !== curIdx) {
       if (cur) days.push(cur);
-      cur = { time: c.time, date: key, open: c.open, high: c.high, low: c.low, close: c.close };
+      curIdx = idx;
+      cur = {
+        time: idx * DAY_MS + offsetHour * 3_600_000,
+        date: sessionKey(c.time, offsetHour),
+        open: c.open, high: c.high, low: c.low, close: c.close,
+      };
     } else {
       cur.high = Math.max(cur.high, c.high);
       cur.low = Math.min(cur.low, c.low);
@@ -206,48 +241,109 @@ export interface DailySeries {
   bars: DailyBar[];
   ema50: number[];
   ema200: number[];
+  /** session index per daily bar */
+  sessionIdx: number[];
+  offsetHour: number;
 }
 
-/** Build a daily series from already-daily bars (live engine) or pass intraday and aggregate. */
-export function computeDailySeries(input: DailyBar[] | Candle[]): DailySeries {
-  const bars: DailyBar[] = (input.length > 0 && "date" in (input[0] as DailyBar))
-    ? (input as DailyBar[])
-    : aggregateDaily(input as Candle[]);
+/**
+ * Build a daily series from already-daily broker bars (live engine) or from intraday candles.
+ * When daily bars are supplied their stamps define the session offset (M3); intraday
+ * aggregation uses `offsetHour` (default = broker session open, 21:00 UTC).
+ */
+export function computeDailySeries(input: DailyBar[] | Candle[], offsetHour?: number): DailySeries {
+  const isDaily = input.length > 0 && "date" in (input[0] as DailyBar);
+  let bars: DailyBar[];
+  let off: number;
+  if (isDaily) {
+    bars = input as DailyBar[];
+    off = offsetHour ?? inferSessionOffsetHour(bars);
+  } else {
+    // treat "daily-spaced" plain candles as daily bars too
+    const cs = input as Candle[];
+    const dailySpaced = cs.length > 1 && (cs[1].time - cs[0].time) >= DAY_MS - 3_600_000;
+    off = offsetHour ?? inferSessionOffsetHour(cs);
+    if (dailySpaced) {
+      bars = cs.map(c => ({ time: c.time, date: sessionKey(c.time, off), open: c.open, high: c.high, low: c.low, close: c.close }));
+    } else {
+      off = offsetHour ?? 21;
+      bars = aggregateDaily(cs, off);
+    }
+  }
   const closes = bars.map(b => b.close);
   return {
     bars,
     ema50: closes.length ? ema(closes, 50) : [],
     ema200: closes.length ? ema(closes, 200) : [],
+    sessionIdx: bars.map(b => sessionIndexOf(b.time, off)),
+    offsetHour: off,
   };
 }
 
 export interface DailyContext {
   emaD50: number;
-  emaD50Prev: number;
+  emaD50Prev: number;   // value of the SECURITY SERIES on the previous intraday bar (Pine emaD50[1])
   emaD200: number;
-  pdl: number;     // previous completed day's low
+  pdl: number;          // request.security("D", low[1]) → low of the bar BEFORE the last completed daily bar
+}
+
+/** Index of the last COMPLETED daily bar for an intraday bar time (lookahead_off, session-aligned). */
+export function lastCompletedDailyIndex(ds: DailySeries, barTimeMs: number): number {
+  const cur = sessionIndexOf(barTimeMs, ds.offsetHour);
+  let k = -1;
+  for (let i = ds.bars.length - 1; i >= 0; i--) {
+    if (ds.sessionIdx[i] < cur) { k = i; break; }
+  }
+  return k;
 }
 
 /**
- * Daily context for an intraday bar, using only COMPLETED daily bars (the last daily bar
- * whose UTC date is strictly before the intraday bar's UTC date). This is the
- * non-repainting, lookahead-off equivalent of Pine's request.security("D", …).
- * Returns null when there is not enough daily history (need ≥2 completed days).
+ * Pine `request.security(tf="D", …, lookahead_off)` emulation for an intraday bar.
+ *
+ * M1 — TRUE Pine HTF semantics: with lookahead OFF, `request.security` does NOT return the
+ * previous completed daily value all day. It returns the value of the CURRENTLY DEVELOPING
+ * daily bar, recomputed on every intraday bar (it simply never peeks into the future).
+ * So `emaD50` on bar i = EMA50 seeded on completed daily closes and advanced one step with
+ * the developing session close = close[i]; `emaD50[1]` is the same expression evaluated on
+ * intraday bar i-1. That makes `dTrendUp` a genuine intraday-updating series.
+ *
+ * M2 — `pdl = request.security("D", low[1])`: index [1] is taken INSIDE the daily series, so
+ * relative to the developing daily bar it is the LAST COMPLETED daily bar's low.
+ *
+ * M3 — bucketing and completion are session-aligned (broker daily bars stamped 21:00 UTC
+ * belong to the session that STARTS at 21:00). A still-forming daily session is only ever
+ * seen through intraday data up to the current bar — never its future OHLC.
  */
-export function dailyContextFor(ds: DailySeries, barTimeMs: number): DailyContext | null {
-  const today = utcDateKey(barTimeMs);
-  // last index with date < today
-  let k = -1;
-  for (let i = ds.bars.length - 1; i >= 0; i--) {
-    if (ds.bars[i].date < today) { k = i; break; }
+export function dailyContextFor(
+  ds: DailySeries,
+  barTimeMs: number,
+  prevBarTimeMs?: number,
+  developingClose?: number,
+  prevDevelopingClose?: number,
+): DailyContext | null {
+  const k = lastCompletedDailyIndex(ds, barTimeMs);
+  if (k < 0 || !Number.isFinite(ds.ema50[k]) || !Number.isFinite(ds.ema200[k])) return null;
+
+  const step = (base: number, close: number, period: number) => base + (2 / (period + 1)) * (close - base);
+
+  if (developingClose === undefined) {
+    // completed-bar fallback (pure-function tests / no intraday context available)
+    if (k < 1) return null;
+    return { emaD50: ds.ema50[k], emaD50Prev: ds.ema50[k - 1], emaD200: ds.ema200[k], pdl: ds.bars[k].low };
   }
-  if (k < 1) return null;
-  return {
-    emaD50: ds.ema50[k],
-    emaD50Prev: ds.ema50[k - 1],
-    emaD200: ds.ema200[k],
-    pdl: ds.bars[k].low,
-  };
+
+  const emaD50 = step(ds.ema50[k], developingClose, 50);
+  const emaD200 = step(ds.ema200[k], developingClose, 200);
+
+  let emaD50Prev = emaD50;
+  if (prevBarTimeMs !== undefined && prevDevelopingClose !== undefined) {
+    const kPrev = lastCompletedDailyIndex(ds, prevBarTimeMs);
+    if (kPrev >= 0 && Number.isFinite(ds.ema50[kPrev])) {
+      emaD50Prev = step(ds.ema50[kPrev], prevDevelopingClose, 50);
+    }
+  }
+
+  return { emaD50, emaD50Prev, emaD200, pdl: ds.bars[k].low };
 }
 
 /* ──────────── Asian session (locked low/high) ──────────── */
@@ -373,11 +469,15 @@ export function evaluateLongTrigger(ctx: BarContext): TriggerResult {
 export interface OpenPosition {
   entry: number;
   sl: number;
+  /** Pine keeps L-TP1's original stop when BE fires; only TP2/TP3 legs move to entry. */
+  slLeg1: number;
   tp1: number;
   tp2: number;
   tp3: number;
   beLevel: number;
   qty: number;
+  /** Broker lots = qty * dpu / pipValuePerLot (documented unit conversion). */
+  lots: number;
   qty1: number;
   qty2: number;
   qty3: number;
@@ -385,6 +485,8 @@ export interface OpenPosition {
   filled2: boolean;
   filled3: boolean;
   beDone: boolean;
+  /** realized P&L accumulated from partially closed legs */
+  realized: number;
   trigger: TriggerType;
   openedAt: number;
 }
@@ -402,17 +504,19 @@ export function buildPosition(
   const tp3 = entry + cfg.rrTp3 * r;
   const beLevel = entry + cfg.beR * r;
 
-  // lots = risk_usd / (R * pip_value_per_lot)
-  const totalQty = cfg.riskUsd / (r * cfg.pipValuePerLot);
-  const pct3 = Math.max(0, 100 - cfg.pct1 - cfg.pct2);
+  // Pine: qty = math.max(riskUSD / (riskD * dpu), 1.0); qty3 = qty - qty1 - qty2
+  const dpu = cfg.dollarPerUnit ?? 1;
+  const minQty = cfg.minQty ?? 1;
+  const totalQty = Math.max(cfg.riskUsd / (r * dpu), minQty);
   const qty1 = totalQty * (cfg.pct1 / 100);
   const qty2 = totalQty * (cfg.pct2 / 100);
-  const qty3 = totalQty * (pct3 / 100);
+  const qty3 = totalQty - qty1 - qty2;
+  const lots = cfg.pipValuePerLot > 0 ? (totalQty * dpu) / cfg.pipValuePerLot : totalQty;
 
   return {
-    entry, sl: rawSL, tp1, tp2, tp3, beLevel,
-    qty: totalQty, qty1, qty2, qty3,
-    filled1: false, filled2: false, filled3: false, beDone: false,
+    entry, sl: rawSL, slLeg1: rawSL, tp1, tp2, tp3, beLevel,
+    qty: totalQty, lots, qty1, qty2, qty3,
+    filled1: false, filled2: false, filled3: false, beDone: false, realized: 0,
     trigger, openedAt,
   };
 }
@@ -455,6 +559,8 @@ export function runBacktest(
   cfg: StrategyConfig,
   initialEquity = 10_000,
   dailyCandles?: Candle[],
+  /** First bar index to trade from — exclude indicator warm-up (default 25). */
+  startIndex = 25,
 ): BacktestResult {
   const closes = candles.map(c => c.close);
   const ema21 = ema(closes, 21);
@@ -463,7 +569,8 @@ export function runBacktest(
   const sqz = squeezeSeries(candles, 20, 2, 1.5);
   const ha = toHA(candles);
   const asian = asianLockedSeries(candles, cfg);
-  const ds = computeDailySeries(dailyCandles?.length ? dailyCandles : candles);
+  const ds = computeDailySeries(dailyCandles?.length ? dailyCandles : candles, cfg.dailySessionOffsetHour);
+  const dpu = cfg.dollarPerUnit ?? 1;
 
   const trades: BacktestTrade[] = [];
   const equityCurve: { t: number; equity: number }[] = [];
@@ -472,54 +579,54 @@ export function runBacktest(
   let maxDD = 0;
   let pos: OpenPosition | null = null;
 
-  for (let i = 25; i < candles.length; i++) {
+  for (let i = Math.max(1, startIndex); i < candles.length; i++) {
     const c = candles[i];
 
-    // Manage existing position
+    // Manage existing position (Pine leg semantics: L-TP1 keeps its ORIGINAL stop after BE;
+    // only the TP2/TP3 legs are re-issued with stop = entry).
     if (pos) {
-      // SL hit first (conservative)
-      if (c.low <= pos.sl) {
-        const remaining = (pos.filled1 ? 0 : pos.qty1) + (pos.filled2 ? 0 : pos.qty2) + (pos.filled3 ? 0 : pos.qty3);
-        const pnl = (pos.sl - pos.entry) * remaining * cfg.pipValuePerLot
-          + (pos.filled1 ? (pos.tp1 - pos.entry) * pos.qty1 * cfg.pipValuePerLot : 0)
-          + (pos.filled2 ? (pos.tp2 - pos.entry) * pos.qty2 * cfg.pipValuePerLot : 0);
-        equity += pnl;
+      const p = pos;
+      let realized = 0;
+      // stops first (conservative intrabar assumption)
+      if (!p.filled1 && c.low <= p.slLeg1) { realized += (p.slLeg1 - p.entry) * p.qty1 * dpu; p.filled1 = true; }
+      const restStop = p.beDone ? p.entry : p.sl;
+      if (c.low <= restStop) {
+        if (!p.filled2) realized += (restStop - p.entry) * p.qty2 * dpu;
+        if (!p.filled3) realized += (restStop - p.entry) * p.qty3 * dpu;
+        equity += realized + p.realized;
         trades.push({
-          openedAt: pos.openedAt, closedAt: c.time, trigger: pos.trigger,
-          entry: pos.entry, sl: pos.sl, tp1: pos.tp1, tp2: pos.tp2, tp3: pos.tp3,
-          exitReason: pos.beDone ? "be_stop" : "sl", pnlUsd: pnl,
+          openedAt: p.openedAt, closedAt: c.time, trigger: p.trigger,
+          entry: p.entry, sl: restStop, tp1: p.tp1, tp2: p.tp2, tp3: p.tp3,
+          exitReason: p.beDone ? "be_stop" : "sl", pnlUsd: realized + p.realized,
         });
         pos = null;
       } else {
-        if (!pos.filled1 && c.high >= pos.tp1) pos.filled1 = true;
-        if (!pos.filled2 && c.high >= pos.tp2) pos.filled2 = true;
-        if (!pos.beDone && c.high >= pos.beLevel) { pos.sl = pos.entry; pos.beDone = true; }
-        if (!pos.filled3 && c.high >= pos.tp3) {
-          pos.filled3 = true;
-          const pnl = (pos.tp1 - pos.entry) * pos.qty1 * cfg.pipValuePerLot
-            + (pos.tp2 - pos.entry) * pos.qty2 * cfg.pipValuePerLot
-            + (pos.tp3 - pos.entry) * pos.qty3 * cfg.pipValuePerLot;
-          equity += pnl;
+        p.realized += realized;
+        if (!p.filled1 && c.high >= p.tp1) { p.filled1 = true; p.realized += (p.tp1 - p.entry) * p.qty1 * dpu; }
+        if (!p.filled2 && c.high >= p.tp2) { p.filled2 = true; p.realized += (p.tp2 - p.entry) * p.qty2 * dpu; }
+        if (!p.beDone && c.high >= p.beLevel) { p.sl = p.entry; p.beDone = true; }
+        if (!p.filled3 && c.high >= p.tp3) {
+          p.filled3 = true;
+          p.realized += (p.tp3 - p.entry) * p.qty3 * dpu;
+          equity += p.realized;
           trades.push({
-            openedAt: pos.openedAt, closedAt: c.time, trigger: pos.trigger,
-            entry: pos.entry, sl: pos.sl, tp1: pos.tp1, tp2: pos.tp2, tp3: pos.tp3,
-            exitReason: "tp3", pnlUsd: pnl,
+            openedAt: p.openedAt, closedAt: c.time, trigger: p.trigger,
+            entry: p.entry, sl: p.sl, tp1: p.tp1, tp2: p.tp2, tp3: p.tp3,
+            exitReason: "tp3", pnlUsd: p.realized,
           });
           pos = null;
-        } else if (pos && pos.beDone) {
-          // HA-flip exit: two consecutive red HA bars
+        } else if (p.beDone) {
+          // Pine: after BE, two consecutive red HA bars close the remainder at bar close
           const haRed = ha[i].close < ha[i].open;
           const haRedPrev = ha[i - 1].close < ha[i - 1].open;
           if (haRed && haRedPrev) {
             const exitPx = c.close;
-            const remaining = (pos.filled3 ? 0 : pos.qty3) + (pos.filled2 ? 0 : pos.qty2) + (pos.filled1 ? 0 : pos.qty1);
-            const pnl = (exitPx - pos.entry) * remaining * cfg.pipValuePerLot
-              + (pos.filled1 ? (pos.tp1 - pos.entry) * pos.qty1 * cfg.pipValuePerLot : 0)
-              + (pos.filled2 ? (pos.tp2 - pos.entry) * pos.qty2 * cfg.pipValuePerLot : 0);
+            const remaining = (p.filled1 ? 0 : p.qty1) + (p.filled2 ? 0 : p.qty2) + (p.filled3 ? 0 : p.qty3);
+            const pnl = p.realized + (exitPx - p.entry) * remaining * dpu;
             equity += pnl;
             trades.push({
-              openedAt: pos.openedAt, closedAt: c.time, trigger: pos.trigger,
-              entry: pos.entry, sl: pos.sl, tp1: pos.tp1, tp2: pos.tp2, tp3: pos.tp3,
+              openedAt: p.openedAt, closedAt: c.time, trigger: p.trigger,
+              entry: p.entry, sl: p.sl, tp1: p.tp1, tp2: p.tp2, tp3: p.tp3,
               exitReason: "ha_flip", pnlUsd: pnl,
             });
             pos = null;
@@ -530,7 +637,7 @@ export function runBacktest(
 
     // New entry only when flat
     if (!pos) {
-      const dctx = dailyContextFor(ds, c.time);
+      const dctx = dailyContextFor(ds, c.time, candles[i - 1].time, c.close, candles[i - 1].close);
       const atrPct = (atrArr[i] / c.close) * 100;
       if (dctx && Number.isFinite(atrArr[i])) {
         const trig = evaluateLongTrigger({
