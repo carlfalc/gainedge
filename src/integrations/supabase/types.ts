@@ -521,6 +521,7 @@ export type Database = {
           direction: string
           entry_price: number
           execution_path: string
+          features: Json
           filled1: boolean
           filled2: boolean
           filled3: boolean
@@ -563,6 +564,7 @@ export type Database = {
           direction?: string
           entry_price: number
           execution_path?: string
+          features?: Json
           filled1?: boolean
           filled2?: boolean
           filled3?: boolean
@@ -605,6 +607,7 @@ export type Database = {
           direction?: string
           entry_price?: number
           execution_path?: string
+          features?: Json
           filled1?: boolean
           filled2?: boolean
           filled3?: boolean

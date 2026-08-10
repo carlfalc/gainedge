@@ -1,0 +1,1 @@
+ALTER TABLE public.falconer_trades ADD COLUMN IF NOT EXISTS features jsonb NOT NULL DEFAULT '{}'::jsonb;
