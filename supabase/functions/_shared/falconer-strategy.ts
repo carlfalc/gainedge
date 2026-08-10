@@ -554,51 +554,51 @@ export function runBacktest(
   for (let i = 25; i < candles.length; i++) {
     const c = candles[i];
 
-    // Manage existing position
+    // Manage existing position (Pine leg semantics: L-TP1 keeps its ORIGINAL stop after BE;
+    // only the TP2/TP3 legs are re-issued with stop = entry).
     if (pos) {
-      // SL hit first (conservative)
-      if (c.low <= pos.sl) {
-        const remaining = (pos.filled1 ? 0 : pos.qty1) + (pos.filled2 ? 0 : pos.qty2) + (pos.filled3 ? 0 : pos.qty3);
-        const pnl = (pos.sl - pos.entry) * remaining * cfg.pipValuePerLot
-          + (pos.filled1 ? (pos.tp1 - pos.entry) * pos.qty1 * cfg.pipValuePerLot : 0)
-          + (pos.filled2 ? (pos.tp2 - pos.entry) * pos.qty2 * cfg.pipValuePerLot : 0);
-        equity += pnl;
+      const p = pos;
+      let realized = 0;
+      // stops first (conservative intrabar assumption)
+      if (!p.filled1 && c.low <= p.slLeg1) { realized += (p.slLeg1 - p.entry) * p.qty1 * dpu; p.filled1 = true; p.exitedLeg1 = true; }
+      const restStop = p.beDone ? p.entry : p.sl;
+      if (c.low <= restStop) {
+        if (!p.filled2) realized += (restStop - p.entry) * p.qty2 * dpu;
+        if (!p.filled3) realized += (restStop - p.entry) * p.qty3 * dpu;
+        equity += realized + p.realized;
         trades.push({
-          openedAt: pos.openedAt, closedAt: c.time, trigger: pos.trigger,
-          entry: pos.entry, sl: pos.sl, tp1: pos.tp1, tp2: pos.tp2, tp3: pos.tp3,
-          exitReason: pos.beDone ? "be_stop" : "sl", pnlUsd: pnl,
+          openedAt: p.openedAt, closedAt: c.time, trigger: p.trigger,
+          entry: p.entry, sl: restStop, tp1: p.tp1, tp2: p.tp2, tp3: p.tp3,
+          exitReason: p.beDone ? "be_stop" : "sl", pnlUsd: realized + p.realized,
         });
         pos = null;
       } else {
-        if (!pos.filled1 && c.high >= pos.tp1) pos.filled1 = true;
-        if (!pos.filled2 && c.high >= pos.tp2) pos.filled2 = true;
-        if (!pos.beDone && c.high >= pos.beLevel) { pos.sl = pos.entry; pos.beDone = true; }
-        if (!pos.filled3 && c.high >= pos.tp3) {
-          pos.filled3 = true;
-          const pnl = (pos.tp1 - pos.entry) * pos.qty1 * cfg.pipValuePerLot
-            + (pos.tp2 - pos.entry) * pos.qty2 * cfg.pipValuePerLot
-            + (pos.tp3 - pos.entry) * pos.qty3 * cfg.pipValuePerLot;
-          equity += pnl;
+        p.realized += realized;
+        if (!p.filled1 && c.high >= p.tp1) { p.filled1 = true; p.realized += (p.tp1 - p.entry) * p.qty1 * dpu; }
+        if (!p.filled2 && c.high >= p.tp2) { p.filled2 = true; p.realized += (p.tp2 - p.entry) * p.qty2 * dpu; }
+        if (!p.beDone && c.high >= p.beLevel) { p.sl = p.entry; p.beDone = true; }
+        if (!p.filled3 && c.high >= p.tp3) {
+          p.filled3 = true;
+          p.realized += (p.tp3 - p.entry) * p.qty3 * dpu;
+          equity += p.realized;
           trades.push({
-            openedAt: pos.openedAt, closedAt: c.time, trigger: pos.trigger,
-            entry: pos.entry, sl: pos.sl, tp1: pos.tp1, tp2: pos.tp2, tp3: pos.tp3,
-            exitReason: "tp3", pnlUsd: pnl,
+            openedAt: p.openedAt, closedAt: c.time, trigger: p.trigger,
+            entry: p.entry, sl: p.sl, tp1: p.tp1, tp2: p.tp2, tp3: p.tp3,
+            exitReason: "tp3", pnlUsd: p.realized,
           });
           pos = null;
-        } else if (pos && pos.beDone) {
-          // HA-flip exit: two consecutive red HA bars
+        } else if (p.beDone) {
+          // Pine: after BE, two consecutive red HA bars close the remainder at bar close
           const haRed = ha[i].close < ha[i].open;
           const haRedPrev = ha[i - 1].close < ha[i - 1].open;
           if (haRed && haRedPrev) {
             const exitPx = c.close;
-            const remaining = (pos.filled3 ? 0 : pos.qty3) + (pos.filled2 ? 0 : pos.qty2) + (pos.filled1 ? 0 : pos.qty1);
-            const pnl = (exitPx - pos.entry) * remaining * cfg.pipValuePerLot
-              + (pos.filled1 ? (pos.tp1 - pos.entry) * pos.qty1 * cfg.pipValuePerLot : 0)
-              + (pos.filled2 ? (pos.tp2 - pos.entry) * pos.qty2 * cfg.pipValuePerLot : 0);
+            const remaining = (p.filled1 ? 0 : p.qty1) + (p.filled2 ? 0 : p.qty2) + (p.filled3 ? 0 : p.qty3);
+            const pnl = p.realized + (exitPx - p.entry) * remaining * dpu;
             equity += pnl;
             trades.push({
-              openedAt: pos.openedAt, closedAt: c.time, trigger: pos.trigger,
-              entry: pos.entry, sl: pos.sl, tp1: pos.tp1, tp2: pos.tp2, tp3: pos.tp3,
+              openedAt: p.openedAt, closedAt: c.time, trigger: p.trigger,
+              entry: p.entry, sl: p.sl, tp1: p.tp1, tp2: p.tp2, tp3: p.tp3,
               exitReason: "ha_flip", pnlUsd: pnl,
             });
             pos = null;
@@ -609,7 +609,7 @@ export function runBacktest(
 
     // New entry only when flat
     if (!pos) {
-      const dctx = dailyContextFor(ds, c.time);
+      const dctx = dailyContextFor(ds, c.time, candles[i - 1].time);
       const atrPct = (atrArr[i] / c.close) * 100;
       if (dctx && Number.isFinite(atrArr[i])) {
         const trig = evaluateLongTrigger({
