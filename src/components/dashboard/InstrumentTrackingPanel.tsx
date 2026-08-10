@@ -396,6 +396,29 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
               </div>
 
+              {snap && f ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                  <span>Completed {snap.timeframe} close <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{snap.close}</span></span>
+                  <span>ATR% <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(f.atr_pct, 3)}</span></span>
+                  <span>Regime <span style={{ color: C.text }}>{String(f.regime ?? "—").replace("_", " ")}</span></span>
+                  <span>Session <span style={{ color: C.text }}>{String(f.session ?? "—")}</span></span>
+                  <span style={{ gridColumn: "1 / -1" }}>
+                    Patterns <span style={{ color: C.text }}>
+                      {snap.patterns?.length
+                        ? snap.patterns.slice(0, 3).map((p: any) => p?.name ?? p?.type ?? String(p)).join(", ")
+                        : "No pattern detected"}
+                    </span>
+                  </span>
+                  <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
+                    Completed bar close — not a live tick quote.
+                  </span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: "#F59E0B", marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                  DATA BUILDING — no RON snapshot for {inst.symbol} yet. Indicators unavailable; this is not a current assessment.
+                </div>
+              )}
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
                 <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
                 <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
@@ -417,7 +440,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     {inst.reasoning && <div style={{ marginTop: 4 }}>{inst.reasoning}</div>}
                   </>
                 ) : (
-                  inst.reasoning || "No RON snapshot for this instrument yet."
+                  inst.reasoning || "DATA BUILDING — RON has not computed a snapshot for this instrument yet."
                 )}
               </div>
 
