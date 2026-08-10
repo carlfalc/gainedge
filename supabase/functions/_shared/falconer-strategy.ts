@@ -41,13 +41,18 @@ export interface StrategyConfig {
   // Asian session (UTC hours); start>end means the window wraps past midnight (Pine "2200-0600")
   asianStartHour: number;   // 22
   asianEndHour: number;     // 6
-  // symbol meta
-  pipValuePerLot: number;   // USD per 1.0 lot per 1 unit price move (gold = 100)
-  // Pine parity knobs
-  dollarPerUnit?: number;   // Pine `dpu` (default 1.0) — USD per contract per 1 unit price move
+  // symbol meta — units bridge ONLY (never used in P&L; see below)
+  /** Contracts per 1.0 broker lot (XAUUSD = 100 oz per lot). Used solely to convert Pine
+   *  contracts into MT5 lots for order routing. */
+  pipValuePerLot: number;
+  // Pine parity knobs — P&L unit definition
+  /** Pine `dpu`: USD per contract per 1.0 unit of price move. Canonical script uses 1.0, so
+   *  every P&L in this engine is (exit - entry) * contracts * dpu, exactly like Pine. */
+  dollarPerUnit?: number;
   minQty?: number;          // Pine `math.max(qty, 1.0)` floor (default 1.0)
-  /** UTC hour at which the broker/exchange DAILY session opens (MT5 gold/indices ≈ 21:00 or 22:00). */
-  dailySessionOffsetHour?: number;
+  /** UTC hour at which the broker DAILY session opens, or "auto" for the DST-aware
+   *  17:00 New York boundary (21:00 UTC in EDT, 22:00 UTC in EST). */
+  dailySessionOffsetHour?: SessionOffset;
 }
 
 export const DEFAULT_CONFIG: StrategyConfig = {
@@ -66,7 +71,7 @@ export const DEFAULT_CONFIG: StrategyConfig = {
   pipValuePerLot: 100, // gold default
   dollarPerUnit: 1.0,
   minQty: 1.0,
-  dailySessionOffsetHour: 21,
+  dailySessionOffsetHour: "auto",
 };
 
 /* ──────────── Indicators ──────────── */
@@ -185,17 +190,62 @@ export interface DailyBar { time: number; date: string; open: number; high: numb
 
 const DAY_MS = 86_400_000;
 
+/** Daily-session offset: fixed UTC hour, or "auto" = DST-aware broker session (17:00 New York). */
+export type SessionOffset = number | "auto";
+
+/** UTC offset (hours behind UTC) of America/New_York at `ms` — 4 during EDT, 5 during EST. */
+const nyOffsetCache = new Map<number, number>();
+export function newYorkUtcOffsetHours(ms: number): number {
+  const dayKey = Math.floor(ms / DAY_MS);
+  const cached = nyOffsetCache.get(dayKey);
+  if (cached !== undefined) return cached;
+  const d = new Date(ms);
+  const asUTC = new Date(d.toLocaleString("en-US", { timeZone: "UTC" }));
+  const asNY = new Date(d.toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const off = Math.round((asUTC.getTime() - asNY.getTime()) / 3_600_000);
+  nyOffsetCache.set(dayKey, off);
+  return off;
+}
+
+/**
+ * DST-aware broker daily-session opening UTC hour: MT5 servers roll the daily bar at
+ * 17:00 New York → 21:00 UTC during EDT, 22:00 UTC during EST.
+ */
+export function brokerSessionOffsetHour(ms: number): number {
+  return 17 + newYorkUtcOffsetHours(ms);
+}
+
+function offsetHourAt(off: SessionOffset, ms: number): number {
+  return off === "auto" ? brokerSessionOffsetHour(ms) : off;
+}
+
 /**
  * M3 — session-aligned daily bucketing.
  * A broker daily candle stamped at 21:00 UTC belongs to the session [21:00, next 21:00),
  * NOT to the prior UTC calendar day. `sessionIndex` is the integer index of that session.
+ *
+ * With "auto" the index is computed in New York local time (session starts 17:00 NY), so it
+ * stays continuous across DST switches — the transition session is simply 23h or 25h long.
  */
-export function sessionIndexOf(ms: number, offsetHour: number): number {
+export function sessionIndexOf(ms: number, offsetHour: SessionOffset): number {
+  if (offsetHour === "auto") {
+    const nyLocalMs = ms - newYorkUtcOffsetHours(ms) * 3_600_000;
+    return Math.floor((nyLocalMs - 17 * 3_600_000) / DAY_MS);
+  }
   return Math.floor((ms - offsetHour * 3_600_000) / DAY_MS);
 }
 
-function sessionKey(ms: number, offsetHour: number): string {
-  const start = sessionIndexOf(ms, offsetHour) * DAY_MS + offsetHour * 3_600_000;
+/** UTC timestamp at which the session containing `ms` opens. */
+export function sessionStartOf(ms: number, offsetHour: SessionOffset): number {
+  const h = offsetHourAt(offsetHour, ms);
+  if (offsetHour === "auto") {
+    return sessionIndexOf(ms, offsetHour) * DAY_MS + 17 * 3_600_000 + newYorkUtcOffsetHours(ms) * 3_600_000;
+  }
+  return sessionIndexOf(ms, offsetHour) * DAY_MS + h * 3_600_000;
+}
+
+function sessionKey(ms: number, offsetHour: SessionOffset): string {
+  const start = sessionStartOf(ms, offsetHour);
   return new Date(start).toISOString().slice(0, 10);
 }
 
@@ -213,7 +263,7 @@ export function inferSessionOffsetHour(bars: { time: number }[], fallback = 21):
 }
 
 /** Aggregate intraday candles into session-aligned daily bars (ascending). */
-export function aggregateDaily(candles: Candle[], offsetHour = 21): DailyBar[] {
+export function aggregateDaily(candles: Candle[], offsetHour: SessionOffset = "auto"): DailyBar[] {
   const days: DailyBar[] = [];
   let cur: DailyBar | null = null;
   let curIdx = NaN;
@@ -223,7 +273,7 @@ export function aggregateDaily(candles: Candle[], offsetHour = 21): DailyBar[] {
       if (cur) days.push(cur);
       curIdx = idx;
       cur = {
-        time: idx * DAY_MS + offsetHour * 3_600_000,
+        time: sessionStartOf(c.time, offsetHour),
         date: sessionKey(c.time, offsetHour),
         open: c.open, high: c.high, low: c.low, close: c.close,
       };
@@ -243,7 +293,7 @@ export interface DailySeries {
   ema200: number[];
   /** session index per daily bar */
   sessionIdx: number[];
-  offsetHour: number;
+  offsetHour: SessionOffset;
 }
 
 /**
@@ -251,22 +301,21 @@ export interface DailySeries {
  * When daily bars are supplied their stamps define the session offset (M3); intraday
  * aggregation uses `offsetHour` (default = broker session open, 21:00 UTC).
  */
-export function computeDailySeries(input: DailyBar[] | Candle[], offsetHour?: number): DailySeries {
+export function computeDailySeries(input: DailyBar[] | Candle[], offsetHour?: SessionOffset): DailySeries {
   const isDaily = input.length > 0 && "date" in (input[0] as DailyBar);
   let bars: DailyBar[];
-  let off: number;
+  let off: SessionOffset;
   if (isDaily) {
     bars = input as DailyBar[];
-    off = offsetHour ?? inferSessionOffsetHour(bars);
+    off = offsetHour ?? "auto";
   } else {
     // treat "daily-spaced" plain candles as daily bars too
     const cs = input as Candle[];
     const dailySpaced = cs.length > 1 && (cs[1].time - cs[0].time) >= DAY_MS - 3_600_000;
-    off = offsetHour ?? inferSessionOffsetHour(cs);
+    off = offsetHour ?? "auto";
     if (dailySpaced) {
       bars = cs.map(c => ({ time: c.time, date: sessionKey(c.time, off), open: c.open, high: c.high, low: c.low, close: c.close }));
     } else {
-      off = offsetHour ?? 21;
       bars = aggregateDaily(cs, off);
     }
   }
