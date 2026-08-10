@@ -101,7 +101,11 @@ function filterSpikeCandles<T extends { high: number }>(candles: T[]) {
 
     if (!averageHigh) return true;
 
-    return Number(candle.high ?? 0) <= averageHigh * 1.03;
+    // Only reject genuine data-feed spikes. A 3% band discarded legitimate
+    // trending candles (gold routinely moves >3% over 50 bars), which created
+    // artificial gaps in history. 25% over the 50-bar average is far outside
+    // any real intraday move but still catches corrupt ticks.
+    return Number(candle.high ?? 0) <= averageHigh * 1.25;
   });
 }
 

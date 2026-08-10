@@ -19,8 +19,8 @@ const TIMEFRAME_MS: Record<string, number> = {
 };
 
 const PAGE_LIMIT = 1000;
-const PAGES_PER_INVOCATION = 6;
-const MAX_RETRIES = 4;
+const DEFAULT_PAGES_PER_INVOCATION = 6;
+const MAX_RETRIES = 2;
 
 type Json = Record<string, unknown>;
 
@@ -169,13 +169,14 @@ Deno.serve(async (req) => {
     }
 
     const nowBar = Math.floor(Date.now() / tfMs) * tfMs;
+    const pagesPerCall = Math.max(1, Math.min(12, Number(body.pages ?? DEFAULT_PAGES_PER_INVOCATION)));
     let totalInserted = 0;
     let pagesThisCall = 0;
     let done = false;
     let lastError: string | null = null;
 
     try {
-      for (let page = 0; page < PAGES_PER_INVOCATION; page++) {
+      for (let page = 0; page < pagesPerCall; page++) {
         if (cursor <= requestedStart) { done = true; break; }
         const pageData = await fetchPage(accountId, symbol, timeframe, cursor.toISOString());
         if (!pageData.length) { done = true; break; }
