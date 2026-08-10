@@ -367,7 +367,7 @@ async function processUserSymbol(
     return { symbol, fired: false, reason: `atr_pct_${atrPct.toFixed(3)}` };
   }
 
-  const dctx = dailyContextFor(dailySeries, candles[i].time, candles[i - 1].time);
+  const dctx = dailyContextFor(dailySeries, candles[i].time, candles[i - 1].time, candles[i].close, candles[i - 1].close);
   if (!dctx) return { symbol, fired: false, reason: "no_daily_context" };
 
   const trig = evaluateLongTrigger({

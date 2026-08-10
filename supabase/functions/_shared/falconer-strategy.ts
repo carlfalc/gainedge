@@ -300,27 +300,50 @@ export function lastCompletedDailyIndex(ds: DailySeries, barTimeMs: number): num
 /**
  * Pine `request.security(tf="D", …, lookahead_off)` emulation for an intraday bar.
  *
- * M1: `emaD50[1]` in Pine is the previous value of the MAPPED (intraday-indexed) series,
- * not the previous daily bar's EMA. It only steps at the daily rollover bar, so
- * `dTrendUp = emaD50 > emaD50[1]` can only be true on the first intraday bar of a new
- * session. `prevBarTimeMs` supplies that previous-intraday-bar mapping.
+ * M1 — TRUE Pine HTF semantics: with lookahead OFF, `request.security` does NOT return the
+ * previous completed daily value all day. It returns the value of the CURRENTLY DEVELOPING
+ * daily bar, recomputed on every intraday bar (it simply never peeks into the future).
+ * So `emaD50` on bar i = EMA50 seeded on completed daily closes and advanced one step with
+ * the developing session close = close[i]; `emaD50[1]` is the same expression evaluated on
+ * intraday bar i-1. That makes `dTrendUp` a genuine intraday-updating series.
  *
- * M2: `pdl = request.security("D", low[1])` is the low of the daily bar BEFORE the last
- * completed daily bar (`bars[k-1].low`), not the last completed day's low.
+ * M2 — `pdl = request.security("D", low[1])`: index [1] is taken INSIDE the daily series, so
+ * relative to the developing daily bar it is the LAST COMPLETED daily bar's low.
  *
- * M3: bucketing/completion is session-aligned; a still-forming daily session is never read.
+ * M3 — bucketing and completion are session-aligned (broker daily bars stamped 21:00 UTC
+ * belong to the session that STARTS at 21:00). A still-forming daily session is only ever
+ * seen through intraday data up to the current bar — never its future OHLC.
  */
-export function dailyContextFor(ds: DailySeries, barTimeMs: number, prevBarTimeMs?: number): DailyContext | null {
+export function dailyContextFor(
+  ds: DailySeries,
+  barTimeMs: number,
+  prevBarTimeMs?: number,
+  developingClose?: number,
+  prevDevelopingClose?: number,
+): DailyContext | null {
   const k = lastCompletedDailyIndex(ds, barTimeMs);
-  if (k < 1) return null;
-  const kPrev = prevBarTimeMs === undefined ? k : lastCompletedDailyIndex(ds, prevBarTimeMs);
-  if (kPrev < 0) return null;
-  return {
-    emaD50: ds.ema50[k],
-    emaD50Prev: ds.ema50[kPrev],
-    emaD200: ds.ema200[k],
-    pdl: ds.bars[k - 1].low,
-  };
+  if (k < 0 || !Number.isFinite(ds.ema50[k]) || !Number.isFinite(ds.ema200[k])) return null;
+
+  const step = (base: number, close: number, period: number) => base + (2 / (period + 1)) * (close - base);
+
+  if (developingClose === undefined) {
+    // completed-bar fallback (pure-function tests / no intraday context available)
+    if (k < 1) return null;
+    return { emaD50: ds.ema50[k], emaD50Prev: ds.ema50[k - 1], emaD200: ds.ema200[k], pdl: ds.bars[k].low };
+  }
+
+  const emaD50 = step(ds.ema50[k], developingClose, 50);
+  const emaD200 = step(ds.ema200[k], developingClose, 200);
+
+  let emaD50Prev = emaD50;
+  if (prevBarTimeMs !== undefined && prevDevelopingClose !== undefined) {
+    const kPrev = lastCompletedDailyIndex(ds, prevBarTimeMs);
+    if (kPrev >= 0 && Number.isFinite(ds.ema50[kPrev])) {
+      emaD50Prev = step(ds.ema50[kPrev], prevDevelopingClose, 50);
+    }
+  }
+
+  return { emaD50, emaD50Prev, emaD200, pdl: ds.bars[k].low };
 }
 
 /* ──────────── Asian session (locked low/high) ──────────── */
@@ -612,7 +635,7 @@ export function runBacktest(
 
     // New entry only when flat
     if (!pos) {
-      const dctx = dailyContextFor(ds, c.time, candles[i - 1].time);
+      const dctx = dailyContextFor(ds, c.time, candles[i - 1].time, c.close, candles[i - 1].close);
       const atrPct = (atrArr[i] / c.close) * 100;
       if (dctx && Number.isFinite(atrArr[i])) {
         const trig = evaluateLongTrigger({
