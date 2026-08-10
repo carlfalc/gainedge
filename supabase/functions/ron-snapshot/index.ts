@@ -29,19 +29,25 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  // Accept the env service-role key, or any service-role JWT (the pg_cron tick uses a
-  // Vault-stored service-role key, which is a distinct but equally privileged token).
-  const isServiceRoleJwt = (t: string) => {
-    try {
-      const p = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-      return p.role === "service_role";
-    } catch { return false; }
-  };
-  if (!token || (token !== serviceKey && !isServiceRoleJwt(token))) {
-    return json({ error: "Unauthorized" }, 401);
-  }
-
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+
+  // Authorization: EXACT secret match only. No unverified JWT claim is ever trusted.
+  //   1) the Edge Function's own service-role secret, or
+  //   2) a securely stored cron key, compared inside the database by
+  //      public.ron_verify_cron_token (SECURITY DEFINER, service_role only).
+  const timingSafeEq = (a: string, b: string) => {
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let k = 0; k < a.length; k++) diff |= a.charCodeAt(k) ^ b.charCodeAt(k);
+    return diff === 0;
+  };
+  let authorized = !!token && !!serviceKey && timingSafeEq(token, serviceKey);
+  if (!authorized && token) {
+    const { data: ok, error: verr } = await supabase.rpc("ron_verify_cron_token", { _token: token });
+    if (verr) console.error("ron_verify_cron_token failed", verr.message);
+    authorized = ok === true;
+  }
+  if (!authorized) return json({ error: "Unauthorized" }, 401);
 
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body == live tick */ }
