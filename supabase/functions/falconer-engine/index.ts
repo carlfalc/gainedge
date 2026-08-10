@@ -338,7 +338,13 @@ async function processUserSymbol(
   // Daily higher-timeframe context (EMA50/EMA200 trend + previous-day low). The Pine
   // strategy's trend filter lives on the DAILY chart, so the engine loads a dedicated
   // ~320-bar daily series — the 15m window is far too short to warm a daily EMA200.
-  const dailyCandles = await loadCandles(supabase, symbol, "1d", DAILY_LOOKBACK);
+  // Prefer broker-session daily bars resampled from genuine 1h candles
+  // (source = metaapi_resampled_1h, stored as timeframe "1d_r1h"). The native
+  // MetaApi 1D feed is sparse and cannot warm EMA200. Falls back to "1d".
+  let dailyCandles = await loadCandles(supabase, symbol, "1d_r1h", DAILY_LOOKBACK);
+  if (dailyCandles.length < 250) {
+    dailyCandles = await loadCandles(supabase, symbol, "1d", DAILY_LOOKBACK);
+  }
   if (dailyCandles.length < 250) {
     await logEvent(supabase, {
       user_id: s.user_id,

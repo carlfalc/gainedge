@@ -124,6 +124,20 @@ Deno.serve(async (req) => {
 
     // Load a dedicated daily warmup window so EMA50/EMA200/PDL context matches
     // the live engine instead of being approximated from the selected test window.
+    // Higher-timeframe source: prefer broker-session daily bars resampled from
+    // genuine 1h candles ("1d_r1h", source = metaapi_resampled_1h) because the
+    // native MetaApi 1D feed is sparse; fall back to native "1d".
+    let dailyTimeframe = "1d_r1h";
+    {
+      const { count } = await supabase
+        .from("candle_history")
+        .select("id", { count: "exact", head: true })
+        .eq("symbol", body.symbol)
+        .eq("timeframe", "1d_r1h")
+        .lte("timestamp", body.period_end);
+      if ((count ?? 0) < 250) dailyTimeframe = "1d";
+    }
+
     const dailyCandles: Candle[] = [];
     let dailyCursor = new Date(new Date(body.period_start).getTime() - 330 * 24 * 60 * 60 * 1000).toISOString();
     while (true) {
@@ -131,7 +145,7 @@ Deno.serve(async (req) => {
         .from("candle_history")
         .select("timestamp, open, high, low, close, volume")
         .eq("symbol", body.symbol)
-        .eq("timeframe", "1d")
+        .eq("timeframe", dailyTimeframe)
         .gte("timestamp", dailyCursor)
         .lte("timestamp", body.period_end)
         .order("timestamp", { ascending: true })
