@@ -23,25 +23,54 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+/** NY UTC offset (-4 EDT / -5 EST) for an instant. */
+function nyOffsetHours(d: Date): number {
+  const p = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", hour12: false,
+    year: "numeric", month: "numeric", day: "numeric", hour: "numeric",
+  }).formatToParts(d);
+  const g = (t: string) => Number(p.find((x) => x.type === t)?.value);
+  const nyAsUtc = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24);
+  const utcFloor = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours());
+  return Math.round((nyAsUtc - utcFloor) / 3_600_000);
+}
+
+/** Deterministic XAUUSD schedule: Sun 17:00 NY → Fri 17:00 NY, 1h daily break at 17:00 NY. */
+function marketOpen(now: Date): boolean {
+  const ny = new Date(now.getTime() + nyOffsetHours(now) * 3_600_000);
+  const day = ny.getUTCDay(), hour = ny.getUTCHours();
+  if (day === 6) return false;
+  if (day === 5 && hour >= 17) return false;
+  if (day === 0 && hour < 17) return false;
+  if (hour === 17) return false;
+  return true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  // Accept the env service-role key, or any service-role JWT (the pg_cron tick uses a
-  // Vault-stored service-role key, which is a distinct but equally privileged token).
-  const isServiceRoleJwt = (t: string) => {
-    try {
-      const p = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-      return p.role === "service_role";
-    } catch { return false; }
-  };
-  if (!token || (token !== serviceKey && !isServiceRoleJwt(token))) {
-    return json({ error: "Unauthorized" }, 401);
-  }
-
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+
+  // Authorization: EXACT secret match only. No unverified JWT claim is ever trusted.
+  //   1) the Edge Function's own service-role secret, or
+  //   2) a securely stored cron key, compared inside the database by
+  //      public.ron_verify_cron_token (SECURITY DEFINER, service_role only).
+  const timingSafeEq = (a: string, b: string) => {
+    if (a.length !== b.length) return false;
+    let diff = 0;
+    for (let k = 0; k < a.length; k++) diff |= a.charCodeAt(k) ^ b.charCodeAt(k);
+    return diff === 0;
+  };
+  let authorized = !!token && !!serviceKey && timingSafeEq(token, serviceKey);
+  if (!authorized && token) {
+    const { data: ok, error: verr } = await supabase.rpc("ron_verify_cron_token", { _token: token });
+    if (verr) console.error("ron_verify_cron_token failed", verr.message);
+    authorized = ok === true;
+  }
+  if (!authorized) return json({ error: "Unauthorized" }, 401);
 
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body == live tick */ }
@@ -117,11 +146,18 @@ Deno.serve(async (req) => {
       if (candles.length < 30) return json({ ok: true, mode, skipped: "insufficient_history" });
 
       const snap = computeRonSnapshot(SYMBOL, TIMEFRAME, candles, { source: "candle_history" });
-      // Freshness: a bar much older than one interval means the feed is behind (or market closed).
+      // Freshness: only call the feed stale when the market should actually be open.
       const ageMin = (nowMs - new Date(targetIso).getTime()) / 60000;
-      if (ageMin > 45 && snap.data_health === "healthy") snap.data_health = "stale";
+      const isOpen = marketOpen(new Date(nowMs));
+      if (ageMin > 45 && isOpen && snap.data_health === "healthy") snap.data_health = "stale";
       await upsert([snap]);
-      return json({ ok: true, mode, bar_time: targetIso, data_health: snap.data_health, age_minutes: Math.round(ageMin) });
+      return json({
+        ok: true, mode, bar_time: targetIso,
+        data_health: snap.data_health,
+        market_open: isOpen,
+        presentation: ageMin <= 35 ? "LIVE" : isOpen ? "STALE / FEED BEHIND" : "MARKET CLOSED",
+        age_minutes: Math.round(ageMin),
+      });
     }
 
     // ── backfill ─────────────────────────────────────────────────────

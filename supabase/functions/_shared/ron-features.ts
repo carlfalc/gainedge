@@ -229,7 +229,9 @@ export function computeRonSnapshot(
       dayHigh = dayHigh == null ? c.high : Math.max(dayHigh, c.high);
       dayLow = dayLow == null ? c.low : Math.min(dayLow, c.low);
       const h = new Date(c.time).getUTCHours();
-      if (h < 8) {
+      // Asian window 22:00–06:00 UTC — matches the Falconer session definition
+      // (asianStartHour 22 / asianEndHour 6). Read-only: Falconer code is untouched.
+      if (h >= 22 || h < 6) {
         asianHigh = asianHigh == null ? c.high : Math.max(asianHigh, c.high);
         asianLow = asianLow == null ? c.low : Math.min(asianLow, c.low);
       }

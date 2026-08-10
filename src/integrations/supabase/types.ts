@@ -1473,6 +1473,7 @@ export type Database = {
         }[]
       }
       ron_snapshot_cron_tick: { Args: never; Returns: undefined }
+      ron_verify_cron_token: { Args: { _token: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

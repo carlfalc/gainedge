@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useRonSnapshots, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
+import { assessDataHealth } from "@/lib/market-hours";
 
 interface ScanResult {
   id: string; symbol: string; direction: string;
@@ -266,13 +267,15 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           const snap = snapshots.get(inst.symbol);
           const f = snap?.features ?? null;
           const ron = ronStateFrom(f);
-          // Truthfulness: only real price paths are plotted. No synthetic sparkline.
-          const sparkData = live?.sparkline_data?.length ? live.sparkline_data : null;
+          const health = assessDataHealth(snap?.bar_time ?? null, 15);
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
           const color = expired ? "#555F73" : directionColor(inst.direction);
           // Prefer the live feed only while it is actually fresh; otherwise fall back to the
           // RON snapshot so the indicator row can never contradict RON's own reasoning.
           const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
+          // Truthfulness: only real AND fresh price paths are plotted. No synthetic sparkline,
+          // and never a stale series presented as live.
+          const sparkData = liveFresh && live?.sparkline_data?.length ? live.sparkline_data : null;
           const liveRsi = (liveFresh ? live?.rsi : null) ?? (f?.rsi14 ?? null);
           const liveAdx = (liveFresh ? live?.adx : null) ?? (f?.adx14 ?? null);
           const liveMacd = (liveFresh ? live?.macd_status : null) ?? (f?.macd_state ?? null);
@@ -359,7 +362,18 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 <div>
                   <div style={{ fontSize: 9, color: C.sec, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: ron ? ronStateColor(ron.state) : C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
-                    {ron ? ron.state : "NO DATA"}
+                    {ron ? ron.state : "DATA BUILDING"}
+                  </div>
+                  <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
+                    Probability: {ron ? "Not calibrated yet · building evidence" : "Not calibrated yet"}
+                  </div>
+                  <div style={{
+                    fontSize: 9, marginTop: 2, fontWeight: 600,
+                    color: health.label === "LIVE" ? C.jade
+                      : health.label === "STALE / FEED BEHIND" ? "#EF4444"
+                        : "#F59E0B",
+                  }} title={health.detail}>
+                    {health.label}{snap ? ` · ${formatAge(snap.bar_time)}` : ""}
                   </div>
                   {snap && (
                     <div style={{ fontSize: 9, color: snap.data_health === "healthy" ? C.sec : "#F59E0B" }}>
@@ -382,6 +396,29 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
               </div>
 
+              {snap && f ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                  <span>Completed {snap.timeframe} close <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{snap.close}</span></span>
+                  <span>ATR% <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(f.atr_pct, 3)}</span></span>
+                  <span>Regime <span style={{ color: C.text }}>{String(f.regime ?? "—").replace("_", " ")}</span></span>
+                  <span>Session <span style={{ color: C.text }}>{String(f.session ?? "—")}</span></span>
+                  <span style={{ gridColumn: "1 / -1" }}>
+                    Patterns <span style={{ color: C.text }}>
+                      {snap.patterns?.length
+                        ? snap.patterns.slice(0, 3).map((p: any) => p?.name ?? p?.type ?? String(p)).join(", ")
+                        : "No pattern detected"}
+                    </span>
+                  </span>
+                  <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
+                    Completed bar close — not a live tick quote.
+                  </span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 10, color: "#F59E0B", marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                  DATA BUILDING — no RON snapshot for {inst.symbol} yet. Indicators unavailable; this is not a current assessment.
+                </div>
+              )}
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
                 <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
                 <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
@@ -403,7 +440,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     {inst.reasoning && <div style={{ marginTop: 4 }}>{inst.reasoning}</div>}
                   </>
                 ) : (
-                  inst.reasoning || "No RON snapshot for this instrument yet."
+                  inst.reasoning || "DATA BUILDING — RON has not computed a snapshot for this instrument yet."
                 )}
               </div>
 
