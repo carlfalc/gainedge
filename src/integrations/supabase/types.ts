@@ -1204,7 +1204,10 @@ export type Database = {
           anchor_price: number
           atr_at_anchor: number | null
           bar_time: string
+          barrier_atr_mult: number | null
+          barrier_version: number | null
           bars_used: number | null
+          coverage_class: string | null
           coverage_ok: boolean
           created_at: string
           data_resolution: string
@@ -1220,16 +1223,35 @@ export type Database = {
           label_version: number
           labelled_at: string
           last_bar_time: string | null
+          long_event_eligible: boolean | null
           long_excursion_atr: number | null
+          long_first_hit: string | null
+          long_first_hit_time: string | null
+          long_mae_atr_v2: number | null
+          long_mae_price: number | null
+          long_mfe_atr_v2: number | null
+          long_mfe_price: number | null
+          long_success: boolean | null
           mae_atr: number | null
           mae_pct: number | null
           mae_price: number | null
+          max_high_price: number | null
+          metric_hash: string | null
           mfe_atr: number | null
           mfe_pct: number | null
           mfe_price: number | null
+          min_low_price: number | null
           session: string | null
           session_overlap: boolean | null
+          short_event_eligible: boolean | null
           short_excursion_atr: number | null
+          short_first_hit: string | null
+          short_first_hit_time: string | null
+          short_mae_atr_v2: number | null
+          short_mae_price: number | null
+          short_mfe_atr_v2: number | null
+          short_mfe_price: number | null
+          short_success: boolean | null
           symbol: string
           timeframe: string
           updated_at: string
@@ -1238,7 +1260,10 @@ export type Database = {
           anchor_price: number
           atr_at_anchor?: number | null
           bar_time: string
+          barrier_atr_mult?: number | null
+          barrier_version?: number | null
           bars_used?: number | null
+          coverage_class?: string | null
           coverage_ok?: boolean
           created_at?: string
           data_resolution: string
@@ -1254,16 +1279,35 @@ export type Database = {
           label_version?: number
           labelled_at?: string
           last_bar_time?: string | null
+          long_event_eligible?: boolean | null
           long_excursion_atr?: number | null
+          long_first_hit?: string | null
+          long_first_hit_time?: string | null
+          long_mae_atr_v2?: number | null
+          long_mae_price?: number | null
+          long_mfe_atr_v2?: number | null
+          long_mfe_price?: number | null
+          long_success?: boolean | null
           mae_atr?: number | null
           mae_pct?: number | null
           mae_price?: number | null
+          max_high_price?: number | null
+          metric_hash?: string | null
           mfe_atr?: number | null
           mfe_pct?: number | null
           mfe_price?: number | null
+          min_low_price?: number | null
           session?: string | null
           session_overlap?: boolean | null
+          short_event_eligible?: boolean | null
           short_excursion_atr?: number | null
+          short_first_hit?: string | null
+          short_first_hit_time?: string | null
+          short_mae_atr_v2?: number | null
+          short_mae_price?: number | null
+          short_mfe_atr_v2?: number | null
+          short_mfe_price?: number | null
+          short_success?: boolean | null
           symbol: string
           timeframe: string
           updated_at?: string
@@ -1272,7 +1316,10 @@ export type Database = {
           anchor_price?: number
           atr_at_anchor?: number | null
           bar_time?: string
+          barrier_atr_mult?: number | null
+          barrier_version?: number | null
           bars_used?: number | null
+          coverage_class?: string | null
           coverage_ok?: boolean
           created_at?: string
           data_resolution?: string
@@ -1288,16 +1335,35 @@ export type Database = {
           label_version?: number
           labelled_at?: string
           last_bar_time?: string | null
+          long_event_eligible?: boolean | null
           long_excursion_atr?: number | null
+          long_first_hit?: string | null
+          long_first_hit_time?: string | null
+          long_mae_atr_v2?: number | null
+          long_mae_price?: number | null
+          long_mfe_atr_v2?: number | null
+          long_mfe_price?: number | null
+          long_success?: boolean | null
           mae_atr?: number | null
           mae_pct?: number | null
           mae_price?: number | null
+          max_high_price?: number | null
+          metric_hash?: string | null
           mfe_atr?: number | null
           mfe_pct?: number | null
           mfe_price?: number | null
+          min_low_price?: number | null
           session?: string | null
           session_overlap?: boolean | null
+          short_event_eligible?: boolean | null
           short_excursion_atr?: number | null
+          short_first_hit?: string | null
+          short_first_hit_time?: string | null
+          short_mae_atr_v2?: number | null
+          short_mae_price?: number | null
+          short_mfe_atr_v2?: number | null
+          short_mfe_price?: number | null
+          short_success?: boolean | null
           symbol?: string
           timeframe?: string
           updated_at?: string
