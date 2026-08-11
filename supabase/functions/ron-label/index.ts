@@ -14,12 +14,13 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { labelOutcome, metricHash, type FwdBar } from "../_shared/ron-outcomes.ts";
 import { labelOutcomeV2, metricHashV2 } from "../_shared/ron-outcomes-v2.ts";
+import { labelOutcomeV3, metricHashV3 } from "../_shared/ron-outcomes-v3.ts";
 import { classifyRonSession, xauVenueOpen } from "../_shared/ron-sessions.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
 const FEATURE_VERSION = 2;
-const DEFAULT_LABEL_VERSION = 2;   // v1 rows are preserved untouched for audit
+const DEFAULT_LABEL_VERSION = 3;   // v1 and v2 rows are preserved untouched for audit
 const BAR_MS = 15 * 60 * 1000;
 const RES_MS = 60 * 1000;              // 1-minute forward resolution
 const RES_LABEL = "1m";
@@ -57,7 +58,17 @@ Deno.serve(async (req) => {
     ? body.horizons.map(Number).filter((n: number) => Number.isFinite(n) && n > 0)
     : DEFAULT_HORIZONS;
   const maxHorizon = Math.max(...horizons);
-  const LABEL_VERSION = Number(body.label_version ?? DEFAULT_LABEL_VERSION) === 1 ? 1 : 2;
+  const requested = Number(body.label_version ?? DEFAULT_LABEL_VERSION);
+  const LABEL_VERSION = requested === 1 ? 1 : requested === 2 ? 2 : 3;
+
+  /**
+   * `data_end` truncates the visible future and exists ONLY for the no-lookahead
+   * acceptance harness. Any request carrying it is forced non-persisting BY
+   * CONSTRUCTION, regardless of what the caller passes for dry_run — a truncated-horizon
+   * probe must never be able to overwrite a canonical stored row.
+   */
+  const harness = body.data_end != null;
+  const persist = !harness && body.dry_run !== true;
 
   try {
     /** All stored 1m bars in [fromIso, toIso], paged so we never rely on one page. */
@@ -140,6 +151,57 @@ Deno.serve(async (req) => {
 
       for (const h of horizons) {
         const horizonEnd = t + BAR_MS + h * 60_000;
+
+        if (LABEL_VERSION === 3) {
+          const l = labelOutcomeV3(t, BAR_MS, anchor, atr, fwd, h, RES_MS, RES_LABEL, nowMs, xauVenueOpen);
+          const key = `${new Date(t).toISOString()}|${h}`;
+          const hash = await metricHashV3(l);
+          hashes[key] = hash;
+          const bucket = l.coverage_ok ? "ok" : `excluded_${l.coverage_class}`;
+          summary[bucket] = (summary[bucket] ?? 0) + 1;
+          summary[`session_${ctx.session}${l.coverage_ok ? "_ok" : "_excluded"}`] =
+            (summary[`session_${ctx.session}${l.coverage_ok ? "_ok" : "_excluded"}`] ?? 0) + 1;
+          if (l.coverage_ok) {
+            summary[`long_${l.long.first_hit}`] = (summary[`long_${l.long.first_hit}`] ?? 0) + 1;
+            summary[`short_${l.short.first_hit}`] = (summary[`short_${l.short.first_hit}`] ?? 0) + 1;
+          }
+          rows.push({
+            symbol: SYMBOL, timeframe: TIMEFRAME,
+            bar_time: new Date(t).toISOString(),
+            feature_version: FEATURE_VERSION, label_version: 3,
+            horizon_minutes: h,
+            session: ctx.session, session_overlap: ctx.overlap,
+            anchor_price: anchor, atr_at_anchor: atr,
+            forward_close: l.forward_close,
+            forward_return_pct: l.forward_return_pct,
+            forward_return_atr: l.forward_return_atr,
+            // legacy v1 columns stay NULL for v3 — their v1 meaning is ambiguous
+            mfe_price: null, mae_price: null, mfe_pct: null, mae_pct: null,
+            mfe_atr: null, mae_atr: null,
+            long_excursion_atr: null, short_excursion_atr: null,
+            max_high_price: l.max_high_price, min_low_price: l.min_low_price,
+            long_mfe_price: l.long_mfe_price, long_mae_price: l.long_mae_price,
+            short_mfe_price: l.short_mfe_price, short_mae_price: l.short_mae_price,
+            long_mfe_atr_v2: l.long_mfe_atr, long_mae_atr_v2: l.long_mae_atr,
+            short_mfe_atr_v2: l.short_mfe_atr, short_mae_atr_v2: l.short_mae_atr,
+            barrier_atr_mult: l.barrier_atr_mult, barrier_version: l.barrier_version,
+            long_first_hit: l.long.first_hit, long_success: l.long.success,
+            long_event_eligible: l.long.event_eligible, long_first_hit_time: l.long.first_hit_time,
+            short_first_hit: l.short.first_hit, short_success: l.short.success,
+            short_event_eligible: l.short.event_eligible, short_first_hit_time: l.short.first_hit_time,
+            bars_used: l.bars_used,
+            first_bar_time: l.first_bar_time,
+            last_bar_time: l.last_bar_time,
+            data_resolution: RES_LABEL,
+            data_source: "candle_history_1m",
+            coverage_ok: l.coverage_ok,
+            coverage_class: l.coverage_class,
+            exclusion_reason: l.exclusion_reason,
+            metric_hash: hash,
+            labelled_at: new Date().toISOString(),
+          });
+          continue;
+        }
 
         if (LABEL_VERSION === 2) {
           const l = labelOutcomeV2(t, BAR_MS, anchor, atr, fwd, h, RES_MS, RES_LABEL, nowMs, xauVenueOpen);
@@ -231,7 +293,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (body.dry_run !== true) {
+    if (persist) {
       for (let i = 0; i < rows.length; i += 200) {
         const { error } = await supabase
           .from("ron_snapshot_outcomes")
@@ -245,6 +307,9 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       mode: body.mode ?? "backfill",
+      label_version: LABEL_VERSION,
+      harness,
+      persisted: persist,
       snapshots: snaps.length,
       rows: rows.length,
       horizons,
