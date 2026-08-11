@@ -434,8 +434,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     Completed bar close — not a live tick quote.
                   </span>
                   <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
-                    Outcome labels: {outcomeStats
-                      ? `building · ${outcomeStats.labelled.toLocaleString()} labelled, ${outcomeStats.excluded.toLocaleString()} excluded (incomplete 1m coverage)`
+                    Outcome labels (research v2): {outcomeStats
+                      ? `building · ${outcomeStats.labelled.toLocaleString()} labelled, ${outcomeStats.excluded.toLocaleString()} excluded (session breaks or 1m gaps)`
                       : "building"}
                   </span>
                 </div>
