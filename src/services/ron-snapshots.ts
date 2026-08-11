@@ -110,8 +110,12 @@ export interface RonOutcomeStats {
   latestLabelledBar: string | null;
 }
 
-/** The only outcome label version research/calibration code may read. v1 is audit-only. */
-export const CURRENT_RON_LABEL_VERSION = 2;
+/**
+ * The ONLY canonical outcome label version. v1 and v2 remain in the table for audit and
+ * must never be mixed into current-state queries: v2's coverage-cause classifier compared
+ * aggregate counts and could report an open-market data hole as a session boundary.
+ */
+export const CURRENT_RON_LABEL_VERSION = 3;
 
 export function useRonOutcomeStats() {
   const [stats, setStats] = useState<RonOutcomeStats | null>(null);
