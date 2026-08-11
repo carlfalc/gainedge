@@ -16,6 +16,7 @@ import { labelOutcome, metricHash, type FwdBar } from "../_shared/ron-outcomes.t
 import { labelOutcomeV2, metricHashV2 } from "../_shared/ron-outcomes-v2.ts";
 import { labelOutcomeV3, metricHashV3 } from "../_shared/ron-outcomes-v3.ts";
 import { classifyRonSession, xauVenueOpen } from "../_shared/ron-sessions.ts";
+import { RON_QUALITY_VERSION } from "../_shared/ron-data-quality.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
@@ -142,9 +143,29 @@ Deno.serve(async (req) => {
     const rows: any[] = [];
     const hashes: Record<string, string> = {};
     const summary: Record<string, number> = {};
+    const quarantinedBars: {
+      bar_time: string; quality_version: number; rule_code: string; exclusion_reason: string;
+    }[] = [];
 
     for (const s of snaps) {
       const t = new Date(s.bar_time).getTime();
+      /**
+       * Phase 2C quarantine. A critical source-quality anchor (quality_version=1:
+       * `venue_break_bar` — the bar OPENS while the venue is closed) can never be a
+       * measurable opportunity, so it can never produce an outcome row. It is SKIPPED
+       * rather than written with mutated values: existing stored rows stay byte-identical
+       * for audit, and no new outcome evidence is ever created from a quarantined bar.
+       */
+      if (!xauVenueOpen(new Date(t))) {
+        summary.quarantined_source_quality = (summary.quarantined_source_quality ?? 0) + 1;
+        quarantinedBars.push({
+          bar_time: new Date(t).toISOString(),
+          quality_version: RON_QUALITY_VERSION,
+          rule_code: "venue_break_bar",
+          exclusion_reason: "source_quality_critical_venue_break",
+        });
+        continue;
+      }
       const atr = s.features?.atr14 == null ? null : Number(s.features.atr14);
       const ctx = classifyRonSession(t);
       const anchor = Number(s.close);
@@ -314,6 +335,7 @@ Deno.serve(async (req) => {
       rows: rows.length,
       horizons,
       summary,
+      quarantined_source_quality: quarantinedBars,
       hashes: body.mode === "single" || body.with_hashes ? hashes : undefined,
       first_bar: snaps[0].bar_time,
       last_bar: snaps[snaps.length - 1].bar_time,

@@ -147,3 +147,47 @@ export function useRonOutcomeStats() {
 
   return stats;
 }
+
+/**
+ * Phase 2C data-integrity status, read from the deterministic quality flags produced by
+ * the `ron-quality` detector. This reports SOURCE-DATA health only — it is never a
+ * probability, a confidence score or a trading opinion.
+ */
+export const CURRENT_RON_QUALITY_VERSION = 1;
+
+export interface RonDataQuality {
+  critical: number;
+  warning: number;
+  latestCriticalBar: string | null;
+}
+
+export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
+  const [quality, setQuality] = useState<RonDataQuality | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const base = () => supabase.from("ron_data_quality_flags")
+        .select("id", { count: "exact", head: true })
+        .eq("symbol", symbol).eq("timeframe", timeframe)
+        .eq("quality_version", CURRENT_RON_QUALITY_VERSION);
+      const [crit, warn, latest] = await Promise.all([
+        base().eq("severity", "critical"),
+        base().eq("severity", "warning"),
+        supabase.from("ron_data_quality_flags").select("bar_time")
+          .eq("symbol", symbol).eq("timeframe", timeframe)
+          .eq("quality_version", CURRENT_RON_QUALITY_VERSION).eq("severity", "critical")
+          .order("bar_time", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setQuality({
+        critical: crit.count ?? 0,
+        warning: warn.count ?? 0,
+        latestCriticalBar: (latest.data as any)?.bar_time ?? null,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [symbol, timeframe]);
+
+  return quality;
+}

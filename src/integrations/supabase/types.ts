@@ -1232,6 +1232,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_data_quality_flags: {
+        Row: {
+          bar_time: string
+          created_at: string
+          detected_at: string
+          detector: string
+          evidence: Json
+          evidence_hash: string
+          id: string
+          provenance: string
+          quality_version: number
+          rule_code: string
+          severity: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+        }
+        Insert: {
+          bar_time: string
+          created_at?: string
+          detected_at?: string
+          detector?: string
+          evidence?: Json
+          evidence_hash: string
+          id?: string
+          provenance?: string
+          quality_version?: number
+          rule_code: string
+          severity: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+        }
+        Update: {
+          bar_time?: string
+          created_at?: string
+          detected_at?: string
+          detector?: string
+          evidence?: Json
+          evidence_hash?: string
+          id?: string
+          provenance?: string
+          quality_version?: number
+          rule_code?: string
+          severity?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ron_market_snapshots: {
         Row: {
           bar_time: string
