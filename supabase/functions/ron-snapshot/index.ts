@@ -189,11 +189,15 @@ Deno.serve(async (req) => {
 
     const snaps: any[] = [];
     let skippedWarmup = 0;
+    // Phase 1B correction: no arbitrary warmup skip. computeRonSnapshot is proven safe
+    // with <30 bars (indicators return null, data_health = "insufficient"), so every
+    // genuine source bar gets a row. `min_bars` can still be set explicitly if needed.
+    const minBars = Math.max(1, Number(body.min_bars ?? 1));
     for (const t of targets) {
       const ms = new Date(t.timestamp).getTime();
       const idx = indexOfTime.get(ms);
       if (idx === undefined) continue;
-      if (idx < 30) { skippedWarmup++; continue; }
+      if (idx + 1 < minBars) { skippedWarmup++; continue; }
       // NO LOOKAHEAD: slice ends at the target bar (inclusive).
       const window = all.slice(Math.max(0, idx - (WARMUP_BARS + 200) + 1), idx + 1);
       snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, window, { source: "candle_history_backfill" }));
