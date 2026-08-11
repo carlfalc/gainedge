@@ -110,6 +110,9 @@ export interface RonOutcomeStats {
   latestLabelledBar: string | null;
 }
 
+/** The only outcome label version research/calibration code may read. v1 is audit-only. */
+export const CURRENT_RON_LABEL_VERSION = 2;
+
 export function useRonOutcomeStats() {
   const [stats, setStats] = useState<RonOutcomeStats | null>(null);
 
@@ -118,11 +121,14 @@ export function useRonOutcomeStats() {
     (async () => {
       const [ok, ex, latest] = await Promise.all([
         supabase.from("ron_snapshot_outcomes").select("id", { count: "exact", head: true })
-          .eq("feature_version", CURRENT_RON_FEATURE_VERSION).eq("coverage_ok", true),
+          .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+          .eq("label_version", CURRENT_RON_LABEL_VERSION).eq("coverage_ok", true),
         supabase.from("ron_snapshot_outcomes").select("id", { count: "exact", head: true })
-          .eq("feature_version", CURRENT_RON_FEATURE_VERSION).eq("coverage_ok", false),
+          .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+          .eq("label_version", CURRENT_RON_LABEL_VERSION).eq("coverage_ok", false),
         supabase.from("ron_snapshot_outcomes").select("bar_time")
-          .eq("feature_version", CURRENT_RON_FEATURE_VERSION).eq("coverage_ok", true)
+          .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+          .eq("label_version", CURRENT_RON_LABEL_VERSION).eq("coverage_ok", true)
           .order("bar_time", { ascending: false }).limit(1).maybeSingle(),
       ]);
       if (cancelled) return;
