@@ -5,7 +5,7 @@ import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "l
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
-import { useRonSnapshots, useRonOutcomeStats, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
+import { useRonSnapshots, useRonOutcomeStats, useRonDataQuality, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
 import { assessDataHealth } from "@/lib/market-hours";
 import { classifyRonSession } from "@/lib/ron-sessions";
 
@@ -60,6 +60,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   const { data: liveData } = useLiveMarketData(userId);
   const { snapshots } = useRonSnapshots();
   const outcomeStats = useRonOutcomeStats();
+  const dataQuality = useRonDataQuality();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -366,9 +367,25 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
                 <div>
                   <div style={{ fontSize: 9, color: C.sec, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: ron ? ronStateColor(ron.state) : C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
-                    {ron ? ron.state : "DATA BUILDING"}
-                  </div>
+                  {(() => {
+                    // Phase 2C: a quarantined source anchor (a provider rollup artifact
+                    // opening inside the venue break) is never shown as a tradable setup.
+                    const quarantined = inst.symbol === "XAUUSD" && !!dataQuality?.latestCriticalBar &&
+                      (!snap || new Date(dataQuality.latestCriticalBar).getTime() > new Date(snap.bar_time).getTime());
+                    return (
+                      <>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: quarantined ? "#F59E0B" : ron ? ronStateColor(ron.state) : C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                          {quarantined ? "NO TRADABLE SETUP" : ron ? ron.state : "DATA BUILDING"}
+                        </div>
+                        {inst.symbol === "XAUUSD" && dataQuality && (
+                          <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.sec }}
+                               title={`Deterministic source-data quality v${1}: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags. Raw candle history is never modified.`}>
+                            Data integrity: {quarantined ? "Source anomaly quarantined" : "Healthy"}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                   <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
                     Probability: {ron ? "Not calibrated yet · building evidence" : "Not calibrated yet"}
                   </div>

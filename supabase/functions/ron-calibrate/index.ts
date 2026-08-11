@@ -23,9 +23,11 @@ import {
   CALIBRATION_BARRIER_VERSION, CALIBRATION_VERSION, HOLDOUT_FRACTION, SAMPLE_FLOORS,
   INELIGIBLE_ANCHOR_SESSIONS, anchorSessionEligible,
   calibrateDirection, cellPayloadV2, definitionPayloadV2, eligibleFor, resolvePrediction,
-  runPayloadV2, sha256, type CalibrationInputRow, type Direction, type EligibleObs,
+  runPayloadV2, sha256, resolveSourceClockV2, NoGenuineSourceClockError,
+  type CalibrationInputRow, type Direction, type EligibleObs,
   type RunIdentityV2,
 } from "../_shared/ron-calibration.ts";
+import { CRITICAL_RULES, RON_QUALITY_VERSION } from "../_shared/ron-data-quality.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
@@ -74,18 +76,35 @@ Deno.serve(async (req) => {
   // 1m XAUUSD candle. `labelled_at` (a mutable write timestamp) must never participate
   // in source_as_of, source_bar_cutoff or row membership.
   let sourceAsOf = typeof body.source_as_of === "string" ? body.source_as_of : null;
-  let sourceClock: "explicit" | "market_1m_candle" | "wall_clock_fallback" = "explicit";
+  let sourceClock: "explicit" | "market_1m_candle" = "explicit";
+  let latest1m: string | null = null;
   if (!sourceAsOf) {
     const { data } = await supabase
       .from("candle_history")
       .select("timestamp")
       .eq("symbol", SYMBOL).eq("timeframe", "1m")
       .order("timestamp", { ascending: false }).limit(1).maybeSingle();
-    const latest = (data as any)?.timestamp ?? null;
-    sourceAsOf = latest ?? new Date().toISOString();
-    sourceClock = latest ? "market_1m_candle" : "wall_clock_fallback";
+    latest1m = (data as any)?.timestamp ?? null;
   }
-  const frozenAsOf = new Date(sourceAsOf ?? new Date().toISOString()).toISOString();
+  // Phase 2C: FAIL CLOSED. calibration_version=2 has no wall-clock fallback — a frozen
+  // source instant may only come from genuine market data or an explicit replay value.
+  let frozenAsOf: string;
+  try {
+    const resolved = resolveSourceClockV2(sourceAsOf, latest1m);
+    frozenAsOf = resolved.source_as_of;
+    sourceClock = resolved.source_clock;
+  } catch (e) {
+    if (e instanceof NoGenuineSourceClockError) {
+      return json({
+        error: "NO_GENUINE_SOURCE_CLOCK",
+        detail: "No genuine XAUUSD 1m candle is available to freeze source_as_of. " +
+          "calibration_version=2 refuses wall-clock, labelled_at, created_at and updated_at fallbacks. " +
+          "Pass an explicit source_as_of for frozen research replay.",
+        calibration_version: CALIBRATION_VERSION,
+      }, 503);
+    }
+    throw e;
+  }
   sourceAsOf = frozenAsOf;
   const sourceBarCutoff = typeof body.source_bar_cutoff === "string"
     ? new Date(body.source_bar_cutoff).toISOString()
@@ -132,6 +151,34 @@ Deno.serve(async (req) => {
   }
 
   // ---- eligibility -------------------------------------------------------
+  // Phase 2C quarantine: a source bar with a CRITICAL data-quality flag can never be
+  // calibration evidence. Critical bars are, by construction of quality_version=1, exactly
+  // the bars whose OPEN falls outside the tradable venue schedule — i.e. the same anchors
+  // the v2 contract already excludes as `market_closed`. Mapping them onto the existing
+  // session-ineligibility path therefore leaves the v2 exclusion breakdown, run_hash and
+  // cell hashes byte-identical while making the quarantine explicit and auditable.
+  const qualityCritical = new Set<string>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("ron_data_quality_flags")
+      .select("bar_time, rule_code, severity")
+      .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
+      .eq("quality_version", RON_QUALITY_VERSION)
+      .eq("severity", "critical")
+      .order("bar_time", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) return json({ error: error.message }, 500);
+    const rows = data ?? [];
+    for (const r of rows as any[]) {
+      if (r.severity === "critical" || CRITICAL_RULES.includes(r.rule_code)) {
+        qualityCritical.add(new Date(r.bar_time).toISOString());
+      }
+    }
+    if (rows.length < PAGE) break;
+  }
+  let qualityQuarantinedRows = 0;
+  let qualityQuarantinedBeyondSession = 0;
+
   const exclusion: Record<string, number> = {};
   const bump = (k: string) => { exclusion[k] = (exclusion[k] ?? 0) + 1; };
   const obs: Record<Direction, EligibleObs[]> = { long: [], short: [] };
@@ -139,9 +186,15 @@ Deno.serve(async (req) => {
   for (const o of outcomes) {
     const iso = new Date(o.bar_time).toISOString();
     const d = dims.get(iso);
+    const quarantined = qualityCritical.has(iso);
+    if (quarantined) {
+      qualityQuarantinedRows++;
+      if (anchorSessionEligible(o.session ?? null)) qualityQuarantinedBeyondSession++;
+    }
     const row: CalibrationInputRow = {
       bar_time: iso,
-      session: o.session ?? null,
+      // Quarantined source bars are routed through the existing ineligible-anchor gate.
+      session: quarantined ? INELIGIBLE_ANCHOR_SESSIONS[0] : (o.session ?? null),
       regime: d?.regime ?? null,
       adx: d?.adx ?? null,
       long_event_eligible: o.long_event_eligible === true,
@@ -196,6 +249,12 @@ Deno.serve(async (req) => {
     source_bar_cutoff: sourceBarCutoff,
     source_clock: sourceClock,
     ineligible_anchor_sessions: INELIGIBLE_ANCHOR_SESSIONS,
+    quality_version: RON_QUALITY_VERSION,
+    quality_critical_anchors: qualityCritical.size,
+    quality_quarantined_rows: qualityQuarantinedRows,
+    // > 0 would mean the quality rule changed calibration membership, which requires a NEW
+    // calibration contract version rather than a rewrite of v2 semantics.
+    quality_quarantine_beyond_session_exclusion: qualityQuarantinedBeyondSession,
     holdout_fraction: holdoutFraction,
     split_cutoff: cutoff,
     sample_floors: SAMPLE_FLOORS,

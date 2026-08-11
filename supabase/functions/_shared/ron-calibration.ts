@@ -45,6 +45,36 @@ export const CALIBRATION_VERSION = 2;
 /** A market-closed anchor can never be a user opportunity, so it can never be evidence. */
 export const INELIGIBLE_ANCHOR_SESSIONS: readonly string[] = ["market_closed"];
 
+/**
+ * Phase 2C fail-closed source clock (calibration_version = 2).
+ *
+ * The frozen research instant may ONLY come from:
+ *   - an explicit `source_as_of` (frozen replay), or
+ *   - the latest GENUINE stored 1m market candle.
+ * Wall clock, labelled_at, created_at and updated_at are mutable write timestamps and are
+ * never acceptable. With no genuine clock available the runner must refuse to produce a
+ * result rather than silently invent provenance.
+ */
+export class NoGenuineSourceClockError extends Error {
+  readonly code = "NO_GENUINE_SOURCE_CLOCK";
+  constructor() {
+    super("NO_GENUINE_SOURCE_CLOCK: no genuine 1m market candle available to freeze source_as_of");
+  }
+}
+
+export function resolveSourceClockV2(
+  explicitSourceAsOf: string | null | undefined,
+  latestGenuine1mTimestamp: string | null | undefined,
+): { source_as_of: string; source_clock: "explicit" | "market_1m_candle" } {
+  if (typeof explicitSourceAsOf === "string" && explicitSourceAsOf.length) {
+    return { source_as_of: new Date(explicitSourceAsOf).toISOString(), source_clock: "explicit" };
+  }
+  if (typeof latestGenuine1mTimestamp === "string" && latestGenuine1mTimestamp.length) {
+    return { source_as_of: new Date(latestGenuine1mTimestamp).toISOString(), source_clock: "market_1m_candle" };
+  }
+  throw new NoGenuineSourceClockError();
+}
+
 export function anchorSessionEligible(session: string | null | undefined): boolean {
   return !INELIGIBLE_ANCHOR_SESSIONS.includes(normSession(session));
 }

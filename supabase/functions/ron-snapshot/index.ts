@@ -141,6 +141,21 @@ Deno.serve(async (req) => {
       if (!latest) return json({ ok: true, mode, skipped: "no_candles" });
 
       const targetIso = new Date(latest.timestamp).toISOString();
+      // ── Phase 2C quarantine ────────────────────────────────────────
+      // A bar whose OPEN falls outside the tradable venue schedule (the DST-aware
+      // NY 17:00-18:00 break, weekends) is a provider rollup artifact, never a genuine
+      // opportunity. It must never become the "current" RON snapshot. The raw candle is
+      // left untouched in candle_history; only the opportunity write is refused.
+      if (!marketOpen(new Date(targetIso))) {
+        return json({
+          ok: true, mode,
+          skipped: "source_bar_quarantined",
+          rule_code: "venue_break_bar",
+          quality_version: 1,
+          bar_time: targetIso,
+          presentation: "SOURCE ANOMALY QUARANTINED",
+        });
+      }
       const { data: existing } = await supabase
         .from("ron_market_snapshots")
         .select("id")
