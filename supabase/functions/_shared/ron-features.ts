@@ -18,7 +18,14 @@ import {
 } from "./falconer-strategy.ts";
 import { detectPatterns, type DetectedPattern } from "./ron-patterns.ts";
 
-export const RON_FEATURE_VERSION = 1;
+/**
+ * Feature-store version.
+ *  v1 — initial Phase 1A slice (Asian window applied inconsistently across the backfill).
+ *  v2 — Phase 1B: corrected Asian window 22:00–06:00 UTC applied to every row, plus
+ *       explicit provenance metadata (warmup/completeness/source history).
+ * v1 rows are preserved for audit; readers must pin a version explicitly.
+ */
+export const RON_FEATURE_VERSION = 2;
 
 export type Regime = "trending_up" | "trending_down" | "ranging" | "transition";
 
@@ -317,6 +324,19 @@ export function computeRonSnapshot(
     asian_low: r(asianLow, 5),
     position_in_day_range_pct: r(posInDayRange, 2),
     bars_used: candles.length,
+    // ── provenance (Phase 1B) ───────────────────────────────────────
+    provenance: {
+      feature_version: RON_FEATURE_VERSION,
+      asian_window_utc: "22:00-06:00",
+      session_boundary: "NY_17:00_DST_aware",
+      warmup_bars_required: 220,
+      warmup_satisfied: !insufficient,
+      source_history_bars: candles.length,
+      source_first_bar: new Date(candles[0].time).toISOString(),
+      source_last_bar: new Date(bar.time).toISOString(),
+      ema200_warm: candles.length >= 200,
+      adx14_warm: candles.length >= 29,
+    },
   };
 
   return {
