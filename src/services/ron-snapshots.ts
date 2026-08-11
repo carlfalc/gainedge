@@ -7,6 +7,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useCallback, useEffect, useState } from "react";
 
+/**
+ * The ONLY snapshot feature version the UI reads. v1 rows stay in the table for audit
+ * but must never be mixed into current-state queries.
+ */
+export const CURRENT_RON_FEATURE_VERSION = 2;
+
 export interface RonSnapshotRow {
   symbol: string;
   timeframe: string;
@@ -71,6 +77,7 @@ export function useRonSnapshots() {
     const { data: rows } = await supabase
       .from("ron_market_snapshots")
       .select("symbol, timeframe, bar_time, open, high, low, close, volume, features, patterns, data_health, computed_at")
+      .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
       .order("bar_time", { ascending: false })
       .limit(200);
     const map = new Map<string, RonSnapshotRow>();
