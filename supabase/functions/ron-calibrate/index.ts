@@ -70,17 +70,20 @@ Deno.serve(async (req) => {
   const persist = body.persist !== false;
 
   // ---- frozen source cut -------------------------------------------------
+  // v2 contract: the default source clock is GENUINE MARKET TIME — the latest stored
+  // 1m XAUUSD candle. `labelled_at` (a mutable write timestamp) must never participate
+  // in source_as_of, source_bar_cutoff or row membership.
   let sourceAsOf = typeof body.source_as_of === "string" ? body.source_as_of : null;
+  let sourceClock: "explicit" | "market_1m_candle" | "wall_clock_fallback" = "explicit";
   if (!sourceAsOf) {
     const { data } = await supabase
-      .from("ron_snapshot_outcomes")
-      .select("labelled_at")
-      .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
-      .eq("feature_version", CALIBRATION_FEATURE_VERSION)
-      .eq("label_version", CALIBRATION_LABEL_VERSION)
-      .eq("horizon_minutes", CALIBRATION_HORIZON_MINUTES)
-      .order("labelled_at", { ascending: false }).limit(1).maybeSingle();
-    sourceAsOf = (data as any)?.labelled_at ?? new Date().toISOString();
+      .from("candle_history")
+      .select("timestamp")
+      .eq("symbol", SYMBOL).eq("timeframe", "1m")
+      .order("timestamp", { ascending: false }).limit(1).maybeSingle();
+    const latest = (data as any)?.timestamp ?? null;
+    sourceAsOf = latest ?? new Date().toISOString();
+    sourceClock = latest ? "market_1m_candle" : "wall_clock_fallback";
   }
   const frozenAsOf = new Date(sourceAsOf ?? new Date().toISOString()).toISOString();
   sourceAsOf = frozenAsOf;
@@ -191,6 +194,7 @@ Deno.serve(async (req) => {
     calibration_version: CALIBRATION_VERSION,
     source_as_of: sourceAsOf,
     source_bar_cutoff: sourceBarCutoff,
+    source_clock: sourceClock,
     ineligible_anchor_sessions: INELIGIBLE_ANCHOR_SESSIONS,
     holdout_fraction: holdoutFraction,
     split_cutoff: cutoff,
@@ -228,7 +232,7 @@ Deno.serve(async (req) => {
       long_report: longReport as unknown as Record<string, unknown>,
       short_report: shortReport as unknown as Record<string, unknown>,
       definition_hash: definitionHash, run_hash: runHash, status: "research",
-    }, { onConflict: "symbol,timeframe,event_definition,event_version,feature_version,label_version,horizon_minutes,calibration_version,source_as_of,holdout_fraction" })
+    }, { onConflict: "symbol,timeframe,event_definition,event_version,feature_version,label_version,horizon_minutes,calibration_version,source_as_of,source_bar_cutoff_key,holdout_fraction" })
     .select("id").single();
   if (runErr) return json({ error: runErr.message, summary }, 500);
 
