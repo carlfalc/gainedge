@@ -99,3 +99,41 @@ export function useRonSnapshots() {
 
   return { snapshots: data, loading, reload: load };
 }
+
+/**
+ * Phase 2A research-evidence status. Real counts from `ron_snapshot_outcomes` — this is
+ * progress reporting only and must never be rendered as a probability or a win rate.
+ */
+export interface RonOutcomeStats {
+  labelled: number;
+  excluded: number;
+  latestLabelledBar: string | null;
+}
+
+export function useRonOutcomeStats() {
+  const [stats, setStats] = useState<RonOutcomeStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [ok, ex, latest] = await Promise.all([
+        supabase.from("ron_snapshot_outcomes").select("id", { count: "exact", head: true })
+          .eq("feature_version", CURRENT_RON_FEATURE_VERSION).eq("coverage_ok", true),
+        supabase.from("ron_snapshot_outcomes").select("id", { count: "exact", head: true })
+          .eq("feature_version", CURRENT_RON_FEATURE_VERSION).eq("coverage_ok", false),
+        supabase.from("ron_snapshot_outcomes").select("bar_time")
+          .eq("feature_version", CURRENT_RON_FEATURE_VERSION).eq("coverage_ok", true)
+          .order("bar_time", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      setStats({
+        labelled: ok.count ?? 0,
+        excluded: ex.count ?? 0,
+        latestLabelledBar: (latest.data as any)?.bar_time ?? null,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return stats;
+}

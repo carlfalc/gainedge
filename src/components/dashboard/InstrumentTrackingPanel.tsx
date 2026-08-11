@@ -5,8 +5,9 @@ import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "l
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
-import { useRonSnapshots, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
+import { useRonSnapshots, useRonOutcomeStats, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
 import { assessDataHealth } from "@/lib/market-hours";
+import { classifyRonSession } from "@/lib/ron-sessions";
 
 interface ScanResult {
   id: string; symbol: string; direction: string;
@@ -58,6 +59,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { data: liveData } = useLiveMarketData(userId);
   const { snapshots } = useRonSnapshots();
+  const outcomeStats = useRonOutcomeStats();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -268,6 +270,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           const f = snap?.features ?? null;
           const ron = ronStateFrom(f);
           const health = assessDataHealth(snap?.bar_time ?? null, 15);
+          // Canonical all-session context — a pure function of the completed bar's
+          // instant, so it is reproducible server-side and never invented.
+          const sess = snap ? classifyRonSession(snap.bar_time) : null;
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
           const color = expired ? "#555F73" : directionColor(inst.direction);
           // Prefer the live feed only while it is actually fresh; otherwise fall back to the
@@ -401,16 +406,37 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                   <span>Completed {snap.timeframe} close <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{snap.close}</span></span>
                   <span>ATR% <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(f.atr_pct, 3)}</span></span>
                   <span>Regime <span style={{ color: C.text }}>{String(f.regime ?? "—").replace("_", " ")}</span></span>
-                  <span>Session <span style={{ color: C.text }}>{String(f.session ?? "—")}</span></span>
+                  <span>
+                    Context <span style={{ color: sess?.overlap ? C.jade : C.text, fontWeight: sess?.overlap ? 700 : 400 }}>
+                      {sess ? sess.label : "—"}
+                    </span>
+                  </span>
+                  <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
+                    {sess
+                      ? `${sess.active.length ? sess.active.join(" + ") : "no cash session"}` +
+                        `${sess.minutes_into_session != null ? ` · ${sess.minutes_into_session}m in` : ""}` +
+                        `${sess.in_asian_range_window ? " · inside Asian range window 22:00-06:00Z" : ""}`
+                      : ""}
+                  </span>
                   <span style={{ gridColumn: "1 / -1" }}>
                     Patterns <span style={{ color: C.text }}>
                       {snap.patterns?.length
-                        ? snap.patterns.slice(0, 3).map((p: any) => p?.name ?? p?.type ?? String(p)).join(", ")
+                        ? snap.patterns
+                            .slice(0, 3)
+                            .map((p: any) =>
+                              [p?.pattern_name, p?.direction].filter(Boolean).join(" ") || "unnamed",
+                            )
+                            .join(", ")
                         : "No pattern detected"}
                     </span>
                   </span>
                   <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
                     Completed bar close — not a live tick quote.
+                  </span>
+                  <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
+                    Outcome labels: {outcomeStats
+                      ? `building · ${outcomeStats.labelled.toLocaleString()} labelled, ${outcomeStats.excluded.toLocaleString()} excluded (incomplete 1m coverage)`
+                      : "building"}
                   </span>
                 </div>
               ) : (

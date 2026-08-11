@@ -1199,6 +1199,111 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_snapshot_outcomes: {
+        Row: {
+          anchor_price: number
+          atr_at_anchor: number | null
+          bar_time: string
+          bars_used: number | null
+          coverage_ok: boolean
+          created_at: string
+          data_resolution: string
+          data_source: string
+          exclusion_reason: string | null
+          feature_version: number
+          first_bar_time: string | null
+          forward_close: number | null
+          forward_return_atr: number | null
+          forward_return_pct: number | null
+          horizon_minutes: number
+          id: string
+          label_version: number
+          labelled_at: string
+          last_bar_time: string | null
+          long_excursion_atr: number | null
+          mae_atr: number | null
+          mae_pct: number | null
+          mae_price: number | null
+          mfe_atr: number | null
+          mfe_pct: number | null
+          mfe_price: number | null
+          session: string | null
+          session_overlap: boolean | null
+          short_excursion_atr: number | null
+          symbol: string
+          timeframe: string
+          updated_at: string
+        }
+        Insert: {
+          anchor_price: number
+          atr_at_anchor?: number | null
+          bar_time: string
+          bars_used?: number | null
+          coverage_ok?: boolean
+          created_at?: string
+          data_resolution: string
+          data_source: string
+          exclusion_reason?: string | null
+          feature_version: number
+          first_bar_time?: string | null
+          forward_close?: number | null
+          forward_return_atr?: number | null
+          forward_return_pct?: number | null
+          horizon_minutes: number
+          id?: string
+          label_version?: number
+          labelled_at?: string
+          last_bar_time?: string | null
+          long_excursion_atr?: number | null
+          mae_atr?: number | null
+          mae_pct?: number | null
+          mae_price?: number | null
+          mfe_atr?: number | null
+          mfe_pct?: number | null
+          mfe_price?: number | null
+          session?: string | null
+          session_overlap?: boolean | null
+          short_excursion_atr?: number | null
+          symbol: string
+          timeframe: string
+          updated_at?: string
+        }
+        Update: {
+          anchor_price?: number
+          atr_at_anchor?: number | null
+          bar_time?: string
+          bars_used?: number | null
+          coverage_ok?: boolean
+          created_at?: string
+          data_resolution?: string
+          data_source?: string
+          exclusion_reason?: string | null
+          feature_version?: number
+          first_bar_time?: string | null
+          forward_close?: number | null
+          forward_return_atr?: number | null
+          forward_return_pct?: number | null
+          horizon_minutes?: number
+          id?: string
+          label_version?: number
+          labelled_at?: string
+          last_bar_time?: string | null
+          long_excursion_atr?: number | null
+          mae_atr?: number | null
+          mae_pct?: number | null
+          mae_price?: number | null
+          mfe_atr?: number | null
+          mfe_pct?: number | null
+          mfe_price?: number | null
+          session?: string | null
+          session_overlap?: boolean | null
+          short_excursion_atr?: number | null
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       session_volume_summary: {
         Row: {
           buyer_volume: number | null
@@ -1472,6 +1577,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      ron_invoke_worker: {
+        Args: { _fn: string; _payload?: Json }
+        Returns: number
       }
       ron_snapshot_cron_tick: { Args: never; Returns: undefined }
       ron_verify_cron_token: { Args: { _token: string }; Returns: boolean }
