@@ -323,16 +323,18 @@ export function computeRonSnapshot(
     asian_high: r(asianHigh, 5),
     asian_low: r(asianLow, 5),
     position_in_day_range_pct: r(posInDayRange, 2),
-    bars_used: candles.length,
     // ── provenance (Phase 1B) ───────────────────────────────────────
+    // Deterministic ONLY. Fields that vary with how much history the caller happened
+    // to load (raw window length / first loaded bar) are deliberately excluded: they
+    // made the feature hash depend on the loader, not on the market. Warmup flags are
+    // capped at the warmup requirement so they are identical for any window that is
+    // at least warm.
     provenance: {
       feature_version: RON_FEATURE_VERSION,
       asian_window_utc: "22:00-06:00",
       session_boundary: "NY_17:00_DST_aware",
       warmup_bars_required: 220,
       warmup_satisfied: !insufficient,
-      source_history_bars: candles.length,
-      source_first_bar: new Date(candles[0].time).toISOString(),
       source_last_bar: new Date(bar.time).toISOString(),
       ema200_warm: candles.length >= 200,
       adx14_warm: candles.length >= 29,

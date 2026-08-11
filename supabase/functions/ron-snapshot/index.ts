@@ -15,6 +15,15 @@ import type { Candle } from "../_shared/falconer-strategy.ts";
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
 const WARMUP_BARS = 400;      // >= EMA200 + ADX warmup
+/**
+ * CANONICAL WINDOW (Phase 1B determinism fix).
+ * Recursive indicators (EMA/RSI-Wilder/ADX) are seeded from the first bar of the input
+ * slice, so a snapshot is only reproducible if EVERY caller feeds the SAME number of
+ * preceding bars. Live and backfill therefore both compute on exactly the last
+ * CANONICAL_WINDOW bars ending at (and including) the target bar. Shorter only when
+ * less genuine history exists.
+ */
+const CANONICAL_WINDOW = 1500;
 const BAR_MS = 15 * 60 * 1000;
 
 const json = (body: unknown, status = 200) =>
@@ -142,7 +151,8 @@ Deno.serve(async (req) => {
         return json({ ok: true, mode, skipped: "already_snapshotted", bar_time: targetIso });
       }
 
-      const candles = await loadCandles(null, targetIso);
+      const loaded = await loadCandles(null, targetIso);
+      const candles = loaded.slice(-CANONICAL_WINDOW);
       if (candles.length < 30) return json({ ok: true, mode, skipped: "insufficient_history" });
 
       const snap = computeRonSnapshot(SYMBOL, TIMEFRAME, candles, { source: "candle_history" });
@@ -182,20 +192,24 @@ Deno.serve(async (req) => {
     const firstTarget = new Date(targets[0].timestamp).getTime();
     const lastTarget = new Date(targets[targets.length - 1].timestamp).getTime();
     // Load warmup history strictly BEFORE the first target plus the target range itself.
-    const warmFromIso = new Date(firstTarget - WARMUP_BARS * BAR_MS * 3).toISOString();
+    const warmFromIso = new Date(firstTarget - CANONICAL_WINDOW * BAR_MS * 3).toISOString();
     const all = await loadCandles(warmFromIso, new Date(lastTarget).toISOString());
     const indexOfTime = new Map<number, number>();
     all.forEach((c, idx) => indexOfTime.set(c.time, idx));
 
     const snaps: any[] = [];
     let skippedWarmup = 0;
+    // Phase 1B correction: no arbitrary warmup skip. computeRonSnapshot is proven safe
+    // with <30 bars (indicators return null, data_health = "insufficient"), so every
+    // genuine source bar gets a row. `min_bars` can still be set explicitly if needed.
+    const minBars = Math.max(1, Number(body.min_bars ?? 1));
     for (const t of targets) {
       const ms = new Date(t.timestamp).getTime();
       const idx = indexOfTime.get(ms);
       if (idx === undefined) continue;
-      if (idx < 30) { skippedWarmup++; continue; }
+      if (idx + 1 < minBars) { skippedWarmup++; continue; }
       // NO LOOKAHEAD: slice ends at the target bar (inclusive).
-      const window = all.slice(Math.max(0, idx - (WARMUP_BARS + 200) + 1), idx + 1);
+      const window = all.slice(Math.max(0, idx - CANONICAL_WINDOW + 1), idx + 1);
       snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, window, { source: "candle_history_backfill" }));
     }
 
