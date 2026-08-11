@@ -2,8 +2,15 @@
  * RON Phase 2A outcome labelling — deterministic, strictly forward-looking.
  *
  * HARD RULES
- *  - A label uses ONLY bars that OPEN strictly after the anchor bar's CLOSE and that
- *    COMPLETE at or before (anchor close + horizon). Never the anchor bar itself.
+ *  - BOUNDARY (precise): a label uses ONLY bars that do NOT open before the anchor bar's
+ *    CLOSE — the first eligible bar MAY open EXACTLY AT anchor close, because
+ *    `candle_history.timestamp` is the bar OPEN time, so that bar covers
+ *    [anchorClose, anchorClose + resolution) and does not overlap the anchor bar.
+ *    Every included bar must COMPLETE at or before (anchor close + horizon).
+ *    This is NOT "strictly after anchor close".
+ *  - NOTE (label_version=1 legacy semantics): `mfe_price`/`mae_price` below store the
+ *    ABSOLUTE highest/lowest traded price, not excursion distances. v1 rows are kept for
+ *    audit only; use `ron-outcomes-v2.ts` for anything downstream.
  *  - Genuine stored candles only. Missing history is never interpolated, bridged or
  *    substituted with a coarser timeframe: it is reported as coverage_ok = false with
  *    a precise exclusion_reason.
