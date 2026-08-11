@@ -1163,6 +1163,7 @@ export type Database = {
           short_report: Json
           source_as_of: string
           source_bar_cutoff: string | null
+          source_bar_cutoff_key: string | null
           split_cutoff: string | null
           status: string
           symbol: string
@@ -1192,6 +1193,7 @@ export type Database = {
           short_report?: Json
           source_as_of: string
           source_bar_cutoff?: string | null
+          source_bar_cutoff_key?: string | null
           split_cutoff?: string | null
           status?: string
           symbol: string
@@ -1221,6 +1223,7 @@ export type Database = {
           short_report?: Json
           source_as_of?: string
           source_bar_cutoff?: string | null
+          source_bar_cutoff_key?: string | null
           split_cutoff?: string | null
           status?: string
           symbol?: string
