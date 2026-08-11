@@ -37,3 +37,6 @@ verify_jwt = true
 
 [functions.ingest-candles]
 verify_jwt = true
+
+[functions.ron-label]
+verify_jwt = true
