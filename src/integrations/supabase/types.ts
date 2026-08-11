@@ -1143,6 +1143,7 @@ export type Database = {
         Row: {
           barrier_atr_mult: number
           barrier_version: number
+          calibration_version: number
           canonical_rows: number
           created_at: string
           definition_hash: string
@@ -1161,6 +1162,7 @@ export type Database = {
           run_hash: string
           short_report: Json
           source_as_of: string
+          source_bar_cutoff: string | null
           split_cutoff: string | null
           status: string
           symbol: string
@@ -1170,6 +1172,7 @@ export type Database = {
         Insert: {
           barrier_atr_mult: number
           barrier_version: number
+          calibration_version?: number
           canonical_rows?: number
           created_at?: string
           definition_hash: string
@@ -1188,6 +1191,7 @@ export type Database = {
           run_hash: string
           short_report?: Json
           source_as_of: string
+          source_bar_cutoff?: string | null
           split_cutoff?: string | null
           status?: string
           symbol: string
@@ -1197,6 +1201,7 @@ export type Database = {
         Update: {
           barrier_atr_mult?: number
           barrier_version?: number
+          calibration_version?: number
           canonical_rows?: number
           created_at?: string
           definition_hash?: string
@@ -1215,6 +1220,7 @@ export type Database = {
           run_hash?: string
           short_report?: Json
           source_as_of?: string
+          source_bar_cutoff?: string | null
           split_cutoff?: string | null
           status?: string
           symbol?: string
@@ -1459,6 +1465,7 @@ export type Database = {
           barrier_atr_mult: number
           barrier_version: number
           brier: number | null
+          calibration_version: number
           cell_hash: string
           cell_key: string
           created_at: string
@@ -1488,6 +1495,7 @@ export type Database = {
           run_id: string
           sample_floor: number
           source_as_of: string
+          source_bar_cutoff: string | null
           split_cutoff: string | null
           successes_fit: number
           successes_holdout: number
@@ -1501,6 +1509,7 @@ export type Database = {
           barrier_atr_mult: number
           barrier_version: number
           brier?: number | null
+          calibration_version?: number
           cell_hash: string
           cell_key: string
           created_at?: string
@@ -1530,6 +1539,7 @@ export type Database = {
           run_id: string
           sample_floor: number
           source_as_of: string
+          source_bar_cutoff?: string | null
           split_cutoff?: string | null
           successes_fit?: number
           successes_holdout?: number
@@ -1543,6 +1553,7 @@ export type Database = {
           barrier_atr_mult?: number
           barrier_version?: number
           brier?: number | null
+          calibration_version?: number
           cell_hash?: string
           cell_key?: string
           created_at?: string
@@ -1572,6 +1583,7 @@ export type Database = {
           run_id?: string
           sample_floor?: number
           source_as_of?: string
+          source_bar_cutoff?: string | null
           split_cutoff?: string | null
           successes_fit?: number
           successes_holdout?: number

@@ -1,29 +1,43 @@
 /**
- * RON Phase 2B — empirical calibration runner (RESEARCH ONLY).
+ * RON Phase 2B.1 — empirical calibration runner, calibration_version = 2 (RESEARCH ONLY).
  *
  * Reads canonical v3 / 60m / ±1 ATR outcomes for XAUUSD 15m, applies the strict
  * eligibility gate, splits chronologically, builds the L0..L3 stat-cell hierarchy and
  * scores the holdout. Nothing it writes is displayed as a probability anywhere.
  *
- * Reproducibility: pass `source_as_of` to freeze the input cut. Re-running with the same
- * frozen cut and the same holdout fraction produces identical hashes and zero duplicates.
+ * REPRODUCIBILITY (v2 input contract)
+ *   Row membership is frozen by MARKET TIME, never by the mutable `labelled_at` column:
+ *   `source_bar_cutoff = floor15m(source_as_of) - (bar 15m + horizon 60m)` is the last
+ *   anchor whose whole forward horizon had elapsed at the frozen instant. Re-labelling an
+ *   unchanged historical outcome therefore cannot change membership, metrics or hashes.
+ *   `source_as_of` is retained as provenance only.
  *
  * POST body:
- *   { source_as_of?: ISO, holdout_fraction?: number, persist?: boolean }
+ *   { source_as_of?: ISO, source_bar_cutoff?: ISO, holdout_fraction?: number, persist?: boolean }
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION, CALIBRATION_FEATURE_VERSION,
   CALIBRATION_LABEL_VERSION, CALIBRATION_HORIZON_MINUTES, CALIBRATION_BARRIER_ATR_MULT,
-  CALIBRATION_BARRIER_VERSION, HOLDOUT_FRACTION, SAMPLE_FLOORS,
-  calibrateDirection, cellPayload, definitionPayload, eligibleFor, resolvePrediction,
-  sha256, type CalibrationInputRow, type Direction, type EligibleObs,
+  CALIBRATION_BARRIER_VERSION, CALIBRATION_VERSION, HOLDOUT_FRACTION, SAMPLE_FLOORS,
+  INELIGIBLE_ANCHOR_SESSIONS, anchorSessionEligible,
+  calibrateDirection, cellPayloadV2, definitionPayloadV2, eligibleFor, resolvePrediction,
+  runPayloadV2, sha256, type CalibrationInputRow, type Direction, type EligibleObs,
+  type RunIdentityV2,
 } from "../_shared/ron-calibration.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
 const PAGE = 1000;
+const BAR_MINUTES = 15;
+
+/** Immutable market-time boundary derived purely from the frozen instant. */
+function deriveSourceBarCutoff(sourceAsOf: string): string {
+  const grid = BAR_MINUTES * 60_000;
+  const floored = Math.floor(new Date(sourceAsOf).getTime() / grid) * grid;
+  return new Date(floored - (BAR_MINUTES + CALIBRATION_HORIZON_MINUTES) * 60_000).toISOString();
+}
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -68,6 +82,11 @@ Deno.serve(async (req) => {
       .order("labelled_at", { ascending: false }).limit(1).maybeSingle();
     sourceAsOf = (data as any)?.labelled_at ?? new Date().toISOString();
   }
+  const frozenAsOf = new Date(sourceAsOf ?? new Date().toISOString()).toISOString();
+  sourceAsOf = frozenAsOf;
+  const sourceBarCutoff = typeof body.source_bar_cutoff === "string"
+    ? new Date(body.source_bar_cutoff).toISOString()
+    : deriveSourceBarCutoff(frozenAsOf);
 
   // ---- canonical outcome rows -------------------------------------------
   const outcomes: any[] = [];
@@ -79,7 +98,7 @@ Deno.serve(async (req) => {
       .eq("feature_version", CALIBRATION_FEATURE_VERSION)
       .eq("label_version", CALIBRATION_LABEL_VERSION)
       .eq("horizon_minutes", CALIBRATION_HORIZON_MINUTES)
-      .lte("labelled_at", sourceAsOf)
+      .lte("bar_time", sourceBarCutoff)
       .order("bar_time", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) return json({ error: error.message }, 500);
@@ -138,7 +157,16 @@ Deno.serve(async (req) => {
     for (const dir of ["long", "short"] as Direction[]) {
       const e = eligibleFor(row, dir);
       if (e) { obs[dir].push(e); any = true; }
-      else bump(`${dir}:${!row.coverage_ok || row.coverage_class !== "complete" ? row.coverage_class : row.atr_at_anchor == null ? "missing_atr" : "event_ineligible"}`);
+      else {
+        const reason = !row.coverage_ok || row.coverage_class !== "complete"
+          ? row.coverage_class
+          : row.atr_at_anchor == null
+            ? "missing_atr"
+            : !anchorSessionEligible(row.session)
+              ? "anchor_session_ineligible"
+              : "event_ineligible";
+        bump(`${dir}:${reason}`);
+      }
     }
     if (!any) bump("row_fully_excluded");
   }
@@ -147,24 +175,30 @@ Deno.serve(async (req) => {
   const shortReport = calibrateDirection("short", obs.short, holdoutFraction);
   const cutoff = longReport.holdout_range?.[0] ?? shortReport.holdout_range?.[0] ?? null;
 
-  const definitionHash = await sha256(definitionPayload(sourceAsOf, cutoff));
-  const runHash = await sha256([
-    definitionHash,
-    outcomes.length, obs.long.length, obs.short.length,
-    [...longReport.cells, ...shortReport.cells].map(cellPayload),
-    longReport.brier, longReport.naive_brier, longReport.ece,
-    shortReport.brier, shortReport.naive_brier, shortReport.ece,
-  ]);
+  const identity: RunIdentityV2 = {
+    symbol: SYMBOL, timeframe: TIMEFRAME,
+    source_as_of: sourceAsOf, source_bar_cutoff: sourceBarCutoff,
+    holdout_fraction: holdoutFraction, split_cutoff: cutoff,
+    canonical_rows: outcomes.length,
+    eligible_long: obs.long.length, eligible_short: obs.short.length,
+    excluded_rows: outcomes.length * 2 - obs.long.length - obs.short.length,
+    exclusion_breakdown: exclusion,
+  };
+  const definitionHash = await sha256(definitionPayloadV2(identity));
+  const runHash = await sha256(runPayloadV2(identity, definitionHash, longReport, shortReport));
 
   const summary = {
+    calibration_version: CALIBRATION_VERSION,
     source_as_of: sourceAsOf,
+    source_bar_cutoff: sourceBarCutoff,
+    ineligible_anchor_sessions: INELIGIBLE_ANCHOR_SESSIONS,
     holdout_fraction: holdoutFraction,
     split_cutoff: cutoff,
     sample_floors: SAMPLE_FLOORS,
     canonical_rows: outcomes.length,
     eligible_long: obs.long.length,
     eligible_short: obs.short.length,
-    excluded_rows: outcomes.length * 2 - obs.long.length - obs.short.length,
+    excluded_rows: identity.excluded_rows,
     exclusion_breakdown: exclusion,
     definition_hash: definitionHash,
     run_hash: runHash,
@@ -180,11 +214,13 @@ Deno.serve(async (req) => {
     .from("ron_calibration_runs")
     .upsert({
       symbol: SYMBOL, timeframe: TIMEFRAME,
+      calibration_version: CALIBRATION_VERSION,
       event_definition: CALIBRATION_EVENT, event_version: CALIBRATION_EVENT_VERSION,
       feature_version: CALIBRATION_FEATURE_VERSION, label_version: CALIBRATION_LABEL_VERSION,
       horizon_minutes: CALIBRATION_HORIZON_MINUTES,
       barrier_atr_mult: CALIBRATION_BARRIER_ATR_MULT, barrier_version: CALIBRATION_BARRIER_VERSION,
-      source_as_of: sourceAsOf, holdout_fraction: holdoutFraction, split_cutoff: cutoff,
+      source_as_of: sourceAsOf, source_bar_cutoff: sourceBarCutoff,
+      holdout_fraction: holdoutFraction, split_cutoff: cutoff,
       canonical_rows: outcomes.length,
       eligible_long: obs.long.length, eligible_short: obs.short.length,
       excluded_rows: summary.excluded_rows,
@@ -192,7 +228,7 @@ Deno.serve(async (req) => {
       long_report: longReport as unknown as Record<string, unknown>,
       short_report: shortReport as unknown as Record<string, unknown>,
       definition_hash: definitionHash, run_hash: runHash, status: "research",
-    }, { onConflict: "symbol,timeframe,event_definition,event_version,feature_version,label_version,horizon_minutes,source_as_of,holdout_fraction" })
+    }, { onConflict: "symbol,timeframe,event_definition,event_version,feature_version,label_version,horizon_minutes,calibration_version,source_as_of,holdout_fraction" })
     .select("id").single();
   if (runErr) return json({ error: runErr.message, summary }, 500);
 
@@ -205,25 +241,29 @@ Deno.serve(async (req) => {
         bar_time: "", t: 0, success: false,
         session: c.dim_session ?? "", regime: c.dim_regime ?? "", adx_bucket: c.dim_adx_bucket ?? "",
       });
+      const persisted = {
+        source_as_of: sourceAsOf, source_bar_cutoff: sourceBarCutoff, split_cutoff: cutoff,
+        fit_start: rep.fit_range?.[0] ?? null, fit_end: rep.fit_range?.[1] ?? null,
+        holdout_start: rep.holdout_range?.[0] ?? null, holdout_end: rep.holdout_range?.[1] ?? null,
+        prediction_rate: c.meets_sample_floor ? c.empirical_rate : res.p,
+        brier: rep.brier, naive_brier: rep.naive_brier,
+      };
       cellRows.push({
         run_id: runId, symbol: SYMBOL, timeframe: TIMEFRAME,
+        calibration_version: CALIBRATION_VERSION,
         event_definition: CALIBRATION_EVENT, event_version: CALIBRATION_EVENT_VERSION,
         feature_version: CALIBRATION_FEATURE_VERSION, label_version: CALIBRATION_LABEL_VERSION,
         horizon_minutes: CALIBRATION_HORIZON_MINUTES,
         barrier_atr_mult: CALIBRATION_BARRIER_ATR_MULT, barrier_version: CALIBRATION_BARRIER_VERSION,
         direction: c.direction, level: c.level, cell_key: c.cell_key,
         dim_session: c.dim_session, dim_regime: c.dim_regime, dim_adx_bucket: c.dim_adx_bucket,
-        source_as_of: sourceAsOf, split_cutoff: cutoff,
-        fit_start: rep.fit_range?.[0] ?? null, fit_end: rep.fit_range?.[1] ?? null,
-        holdout_start: rep.holdout_range?.[0] ?? null, holdout_end: rep.holdout_range?.[1] ?? null,
+        ...persisted,
         n_fit: c.n_fit, successes_fit: c.successes_fit, empirical_rate: c.empirical_rate,
         wilson_low: c.wilson_low, wilson_high: c.wilson_high,
         sample_floor: c.sample_floor, meets_sample_floor: c.meets_sample_floor,
         n_holdout: c.n_holdout, successes_holdout: c.successes_holdout, holdout_rate: c.holdout_rate,
-        prediction_rate: c.meets_sample_floor ? c.empirical_rate : res.p,
-        brier: rep.brier, naive_brier: rep.naive_brier,
         definition_hash: definitionHash,
-        cell_hash: await sha256([definitionHash, cellPayload(c)]),
+        cell_hash: await sha256([definitionHash, cellPayloadV2(c, persisted)]),
       });
     }
   }
