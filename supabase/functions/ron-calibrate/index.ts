@@ -34,11 +34,21 @@ Deno.serve(async (req) => {
   const auth = req.headers.get("Authorization") ?? "";
   const token = auth.replace(/^Bearer\s+/i, "");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!token || token !== serviceKey) {
-    return json({ error: "unauthorized" }, 401);
-  }
-
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
+
+  // Authorization: exact secret match only, never a decoded JWT claim.
+  const eq = (a: string, b: string) => {
+    if (a.length !== b.length) return false;
+    let d = 0;
+    for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return d === 0;
+  };
+  let authorized = !!token && !!serviceKey && eq(token, serviceKey);
+  if (!authorized && token) {
+    const { data: ok } = await supabase.rpc("ron_verify_cron_token", { _token: token });
+    authorized = ok === true;
+  }
+  if (!authorized) return json({ error: "unauthorized" }, 401);
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body allowed */ }
