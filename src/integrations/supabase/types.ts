@@ -1139,6 +1139,90 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_calibration_runs: {
+        Row: {
+          barrier_atr_mult: number
+          barrier_version: number
+          canonical_rows: number
+          created_at: string
+          definition_hash: string
+          eligible_long: number
+          eligible_short: number
+          event_definition: string
+          event_version: number
+          excluded_rows: number
+          exclusion_breakdown: Json
+          feature_version: number
+          holdout_fraction: number
+          horizon_minutes: number
+          id: string
+          label_version: number
+          long_report: Json
+          run_hash: string
+          short_report: Json
+          source_as_of: string
+          split_cutoff: string | null
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+        }
+        Insert: {
+          barrier_atr_mult: number
+          barrier_version: number
+          canonical_rows?: number
+          created_at?: string
+          definition_hash: string
+          eligible_long?: number
+          eligible_short?: number
+          event_definition: string
+          event_version: number
+          excluded_rows?: number
+          exclusion_breakdown?: Json
+          feature_version: number
+          holdout_fraction: number
+          horizon_minutes: number
+          id?: string
+          label_version: number
+          long_report?: Json
+          run_hash: string
+          short_report?: Json
+          source_as_of: string
+          split_cutoff?: string | null
+          status?: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+        }
+        Update: {
+          barrier_atr_mult?: number
+          barrier_version?: number
+          canonical_rows?: number
+          created_at?: string
+          definition_hash?: string
+          eligible_long?: number
+          eligible_short?: number
+          event_definition?: string
+          event_version?: number
+          excluded_rows?: number
+          exclusion_breakdown?: Json
+          feature_version?: number
+          holdout_fraction?: number
+          horizon_minutes?: number
+          id?: string
+          label_version?: number
+          long_report?: Json
+          run_hash?: string
+          short_report?: Json
+          source_as_of?: string
+          split_cutoff?: string | null
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ron_market_snapshots: {
         Row: {
           bar_time: string
@@ -1369,6 +1453,143 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      ron_stat_cells: {
+        Row: {
+          barrier_atr_mult: number
+          barrier_version: number
+          brier: number | null
+          cell_hash: string
+          cell_key: string
+          created_at: string
+          definition_hash: string
+          dim_adx_bucket: string | null
+          dim_regime: string | null
+          dim_session: string | null
+          direction: string
+          empirical_rate: number | null
+          event_definition: string
+          event_version: number
+          feature_version: number
+          fit_end: string | null
+          fit_start: string | null
+          holdout_end: string | null
+          holdout_rate: number | null
+          holdout_start: string | null
+          horizon_minutes: number
+          id: string
+          label_version: number
+          level: number
+          meets_sample_floor: boolean
+          n_fit: number
+          n_holdout: number
+          naive_brier: number | null
+          prediction_rate: number | null
+          run_id: string
+          sample_floor: number
+          source_as_of: string
+          split_cutoff: string | null
+          successes_fit: number
+          successes_holdout: number
+          symbol: string
+          timeframe: string
+          updated_at: string
+          wilson_high: number | null
+          wilson_low: number | null
+        }
+        Insert: {
+          barrier_atr_mult: number
+          barrier_version: number
+          brier?: number | null
+          cell_hash: string
+          cell_key: string
+          created_at?: string
+          definition_hash: string
+          dim_adx_bucket?: string | null
+          dim_regime?: string | null
+          dim_session?: string | null
+          direction: string
+          empirical_rate?: number | null
+          event_definition: string
+          event_version: number
+          feature_version: number
+          fit_end?: string | null
+          fit_start?: string | null
+          holdout_end?: string | null
+          holdout_rate?: number | null
+          holdout_start?: string | null
+          horizon_minutes: number
+          id?: string
+          label_version: number
+          level: number
+          meets_sample_floor?: boolean
+          n_fit?: number
+          n_holdout?: number
+          naive_brier?: number | null
+          prediction_rate?: number | null
+          run_id: string
+          sample_floor: number
+          source_as_of: string
+          split_cutoff?: string | null
+          successes_fit?: number
+          successes_holdout?: number
+          symbol: string
+          timeframe: string
+          updated_at?: string
+          wilson_high?: number | null
+          wilson_low?: number | null
+        }
+        Update: {
+          barrier_atr_mult?: number
+          barrier_version?: number
+          brier?: number | null
+          cell_hash?: string
+          cell_key?: string
+          created_at?: string
+          definition_hash?: string
+          dim_adx_bucket?: string | null
+          dim_regime?: string | null
+          dim_session?: string | null
+          direction?: string
+          empirical_rate?: number | null
+          event_definition?: string
+          event_version?: number
+          feature_version?: number
+          fit_end?: string | null
+          fit_start?: string | null
+          holdout_end?: string | null
+          holdout_rate?: number | null
+          holdout_start?: string | null
+          horizon_minutes?: number
+          id?: string
+          label_version?: number
+          level?: number
+          meets_sample_floor?: boolean
+          n_fit?: number
+          n_holdout?: number
+          naive_brier?: number | null
+          prediction_rate?: number | null
+          run_id?: string
+          sample_floor?: number
+          source_as_of?: string
+          split_cutoff?: string | null
+          successes_fit?: number
+          successes_holdout?: number
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+          wilson_high?: number | null
+          wilson_low?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_stat_cells_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ron_calibration_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       session_volume_summary: {
         Row: {
