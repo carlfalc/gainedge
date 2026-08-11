@@ -33,6 +33,22 @@ export const CALIBRATION_BARRIER_ATR_MULT = 1.0;
 export const CALIBRATION_BARRIER_VERSION = 1;
 export const HOLDOUT_FRACTION = 0.3;
 
+/**
+ * Runner/input-contract version.
+ *   v1 (historical, preserved in the DB): row membership frozen by mutable `labelled_at`,
+ *       partial hash coverage, market_closed anchors could enter the sample.
+ *   v2 (canonical): membership frozen by immutable market time (`source_bar_cutoff`),
+ *       full deterministic hash coverage, market_closed anchors always ineligible.
+ */
+export const CALIBRATION_VERSION = 2;
+
+/** A market-closed anchor can never be a user opportunity, so it can never be evidence. */
+export const INELIGIBLE_ANCHOR_SESSIONS: readonly string[] = ["market_closed"];
+
+export function anchorSessionEligible(session: string | null | undefined): boolean {
+  return !INELIGIBLE_ANCHOR_SESSIONS.includes(normSession(session));
+}
+
 /** Conservative floors: deeper cells must be better evidenced, not just present. */
 export const SAMPLE_FLOORS: Record<number, number> = { 0: 200, 1: 200, 2: 300, 3: 400 };
 
@@ -85,6 +101,7 @@ export function eligibleFor(row: CalibrationInputRow, dir: Direction): EligibleO
   if (!row.coverage_ok) return null;
   if (row.coverage_class !== "complete") return null;
   if (row.atr_at_anchor == null) return null;
+  if (!anchorSessionEligible(row.session)) return null;   // market_closed anchors never count
   const ok = dir === "long" ? row.long_event_eligible : row.short_event_eligible;
   const success = dir === "long" ? row.long_success : row.short_success;
   if (ok !== true) return null;
@@ -341,5 +358,98 @@ export function cellPayload(c: CellStat) {
     c.direction, c.level, c.cell_key, c.dim_session, c.dim_regime, c.dim_adx_bucket,
     c.n_fit, c.successes_fit, c.empirical_rate, c.wilson_low, c.wilson_high,
     c.sample_floor, c.meets_sample_floor, c.n_holdout, c.successes_holdout, c.holdout_rate,
+  ];
+}
+
+/* ------------------------------------------------------------------------- *
+ * calibration_version = 2 canonical hash payloads.
+ *
+ * Every deterministic value persisted for a run/cell that could change an audit
+ * reading is hashed. Only volatile DB metadata (id, run_id, created_at, updated_at)
+ * is excluded. Ordering is fixed and map keys are sorted, so the digest is stable.
+ * ------------------------------------------------------------------------- */
+
+const sortedEntries = (m: Record<string, number>) =>
+  Object.keys(m).sort().map((k) => [k, m[k]]);
+
+export interface RunIdentityV2 {
+  symbol: string;
+  timeframe: string;
+  source_as_of: string;
+  /** Immutable market-time boundary; row membership is derived from this, never labelled_at. */
+  source_bar_cutoff: string | null;
+  holdout_fraction: number;
+  split_cutoff: string | null;
+  canonical_rows: number;
+  eligible_long: number;
+  eligible_short: number;
+  excluded_rows: number;
+  exclusion_breakdown: Record<string, number>;
+}
+
+export function definitionPayloadV2(id: RunIdentityV2) {
+  return [
+    "calibration_version", CALIBRATION_VERSION,
+    CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+    id.symbol, id.timeframe,
+    CALIBRATION_FEATURE_VERSION, CALIBRATION_LABEL_VERSION,
+    CALIBRATION_HORIZON_MINUTES, CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+    id.holdout_fraction,
+    SAMPLE_FLOORS[0], SAMPLE_FLOORS[1], SAMPLE_FLOORS[2], SAMPLE_FLOORS[3],
+    [...INELIGIBLE_ANCHOR_SESSIONS].sort(),
+    id.source_as_of, id.source_bar_cutoff, id.split_cutoff,
+  ];
+}
+
+/** Full deterministic report payload — reliability, fallback and session counts included. */
+export function reportPayloadV2(r: DirectionReport) {
+  return [
+    r.direction, r.n_eligible, r.n_fit, r.n_holdout,
+    r.fit_range, r.holdout_range,
+    r.global_fit_rate, r.holdout_observed_rate,
+    r.n_predicted, r.n_unpredicted,
+    r.brier, r.naive_brier, r.ece,
+    r.reliability.map((b) => [b.lo, b.hi, b.n, b.mean_pred, b.observed]),
+    sortedEntries(r.fallback_levels),
+    sortedEntries(r.session_counts),
+    r.cells.map(cellPayload),
+  ];
+}
+
+export function runPayloadV2(id: RunIdentityV2, defHash: string, long: DirectionReport, short: DirectionReport) {
+  return [
+    defHash,
+    id.canonical_rows, id.eligible_long, id.eligible_short, id.excluded_rows,
+    sortedEntries(id.exclusion_breakdown),
+    reportPayloadV2(long), reportPayloadV2(short),
+  ];
+}
+
+export interface CellPersistedV2 {
+  source_as_of: string;
+  source_bar_cutoff: string | null;
+  split_cutoff: string | null;
+  fit_start: string | null;
+  fit_end: string | null;
+  holdout_start: string | null;
+  holdout_end: string | null;
+  prediction_rate: number | null;
+  brier: number | null;
+  naive_brier: number | null;
+}
+
+/** Canonical cell payload covering every deterministic persisted column. */
+export function cellPayloadV2(c: CellStat, p: CellPersistedV2) {
+  return [
+    CALIBRATION_VERSION, CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+    CALIBRATION_FEATURE_VERSION, CALIBRATION_LABEL_VERSION, CALIBRATION_HORIZON_MINUTES,
+    CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+    c.direction, c.level, c.cell_key, c.dim_session, c.dim_regime, c.dim_adx_bucket,
+    p.source_as_of, p.source_bar_cutoff, p.split_cutoff,
+    p.fit_start, p.fit_end, p.holdout_start, p.holdout_end,
+    c.n_fit, c.successes_fit, c.empirical_rate, c.wilson_low, c.wilson_high,
+    c.sample_floor, c.meets_sample_floor,
+    c.n_holdout, c.successes_holdout, c.holdout_rate,
+    p.prediction_rate, p.brier, p.naive_brier,
   ];
 }
