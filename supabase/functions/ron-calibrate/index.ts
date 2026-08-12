@@ -24,10 +24,11 @@ import {
   INELIGIBLE_ANCHOR_SESSIONS, anchorSessionEligible,
   calibrateDirection, cellPayloadV2, definitionPayloadV2, eligibleFor, resolvePrediction,
   runPayloadV2, sha256, resolveSourceClockV2, NoGenuineSourceClockError,
+  CALIBRATION_CONTRACTS, CALIBRATION_CONTRACT_V3,
   type CalibrationInputRow, type Direction, type EligibleObs,
   type RunIdentityV2,
 } from "../_shared/ron-calibration.ts";
-import { CRITICAL_RULES, RON_QUALITY_VERSION } from "../_shared/ron-data-quality.ts";
+import { loadQuarantinedBarTimes, RON_QUALITY_VERSION } from "../_shared/ron-quality-contract.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
@@ -70,6 +71,14 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body allowed */ }
   const holdoutFraction = typeof body.holdout_fraction === "number" ? body.holdout_fraction : HOLDOUT_FRACTION;
   const persist = body.persist !== false;
+  /**
+   * Phase 2C.1: calibration_version=3 is canonical (feature v3 + label v4). v2 remains
+   * runnable for frozen audit replay and produces byte-identical hashes.
+   */
+  const CONTRACT = CALIBRATION_CONTRACTS[Number(body.calibration_version ?? 3)] ?? CALIBRATION_CONTRACT_V3;
+  const CAL_VERSION = CONTRACT.calibration_version;
+  const FEATURE_V = CONTRACT.feature_version;
+  const LABEL_V = CONTRACT.label_version;
 
   // ---- frozen source cut -------------------------------------------------
   // v2 contract: the default source clock is GENUINE MARKET TIME — the latest stored
@@ -98,9 +107,9 @@ Deno.serve(async (req) => {
       return json({
         error: "NO_GENUINE_SOURCE_CLOCK",
         detail: "No genuine XAUUSD 1m candle is available to freeze source_as_of. " +
-          "calibration_version=2 refuses wall-clock, labelled_at, created_at and updated_at fallbacks. " +
+          "RON calibration refuses wall-clock, labelled_at, created_at and updated_at fallbacks. " +
           "Pass an explicit source_as_of for frozen research replay.",
-        calibration_version: CALIBRATION_VERSION,
+        calibration_version: CAL_VERSION,
       }, 503);
     }
     throw e;
@@ -117,8 +126,8 @@ Deno.serve(async (req) => {
       .from("ron_snapshot_outcomes")
       .select("bar_time, session, atr_at_anchor, coverage_ok, coverage_class, exclusion_reason, long_event_eligible, long_success, short_event_eligible, short_success, barrier_atr_mult, barrier_version, labelled_at")
       .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
-      .eq("feature_version", CALIBRATION_FEATURE_VERSION)
-      .eq("label_version", CALIBRATION_LABEL_VERSION)
+      .eq("feature_version", FEATURE_V)
+      .eq("label_version", LABEL_V)
       .eq("horizon_minutes", CALIBRATION_HORIZON_MINUTES)
       .lte("bar_time", sourceBarCutoff)
       .order("bar_time", { ascending: true })
@@ -136,7 +145,7 @@ Deno.serve(async (req) => {
       .from("ron_market_snapshots")
       .select("bar_time, features")
       .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
-      .eq("feature_version", CALIBRATION_FEATURE_VERSION)
+      .eq("feature_version", FEATURE_V)
       .order("bar_time", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) return json({ error: error.message }, 500);
