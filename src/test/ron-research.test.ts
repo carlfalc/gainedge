@@ -291,7 +291,7 @@ describe("gap-aware coverage epochs and folds", () => {
   });
 
   it("never allocates a test block that spans a coverage-epoch gap", () => {
-    const s = gappedSeries(4000, 3000, 24 * 77);
+    const s = gappedSeries(6000, 3000, 24 * 77);
     const plan = buildGapAwareFolds([s, s], 4);
     expect(plan.accepted_folds).toBeGreaterThanOrEqual(1);
     expect(plan.epochs.length).toBe(2);
@@ -302,6 +302,9 @@ describe("gap-aware coverage epochs and folds", () => {
       const lo = new Date(f.test_start).getTime();
       const hi = new Date(f.test_end!).getTime();
       expect(s.filter((o) => o.t >= lo && o.t < hi).length).toBeGreaterThanOrEqual(MIN_TEST_OBS_PER_FOLD);
+      const ep = plan.epochs.find((e) => e.epoch === f.coverage_epoch)!;
+      expect(lo).toBeGreaterThanOrEqual(new Date(ep.start).getTime());
+      expect(hi).toBeLessThanOrEqual(new Date(ep.end).getTime() + 1);
     }
     expect(buildGapAwareFolds([s, s], 4)).toEqual(plan);
   });
