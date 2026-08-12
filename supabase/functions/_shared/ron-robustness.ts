@@ -354,24 +354,16 @@ export function summariseDirection(dir: Direction, folds: FoldMetrics[]): Direct
   const bySession = new Map<string, number[]>();
   const byRegime = new Map<string, number[]>();
   const pooled: number[] = [];
-  const sqModel = new Map<string, { m: number; nv: number; n: number }>();
-  void sqModel;
   const sliceAcc = (m: Map<string, number[]>, k: string, d: number) => {
     const a = m.get(k) ?? []; a.push(d); m.set(k, a);
   };
-  const sliceModel = new Map<string, { model: number; naive: number; n: number }>();
-  const sliceModelRegime = new Map<string, { model: number; naive: number; n: number }>();
-
   for (const f of folds) {
-    const nb = f.naive_brier;
-    void nb;
     for (const d of f.diffs) {
       pooled.push(d.d);
       sliceAcc(bySession, d.session, d.d);
       sliceAcc(byRegime, d.regime, d.d);
     }
   }
-  void sliceModel; void sliceModelRegime;
 
   const sliceStats = (m: Map<string, number[]>): SliceStat[] =>
     [...m.keys()].sort().map((k) => {
