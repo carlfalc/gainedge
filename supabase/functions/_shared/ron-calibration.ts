@@ -227,7 +227,11 @@ export function normRegime(r: string | null | undefined): string {
  * Strict eligibility gate for ONE direction. Anything ambiguous, uncovered or
  * unmeasurable is dropped — never coerced to false.
  */
-export function eligibleFor(row: CalibrationInputRow, dir: Direction): EligibleObs | null {
+export function eligibleFor(
+  row: CalibrationInputRow,
+  dir: Direction,
+  spec: AdxBucketSpec = ADX_BUCKET_SPEC,
+): EligibleObs | null {
   if (!row.coverage_ok) return null;
   if (row.coverage_class !== "complete") return null;
   if (row.atr_at_anchor == null) return null;
@@ -241,7 +245,7 @@ export function eligibleFor(row: CalibrationInputRow, dir: Direction): EligibleO
     t: new Date(row.bar_time).getTime(),
     session: normSession(row.session),
     regime: normRegime(row.regime),
-    adx_bucket: adxBucket(row.adx),
+    adx_bucket: adxBucket(row.adx, spec),
     success,
   };
 }
