@@ -26,6 +26,11 @@ const DAILY_LOOKBACK = 320;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+/** Bar lengths used only by the closed-bar ingestion guard. */
+const TF_MS_GUARD: Record<string, number> = {
+  "1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+  "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+};
 
 interface Settings {
   user_id: string;
