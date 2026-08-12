@@ -58,6 +58,7 @@ interface InstrumentTrackingPanelProps {
 }
 
 export default function InstrumentTrackingPanel({ showPopOutButton = true }: InstrumentTrackingPanelProps) {
+  const navigate = useNavigate();
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(new Map());
   const [userId, setUserId] = useState<string>();
@@ -207,6 +208,16 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
 
   // Genuine broker quotes for the visible tiles only (single bounded poll loop).
   const { quotes: liveQuotes } = useLiveQuotes(visibleScans.map(s => s.symbol));
+
+  /** Open the existing GainEdge chart page with this symbol selected. */
+  const openChart = (symbol: string) => {
+    // In the popout window there is no router history for /dashboard — open a tab.
+    if (window.opener || window.location.pathname === "/instruments-popout") {
+      window.open(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`, "_blank", "noopener");
+      return;
+    }
+    navigate(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`);
+  };
 
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
