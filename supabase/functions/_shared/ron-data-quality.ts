@@ -111,8 +111,9 @@ export const RECONCILE_TOLERANCE = 0.005;
 export function detectBarQuality(
   bar: SourceBar,
   children: ChildBar[],
-  opts: { barMinutes: number; venueOpen: (d: Date) => boolean },
+  opts: { barMinutes: number; venueOpen: (d: Date) => boolean; qualityVersion?: number },
 ): QualityFlag[] {
+  const qv = opts.qualityVersion ?? RON_QUALITY_VERSION;
   const iso = new Date(bar.time).toISOString();
   const range = r(bar.high - bar.low);
   const base = {
@@ -120,12 +121,33 @@ export function detectBarQuality(
     bar_range: range,                              // EVIDENCE ONLY — never a verdict
     volume: bar.volume == null ? null : Number(bar.volume),
   };
+  const out: QualityFlag[] = [];
+
+  // ── Rule 0 (HARD, v2+): the row was persisted before the bar closed ────
+  // A closed-bar row written at t < bar_open + bar_length is, by arithmetic, a snapshot
+  // of a still-forming period. Its OHLC is not the genuine closed bar.
+  const closeMs = bar.time + opts.barMinutes * 60_000;
+  if (qv >= 2 && bar.created_at != null && Number.isFinite(bar.created_at) && bar.created_at < closeMs) {
+    out.push({
+      bar_time: iso,
+      quality_version: qv,
+      rule_code: "premature_bar_persisted",
+      severity: "critical",
+      evidence: {
+        ...base,
+        reason: "row_written_before_bar_close",
+        bar_close_time: new Date(closeMs).toISOString(),
+        persisted_at: new Date(bar.created_at).toISOString(),
+        early_by_seconds: Math.round((closeMs - bar.created_at) / 1000),
+      },
+    });
+  }
 
   // ── Rule 1 (HARD): the bar opens while the venue is closed ────────────
   if (!opts.venueOpen(new Date(bar.time))) {
-    return [{
+    out.push({
       bar_time: iso,
-      quality_version: RON_QUALITY_VERSION,
+      quality_version: qv,
       rule_code: "venue_break_bar",
       severity: "critical",
       evidence: {
@@ -133,8 +155,10 @@ export function detectBarQuality(
         reason: "bar_open_inside_venue_break_or_closed_market",
         tradable_minutes_in_bar: tradableChildGrid(bar.time, opts.barMinutes, opts.venueOpen).length,
       },
-    }];
+    });
+    return out;
   }
+  if (out.length) return out;   // already critically quarantined
 
   // ── Child-coverage evidence (only where genuine 1m source exists) ─────
   const grid = tradableChildGrid(bar.time, opts.barMinutes, opts.venueOpen);
@@ -164,7 +188,7 @@ export function detectBarQuality(
 
   if (onGrid.length === 0) {
     return [{
-      bar_time: iso, quality_version: RON_QUALITY_VERSION,
+      bar_time: iso, quality_version: qv,
       rule_code: "unverifiable_1m_coverage", severity: "info",
       evidence: { ...coverage, reason: "no_genuine_1m_children_stored", verdict: "unknown_not_corrupt" },
     }];
@@ -172,7 +196,7 @@ export function detectBarQuality(
 
   if (onGrid.length < grid.length) {
     return [{
-      bar_time: iso, quality_version: RON_QUALITY_VERSION,
+      bar_time: iso, quality_version: qv,
       rule_code: "child_coverage_incomplete", severity: "warning",
       evidence: { ...coverage, reason: "partial_1m_children", verdict: "unverifiable_reconciliation" },
     }];
@@ -190,7 +214,7 @@ export function detectBarQuality(
   const worst = Math.max(diffs.open, diffs.high, diffs.low, diffs.close);
   if (worst > RECONCILE_TOLERANCE) {
     return [{
-      bar_time: iso, quality_version: RON_QUALITY_VERSION,
+      bar_time: iso, quality_version: qv,
       rule_code: "ohlc_reconciliation_mismatch", severity: "warning",
       evidence: {
         ...coverage,
