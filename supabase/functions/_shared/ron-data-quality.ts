@@ -18,23 +18,34 @@
  *     2026-07-31 1m outage) the bar is `unverifiable_1m_coverage` — unknown, NOT corrupt.
  */
 
-export const RON_QUALITY_VERSION = 1;
+/**
+ * quality_version history
+ *   v1 — Phase 2C: venue_break_bar (hard), plus child-coverage / reconciliation evidence.
+ *   v2 — Phase 2C.1: adds `premature_bar_persisted` (hard). A bar whose row was written
+ *        into candle_history BEFORE its own close instant cannot be a genuine closed bar,
+ *        so its OHLC is a partial-period snapshot. v1 rows are preserved untouched.
+ */
+export const RON_QUALITY_VERSION = 2;
+export const RON_QUALITY_VERSION_V1 = 1;
 
 export type QualitySeverity = "critical" | "warning" | "info";
 
 export type QualityRuleCode =
   | "venue_break_bar"
+  | "premature_bar_persisted"
   | "unverifiable_1m_coverage"
   | "child_coverage_incomplete"
   | "ohlc_reconciliation_mismatch";
 
 /** Only critical rules quarantine a bar from RON opportunity/evidence paths. */
-export const CRITICAL_RULES: readonly QualityRuleCode[] = ["venue_break_bar"];
+export const CRITICAL_RULES: readonly QualityRuleCode[] = ["venue_break_bar", "premature_bar_persisted"];
 
 export interface SourceBar {
   time: number;                 // bar OPEN, epoch ms
   open: number; high: number; low: number; close: number;
   volume?: number | null;
+  /** DB write instant (candle_history.created_at), epoch ms. Null when unknown. */
+  created_at?: number | null;
 }
 
 export interface ChildBar { time: number; open: number; high: number; low: number; close: number; }
