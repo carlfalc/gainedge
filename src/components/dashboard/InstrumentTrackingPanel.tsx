@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { formatPrintedLocal } from "@/lib/signal-time";
 import { explainPatterns, summariseStructure, fmtLevel } from "@/lib/pattern-interpretation";
+import { deriveFalconerSignalState } from "@/lib/falconer-signal-state";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
 import {
