@@ -147,6 +147,22 @@ Deno.serve(async (req) => {
 
     const nowMs = Date.now();
     const rows: any[] = [];
+    // Central eligibility contract + genuine write instants for the anchors in this batch.
+    const contract = await buildEligibilityContract(supabase, SYMBOL, TIMEFRAME, RON_QUALITY_VERSION);
+    const barCreatedAt = new Map<string, number | null>();
+    {
+      const firstIso = new Date(snaps[0].bar_time).toISOString();
+      const lastIso = new Date(snaps[snaps.length - 1].bar_time).toISOString();
+      const { data: srcRows } = await supabase
+        .from("candle_history")
+        .select("timestamp, created_at")
+        .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
+        .gte("timestamp", firstIso).lte("timestamp", lastIso)
+        .order("timestamp", { ascending: true }).limit(1000);
+      for (const rw of (srcRows ?? []) as any[]) {
+        barCreatedAt.set(new Date(rw.timestamp).toISOString(), rw.created_at ? new Date(rw.created_at).getTime() : null);
+      }
+    }
     const hashes: Record<string, string> = {};
     const summary: Record<string, number> = {};
     const quarantinedBars: {
