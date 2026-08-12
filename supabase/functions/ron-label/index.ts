@@ -78,6 +78,19 @@ Deno.serve(async (req) => {
   const harness = body.data_end != null;
   const persist = !harness && body.dry_run !== true;
 
+  /**
+   * Phase 2D.1e canonical source clock. DISTINCT from the `data_end` harness path:
+   * `source_as_of` (alias `data_cutoff`) clamps the forward 1m loader to a frozen genuine
+   * market instant while persistence REMAINS ALLOWED, so a durable versioned rebuild can
+   * be reproduced against an immutable source cut. It never widens the visible future and
+   * never changes label semantics — it can only remove later 1m bars from view.
+   */
+  const canonicalAsOfRaw = body.source_as_of ?? body.data_cutoff ?? null;
+  const canonicalAsOf = canonicalAsOfRaw ? new Date(canonicalAsOfRaw).getTime() : null;
+  if (canonicalAsOfRaw != null && !Number.isFinite(canonicalAsOf)) {
+    return json({ error: "invalid source_as_of" }, 400);
+  }
+
   try {
     /** All stored 1m bars in [fromIso, toIso], paged so we never rely on one page. */
     const load1m = async (fromIso: string, toIso: string): Promise<FwdBar[]> => {
@@ -141,9 +154,12 @@ Deno.serve(async (req) => {
     const lastHorizonEnd = new Date(snaps[snaps.length - 1].bar_time).getTime() + BAR_MS + maxHorizon * 60_000;
     // `data_end` truncates the visible future (no-lookahead acceptance harness only).
     const dataEnd = body.data_end ? new Date(body.data_end).getTime() : lastHorizonEnd;
+    const ceiling = canonicalAsOf == null
+      ? Math.min(lastHorizonEnd, dataEnd)
+      : Math.min(lastHorizonEnd, dataEnd, canonicalAsOf);
     const fwd = await load1m(
       new Date(firstAnchorClose).toISOString(),
-      new Date(Math.min(lastHorizonEnd, dataEnd)).toISOString(),
+      new Date(ceiling).toISOString(),
     );
 
     const nowMs = Date.now();
@@ -354,6 +370,7 @@ Deno.serve(async (req) => {
       mode: body.mode ?? "backfill",
       label_version: LABEL_VERSION,
       harness,
+      source_as_of: canonicalAsOf == null ? null : new Date(canonicalAsOf).toISOString(),
       persisted: persist,
       snapshots: snaps.length,
       rows: rows.length,

@@ -27,6 +27,13 @@ const json = (b: unknown, s = 200) =>
 const STAGE_ORDER = ["quality_v3", "feature_v4", "label_v5", "quality_v4", "feature_v5", "label_v6"] as const;
 type Stage = string;
 
+/**
+ * Phase 2D.1e frozen source clock — the latest genuine XAUUSD 1m bar recorded at the
+ * checkpoint start. The label stage of the v6 lineage is clamped to this instant so the
+ * rebuild is reproducible and can never consume 1m data published after the freeze.
+ */
+const SOURCE_AS_OF_2D1E = "2026-08-12T22:14:00.000Z";
+
 /** `quality_v4` -> { kind: "quality", version: 4 } */
 function parseStage(stage: string): { kind: "quality" | "feature" | "label"; version: number } {
   const m = /^(quality|feature|label)_v(\d+)$/.exec(stage);
@@ -89,6 +96,7 @@ async function runBatch(stage: Stage, cursor: string | null, endIso: string | nu
   const b = await callWorker("ron-label", {
     mode: "backfill", start: cursor, end: endIso ?? undefined, limit,
     label_version: version, horizons: [60],
+    ...(version >= 6 ? { source_as_of: SOURCE_AS_OF_2D1E } : {}),
   });
   const snapshots = Number(b.snapshots ?? 0);
   return {
