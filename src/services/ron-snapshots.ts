@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
  * The ONLY snapshot feature version the UI reads. v1 rows stay in the table for audit
  * but must never be mixed into current-state queries.
  */
-export const CURRENT_RON_FEATURE_VERSION = 3;
+export const CURRENT_RON_FEATURE_VERSION = 4;
 
 export interface RonSnapshotRow {
   symbol: string;
@@ -177,8 +177,22 @@ export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
         .select("id", { count: "exact", head: true })
         .eq("symbol", symbol).eq("timeframe", timeframe)
         .eq("quality_version", CURRENT_RON_QUALITY_VERSION);
-      const barMs = 15 * 60 * 1000;
-      const currentBar = new Date(Math.floor(Date.now() / barMs) * barMs - barMs).toISOString();
+      /**
+       * Phase 2C.2 closure: the "current source" anchor is the ACTUAL latest clean RON
+       * snapshot bar the UI is displaying — never a browser wall-clock bucket. A guessed
+       * bucket is wrong across venue breaks, weekends, delayed ingestion and stale feeds,
+       * and could claim "Healthy" for a bar RON never evaluated.
+       */
+      const { data: anchorRow } = await supabase
+        .from("ron_market_snapshots")
+        .select("bar_time")
+        .eq("symbol", symbol).eq("timeframe", timeframe)
+        .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+        .order("bar_time", { ascending: false }).limit(1).maybeSingle();
+      if (cancelled) return;
+      const currentBar = (anchorRow as any)?.bar_time
+        ? new Date((anchorRow as any).bar_time).toISOString()
+        : null;
       const [crit, warn, latest, current] = await Promise.all([
         base().eq("severity", "critical"),
         base().eq("severity", "warning"),
@@ -186,7 +200,9 @@ export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
           .eq("symbol", symbol).eq("timeframe", timeframe)
           .eq("quality_version", CURRENT_RON_QUALITY_VERSION).eq("severity", "critical")
           .order("bar_time", { ascending: false }).limit(1).maybeSingle(),
-        base().eq("severity", "critical").eq("bar_time", currentBar),
+        currentBar
+          ? base().eq("severity", "critical").eq("bar_time", currentBar)
+          : Promise.resolve({ count: 0 } as { count: number }),
       ]);
       if (cancelled) return;
       setQuality({
