@@ -1,7 +1,16 @@
-DO $$
-DECLARE v_token text; v_url text := 'https://ecsztqtyttnqdnsphxip.supabase.co/functions/v1/ron-calibrate'; h jsonb;
-BEGIN
-  SELECT decrypted_secret INTO v_token FROM vault.decrypted_secrets WHERE name='email_queue_service_role_key' LIMIT 1;
-  h := jsonb_build_object('Content-Type','application/json','Authorization','Bearer '||v_token);
-  PERFORM net.http_post(url:=v_url, headers:=h, body:='{"source_as_of":"2026-08-12T06:09:00.000Z","source_bar_cutoff":"2026-08-12T04:45:00.000Z","persist":true}'::jsonb, timeout_milliseconds:=150000);
-END $$;
+-- NEUTRALIZED (Phase 2B.2 cleanup pass).
+--
+-- This migration version originally contained a Phase 2B.2 ACCEPTANCE TEST
+-- HARNESS (an anonymous DO block issuing outbound calls to the RON calibration
+-- edge function using a Vault-held service key). It was a test execution
+-- artifact, never a schema change.
+--
+-- It has been replaced with an inert no-op so that migration replay on a fresh
+-- or restored environment performs: zero network calls, zero Vault reads, zero
+-- calibration writes, and no cross-service credential coupling.
+--
+-- The filename/version is preserved so remote migration history stays aligned.
+-- No schema objects were created, altered or dropped by the original block, so
+-- neutralizing it has no schema effect. Existing calibration_version=5 and
+-- calibration_version=6 runs and cells are untouched.
+SELECT 1 WHERE false;
