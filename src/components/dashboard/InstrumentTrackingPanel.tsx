@@ -416,12 +416,16 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{
-                      fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-                      background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
-                      color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
-                    }}>
-                      {inst.direction}
+                    <div
+                      style={{
+                        fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
+                        background: badgeColor + "20", color: badgeColor,
+                      }}
+                      title={hasSignal
+                        ? `Falconer signal history (not RON analysis) · printed ${formatPrintedLocal(inst.scanned_at!)} local time`
+                        : "No Falconer signal has been printed for this instrument"}
+                    >
+                      {badgeText}
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); hidePane(inst.symbol); }}
