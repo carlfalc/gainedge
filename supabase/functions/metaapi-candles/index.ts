@@ -377,10 +377,10 @@ Deno.serve(async (req: Request) => {
         };
       }
 
-      // Bounded concurrency (5 at a time) so a wide watchlist can't storm MetaApi.
+      // Bounded concurrency (3 at a time) so a wide watchlist can't storm MetaApi.
       const quotes: Awaited<ReturnType<typeof quoteFor>>[] = [];
-      for (let i = 0; i < symbols.length; i += 5) {
-        quotes.push(...await Promise.all(symbols.slice(i, i + 5).map(quoteFor)));
+      for (let i = 0; i < symbols.length; i += 3) {
+        quotes.push(...await Promise.all(symbols.slice(i, i + 3).map(quoteFor)));
       }
 
       return new Response(JSON.stringify({ success: true, quotes, server_time: new Date().toISOString() }), {
