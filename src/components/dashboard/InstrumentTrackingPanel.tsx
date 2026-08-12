@@ -349,16 +349,28 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {expired ? (
-                      <Circle size={16} color="#555F73" fill="#555F73" />
-                    ) : inst.direction === "BUY" ? (
+                    {hasSignal && !expired && sigDir === "LONG" ? (
                       <ArrowUp size={16} color="#22C55E" strokeWidth={3} />
-                    ) : inst.direction === "SELL" ? (
+                    ) : hasSignal && !expired && sigDir === "SHORT" ? (
                       <ArrowDown size={16} color="#EF4444" strokeWidth={3} />
                     ) : (
                       <Circle size={16} color="#555F73" fill="#555F73" />
                     )}
                     <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openChart(inst.symbol); }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      aria-label={`Open ${inst.symbol} chart`}
+                      title={`Open the GainEdge chart for ${inst.symbol}`}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
+                        color: C.jade, background: "transparent", border: `1px solid ${C.jade}30`,
+                        borderRadius: 5, padding: "1px 6px", cursor: "pointer",
+                      }}
+                    >
+                      <LineChart size={10} /> Chart ↗
+                    </button>
                     <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                       {tf}
                     </span>
@@ -392,9 +404,14 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text }}>
-                    <span>Last scan:</span>
-                    <Clock size={10} />
-                    <span>{formatAge(inst.scanned_at)}</span>
+                    {hasSignal ? (
+                      <>
+                        <Clock size={10} />
+                        <span>Falconer signal printed {formatAge(inst.scanned_at!)}</span>
+                      </>
+                    ) : (
+                      <span style={{ fontStyle: "italic" }}>No signal history</span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
