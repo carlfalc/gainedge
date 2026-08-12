@@ -16,13 +16,13 @@ import { labelOutcome, metricHash, type FwdBar } from "../_shared/ron-outcomes.t
 import { labelOutcomeV2, metricHashV2 } from "../_shared/ron-outcomes-v2.ts";
 import { labelOutcomeV3, metricHashV3 } from "../_shared/ron-outcomes-v3.ts";
 import { classifyRonSession, xauVenueOpen } from "../_shared/ron-sessions.ts";
-import { RON_QUALITY_VERSION } from "../_shared/ron-data-quality.ts";
+import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-quality-contract.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
-const FEATURE_VERSION = 2;
-const DEFAULT_LABEL_VERSION = 3;   // v1 and v2 rows are preserved untouched for audit
+const DEFAULT_LABEL_VERSION = 4;   // v1..v3 rows are preserved untouched for audit
 const BAR_MS = 15 * 60 * 1000;
+const BAR_MINUTES = 15;
 const RES_MS = 60 * 1000;              // 1-minute forward resolution
 const RES_LABEL = "1m";
 const DEFAULT_HORIZONS = [15, 30, 60, 120, 240];
@@ -60,7 +60,13 @@ Deno.serve(async (req) => {
     : DEFAULT_HORIZONS;
   const maxHorizon = Math.max(...horizons);
   const requested = Number(body.label_version ?? DEFAULT_LABEL_VERSION);
-  const LABEL_VERSION = requested === 1 ? 1 : requested === 2 ? 2 : 3;
+  const LABEL_VERSION = [1, 2, 3, 4].includes(requested) ? requested : DEFAULT_LABEL_VERSION;
+  /**
+   * Provenance contract: label v4 is derived ONLY from feature_version=3 snapshots (whose
+   * input windows are quarantine-free). Legacy label versions stay pinned to feature v2
+   * so previously stored rows remain reproducible byte-for-byte.
+   */
+  const FEATURE_VERSION = LABEL_VERSION >= 4 ? 3 : 2;
 
   /**
    * `data_end` truncates the visible future and exists ONLY for the no-lookahead
