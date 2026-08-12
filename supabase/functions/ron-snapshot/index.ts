@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
           ok: true, mode,
           skipped: "source_bar_quarantined",
           rule_code: contract.reasonFor(targetBar, BAR_MINUTES),
+          rule_codes: contract.reasonsFor(targetBar, BAR_MINUTES),
           quality_version: RON_QUALITY_VERSION,
           bar_time: targetIso,
           presentation: "SOURCE ANOMALY QUARANTINED",

@@ -60,9 +60,14 @@ export const CALIBRATION_CONTRACT_V2: CalibrationContract = {
 export const CALIBRATION_CONTRACT_V3: CalibrationContract = {
   calibration_version: 3, feature_version: 3, label_version: 4,
 };
+/** Phase 2C.2 clean lineage: quality v3 + feature v4 + label v5. */
+export const CALIBRATION_CONTRACT_V4: CalibrationContract = {
+  calibration_version: 4, feature_version: 4, label_version: 5,
+};
 export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   2: CALIBRATION_CONTRACT_V2,
   3: CALIBRATION_CONTRACT_V3,
+  4: CALIBRATION_CONTRACT_V4,
 };
 
 /** A market-closed anchor can never be a user opportunity, so it can never be evidence. */
