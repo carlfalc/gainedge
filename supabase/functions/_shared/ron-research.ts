@@ -490,7 +490,7 @@ export async function evaluateCandidate(
   spec: CandidateSpec,
   dir: Direction,
   obs: ResearchObs[],
-  plan: FoldPlan,
+  plan: { folds: PurgedFold[] },
   baseline: FoldResult[] | null,
   definitionHash: string,
 ): Promise<{ result: CandidateResult; folds: FoldResult[] }> {
