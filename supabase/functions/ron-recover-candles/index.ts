@@ -35,7 +35,7 @@ const PAGE_LIMIT = 1000;
 const MAX_PAGES_PER_CALL = 20;
 const CANARY_MIN_COMMON = 100;
 const CANARY_WINDOW = 1000;
-const DIGEST_CHUNK = 10_000;
+const DIGEST_CHUNK = 1000; // PostgREST caps a single response at 1000 rows
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -145,8 +145,7 @@ async function targetDigest(db: any): Promise<{ digest: string; rows: number; mi
     min ??= new Date(batch[0].timestamp).toISOString();
     max = new Date(batch[batch.length - 1].timestamp).toISOString();
     rows += batch.length;
-    if (batch.length < DIGEST_CHUNK) break;
-    offset += DIGEST_CHUNK;
+    offset += batch.length;
   }
   return { digest: await sha256(chunkHashes.join(":")), rows, min, max };
 }
@@ -189,7 +188,10 @@ Deno.serve(async (req) => {
 
     if (existing?.status === "complete") {
       const d = await targetDigest(db);
-      return json({ done: true, idempotent: true, job: existing, verify: d });
+      const { data: refreshed } = await db.from("ron_data_recovery_jobs")
+        .update({ row_digest: d.digest, min_inserted_ts: d.min, max_inserted_ts: d.max })
+        .eq("id", existing.id).select("*").single();
+      return json({ done: true, idempotent: true, job: refreshed ?? existing, verify: d });
     }
 
     // ---- pre-write canaries (every invocation, before any insert) ----------
