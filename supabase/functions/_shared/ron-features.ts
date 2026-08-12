@@ -169,8 +169,18 @@ export function computeRonSnapshot(
   symbol: string,
   timeframe: string,
   candles: Candle[],
-  opts: { source?: string; spread?: number | null } = {},
+  opts: {
+    source?: string;
+    spread?: number | null;
+    /** Pin the stamped version (v2 replay). Defaults to the current canonical version. */
+    featureVersion?: number;
+    /** v3 provenance: how many quarantined source bars the caller removed from the window. */
+    quarantinedExcluded?: number;
+    /** v3 provenance: the quality_version whose critical rules produced those exclusions. */
+    qualityVersion?: number;
+  } = {},
 ): RonSnapshot {
+  const featureVersion = opts.featureVersion ?? RON_FEATURE_VERSION;
   const i = candles.length - 1;
   const bar = candles[i];
   const closes = candles.map(c => c.close);
@@ -336,7 +346,7 @@ export function computeRonSnapshot(
     // capped at the warmup requirement so they are identical for any window that is
     // at least warm.
     provenance: {
-      feature_version: RON_FEATURE_VERSION,
+      feature_version: featureVersion,
       asian_window_utc: "22:00-06:00",
       session_boundary: "NY_17:00_DST_aware",
       warmup_bars_required: 220,
@@ -344,6 +354,13 @@ export function computeRonSnapshot(
       source_last_bar: new Date(bar.time).toISOString(),
       ema200_warm: candles.length >= 200,
       adx14_warm: candles.length >= 29,
+      ...(featureVersion >= 3
+        ? {
+            input_window_contract: "quarantine_free",
+            quality_version: opts.qualityVersion ?? null,
+            quarantined_bars_excluded: opts.quarantinedExcluded ?? 0,
+          }
+        : {}),
     },
   };
 
