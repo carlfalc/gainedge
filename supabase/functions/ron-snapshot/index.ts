@@ -186,15 +186,24 @@ Deno.serve(async (req) => {
         return json({ ok: true, mode, skipped: "already_snapshotted", bar_time: targetIso });
       }
 
+      // CANONICAL WINDOW (feature v4): filter quarantined bars FIRST, then slice.
       const loaded = await loadCandles(null, targetIso);
-      const { clean, excluded } = cleanWindow(loaded);
-      const candles = clean.slice(-CANONICAL_WINDOW);
+      const { eligible, excludedAtOrBefore } = buildEligibleSeries(
+        loaded, BAR_MINUTES, (b, m) => contract.isQuarantined(b, m),
+      );
+      const idx = eligible.length - 1;
+      if (idx < 0 || eligible[idx].time !== new Date(targetIso).getTime()) {
+        return json({ ok: true, mode, skipped: "target_not_eligible", bar_time: targetIso });
+      }
+      const candles = windowAtEligibleIndex(eligible, idx, CANONICAL_WINDOW);
       if (candles.length < 30) return json({ ok: true, mode, skipped: "insufficient_history" });
 
       const snap = computeRonSnapshot(SYMBOL, TIMEFRAME, candles, {
         source: "candle_history",
-        quarantinedExcluded: excluded,
+        quarantinedExcluded: excludedAtOrBefore[idx],
         qualityVersion: RON_QUALITY_VERSION,
+        windowContract: RON_WINDOW_CONTRACT,
+        eligibleCount: idx + 1,
       });
       // Freshness: only call the feed stale when the market should actually be open.
       const ageMin = (nowMs - new Date(targetIso).getTime()) / 60000;
@@ -229,18 +238,24 @@ Deno.serve(async (req) => {
     if (te) throw te;
     if (!targets?.length) return json({ ok: true, mode, processed: 0, note: "no target bars" });
 
-    const firstTarget = new Date(targets[0].timestamp).getTime();
     const lastTarget = new Date(targets[targets.length - 1].timestamp).getTime();
-    // Load warmup history strictly BEFORE the first target plus the target range itself.
-    const warmFromIso = new Date(firstTarget - CANONICAL_WINDOW * BAR_MS * 3).toISOString();
-    const all = await loadCandles(warmFromIso, new Date(lastTarget).toISOString());
-    const indexOfTime = new Map<number, number>();
-    all.forEach((c, idx) => indexOfTime.set(c.time, idx));
+    /**
+     * The canonical v4 contract is "last 1500 QUALITY-ELIGIBLE bars at or before target",
+     * so the backfill must see the full at-or-before history exactly like the live path.
+     * Loading from the beginning of history (not a warmup guess) is what makes
+     * live/backfill parity provable.
+     */
+    const all = await loadCandles(null, new Date(lastTarget).toISOString());
+    const { eligible, excludedAtOrBefore } = buildEligibleSeries(
+      all, BAR_MINUTES, (b, m) => contract.isQuarantined(b, m),
+    );
+    const eligibleIndexOfTime = new Map<number, number>();
+    eligible.forEach((c, i) => eligibleIndexOfTime.set(c.time, i));
 
     const snaps: any[] = [];
     let skippedWarmup = 0;
     let skippedQuarantined = 0;
-    const quarantinedAnchors: { bar_time: string; rule_code: string | null }[] = [];
+    const quarantinedAnchors: { bar_time: string; rule_codes: string[] }[] = [];
     // Phase 1B correction: no arbitrary warmup skip. computeRonSnapshot is proven safe
     // with <30 bars (indicators return null, data_health = "insufficient"), so every
     // genuine source bar gets a row. `min_bars` can still be set explicitly if needed.
@@ -251,29 +266,29 @@ Deno.serve(async (req) => {
         time: ms,
         created_at: (t as any).created_at ? new Date((t as any).created_at).getTime() : null,
       };
-      // Quarantined bars can never be an anchor (feature_version=3 contract).
+      // Quarantined bars can never be an anchor (feature v4 contract, step 5).
       if (contract.isQuarantined(anchorBar, BAR_MINUTES)) {
         skippedQuarantined++;
         if (quarantinedAnchors.length < 50) {
           quarantinedAnchors.push({
             bar_time: new Date(ms).toISOString(),
-            rule_code: contract.reasonFor(anchorBar, BAR_MINUTES),
+            rule_codes: contract.reasonsFor(anchorBar, BAR_MINUTES),
           });
         }
         continue;
       }
-      const idx = indexOfTime.get(ms);
+      const idx = eligibleIndexOfTime.get(ms);
       if (idx === undefined) continue;
       if (idx + 1 < minBars) { skippedWarmup++; continue; }
-      // NO LOOKAHEAD: slice ends at the target bar (inclusive).
-      // ...and NO CONTAMINATION: quarantined bars are removed from the input window too.
-      const raw = all.slice(Math.max(0, idx - CANONICAL_WINDOW + 1), idx + 1);
-      const { clean, excluded } = cleanWindow(raw);
-      if (!clean.length) { skippedQuarantined++; continue; }
-      snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, clean, {
+      // NO LOOKAHEAD: the eligible series ends at the target bar (inclusive).
+      const window = windowAtEligibleIndex(eligible, idx, CANONICAL_WINDOW);
+      if (!window.length) { skippedQuarantined++; continue; }
+      snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, window, {
         source: "candle_history_backfill",
-        quarantinedExcluded: excluded,
+        quarantinedExcluded: excludedAtOrBefore[idx],
         qualityVersion: RON_QUALITY_VERSION,
+        windowContract: RON_WINDOW_CONTRACT,
+        eligibleCount: idx + 1,
       }));
     }
 
