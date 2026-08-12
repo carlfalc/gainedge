@@ -346,6 +346,32 @@ export function chronoSplit(obs: EligibleObs[], holdoutFraction = HOLDOUT_FRACTI
   };
 }
 
+/**
+ * ONE common chronological cutoff computed from the DISTINCT canonical eligible snapshot
+ * times of ALL directions, before any direction-specific calibration. Applying this single
+ * instant to both sides makes it impossible for one timestamp to be fit for LONG and
+ * holdout for SHORT.
+ */
+export function commonSplitCutoff(
+  perDirection: EligibleObs[][],
+  holdoutFraction = HOLDOUT_FRACTION,
+): string | null {
+  const times = [...new Set(perDirection.flat().map((o) => o.t))].sort((a, b) => a - b);
+  if (!times.length) return null;
+  const idx = Math.max(1, Math.min(times.length - 1, Math.floor(times.length * (1 - holdoutFraction))));
+  return new Date(times[idx]).toISOString();
+}
+
+/** Split one direction's observations at an externally supplied common cutoff. */
+export function splitAtCutoff(obs: EligibleObs[], cutoff: string | null): {
+  cutoff: string | null; fit: EligibleObs[]; holdout: EligibleObs[];
+} {
+  const sorted = [...obs].sort((a, b) => a.t - b.t || (a.bar_time < b.bar_time ? -1 : 1));
+  if (cutoff == null) return { cutoff: null, fit: sorted, holdout: [] };
+  const c = new Date(cutoff).getTime();
+  return { cutoff, fit: sorted.filter((o) => o.t < c), holdout: sorted.filter((o) => o.t >= c) };
+}
+
 export interface DirectionReport {
   direction: Direction;
   n_eligible: number;
