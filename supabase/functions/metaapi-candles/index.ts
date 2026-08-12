@@ -329,6 +329,65 @@ Deno.serve(async (req: Request) => {
     }
 
     // ─── PRICE: Get current tick/price ───
+    // ─── PRICES: bounded batch of current quotes for the dashboard ───
+    if (action === "prices") {
+      const requested: unknown = body.symbols;
+      if (!Array.isArray(requested) || requested.length === 0) {
+        return new Response(JSON.stringify({ error: "Missing symbols[]" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const symbols = [...new Set(
+        requested.filter((s): s is string => typeof s === "string" && s.length > 0 && s.length <= 20),
+      )].slice(0, 25);
+
+      async function quoteFor(canonical: string) {
+        const variants = SYMBOL_VARIANTS[canonical] || [canonical];
+        let lastError: string | null = null;
+        for (const variant of variants) {
+          try {
+            const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
+            const r = await fetchWithTimeout(url, { headers: { "auth-token": METAAPI_TOKEN } });
+            const p = await r.json();
+            if (r.ok && typeof p?.bid === "number" && typeof p?.ask === "number") {
+              return {
+                symbol: canonical,
+                broker_symbol: variant,
+                bid: p.bid,
+                ask: p.ask,
+                broker_time: typeof p.time === "string" ? p.time : null,
+                fetched_at: new Date().toISOString(),
+                error: null as string | null,
+              };
+            }
+            lastError = typeof p?.message === "string" ? p.message : `HTTP ${r.status}`;
+          } catch (err) {
+            lastError = getErrorMessage(err);
+          }
+        }
+        return {
+          symbol: canonical,
+          broker_symbol: null,
+          bid: null,
+          ask: null,
+          broker_time: null,
+          fetched_at: new Date().toISOString(),
+          error: lastError ?? "PRICE_UNAVAILABLE",
+        };
+      }
+
+      // Bounded concurrency (5 at a time) so a wide watchlist can't storm MetaApi.
+      const quotes: Awaited<ReturnType<typeof quoteFor>>[] = [];
+      for (let i = 0; i < symbols.length; i += 5) {
+        quotes.push(...await Promise.all(symbols.slice(i, i + 5).map(quoteFor)));
+      }
+
+      return new Response(JSON.stringify({ success: true, quotes, server_time: new Date().toISOString() }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "price") {
       if (!symbol) {
         return new Response(JSON.stringify({ error: "Missing symbol" }), {
