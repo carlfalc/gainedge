@@ -4,13 +4,14 @@
  */
 import { describe, it, expect } from "vitest";
 import {
-  detectBarQuality, evidenceHash, RON_QUALITY_VERSION, CRITICAL_RULES, isQuarantined,
+  detectBarQuality, evidenceHash, RON_QUALITY_VERSION_V2, CRITICAL_RULES, isQuarantined,
 } from "../../supabase/functions/_shared/ron-data-quality";
 import { criticalRulesForBar } from "../../supabase/functions/_shared/ron-quality-contract";
 import { xauVenueOpen } from "../../supabase/functions/_shared/ron-sessions";
 
 const BAR_MINUTES = 15;
-const opts = { barMinutes: BAR_MINUTES, venueOpen: xauVenueOpen };
+/** These are v2 REPLAY tests: they must keep asserting v2 semantics after v3 shipped. */
+const opts = { barMinutes: BAR_MINUTES, venueOpen: xauVenueOpen, qualityVersion: RON_QUALITY_VERSION_V2 };
 
 /** 2026-08-10T01:45:00Z — a genuine tradable Monday bar (NY 21:45 Sunday). */
 const OPEN = Date.parse("2026-08-10T01:45:00Z");
@@ -18,8 +19,8 @@ const CLOSE = OPEN + BAR_MINUTES * 60_000;
 const bar = { time: OPEN, open: 4317.44, high: 4319.51, low: 4316.64, close: 4316.94, volume: 252 };
 
 describe("quality_version = 2", () => {
-  it("is the current canonical version and treats premature bars as critical", () => {
-    expect(RON_QUALITY_VERSION).toBe(2);
+  it("still replays byte-identically and treats premature bars as critical", () => {
+    expect(RON_QUALITY_VERSION_V2).toBe(2);
     expect(CRITICAL_RULES).toContain("premature_bar_persisted");
     expect(CRITICAL_RULES).toContain("venue_break_bar");
   });

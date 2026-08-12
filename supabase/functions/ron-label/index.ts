@@ -20,7 +20,7 @@ import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-qu
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
-const DEFAULT_LABEL_VERSION = 4;   // v1..v3 rows are preserved untouched for audit
+const DEFAULT_LABEL_VERSION = 5;   // v1..v4 rows are preserved untouched for audit
 const BAR_MS = 15 * 60 * 1000;
 const BAR_MINUTES = 15;
 const RES_MS = 60 * 1000;              // 1-minute forward resolution
@@ -60,13 +60,13 @@ Deno.serve(async (req) => {
     : DEFAULT_HORIZONS;
   const maxHorizon = Math.max(...horizons);
   const requested = Number(body.label_version ?? DEFAULT_LABEL_VERSION);
-  const LABEL_VERSION = [1, 2, 3, 4].includes(requested) ? requested : DEFAULT_LABEL_VERSION;
+  const LABEL_VERSION = [1, 2, 3, 4, 5].includes(requested) ? requested : DEFAULT_LABEL_VERSION;
   /**
    * Provenance contract: label v4 is derived ONLY from feature_version=3 snapshots (whose
    * input windows are quarantine-free). Legacy label versions stay pinned to feature v2
    * so previously stored rows remain reproducible byte-for-byte.
    */
-  const FEATURE_VERSION = LABEL_VERSION >= 4 ? 3 : 2;
+  const FEATURE_VERSION = LABEL_VERSION >= 5 ? 4 : LABEL_VERSION >= 4 ? 3 : 2;
 
   /**
    * `data_end` truncates the visible future and exists ONLY for the no-lookahead
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
         quarantinedBars.push({
           bar_time: new Date(t).toISOString(),
           quality_version: RON_QUALITY_VERSION,
-          rule_code: contract.reasonFor(anchorBar, BAR_MINUTES) ?? "venue_break_bar",
+          rule_code: contract.reasonFor(anchorBar, BAR_MINUTES) ?? "unknown_critical",
           exclusion_reason: "source_quality_critical",
         });
         continue;

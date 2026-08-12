@@ -24,8 +24,13 @@
  *   v2 — Phase 2C.1: adds `premature_bar_persisted` (hard). A bar whose row was written
  *        into candle_history BEFORE its own close instant cannot be a genuine closed bar,
  *        so its OHLC is a partial-period snapshot. v1 rows are preserved untouched.
+ *   v3 — Phase 2C.2: MULTI-FINDING. A single bar may now carry several independent
+ *        findings. Detection no longer returns early after the first critical rule, so a
+ *        premature bar still produces its proven child-coverage / OHLC reconciliation
+ *        evidence. v1 and v2 rows are preserved untouched.
  */
-export const RON_QUALITY_VERSION = 2;
+export const RON_QUALITY_VERSION = 3;
+export const RON_QUALITY_VERSION_V2 = 2;
 export const RON_QUALITY_VERSION_V1 = 1;
 
 export type QualitySeverity = "critical" | "warning" | "info";
@@ -114,6 +119,8 @@ export function detectBarQuality(
   opts: { barMinutes: number; venueOpen: (d: Date) => boolean; qualityVersion?: number },
 ): QualityFlag[] {
   const qv = opts.qualityVersion ?? RON_QUALITY_VERSION;
+  /** v3+ keeps collecting evidence after a critical finding; v1/v2 short-circuit. */
+  const multiFinding = qv >= 3;
   const iso = new Date(bar.time).toISOString();
   const range = r(bar.high - bar.low);
   const base = {
@@ -144,7 +151,8 @@ export function detectBarQuality(
   }
 
   // ── Rule 1 (HARD): the bar opens while the venue is closed ────────────
-  if (!opts.venueOpen(new Date(bar.time))) {
+  const venueClosed = !opts.venueOpen(new Date(bar.time));
+  if (venueClosed) {
     out.push({
       bar_time: iso,
       quality_version: qv,
@@ -156,9 +164,11 @@ export function detectBarQuality(
         tradable_minutes_in_bar: tradableChildGrid(bar.time, opts.barMinutes, opts.venueOpen).length,
       },
     });
+    // A venue-break bar has no tradable child grid, so coverage/reconciliation evidence
+    // is not meaningful for it under any quality_version.
     return out;
   }
-  if (out.length) return out;   // already critically quarantined
+  if (out.length && !multiFinding) return out;   // v1/v2: short-circuit after a critical
 
   // ── Child-coverage evidence (only where genuine 1m source exists) ─────
   const grid = tradableChildGrid(bar.time, opts.barMinutes, opts.venueOpen);
@@ -187,19 +197,21 @@ export function detectBarQuality(
   };
 
   if (onGrid.length === 0) {
-    return [{
+    out.push({
       bar_time: iso, quality_version: qv,
       rule_code: "unverifiable_1m_coverage", severity: "info",
       evidence: { ...coverage, reason: "no_genuine_1m_children_stored", verdict: "unknown_not_corrupt" },
-    }];
+    });
+    return out;
   }
 
   if (onGrid.length < grid.length) {
-    return [{
+    out.push({
       bar_time: iso, quality_version: qv,
       rule_code: "child_coverage_incomplete", severity: "warning",
       evidence: { ...coverage, reason: "partial_1m_children", verdict: "unverifiable_reconciliation" },
-    }];
+    });
+    return out;
   }
 
   // ── Full children present: deterministic OHLC reconciliation ──────────
@@ -213,7 +225,7 @@ export function detectBarQuality(
   };
   const worst = Math.max(diffs.open, diffs.high, diffs.low, diffs.close);
   if (worst > RECONCILE_TOLERANCE) {
-    return [{
+    out.push({
       bar_time: iso, quality_version: qv,
       rule_code: "ohlc_reconciliation_mismatch", severity: "warning",
       evidence: {
@@ -222,10 +234,11 @@ export function detectBarQuality(
         max_abs_diff: r(worst, 6), tolerance: RECONCILE_TOLERANCE,
         reason: "15m_ohlc_does_not_match_available_1m_children",
       },
-    }];
+    });
+    return out;
   }
 
-  return [];   // reconciled and healthy — nothing is persisted for clean bars
+  return out;   // reconciled and healthy — nothing is persisted for clean bars
 }
 
 /** Convenience: does this flag set quarantine the bar from RON evidence paths? */

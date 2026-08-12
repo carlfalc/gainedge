@@ -28,9 +28,15 @@ import { detectPatterns, type DetectedPattern } from "./ron-patterns.ts";
  *       premature_bar_persisted) can never be the anchor NOR appear anywhere in the
  *       recursive input window, so contaminated bars cannot leak forward through
  *       EMA/RSI-Wilder/ADX state. Provenance records the exclusions.
- * v1 and v2 rows are preserved for audit; readers must pin a version explicitly.
+ *  v4 — Phase 2C.2: identical indicator MATH to v3, but the window contract is now the
+ *       TRUE canonical one, `last_1500_quality_eligible`: quarantined (qv3-critical) bars
+ *       are removed from the at-or-before set FIRST and only then are the last 1500
+ *       eligible bars taken. v3 filtered after slicing, so live and backfill could
+ *       disagree around critical events. Provenance is loader-independent.
+ * v1..v3 rows are preserved for audit; readers must pin a version explicitly.
  */
-export const RON_FEATURE_VERSION = 3;
+export const RON_FEATURE_VERSION = 4;
+export const RON_FEATURE_VERSION_V3 = 3;
 export const RON_FEATURE_VERSION_V2 = 2;
 
 export type Regime = "trending_up" | "trending_down" | "ranging" | "transition";
@@ -178,6 +184,10 @@ export function computeRonSnapshot(
     quarantinedExcluded?: number;
     /** v3 provenance: the quality_version whose critical rules produced those exclusions. */
     qualityVersion?: number;
+    /** v4 provenance: the exact canonical window contract used to build the input slice. */
+    windowContract?: string;
+    /** v4 provenance: quality-eligible bars at or before the target (pre-slice). */
+    eligibleCount?: number;
   } = {},
 ): RonSnapshot {
   const featureVersion = opts.featureVersion ?? RON_FEATURE_VERSION;
@@ -359,6 +369,14 @@ export function computeRonSnapshot(
             input_window_contract: "quarantine_free",
             quality_version: opts.qualityVersion ?? null,
             quarantined_bars_excluded: opts.quarantinedExcluded ?? 0,
+          }
+        : {}),
+      ...(featureVersion >= 4
+        ? {
+            window_contract: opts.windowContract ?? "last_1500_quality_eligible",
+            window_size: candles.length,
+            eligible_count: opts.eligibleCount ?? candles.length,
+            excluded_critical_count: opts.quarantinedExcluded ?? 0,
           }
         : {}),
     },

@@ -19,6 +19,13 @@ import { CRITICAL_RULES, RON_QUALITY_VERSION, type QualityRuleCode } from "./ron
 
 export { CRITICAL_RULES, RON_QUALITY_VERSION };
 
+/**
+ * Phase 2C.2 correction: the contract now preserves the ACTUAL persisted rule codes per
+ * bar (Map<bar_time, Set<rule_code>>). The previous Set<bar_time> lost the rule identity
+ * and reported every persisted critical as `venue_break_bar`, which could mislabel a
+ * persisted `premature_bar_persisted` finding.
+ */
+
 export interface ContractBar {
   /** bar OPEN, epoch ms */
   time: number;
@@ -40,15 +47,15 @@ export function criticalRulesForBar(bar: ContractBar, barMinutes: number): Quali
   return rules;
 }
 
-/** All bar_times (ISO) with a persisted CRITICAL flag at the given quality_version. */
-export async function loadQuarantinedBarTimes(
+/** Map of bar_time (ISO) -> persisted CRITICAL rule codes at the given quality_version. */
+export async function loadQuarantinedRuleCodes(
   supabase: { from: (t: string) => any },
   symbol: string,
   timeframe: string,
   qualityVersion: number = RON_QUALITY_VERSION,
   page = 1000,
-): Promise<Set<string>> {
-  const out = new Set<string>();
+): Promise<Map<string, Set<QualityRuleCode>>> {
+  const out = new Map<string, Set<QualityRuleCode>>();
   for (let from = 0; ; from += page) {
     const { data, error } = await supabase
       .from("ron_data_quality_flags")
@@ -62,7 +69,10 @@ export async function loadQuarantinedBarTimes(
     const rows = data ?? [];
     for (const r of rows as { bar_time: string; rule_code: string; severity: string }[]) {
       if (r.severity === "critical" || CRITICAL_RULES.includes(r.rule_code as QualityRuleCode)) {
-        out.add(new Date(r.bar_time).toISOString());
+        const iso = new Date(r.bar_time).toISOString();
+        const set = out.get(iso) ?? new Set<QualityRuleCode>();
+        set.add(r.rule_code as QualityRuleCode);
+        out.set(iso, set);
       }
     }
     if (rows.length < page) break;
@@ -70,14 +80,30 @@ export async function loadQuarantinedBarTimes(
   return out;
 }
 
+/** Back-compatible helper: just the quarantined bar_times. */
+export async function loadQuarantinedBarTimes(
+  supabase: { from: (t: string) => any },
+  symbol: string,
+  timeframe: string,
+  qualityVersion: number = RON_QUALITY_VERSION,
+  page = 1000,
+): Promise<Set<string>> {
+  const map = await loadQuarantinedRuleCodes(supabase, symbol, timeframe, qualityVersion, page);
+  return new Set(map.keys());
+}
+
 export interface EligibilityContract {
   quality_version: number;
+  /** Persisted critical bar_times (ISO) -> the exact persisted rule codes. */
+  persistedRuleCodes: Map<string, Set<QualityRuleCode>>;
   /** Persisted critical bar_times (ISO). */
   persisted: Set<string>;
   /** True when this bar must be excluded from every RON path. */
   isQuarantined(bar: ContractBar, barMinutes: number): boolean;
-  /** Why it was excluded — persisted flags first, then recomputed rules. */
+  /** Primary reason — recomputed rules first, then the ACTUAL persisted rule codes. */
   reasonFor(bar: ContractBar, barMinutes: number): QualityRuleCode | null;
+  /** Every distinct critical reason for the bar (recomputed ∪ persisted), sorted. */
+  reasonsFor(bar: ContractBar, barMinutes: number): QualityRuleCode[];
 }
 
 /** Build the contract once per request, then reuse it for every bar in the batch. */
@@ -87,17 +113,20 @@ export async function buildEligibilityContract(
   timeframe: string,
   qualityVersion: number = RON_QUALITY_VERSION,
 ): Promise<EligibilityContract> {
-  const persisted = await loadQuarantinedBarTimes(supabase, symbol, timeframe, qualityVersion);
-  const reasonFor = (bar: ContractBar, barMinutes: number): QualityRuleCode | null => {
+  const persistedRuleCodes = await loadQuarantinedRuleCodes(supabase, symbol, timeframe, qualityVersion);
+  const persisted = new Set(persistedRuleCodes.keys());
+  const reasonsFor = (bar: ContractBar, barMinutes: number): QualityRuleCode[] => {
     const iso = new Date(bar.time).toISOString();
-    const derived = criticalRulesForBar(bar, barMinutes);
-    if (derived.length) return derived[0];
-    return persisted.has(iso) ? "venue_break_bar" : null;
+    const all = new Set<QualityRuleCode>(criticalRulesForBar(bar, barMinutes));
+    for (const rc of persistedRuleCodes.get(iso) ?? []) all.add(rc);
+    return [...all].sort();
   };
   return {
     quality_version: qualityVersion,
+    persistedRuleCodes,
     persisted,
-    reasonFor,
+    reasonsFor,
+    reasonFor: (bar, barMinutes) => reasonsFor(bar, barMinutes)[0] ?? null,
     isQuarantined: (bar, barMinutes) =>
       persisted.has(new Date(bar.time).toISOString()) || criticalRulesForBar(bar, barMinutes).length > 0,
   };
