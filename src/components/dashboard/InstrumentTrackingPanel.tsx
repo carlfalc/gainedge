@@ -28,6 +28,10 @@ interface ScanResult {
   ema_crossover_status: string; verdict: string;
   /** Genuine falconer_trades.opened_at, or null when the instrument has no signal history. */
   scanned_at: string | null;
+  /** Verbatim falconer_trades.status ("open" | "closed_sl" | ...), null when no row. */
+  status: string | null;
+  /** Verbatim falconer_trades.closed_at, null while open or when no row. */
+  closed_at: string | null;
 }
 
 const adxLabel = (v: number) =>
@@ -144,6 +148,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         verdict: t?.status ?? "PENDING",
         // Truthfulness: never manufacture a scan time. No signal row ⇒ null.
         scanned_at: t?.opened_at ?? null,
+        status: t?.status ?? null,
+        closed_at: t?.closed_at ?? null,
       });
     });
     setScans(rows);
@@ -287,12 +293,15 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         {visibleScans.map((inst, idx) => {
           const tf = instrumentTfs.get(inst.symbol) || "15m";
           // Signal history (Falconer) — explicitly NOT RON analysis.
-          const hasSignal = !!inst.scanned_at && !!inst.direction;
-          const expired = hasSignal ? isDynamicallyExpired(inst.scanned_at!, tf) : false;
-          const sigDir = (inst.direction || "").toLowerCase() === "long" ? "LONG"
-            : (inst.direction || "").toLowerCase() === "short" ? "SHORT" : (inst.direction || "").toUpperCase();
-          const badgeText = !hasSignal ? "NO SIGNAL" : expired ? `HISTORICAL ${sigDir}` : `FALCONER ${sigDir}`;
-          const badgeColor = !hasSignal || expired ? C.muted : sigDir === "LONG" ? C.green : C.red;
+          const sig = deriveFalconerSignalState(
+            { direction: inst.direction, opened_at: inst.scanned_at, status: inst.status, closed_at: inst.closed_at },
+            tf,
+          );
+          const hasSignal = sig.hasSignal;
+          const active = sig.isActive;
+          const sigDir = sig.direction;
+          const badgeText = sig.badgeText;
+          const badgeColor = sig.badgeTone === "active-long" ? C.green : sig.badgeTone === "active-short" ? C.red : C.muted;
           const countdown = nextScanSeconds(tf);
           const live = liveData.get(inst.symbol);
           const snap = snapshots.get(inst.symbol);
