@@ -448,6 +448,9 @@ export interface DirectionReport {
   reliability: ReliabilityBin[];
   fallback_levels: Record<string, number>;
   session_counts: Record<string, number>;
+  /** Phase 2B.2 (Defect B): holdout coverage across the other calibration dimensions. */
+  regime_counts: Record<string, number>;
+  adx_bucket_counts: Record<string, number>;
   cells: CellStat[];
 }
 
@@ -469,9 +472,13 @@ export function calibrateDirection(
   const naivePreds: { p: number; y: boolean }[] = [];
   const fallback: Record<string, number> = { L3: 0, L2: 0, L1: 0, L0: 0, none: 0 };
   const sessions: Record<string, number> = {};
+  const regimes: Record<string, number> = {};
+  const adxBuckets: Record<string, number> = {};
   let successHold = 0;
   for (const o of holdout) {
     sessions[o.session] = (sessions[o.session] ?? 0) + 1;
+    regimes[o.regime] = (regimes[o.regime] ?? 0) + 1;
+    adxBuckets[o.adx_bucket] = (adxBuckets[o.adx_bucket] ?? 0) + 1;
     if (o.success) successHold++;
     const r = resolvePrediction(map, dir, o);
     if (r.p == null) { fallback.none++; continue; }
@@ -498,6 +505,8 @@ export function calibrateDirection(
     reliability: reliabilityBins(preds),
     fallback_levels: fallback,
     session_counts: sessions,
+    regime_counts: regimes,
+    adx_bucket_counts: adxBuckets,
     cells,
   };
 }
