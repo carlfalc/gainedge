@@ -310,7 +310,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           // instant, so it is reproducible server-side and never invented.
           const sess = snap ? classifyRonSession(snap.bar_time) : null;
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
-          const color = expired ? "#555F73" : directionColor(inst.direction);
+          // Deterministic pattern education, grounded only in persisted pattern objects.
+          const patternExplanations = explainPatterns(snap?.patterns as any[] | undefined, 3);
+          const structureSummary = summariseStructure((snap?.patterns as any[] | undefined)?.slice(0, 3) ?? []);
           // Prefer the live feed only while it is actually fresh; otherwise fall back to the
           // RON snapshot so the indicator row can never contradict RON's own reasoning.
           const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
