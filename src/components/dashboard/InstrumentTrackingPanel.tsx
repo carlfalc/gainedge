@@ -137,7 +137,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       rows.push({
         id: t?.id ?? `placeholder-${i.symbol}`,
         symbol: i.symbol,
-        direction: t?.direction ?? "WAIT",
+        direction: t?.direction ?? null,
         entry_price: t?.entry_price ?? null,
         take_profit: t?.tp3_price ?? null,
         stop_loss: t?.sl_price ?? null,
@@ -148,7 +148,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         reasoning: t ? `Falconer v7 ${t.trigger_type}` : "",
         ema_crossover_status: "",
         verdict: t?.status ?? "PENDING",
-        scanned_at: t?.opened_at ?? new Date().toISOString(),
+        // Truthfulness: never manufacture a scan time. No signal row ⇒ null.
+        scanned_at: t?.opened_at ?? null,
       });
     });
     setScans(rows);
