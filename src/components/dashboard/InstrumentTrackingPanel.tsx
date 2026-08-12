@@ -217,7 +217,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           <span style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
             CURRENT INSTRUMENT TRACKING
           </span>
-          <span style={{ color: C.sec, fontWeight: 400, fontSize: 10 }}>
+          <span style={{ color: C.text, fontWeight: 400, fontSize: 10 }}>
             {visibleScans.length}/{scans.length} visible
           </span>
         </div>
@@ -329,7 +329,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       ${live.last_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
                     </div>
                   )}
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text }}>
                     <span>Last scan:</span>
                     <Clock size={10} />
                     <span>{formatAge(inst.scanned_at)}</span>
@@ -355,10 +355,10 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.4")}
                       title="Hide this card"
                     >
-                      <X size={14} color={C.sec} />
+                      <X size={14} color={C.text} />
                     </button>
                   </div>
-                  <span style={{ fontSize: 9, color: countdown === -1 ? "#F59E0B" : C.sec, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <span style={{ fontSize: 9, color: countdown === -1 ? "#F59E0B" : C.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
                     <Clock size={9} /> {countdown === -1 ? "Market closed" : `Next scan: ${formatCountdown(countdown)}`}
                   </span>
                 </div>
@@ -366,7 +366,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
 
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 9, color: C.sec, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
+                  <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
                   {(() => {
                     // Phase 2C: a quarantined source anchor (a provider rollup artifact
                     // opening inside the venue break) is never shown as a tradable setup.
@@ -374,11 +374,11 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       (!snap || new Date(dataQuality.latestCriticalBar).getTime() > new Date(snap.bar_time).getTime());
                     return (
                       <>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: quarantined ? "#F59E0B" : ron ? ronStateColor(ron.state) : C.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: quarantined ? "#F59E0B" : ron ? ronStateColor(ron.state) : C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                           {quarantined ? "NO TRADABLE SETUP" : ron ? ron.state : "DATA BUILDING"}
                         </div>
                         {inst.symbol === "XAUUSD" && dataQuality && (
-                          <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.sec }}
+                          <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.text }}
                                title={`Deterministic source-data quality v${1}: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags. Raw candle history is never modified.`}>
                             Data integrity: {quarantined ? "Source anomaly quarantined" : "Healthy"}
                           </div>
@@ -386,7 +386,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       </>
                     );
                   })()}
-                  <div style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
+                  <div style={{ fontSize: 9, color: C.text, marginTop: 2 }}>
                     Probability: {ron ? "Not calibrated yet · building evidence" : "Not calibrated yet"}
                   </div>
                   <div style={{
@@ -398,7 +398,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     {health.label}{snap ? ` · ${formatAge(snap.bar_time)}` : ""}
                   </div>
                   {snap && (
-                    <div style={{ fontSize: 9, color: snap.data_health === "healthy" ? C.sec : "#F59E0B" }}>
+                    <div style={{ fontSize: 9, color: snap.data_health === "healthy" ? C.text : "#F59E0B" }}>
                       {snap.timeframe} bar {new Date(snap.bar_time).toISOString().slice(5, 16).replace("T", " ")}Z
                       {snap.data_health !== "healthy" ? ` · ${snap.data_health}` : ""}
                     </div>
@@ -407,19 +407,19 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 {sparkData ? (
                   <Sparkline data={sparkData} color={sparkColor} w={120} h={32} />
                 ) : (
-                  <span style={{ fontSize: 9, color: C.muted, fontStyle: "italic" }}>No live price feed</span>
+                  <span style={{ fontSize: 9, color: C.text, fontStyle: "italic" }}>No live price feed</span>
                 )}
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12 }}>
-                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveAdx)}</span>{liveAdx != null && <span style={{ color: C.muted, fontSize: 10 }}> - {adxLabel(Number(liveAdx))}</span>}</span>
-                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveRsi)}</span>{liveRsi != null && <span style={{ color: C.muted, fontSize: 10 }}> - {rsiLabel(Number(liveRsi))}</span>}</span>
-                <span>MACD <span style={{ color: String(liveMacd).startsWith("bullish") || liveMacd === "Bullish" ? C.green : String(liveMacd).startsWith("bearish") || liveMacd === "Bearish" ? C.red : C.muted, fontWeight: 600 }}>{macdLabel(liveMacd)}</span></span>
-                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ color: C.muted, fontSize: 10 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text, marginBottom: 12 }}>
+                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveAdx)}</span>{liveAdx != null && <span style={{ color: C.text, fontSize: 10 }}> - {adxLabel(Number(liveAdx))}</span>}</span>
+                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveRsi)}</span>{liveRsi != null && <span style={{ color: C.text, fontSize: 10 }}> - {rsiLabel(Number(liveRsi))}</span>}</span>
+                <span>MACD <span style={{ color: String(liveMacd).startsWith("bullish") || liveMacd === "Bullish" ? C.green : String(liveMacd).startsWith("bearish") || liveMacd === "Bearish" ? C.red : C.text, fontWeight: 600 }}>{macdLabel(liveMacd)}</span></span>
+                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ color: C.text, fontSize: 10 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
               </div>
 
               {snap && f ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.sec, marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text, marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
                   <span>Completed {snap.timeframe} close <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{snap.close}</span></span>
                   <span>ATR% <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(f.atr_pct, 3)}</span></span>
                   <span>Regime <span style={{ color: C.text }}>{String(f.regime ?? "—").replace("_", " ")}</span></span>
@@ -428,7 +428,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       {sess ? sess.label : "—"}
                     </span>
                   </span>
-                  <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
+                  <span style={{ gridColumn: "1 / -1", color: C.text, fontSize: 10 }}>
                     {sess
                       ? `${sess.active.length ? sess.active.join(" + ") : "no cash session"}` +
                         `${sess.minutes_into_session != null ? ` · ${sess.minutes_into_session}m in` : ""}` +
@@ -447,10 +447,10 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                         : "No pattern detected"}
                     </span>
                   </span>
-                  <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
+                  <span style={{ gridColumn: "1 / -1", color: C.text, fontSize: 10 }}>
                     Completed bar close — not a live tick quote.
                   </span>
-                  <span style={{ gridColumn: "1 / -1", color: C.muted, fontSize: 10 }}>
+                  <span style={{ gridColumn: "1 / -1", color: C.text, fontSize: 10 }}>
                     Outcome labels (research only, label v4, feature v3, XAUUSD 15m sample slices): {outcomeStats
                       ? `${outcomeStats.labelled.toLocaleString()} labelled, ${outcomeStats.excluded.toLocaleString()} excluded (venue-closed minutes and/or missing 1m candles). Nothing shown on this dashboard is derived from them.`
                       : "loading"}
@@ -463,13 +463,13 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               )}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
-                <div><span style={{ color: C.sec }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>SL:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
-                <div><span style={{ color: C.sec }}>R:R:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
+                <div><span style={{ color: C.text }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
+                <div><span style={{ color: C.text }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
+                <div><span style={{ color: C.text }}>SL:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
+                <div><span style={{ color: C.text }}>R:R:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
               </div>
 
-              <div style={{ fontSize: 11, color: expired ? "rgba(255,255,255,0.7)" : C.sec, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
+              <div style={{ fontSize: 11, color: expired ? "rgba(255,255,255,0.7)" : C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
                 {expired && (
                   <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 600, marginBottom: 4 }}>
                     (Expired — {formatAge(inst.scanned_at)})
@@ -479,7 +479,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 {ron ? (
                   <>
                     {ron.why}
-                    <div style={{ marginTop: 4, color: C.muted }}>What would change it: {ron.next}</div>
+                    <div style={{ marginTop: 4, color: C.text }}>What would change it: {ron.next}</div>
                     {inst.reasoning && <div style={{ marginTop: 4 }}>{inst.reasoning}</div>}
                   </>
                 ) : (
@@ -488,7 +488,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               </div>
 
               {expired && (
-                <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.sec, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.text, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                   <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
                 </div>
               )}
