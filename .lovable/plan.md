@@ -1,118 +1,63 @@
-# RON as the Intelligence Brain — Phased Architecture Plan
+# Phase 2D.1d — Recovered-Source Downstream Impact Inventory (READ-ONLY)
 
-Falconer v7 TP3 stays frozen and becomes one pluggable model adapter. RON becomes a continuously running market-state engine, outcome-labelling pipeline and empirical probability layer. Execution stays off (`execution_path = signal_only`, `allow_live_execution = false`) throughout every phase in this plan.
+Recommended next checkpoint: **A (impact/inventory audit)**, not B (rebuild) and not C (Research V3).
 
-## Verified current state (checked against the live database and code)
+## 1. Scope
 
-- Candle history is genuine and usable: 1m 165,000 rows (XAUUSD only), 15m 88,545 rows across 17 symbols, 1h 13,174, 5m 11,650, native 1d 1,884 (2 symbols), resampled `1d_r1h` 580.
-- `live_market_data` holds 27 rows, last updated **2026-04-16** — stale by ~4 months. Its 30s compute cron is retired and `triggerMarketDataCompute()` in `src/services/broker-data.ts` is a no-op returning immediately.
-- `falconer_trades` holds 666 rows but only **1** has a non-empty `features` object. Historical rows cannot train anything; they are outcome history only.
-- 19 distinct symbols tracked in `user_instruments`, 2 user profiles today.
-- `DashboardHome.tsx` fabricates `confidence: 8` per trade and `generateSparkData()` synthesises sparklines.
-- Edge functions today: falconer-engine, falconer-backtest, metaapi-candles, metaapi-backfill, metaapi-trade, connect-metaapi, gainedge-ai, fetch-candles, fetch-news, forex-ticker, email functions.
-- `src/services/pattern-detection.ts` (390 lines, rich) is client-only; the engine uses `_shared/pattern-analysis.ts` (55 lines).
+A strictly read-only audit that quantifies exactly which downstream RON artifacts were derived while the 76,238 recovered XAUUSD 1m candles were still absent, and produces a frozen, hash-stamped impact manifest that a later versioned rebuild (Phase 2D.1e) must reproduce or supersede. No migrations, no function deploys, no cron changes, no rows written, no version bumps.
 
-## 1. Architecture and data flow
+Deliverables (evidence only, reported in chat plus a checked-in read-only audit script if the repo already has one; otherwise chat-only):
+- Per-artifact staleness inventory: quality v3 flags, feature v4 snapshots, label v5 outcomes, calibration v4/v5/v6, research V1/V2.
+- Exact affected-row counts and bar_time ranges for each artifact intersecting `(2026-05-15T00:01Z, 2026-07-31T17:32Z)`.
+- Classification of each artifact as `unaffected`, `affected_conservative` (was excluded, may now become eligible), or `affected_contradictory` (a stored value would change sign/eligibility).
+- A recomputed-but-not-persisted spot check on a bounded sample (<= 50 bars) proving the direction of change.
+- A written rebuild dependency order for Phase 2D.1e (qv -> fv -> lv -> calibration), with the version numbers to be used.
 
-```text
-MetaAPI / Eightcap
-   |  (metaapi-candles, metaapi-backfill)
-   v
-candle_history  ------------------------------+
-   |                                          |
-   | ron-snapshot (every closed bar)          | ron-label (deferred forward window)
-   v                                          v
-ron_market_snapshots  ---------------->  ron_snapshot_outcomes
-   |          ^                                   |
-   |          | model_signals (Falconer + future) |
-   |     model adapters (falconer v7 = adapter #1)|
-   v                                              v
-ron-score  <----- ron_stat_cells (empirical calibrated buckets) <--- ron-aggregate
-   |
-   v
-ron_symbol_state (current RON verdict per symbol/timeframe, freshness + data health)
-   |
-   v
-Dashboard (read-only) + gainedge-ai (explains RON output, never invents numbers)
-```
+## 2. Why this is the next dependency
 
-Key rule: RON never derives a number from an LLM. `gainedge-ai` is downgraded to a narrator over `ron_symbol_state` / `ron_stat_cells` evidence rows.
+The recovery inserted genuine 1m history *after* the v3/v4/v5 lineage was already built:
 
-## 2. Database changes
+- rebuild jobs completed 2026-08-12 03:15 / 03:25 / 03:37Z; the recovery job completed 2026-08-12 08:34:56Z.
+- 4,465 feature v4 snapshots exist inside the recovered window (15m candles there: 4,466).
+- All 4,465 label v5 outcomes inside that window carry `coverage_ok = false`; the label v5 coverage histogram is dominated by `genuine_data_gap: 4439`.
 
-New tables:
+So the current labels encode "no 1m data" for a window where genuine 1m data now exists. Rebuilding (B) before measuring produces a new lineage with no auditable statement of what changed and why, and Research V3 (C) would be run on labels whose eligibility base is about to move — both violate the reproducibility discipline enforced since Phase 2B.1. Measure first, then rebuild, then research.
 
-- `ron_market_snapshots` — one row per symbol/timeframe/closed bar. Identity (symbol, timeframe, bar_time), OHLCV + spread, a `features jsonb` (RSI+slope, ADX/DMI, MACD state/hist/slope, StochRSI, ATR, atr_pct, volatility percentile + regime, EMA9/21/50/200 distance+slope, HTF daily context, structure HH/HL/LH/LL + regime, HA state, relative volume, S/R distances, session/hour/weekday/minutes-from-open, PDH/PDL/PWH/PWL, Asian range, position in daily range, news proximity), `patterns jsonb`, `model_signals jsonb` (per-model trigger state and distance-to-trigger even when nothing fires), `feature_version`, `data_health`. Unique on (symbol, timeframe, bar_time, feature_version), indexed by bar_time.
-- `ron_snapshot_outcomes` — forward labels per snapshot: MFE/MAE in R and price, `hit_05r`…`hit_5r`, `stop_first`, bars/minutes to each target, forward returns at configurable horizons, regime after, `label_version`, `resolved_at`.
-- `ron_stat_cells` — empirical statistics per segment key (symbol, session, weekday, hour bucket, regime, volatility bucket, pattern, trigger/model, and combinations). Stores n, wins, win_rate, mean R, Wilson confidence interval, min-sample flag, `dataset_split`, `computed_at`.
-- `ron_symbol_state` — current RON verdict per tracked symbol/timeframe: state (WAIT / WATCH / SETUP FORMING / HIGH CONFLUENCE / ENTRY QUALIFIED), evidence score, calibrated probability (nullable when sample size is insufficient), uncertainty band, top evidence items, `snapshot_id`, freshness, `data_health`. This replaces `live_market_data` as the dashboard read model.
-- `ron_models` — model registry: key, version, adapter, status (champion/challenger/retired), config, metrics.
-- `ron_global_contributions` (Phase 4) — de-identified feature/outcome records: no user_id, no account id, no balances; carries `contribution_id`, normalised symbol, broker/feed tag, feature_version, model_version, source_quality. Plus `ron_consent` per user (opt-in, timestamp, revocation).
+## 3. Read-only evidence required before any write
 
-Changed/retired:
+- Immutability canaries: XAUUSD 1m count at cutoff 2026-08-12T07:54:00Z = 174,425; strict recovered range count = 76,238 with min 2026-05-15T00:01Z / max 2026-07-31T17:32Z; recovery job `8d2ca692-576c-4fca-86ab-7f564e69b1dc` status `complete`, inserted 76,238, digest `bfc7fa18…16ad8`.
+- Frozen-artifact canaries: research V1 and V2 ids/hashes/row counts (V2 = `8b32c54c…`, hash `3dc82dde…`); calibration v4 id/hash/126 cells; calibration v6 `9c4ca06e…` hash `082db6fa…`.
+- Timeline proof: `ron_rebuild_jobs.completed_at` per stage vs `ron_data_recovery_jobs.completed_at`.
+- Affected-set queries: v4 snapshots and v5 outcomes intersecting the recovered window; coverage_class and data_resolution histograms inside vs outside the window; quality v3 flags inside the window by rule_code.
+- Eligibility delta estimate: for the in-window bars, count how many are currently excluded solely by `genuine_data_gap` / `coverage_ok = false` and would now have a complete 1m forward window under the existing labeller contract.
+- Re-verify privilege lockdown from 2D.1c-a still holds (service_role only on `bulk_insert_candles`, `ron_data_recovery_jobs`, `ron_verify_cron_token`).
+- Confirm `allow_live_execution = false` and `execution_path = {signal_only}`.
 
-- `live_market_data`: keep read-only for one release while the dashboard migrates, then drop.
-- `falconer_trades`: unchanged (parity frozen). It becomes an outcome source, not a feature source.
-- All new public tables get GRANTs + RLS in the same migration; snapshot/stat tables are readable by `authenticated`, written only by `service_role`.
+## 4. Do not touch
 
-## 3. Edge functions and cadence
+- No INSERT/UPDATE/DELETE on `candle_history`, and no touching the recovery job row or digest.
+- No new migrations, no privilege changes, no cron edits, no edge-function deploys.
+- No version bumps: quality stays 3, feature 4, label 5, calibration 6, research 2 during this checkpoint.
+- `_shared/falconer-strategy.ts` semantics untouched; no execution enablement; no numeric probability added to the dashboard.
+- No Research V3 work, and no implementation of the venue-aware expected-open continuity contract (recorded as a Phase 2D.2 prerequisite only).
+- Do not re-run `ron-rebuild`, `ron-calibrate`, or `ron-research`.
 
-- `ron-snapshot` — computes features for newest closed bars across tracked symbol/timeframes. Cron every 1 minute, guarded by market hours and a last-bar cursor so work happens only on bar close.
-- `ron-label` — resolves outcomes once the forward window has fully elapsed, using 1m/5m data for stop-first/target-first resolution. Cron every 5 minutes, plus a bulk backfill mode.
-- `ron-aggregate` — rebuilds `ron_stat_cells` with sample-size and confidence-interval discipline. Hourly or nightly.
-- `ron-score` — turns the latest snapshot + stat cells + model signals into `ron_symbol_state`. Runs right after `ron-snapshot`.
-- `falconer-engine` — strategy logic unchanged; refactored only to also emit its trigger state into `model_signals` through the adapter interface.
-- `gainedge-ai` — refactored to explain stored RON evidence; no numeric invention.
+## 5. Terminal acceptance criteria
 
-## 4. Retire / keep / refactor
+- Every canary in section 3 matches its pre-audit value byte-for-byte at the end of the audit.
+- The impact manifest states, per artifact and version, affected row counts, ranges and classification, with the query used for each number.
+- The audit explicitly answers: how many currently-ineligible in-window anchors are expected to become eligible after rebuild, and the expected direction of change in eligible LONG/SHORT counts.
+- A Phase 2D.1e rebuild spec exists with concrete next version numbers and stage order, plus the exact canaries the rebuild must preserve.
+- Zero writes of any kind are demonstrable (no new rows in any RON table, no new migration file, no function version change).
 
-Retire: the `live_market_data` compute path and the dead `triggerMarketDataCompute()`; placeholder confidence and `generateSparkData()`; mock-derived trend labels; leftover legacy RON auto-trade components already rendering null.
+## 6. Stop boundary
 
-Keep frozen: `_shared/falconer-strategy.ts`, session/DST math, parity fixes, the MetaAPI connection and secrets, `metaapi-candles` / `metaapi-backfill`.
+Stop immediately after the impact manifest and the 2D.1e rebuild spec are reported. Do not begin the rebuild, do not bump versions, do not start Research V3.
 
-Refactor: promote `src/services/pattern-detection.ts` into `supabase/functions/_shared/pattern-detection.ts` so server and client share one implementation. Patterns become snapshot features only — they do not gate Falconer entries, so parity stays intact.
+## 7. Current-state drift since Phase 2D.1c-a acceptance
 
-## 5. Dashboard changes
-
-- `DashboardHome.tsx` and `InstrumentTrackingPanel.tsx` read `ron_symbol_state` plus the latest `ron_market_snapshots` via Realtime instead of `live_market_data`.
-- Cards show real last price, RON state, trend/regime, RSI/ADX/MACD/StochRSI/ATR%, session, pattern context, evidence score, probability only when calibrated (otherwise "insufficient sample"), a real sparkline built from recent candles, freshness timestamp and a data-health dot.
-- One plain-language line per card: direction, state, why, risk context, what must happen next.
-- Every fabricated value is removed. Stale data renders as stale rather than as a number.
-
-## 6. Backfilling and training without lookahead
-
-- Replay `candle_history` chronologically; a snapshot at bar *t* may use only bars <= t, and daily context reuses the session-aligned no-lookahead logic proven during the parity work.
-- Labels are written only for snapshots whose full forward window is already in the past.
-- Split by time, not randomly: train up to a cutoff, validation next block, test most recent block. The split is stored on `ron_stat_cells` so no cell mixes periods.
-- Warm start with XAUUSD (dense 1m/15m/1h), then the other 16 symbols on 15m.
-- The 665 legacy Falconer rows are used only for sanity comparison, never as feature training data.
-
-## 7. Phases
-
-- **Phase 0 — Truthfulness.** Remove fake confidence, fake sparklines and mock labels; add freshness and data-health indicators; mark stale layers explicitly. No new tables.
-- **Phase 1 — Feature store.** `ron_market_snapshots`, shared indicator/pattern library, `ron-snapshot` cron, historical backfill for XAUUSD then all symbols.
-- **Phase 2 — Outcome labelling.** `ron_snapshot_outcomes`, `ron-label` cron and bulk backfill.
-- **Phase 3 — Empirical probability.** `ron_stat_cells`, `ron-aggregate`, `ron-score`, `ron_symbol_state`, dashboard switched onto RON; `min_setup_score` becomes a real blocking gate in routing (still signal-only).
-- **Phase 4 — Network learning.** Consent table, opt-in de-identified contribution pipeline, global vs personal blending with sample-size rules.
-- **Phase 5 — Model platform.** `ron_models`, adapter interface, walk-forward comparison, champion/challenger and retirement.
-
-## 8. Acceptance tests
-
-- P0: no fabricated number renders anywhere; stale data renders as stale; existing Falconer parity tests still pass.
-- P1: recomputing a historical bar twice yields identical features; no snapshot references a future bar; snapshot coverage matches candle coverage per symbol/timeframe.
-- P2: labels reproduce known Falconer trade outcomes on overlapping bars; no label exists whose forward window extends past `now()`; stop-first resolution verified against 1m data on sampled trades.
-- P3: every displayed probability has n >= threshold and a confidence interval; calibration (predicted vs realised) within tolerance on the held-out test block; a below-threshold score blocks routing.
-- P4: no user_id, account id, balance or name in any contribution row; opting out stops future contributions.
-- P5: two models run side by side on identical bars and are comparable without either affecting the other.
-
-## 9. Risks and scale
-
-- Snapshot volume: 19 symbols on 15m is roughly 1.8k rows/day; adding 5m/1m multiplies quickly. Mitigate with per-symbol timeframe allowlists, bar_time indexing/partitioning and a retention policy that keeps features while ageing out duplicated OHLCV.
-- Do not fan out crons per subscriber: snapshots are global per symbol/timeframe; only `ron_symbol_state` presentation is user-filtered.
-- MetaAPI rate limits and the earlier `context canceled` timeouts: keep chunked, paginated, resumable jobs.
-- Statistical risk of over-segmentation producing confident nonsense: enforce minimum sample sizes and always surface confidence intervals.
-- Privacy: the global pool must be de-identified at write time, not at read time.
-
-## 10. Recommended first slice
-
-Phase 0 plus the XAUUSD-only backbone of Phase 1: shared indicator/pattern library, `ron_market_snapshots`, `ron-snapshot` for XAUUSD 15m (live cron plus historical backfill over the existing genuine history), and one dashboard card wired to real computed indicators with freshness and data health. Nothing about execution, Falconer logic or probability claims changes in this slice.
+- **Material drift:** the entire qv3/fv4/lv5 lineage predates the recovery insert (03:15–03:37Z vs 08:34Z). 4,465 in-window feature v4 snapshots and their 4,465 label v5 outcomes are all `coverage_ok = false`, so downstream eligibility is currently understated for the recovered window.
+- Calibration v6 (`9c4ca06e…`, `source_as_of 2026-08-12T06:09:00Z`) is also pre-recovery and is stamped `status = research`; it is therefore stale with respect to the recovered source, though its hash is unchanged.
+- The live snapshot cron is still healthy — feature v4 snapshots extend to 2026-08-12T09:00Z.
+- Version constants in code: quality 3, feature 4, label 5, research 2; `CALIBRATION_VERSION = 2` in `_shared/ron-calibration.ts` while persisted runs reach v6, so the runtime constant lags the persisted contract version — flag for confirmation during the audit before any rebuild picks a next version number.
+- No drift found in the recovery canaries: 174,425 / 76,238 / digest `bfc7fa18…16ad8` all unchanged.
