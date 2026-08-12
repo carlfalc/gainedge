@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { C as CBase } from "@/lib/mock-data";
-import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "lucide-react";
+import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink, LineChart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
+import { formatPrintedLocal } from "@/lib/signal-time";
+import { explainPatterns, summariseStructure, fmtLevel } from "@/lib/pattern-interpretation";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
 import {
@@ -16,11 +19,15 @@ import { classifyRonSession } from "@/lib/ron-sessions";
 
 const C = { ...CBase, text: "#FFFFFF", sec: "#FFFFFF" };
 interface ScanResult {
-  id: string; symbol: string; direction: string;
+  id: string; symbol: string;
+  /** Falconer signal-history direction ("long"/"short"), or null when no signal exists. */
+  direction: string | null;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
   macd_status: string | null; stoch_rsi: number | null; reasoning: string;
-  ema_crossover_status: string; verdict: string; scanned_at: string;
+  ema_crossover_status: string; verdict: string;
+  /** Genuine falconer_trades.opened_at, or null when the instrument has no signal history. */
+  scanned_at: string | null;
 }
 
 const adxLabel = (v: number) =>
