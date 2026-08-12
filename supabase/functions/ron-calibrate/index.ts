@@ -22,10 +22,12 @@ import {
   CALIBRATION_LABEL_VERSION, CALIBRATION_HORIZON_MINUTES, CALIBRATION_BARRIER_ATR_MULT,
   CALIBRATION_BARRIER_VERSION, CALIBRATION_VERSION, HOLDOUT_FRACTION, SAMPLE_FLOORS,
   INELIGIBLE_ANCHOR_SESSIONS, anchorSessionEligible,
-  calibrateDirection, cellPayloadV2, definitionPayloadV2, eligibleFor, resolvePrediction,
+  calibrateDirection, cellPayloadV2, definitionPayloadV2, definitionPayloadV5,
+  commonSplitCutoff, eligibleFor, resolvePrediction,
   runPayloadV2, sha256, resolveSourceClockV2, NoGenuineSourceClockError,
   CALIBRATION_CONTRACTS, CALIBRATION_CONTRACT_V3,
-  CALIBRATION_CONTRACT_V4,
+  CALIBRATION_CONTRACT_V4, CALIBRATION_CONTRACT_V5,
+  ADX_BUCKET_BOUNDS, HIERARCHY_POLICY_VERSION,
   type CalibrationInputRow, type Direction, type EligibleObs,
   type RunIdentityV2,
 } from "../_shared/ron-calibration.ts";
@@ -76,12 +78,14 @@ Deno.serve(async (req) => {
    * Phase 2C.1: calibration_version=3 is canonical (feature v3 + label v4). v2 remains
    * runnable for frozen audit replay and produces byte-identical hashes.
    */
-  const CONTRACT = CALIBRATION_CONTRACTS[Number(body.calibration_version ?? 4)] ?? CALIBRATION_CONTRACT_V4;
+  const CONTRACT = CALIBRATION_CONTRACTS[Number(body.calibration_version ?? 5)] ?? CALIBRATION_CONTRACT_V5;
   const CAL_VERSION = CONTRACT.calibration_version;
   const FEATURE_V = CONTRACT.feature_version;
   const LABEL_V = CONTRACT.label_version;
   /** Quality lineage pinned per calibration contract; older runs replay their own qv. */
   const QUALITY_V = CAL_VERSION >= 4 ? 3 : CAL_VERSION === 3 ? 2 : 1;
+  /** v5+: one common cutoff for both directions; v2..v4 replay their per-direction split. */
+  const COMMON_SPLIT = CAL_VERSION >= 5;
 
   // ---- frozen source cut -------------------------------------------------
   // v2 contract: the default source clock is GENUINE MARKET TIME — the latest stored
@@ -226,9 +230,18 @@ Deno.serve(async (req) => {
     if (!any) bump("row_fully_excluded");
   }
 
-  const longReport = calibrateDirection("long", obs.long, holdoutFraction);
-  const shortReport = calibrateDirection("short", obs.short, holdoutFraction);
-  const cutoff = longReport.holdout_range?.[0] ?? shortReport.holdout_range?.[0] ?? null;
+  // ONE common chronological cutoff from the distinct canonical eligible snapshot times of
+  // BOTH directions, computed before any direction-specific calibration.
+  const commonCutoff = COMMON_SPLIT ? commonSplitCutoff([obs.long, obs.short], holdoutFraction) : null;
+  const longReport = COMMON_SPLIT
+    ? calibrateDirection("long", obs.long, holdoutFraction, commonCutoff)
+    : calibrateDirection("long", obs.long, holdoutFraction);
+  const shortReport = COMMON_SPLIT
+    ? calibrateDirection("short", obs.short, holdoutFraction, commonCutoff)
+    : calibrateDirection("short", obs.short, holdoutFraction);
+  const cutoff = COMMON_SPLIT
+    ? commonCutoff
+    : (longReport.holdout_range?.[0] ?? shortReport.holdout_range?.[0] ?? null);
 
   const identity: RunIdentityV2 = {
     symbol: SYMBOL, timeframe: TIMEFRAME,
@@ -239,7 +252,11 @@ Deno.serve(async (req) => {
     excluded_rows: outcomes.length * 2 - obs.long.length - obs.short.length,
     exclusion_breakdown: exclusion,
   };
-  const definitionHash = await sha256(definitionPayloadV2(identity, CONTRACT));
+  const definitionHash = await sha256(
+    CAL_VERSION >= 5
+      ? definitionPayloadV5(identity, CONTRACT, QUALITY_V)
+      : definitionPayloadV2(identity, CONTRACT),
+  );
   const runHash = await sha256(runPayloadV2(identity, definitionHash, longReport, shortReport));
 
   const summary = {
@@ -258,7 +275,10 @@ Deno.serve(async (req) => {
     quality_quarantine_beyond_session_exclusion: qualityQuarantinedBeyondSession,
     holdout_fraction: holdoutFraction,
     split_cutoff: cutoff,
+    common_split_cutoff: COMMON_SPLIT ? commonCutoff : null,
     sample_floors: SAMPLE_FLOORS,
+    adx_bucket_bounds: ADX_BUCKET_BOUNDS,
+    hierarchy_policy_version: HIERARCHY_POLICY_VERSION,
     canonical_rows: outcomes.length,
     eligible_long: obs.long.length,
     eligible_short: obs.short.length,
