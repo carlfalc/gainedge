@@ -1289,6 +1289,87 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_data_recovery_jobs: {
+        Row: {
+          broker_symbol: string
+          completed_at: string | null
+          conflicts_existing: number
+          cursor_end_anchor: string | null
+          error_count: number
+          filtered_out: number
+          id: string
+          inserted: number
+          last_error: string | null
+          max_inserted_ts: string | null
+          min_inserted_ts: string | null
+          pages_fetched: number
+          range_end_exclusive: string
+          range_start_exclusive: string
+          raw_candles: number
+          recovery_version: number
+          row_digest: string | null
+          source: string
+          started_at: string
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+          validated_in_range: number
+        }
+        Insert: {
+          broker_symbol: string
+          completed_at?: string | null
+          conflicts_existing?: number
+          cursor_end_anchor?: string | null
+          error_count?: number
+          filtered_out?: number
+          id?: string
+          inserted?: number
+          last_error?: string | null
+          max_inserted_ts?: string | null
+          min_inserted_ts?: string | null
+          pages_fetched?: number
+          range_end_exclusive: string
+          range_start_exclusive: string
+          raw_candles?: number
+          recovery_version?: number
+          row_digest?: string | null
+          source: string
+          started_at?: string
+          status?: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+          validated_in_range?: number
+        }
+        Update: {
+          broker_symbol?: string
+          completed_at?: string | null
+          conflicts_existing?: number
+          cursor_end_anchor?: string | null
+          error_count?: number
+          filtered_out?: number
+          id?: string
+          inserted?: number
+          last_error?: string | null
+          max_inserted_ts?: string | null
+          min_inserted_ts?: string | null
+          pages_fetched?: number
+          range_end_exclusive?: string
+          range_start_exclusive?: string
+          raw_candles?: number
+          recovery_version?: number
+          row_digest?: string | null
+          source?: string
+          started_at?: string
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+          validated_in_range?: number
+        }
+        Relationships: []
+      }
       ron_market_snapshots: {
         Row: {
           bar_time: string
