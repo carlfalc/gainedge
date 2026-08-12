@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { C as CBase } from "@/lib/mock-data";
-import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "lucide-react";
+import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink, LineChart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
+import { formatPrintedLocal } from "@/lib/signal-time";
+import { explainPatterns, summariseStructure, fmtLevel } from "@/lib/pattern-interpretation";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
 import {
@@ -16,11 +19,15 @@ import { classifyRonSession } from "@/lib/ron-sessions";
 
 const C = { ...CBase, text: "#FFFFFF", sec: "#FFFFFF" };
 interface ScanResult {
-  id: string; symbol: string; direction: string;
+  id: string; symbol: string;
+  /** Falconer signal-history direction ("long"/"short"), or null when no signal exists. */
+  direction: string | null;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
   risk_reward: string | null; adx: number | null; rsi: number | null;
   macd_status: string | null; stoch_rsi: number | null; reasoning: string;
-  ema_crossover_status: string; verdict: string; scanned_at: string;
+  ema_crossover_status: string; verdict: string;
+  /** Genuine falconer_trades.opened_at, or null when the instrument has no signal history. */
+  scanned_at: string | null;
 }
 
 const adxLabel = (v: number) =>
@@ -31,13 +38,6 @@ const rsiLabel = (v: number) =>
 
 const stochLabel = (v: number) =>
   v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
-
-const directionColor = (dir: string) => {
-  if (dir === "BUY") return "#22C55E";
-  if (dir === "SELL") return "#EF4444";
-  if (dir === "WAIT") return "#F59E0B";
-  return "#555F73";
-};
 
 const num = (v: unknown, dp = 1): string =>
   v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(dp);
@@ -51,6 +51,7 @@ interface InstrumentTrackingPanelProps {
 }
 
 export default function InstrumentTrackingPanel({ showPopOutButton = true }: InstrumentTrackingPanelProps) {
+  const navigate = useNavigate();
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(new Map());
   const [userId, setUserId] = useState<string>();
@@ -130,7 +131,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       rows.push({
         id: t?.id ?? `placeholder-${i.symbol}`,
         symbol: i.symbol,
-        direction: t?.direction ?? "WAIT",
+        direction: t?.direction ?? null,
         entry_price: t?.entry_price ?? null,
         take_profit: t?.tp3_price ?? null,
         stop_loss: t?.sl_price ?? null,
@@ -141,7 +142,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         reasoning: t ? `Falconer v7 ${t.trigger_type}` : "",
         ema_crossover_status: "",
         verdict: t?.status ?? "PENDING",
-        scanned_at: t?.opened_at ?? new Date().toISOString(),
+        // Truthfulness: never manufacture a scan time. No signal row ⇒ null.
+        scanned_at: t?.opened_at ?? null,
       });
     });
     setScans(rows);
@@ -199,6 +201,16 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
 
   // Genuine broker quotes for the visible tiles only (single bounded poll loop).
   const { quotes: liveQuotes } = useLiveQuotes(visibleScans.map(s => s.symbol));
+
+  /** Open the existing GainEdge chart page with this symbol selected. */
+  const openChart = (symbol: string) => {
+    // In the popout window there is no router history for /dashboard — open a tab.
+    if (window.opener || window.location.pathname === "/instruments-popout") {
+      window.open(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`, "_blank", "noopener");
+      return;
+    }
+    navigate(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`);
+  };
 
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
@@ -274,7 +286,13 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {visibleScans.map((inst, idx) => {
           const tf = instrumentTfs.get(inst.symbol) || "15m";
-          const expired = isDynamicallyExpired(inst.scanned_at, tf);
+          // Signal history (Falconer) — explicitly NOT RON analysis.
+          const hasSignal = !!inst.scanned_at && !!inst.direction;
+          const expired = hasSignal ? isDynamicallyExpired(inst.scanned_at!, tf) : false;
+          const sigDir = (inst.direction || "").toLowerCase() === "long" ? "LONG"
+            : (inst.direction || "").toLowerCase() === "short" ? "SHORT" : (inst.direction || "").toUpperCase();
+          const badgeText = !hasSignal ? "NO SIGNAL" : expired ? `HISTORICAL ${sigDir}` : `FALCONER ${sigDir}`;
+          const badgeColor = !hasSignal || expired ? C.muted : sigDir === "LONG" ? C.green : C.red;
           const countdown = nextScanSeconds(tf);
           const live = liveData.get(inst.symbol);
           const snap = snapshots.get(inst.symbol);
@@ -285,7 +303,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           // instant, so it is reproducible server-side and never invented.
           const sess = snap ? classifyRonSession(snap.bar_time) : null;
           const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
-          const color = expired ? "#555F73" : directionColor(inst.direction);
+          // Deterministic pattern education, grounded only in persisted pattern objects.
+          const patternExplanations = explainPatterns(snap?.patterns as any[] | undefined, 3);
+          const structureSummary = summariseStructure((snap?.patterns as any[] | undefined)?.slice(0, 3) ?? []);
           // Prefer the live feed only while it is actually fresh; otherwise fall back to the
           // RON snapshot so the indicator row can never contradict RON's own reasoning.
           const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
@@ -322,16 +342,28 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {expired ? (
-                      <Circle size={16} color="#555F73" fill="#555F73" />
-                    ) : inst.direction === "BUY" ? (
+                    {hasSignal && !expired && sigDir === "LONG" ? (
                       <ArrowUp size={16} color="#22C55E" strokeWidth={3} />
-                    ) : inst.direction === "SELL" ? (
+                    ) : hasSignal && !expired && sigDir === "SHORT" ? (
                       <ArrowDown size={16} color="#EF4444" strokeWidth={3} />
                     ) : (
                       <Circle size={16} color="#555F73" fill="#555F73" />
                     )}
                     <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openChart(inst.symbol); }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      aria-label={`Open ${inst.symbol} chart`}
+                      title={`Open the GainEdge chart for ${inst.symbol}`}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
+                        color: C.jade, background: "transparent", border: `1px solid ${C.jade}30`,
+                        borderRadius: 5, padding: "1px 6px", cursor: "pointer",
+                      }}
+                    >
+                      <LineChart size={10} /> Chart ↗
+                    </button>
                     <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                       {tf}
                     </span>
@@ -365,19 +397,28 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text }}>
-                    <span>Last scan:</span>
-                    <Clock size={10} />
-                    <span>{formatAge(inst.scanned_at)}</span>
+                    {hasSignal ? (
+                      <>
+                        <Clock size={10} />
+                        <span>Falconer signal printed {formatAge(inst.scanned_at!)}</span>
+                      </>
+                    ) : (
+                      <span style={{ fontStyle: "italic" }}>No signal history</span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{
-                      fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-                      background: expired ? C.muted + "20" : inst.direction === "BUY" ? C.green + "20" : inst.direction === "SELL" ? C.red + "20" : inst.direction === "WAIT" ? C.amber + "20" : C.muted + "20",
-                      color: expired ? C.muted : inst.direction === "BUY" ? C.green : inst.direction === "SELL" ? C.red : inst.direction === "WAIT" ? C.amber : C.muted,
-                    }}>
-                      {inst.direction}
+                    <div
+                      style={{
+                        fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
+                        background: badgeColor + "20", color: badgeColor,
+                      }}
+                      title={hasSignal
+                        ? `Falconer signal history (not RON analysis) · printed ${formatPrintedLocal(inst.scanned_at!)} local time`
+                        : "No Falconer signal has been printed for this instrument"}
+                    >
+                      {badgeText}
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); hidePane(inst.symbol); }}
@@ -500,32 +541,106 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 </div>
               )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
-                <div><span style={{ color: C.text }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
-                <div><span style={{ color: C.text }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
-                <div><span style={{ color: C.text }}>SL:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
-                <div><span style={{ color: C.text }}>R:R:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
+              {/* ── C. Pattern interpretation (educational, deterministic, grounded) ── */}
+              {snap && patternExplanations.length > 0 && (
+                <div style={{ marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                    Pattern interpretation
+                  </div>
+                  {structureSummary && (
+                    <div style={{ fontSize: 10, color: C.amber, marginBottom: 6, overflowWrap: "anywhere" }}>
+                      {structureSummary}
+                    </div>
+                  )}
+                  {patternExplanations.map((e, i) => {
+                    const body = (
+                      <div style={{ fontSize: 10, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                        <div>{e.meaning}</div>
+                        <div style={{ marginTop: 2 }}><span style={{ color: C.green }}>Stronger if:</span> {e.strengthens}</div>
+                        <div style={{ marginTop: 2 }}><span style={{ color: C.red }}>Weaker if:</span> {e.weakens}</div>
+                        {e.levels.length > 0 && (
+                          <div style={{ marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
+                            Detected levels: {e.levels.map(l => `${l.label} ${fmtLevel(l.value)}`).join(" · ")}
+                          </div>
+                        )}
+                      </div>
+                    );
+                    const title = (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: e.direction === "bullish" ? C.green : e.direction === "bearish" ? C.red : C.text }}>
+                        {e.title}
+                      </span>
+                    );
+                    // First explanation is open by default so it is discoverable.
+                    return i === 0 ? (
+                      <div key={i} style={{ marginBottom: 8 }}>{title}{body}</div>
+                    ) : (
+                      <details key={i} style={{ marginBottom: 6 }}>
+                        <summary style={{ cursor: "pointer", listStyle: "revert" }} title={`Show interpretation for ${e.title}`}>{title}</summary>
+                        {body}
+                      </details>
+                    );
+                  })}
+                  <div style={{ fontSize: 9, color: C.text, opacity: 0.85, marginTop: 4, overflowWrap: "anywhere" }}>
+                    Educational context on detected chart structure — not a trade recommendation, and not a RON opportunity.
+                  </div>
+                </div>
+              )}
+
+              {/* ── D1. RON Opportunity (truthful placeholder until calibration) ── */}
+              <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 9, color: C.jade, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  RON opportunity
+                </div>
+                <div style={{ fontSize: 11, color: C.text, marginBottom: 4 }}>No qualified RON opportunity yet</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text }}>
+                  <div>Probability: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>Not calibrated yet</span></div>
+                  <div>Entry: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                  <div>Stop: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                  <div>Targets: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                  <div>R:R: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                </div>
               </div>
 
-              <div style={{ fontSize: 11, color: expired ? "rgba(255,255,255,0.7)" : C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
-                {expired && (
-                  <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 600, marginBottom: 4 }}>
-                    (Expired — {formatAge(inst.scanned_at)})
-                  </div>
+              {/* ── D2. Falconer signal history — clearly separate from RON ── */}
+              <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Signal history
+                </div>
+                {hasSignal ? (
+                  <details>
+                    <summary style={{ cursor: "pointer", fontSize: 10, color: C.text, overflowWrap: "anywhere" }}
+                             title="Historical Falconer signal — separate from RON analysis">
+                      Falconer {sigDir} · printed {formatPrintedLocal(inst.scanned_at!)} · {formatAge(inst.scanned_at!)}
+                      {expired ? " · Expired / historical" : ""}
+                    </summary>
+                    <div style={{ fontSize: 10, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
+                      {expired && (
+                        <div style={{ color: "#F59E0B", fontWeight: 600, marginBottom: 2 }}>Expired / historical — not a current signal.</div>
+                      )}
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        Entry {inst.entry_price ?? "—"} · SL {inst.stop_loss ?? "—"} · TP {inst.take_profit ?? "—"} · R:R {inst.risk_reward ?? "—"}
+                      </div>
+                      <div style={{ opacity: 0.85 }}>Source: Falconer · status {inst.verdict}{inst.reasoning ? ` · ${inst.reasoning}` : ""}</div>
+                    </div>
+                  </details>
+                ) : (
+                  <div style={{ fontSize: 10, color: C.text, fontStyle: "italic" }}>No signal history</div>
                 )}
-                <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>RON: </span>
+              </div>
+
+              <div style={{ fontSize: 11, color: C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                <span style={{ color: C.jade, fontWeight: 600 }}>RON: </span>
                 {ron ? (
                   <>
                     {ron.why}
                     <div style={{ marginTop: 4, color: C.text }}>What would change it: {ron.next}</div>
-                    {inst.reasoning && <div style={{ marginTop: 4 }}>{inst.reasoning}</div>}
                   </>
                 ) : (
-                  inst.reasoning || "DATA BUILDING — RON has not computed a snapshot for this instrument yet."
+                  "DATA BUILDING — RON has not computed a snapshot for this instrument yet."
                 )}
               </div>
 
-              {expired && (
+              {hasSignal && expired && (
                 <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.text, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                   <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
                 </div>
