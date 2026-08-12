@@ -64,11 +64,28 @@ export const CALIBRATION_CONTRACT_V3: CalibrationContract = {
 export const CALIBRATION_CONTRACT_V4: CalibrationContract = {
   calibration_version: 4, feature_version: 4, label_version: 5,
 };
+/**
+ * Phase 2B.1 auditability corrections (same clean lineage as v4: quality v3 + feature v4
+ * + label v5) but materially changed calibration MECHANICS:
+ *   - ONE common chronological split cutoff shared by LONG and SHORT,
+ *   - definition hash covers every actual run parameter (quality version, ADX bucket
+ *     boundaries, sample floors, hierarchy/fallback policy version, frozen source cut).
+ * A new calibration_version is mandatory so v4 history can never be overwritten.
+ */
+export const CALIBRATION_CONTRACT_V5: CalibrationContract = {
+  calibration_version: 5, feature_version: 4, label_version: 5,
+};
 export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   2: CALIBRATION_CONTRACT_V2,
   3: CALIBRATION_CONTRACT_V3,
   4: CALIBRATION_CONTRACT_V4,
+  5: CALIBRATION_CONTRACT_V5,
 };
+
+/** Exact ADX bucket boundaries — part of the definition hash, never implicit. */
+export const ADX_BUCKET_BOUNDS: readonly number[] = [20, 30];
+/** Hierarchy/fallback resolution policy: deepest floor-qualifying cell, else broader, else null. */
+export const HIERARCHY_POLICY_VERSION = 1;
 
 /** A market-closed anchor can never be a user opportunity, so it can never be evidence. */
 export const INELIGIBLE_ANCHOR_SESSIONS: readonly string[] = ["market_closed"];
@@ -329,6 +346,32 @@ export function chronoSplit(obs: EligibleObs[], holdoutFraction = HOLDOUT_FRACTI
   };
 }
 
+/**
+ * ONE common chronological cutoff computed from the DISTINCT canonical eligible snapshot
+ * times of ALL directions, before any direction-specific calibration. Applying this single
+ * instant to both sides makes it impossible for one timestamp to be fit for LONG and
+ * holdout for SHORT.
+ */
+export function commonSplitCutoff(
+  perDirection: EligibleObs[][],
+  holdoutFraction = HOLDOUT_FRACTION,
+): string | null {
+  const times = [...new Set(perDirection.flat().map((o) => o.t))].sort((a, b) => a - b);
+  if (!times.length) return null;
+  const idx = Math.max(1, Math.min(times.length - 1, Math.floor(times.length * (1 - holdoutFraction))));
+  return new Date(times[idx]).toISOString();
+}
+
+/** Split one direction's observations at an externally supplied common cutoff. */
+export function splitAtCutoff(obs: EligibleObs[], cutoff: string | null): {
+  cutoff: string | null; fit: EligibleObs[]; holdout: EligibleObs[];
+} {
+  const sorted = [...obs].sort((a, b) => a.t - b.t || (a.bar_time < b.bar_time ? -1 : 1));
+  if (cutoff == null) return { cutoff: null, fit: sorted, holdout: [] };
+  const c = new Date(cutoff).getTime();
+  return { cutoff, fit: sorted.filter((o) => o.t < c), holdout: sorted.filter((o) => o.t >= c) };
+}
+
 export interface DirectionReport {
   direction: Direction;
   n_eligible: number;
@@ -349,8 +392,15 @@ export interface DirectionReport {
   cells: CellStat[];
 }
 
-export function calibrateDirection(dir: Direction, obs: EligibleObs[], holdoutFraction = HOLDOUT_FRACTION): DirectionReport {
-  const { cutoff, fit, holdout } = chronoSplit(obs, holdoutFraction);
+export function calibrateDirection(
+  dir: Direction,
+  obs: EligibleObs[],
+  holdoutFraction = HOLDOUT_FRACTION,
+  commonCutoff?: string | null,
+): DirectionReport {
+  const { cutoff, fit, holdout } = commonCutoff !== undefined
+    ? splitAtCutoff(obs, commonCutoff)
+    : chronoSplit(obs, holdoutFraction);
   const cells = buildCells(dir, fit, holdout);
   const map = new Map(cells.map((c) => [c.cell_key, c]));
   const global = map.get(cellKey(0, dir, { session: "", regime: "", adx_bucket: "" }));
@@ -460,6 +510,37 @@ export function definitionPayloadV2(id: RunIdentityV2, ctx: CalibrationContract 
 }
 
 /** Full deterministic report payload — reliability, fallback and session counts included. */
+/**
+ * calibration_version >= 5 definition payload. Every ACTUAL run parameter participates:
+ * contract versions, quality lineage, horizon/barrier, holdout fraction, exact ADX bucket
+ * boundaries, sample floors, hierarchy/fallback policy version, ineligible anchor sessions
+ * and the frozen market-data source cut + common split cutoff.
+ */
+export function definitionPayloadV5(
+  id: RunIdentityV2,
+  ctx: CalibrationContract,
+  qualityVersion: number,
+) {
+  return [
+    "calibration_version", ctx.calibration_version,
+    CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+    id.symbol, id.timeframe,
+    "feature_version", ctx.feature_version,
+    "label_version", ctx.label_version,
+    "quality_version", qualityVersion,
+    "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+    "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+    "holdout_fraction", id.holdout_fraction,
+    "sample_floors", [0, 1, 2, 3].map((l) => [l, SAMPLE_FLOORS[l]]),
+    "adx_bucket_bounds", [...ADX_BUCKET_BOUNDS],
+    "hierarchy_policy_version", HIERARCHY_POLICY_VERSION,
+    "ineligible_anchor_sessions", [...INELIGIBLE_ANCHOR_SESSIONS].sort(),
+    "source_as_of", id.source_as_of,
+    "source_bar_cutoff", id.source_bar_cutoff,
+    "split_cutoff", id.split_cutoff,
+  ];
+}
+
 export function reportPayloadV2(r: DirectionReport) {
   return [
     r.direction, r.n_eligible, r.n_fit, r.n_holdout,
