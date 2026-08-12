@@ -548,32 +548,106 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 </div>
               )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, fontSize: 11, marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
-                <div><span style={{ color: C.text }}>Entry:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.entry_price ?? "—"}</span></div>
-                <div><span style={{ color: C.text }}>TP:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.green, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.take_profit ?? "—"}</span></div>
-                <div><span style={{ color: C.text }}>SL:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.red, fontFamily: "'JetBrains Mono', monospace", textDecoration: expired ? "line-through" : "none" }}>{inst.stop_loss ?? "—"}</span></div>
-                <div><span style={{ color: C.text }}>R:R:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
+              {/* ── C. Pattern interpretation (educational, deterministic, grounded) ── */}
+              {snap && patternExplanations.length > 0 && (
+                <div style={{ marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                    Pattern interpretation
+                  </div>
+                  {structureSummary && (
+                    <div style={{ fontSize: 10, color: C.amber, marginBottom: 6, overflowWrap: "anywhere" }}>
+                      {structureSummary}
+                    </div>
+                  )}
+                  {patternExplanations.map((e, i) => {
+                    const body = (
+                      <div style={{ fontSize: 10, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                        <div>{e.meaning}</div>
+                        <div style={{ marginTop: 2 }}><span style={{ color: C.green }}>Stronger if:</span> {e.strengthens}</div>
+                        <div style={{ marginTop: 2 }}><span style={{ color: C.red }}>Weaker if:</span> {e.weakens}</div>
+                        {e.levels.length > 0 && (
+                          <div style={{ marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
+                            Detected levels: {e.levels.map(l => `${l.label} ${fmtLevel(l.value)}`).join(" · ")}
+                          </div>
+                        )}
+                      </div>
+                    );
+                    const title = (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: e.direction === "bullish" ? C.green : e.direction === "bearish" ? C.red : C.text }}>
+                        {e.title}
+                      </span>
+                    );
+                    // First explanation is open by default so it is discoverable.
+                    return i === 0 ? (
+                      <div key={i} style={{ marginBottom: 8 }}>{title}{body}</div>
+                    ) : (
+                      <details key={i} style={{ marginBottom: 6 }}>
+                        <summary style={{ cursor: "pointer", listStyle: "revert" }} title={`Show interpretation for ${e.title}`}>{title}</summary>
+                        {body}
+                      </details>
+                    );
+                  })}
+                  <div style={{ fontSize: 9, color: C.text, opacity: 0.85, marginTop: 4, overflowWrap: "anywhere" }}>
+                    Educational context on detected chart structure — not a trade recommendation, and not a RON opportunity.
+                  </div>
+                </div>
+              )}
+
+              {/* ── D1. RON Opportunity (truthful placeholder until calibration) ── */}
+              <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 9, color: C.jade, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  RON opportunity
+                </div>
+                <div style={{ fontSize: 11, color: C.text, marginBottom: 4 }}>No qualified RON opportunity yet</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text }}>
+                  <div>Probability: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>Not calibrated yet</span></div>
+                  <div>Entry: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                  <div>Stop: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                  <div>Targets: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                  <div>R:R: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
+                </div>
               </div>
 
-              <div style={{ fontSize: 11, color: expired ? "rgba(255,255,255,0.7)" : C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
-                {expired && (
-                  <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 600, marginBottom: 4 }}>
-                    (Expired — {formatAge(inst.scanned_at)})
-                  </div>
+              {/* ── D2. Falconer signal history — clearly separate from RON ── */}
+              <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
+                  Signal history
+                </div>
+                {hasSignal ? (
+                  <details>
+                    <summary style={{ cursor: "pointer", fontSize: 10, color: C.text, overflowWrap: "anywhere" }}
+                             title="Historical Falconer signal — separate from RON analysis">
+                      Falconer {sigDir} · printed {formatPrintedLocal(inst.scanned_at!)} · {formatAge(inst.scanned_at!)}
+                      {expired ? " · Expired / historical" : ""}
+                    </summary>
+                    <div style={{ fontSize: 10, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
+                      {expired && (
+                        <div style={{ color: "#F59E0B", fontWeight: 600, marginBottom: 2 }}>Expired / historical — not a current signal.</div>
+                      )}
+                      <div style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                        Entry {inst.entry_price ?? "—"} · SL {inst.stop_loss ?? "—"} · TP {inst.take_profit ?? "—"} · R:R {inst.risk_reward ?? "—"}
+                      </div>
+                      <div style={{ opacity: 0.85 }}>Source: Falconer · status {inst.verdict}{inst.reasoning ? ` · ${inst.reasoning}` : ""}</div>
+                    </div>
+                  </details>
+                ) : (
+                  <div style={{ fontSize: 10, color: C.text, fontStyle: "italic" }}>No signal history</div>
                 )}
-                <span style={{ color: expired ? "rgba(255,255,255,0.7)" : C.jade, fontWeight: 600 }}>RON: </span>
+              </div>
+
+              <div style={{ fontSize: 11, color: C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                <span style={{ color: C.jade, fontWeight: 600 }}>RON: </span>
                 {ron ? (
                   <>
                     {ron.why}
                     <div style={{ marginTop: 4, color: C.text }}>What would change it: {ron.next}</div>
-                    {inst.reasoning && <div style={{ marginTop: 4 }}>{inst.reasoning}</div>}
                   </>
                 ) : (
-                  inst.reasoning || "DATA BUILDING — RON has not computed a snapshot for this instrument yet."
+                  "DATA BUILDING — RON has not computed a snapshot for this instrument yet."
                 )}
               </div>
 
-              {expired && (
+              {hasSignal && expired && (
                 <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.text, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                   <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
                 </div>
