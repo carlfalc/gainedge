@@ -1,6 +1,10 @@
 /**
- * Shared broker data service — reads from live_market_data table (populated by background job).
- * Provides real-time subscriptions via Supabase Realtime.
+ * @deprecated for LIVE QUOTE UI.
+ * Shared broker data service — reads the legacy `live_market_data` table.
+ * Its price/bid/ask/market_open/price_direction/sparkline fields are NOT a truthful
+ * live quote source (rows can be months stale). Use `useLiveQuotes` from
+ * `@/services/live-quotes` for any headline/live price. This module is retained only
+ * for legacy indicator/volume fallbacks that are already freshness-gated.
  */
 
 import { supabase } from "@/integrations/supabase/client";
