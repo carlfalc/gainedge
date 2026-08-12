@@ -23,9 +23,15 @@ import { detectPatterns, type DetectedPattern } from "./ron-patterns.ts";
  *  v1 — initial Phase 1A slice (Asian window applied inconsistently across the backfill).
  *  v2 — Phase 1B: corrected Asian window 22:00–06:00 UTC applied to every row, plus
  *       explicit provenance metadata (warmup/completeness/source history).
- * v1 rows are preserved for audit; readers must pin a version explicitly.
+ *  v3 — Phase 2C.1: identical indicator MATH to v2, but the input window is guaranteed
+ *       QUARANTINE-FREE. Bars carrying a critical data-quality flag (venue_break_bar,
+ *       premature_bar_persisted) can never be the anchor NOR appear anywhere in the
+ *       recursive input window, so contaminated bars cannot leak forward through
+ *       EMA/RSI-Wilder/ADX state. Provenance records the exclusions.
+ * v1 and v2 rows are preserved for audit; readers must pin a version explicitly.
  */
-export const RON_FEATURE_VERSION = 2;
+export const RON_FEATURE_VERSION = 3;
+export const RON_FEATURE_VERSION_V2 = 2;
 
 export type Regime = "trending_up" | "trending_down" | "ranging" | "transition";
 
