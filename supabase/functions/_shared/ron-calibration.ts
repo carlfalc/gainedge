@@ -660,3 +660,100 @@ export function cellPayloadV2(c: CellStat, p: CellPersistedV2, ctx: CalibrationC
     p.prediction_rate, p.brier, p.naive_brier,
   ];
 }
+
+/* ------------------------------------------------------------------------- *
+ * calibration_version = 6 (Phase 2B.2) payloads.
+ *
+ * Strictly additive: v2..v5 payload functions above are untouched, so every historical
+ * run replays to a byte-identical definition_hash / run_hash / cell_hash.
+ * ------------------------------------------------------------------------- */
+
+export interface RunIdentityV6 extends RunIdentityV2 {
+  /** Min/max bar_time of the EXACT frozen canonical outcome rows selected for the run. */
+  canonical_source_min_bar_time: string | null;
+  canonical_source_max_bar_time: string | null;
+}
+
+/**
+ * v6 definition payload. Identical in spirit to v5, but the ADX bucket SPEC (labels,
+ * boundaries and inclusivity) is hashed rather than two bare numbers.
+ */
+export function definitionPayloadV6(
+  id: RunIdentityV6,
+  ctx: CalibrationContract,
+  qualityVersion: number,
+  spec: AdxBucketSpec = ADX_BUCKET_SPEC,
+) {
+  return [
+    "calibration_version", ctx.calibration_version,
+    CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+    id.symbol, id.timeframe,
+    "feature_version", ctx.feature_version,
+    "label_version", ctx.label_version,
+    "quality_version", qualityVersion,
+    "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+    "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+    "holdout_fraction", id.holdout_fraction,
+    "sample_floors", [0, 1, 2, 3].map((l) => [l, SAMPLE_FLOORS[l]]),
+    adxBucketSpecPayload(spec),
+    "hierarchy_policy_version", HIERARCHY_POLICY_VERSION,
+    "ineligible_anchor_sessions", [...INELIGIBLE_ANCHOR_SESSIONS].sort(),
+    "source_as_of", id.source_as_of,
+    "source_bar_cutoff", id.source_bar_cutoff,
+    "split_cutoff", id.split_cutoff,
+  ];
+}
+
+/** v6 direction report payload — adds holdout regime and ADX-bucket coverage. */
+export function reportPayloadV6(r: DirectionReport) {
+  return [
+    r.direction, r.n_eligible, r.n_fit, r.n_holdout,
+    r.fit_range, r.holdout_range,
+    r.global_fit_rate, r.holdout_observed_rate,
+    r.n_predicted, r.n_unpredicted,
+    r.brier, r.naive_brier, r.ece,
+    r.reliability.map((b) => [b.lo, b.hi, b.n, b.mean_pred, b.observed]),
+    "fallback_levels", sortedEntries(r.fallback_levels),
+    "session_counts", sortedEntries(r.session_counts),
+    "regime_counts", sortedEntries(r.regime_counts),
+    "adx_bucket_counts", sortedEntries(r.adx_bucket_counts),
+    r.cells.map(cellPayload),
+  ];
+}
+
+/**
+ * Ordered digest over the v6 cell hashes in (direction, cell_key) order. Cell hashes are
+ * computable from the definition hash plus the deterministic persisted cell payload, so
+ * this never depends on a database-assigned run_id.
+ */
+export async function orderedCellDigest(
+  cells: { direction: Direction; cell_key: string; cell_hash: string }[],
+): Promise<{ digest: string; ordered: string[] }> {
+  const ordered = [...cells]
+    .sort((a, b) =>
+      (a.direction < b.direction ? -1 : a.direction > b.direction ? 1 : 0) ||
+      (a.cell_key < b.cell_key ? -1 : a.cell_key > b.cell_key ? 1 : 0))
+    .map((c) => `${c.direction}|${c.cell_key}|${c.cell_hash}`);
+  return { digest: await sha256(ordered), ordered };
+}
+
+export function runPayloadV6(
+  id: RunIdentityV6,
+  defHash: string,
+  long: DirectionReport,
+  short: DirectionReport,
+  orderedCellHashDigest: string | null,
+) {
+  return [
+    defHash,
+    "canonical_rows", id.canonical_rows,
+    "canonical_source_min_bar_time", id.canonical_source_min_bar_time,
+    "canonical_source_max_bar_time", id.canonical_source_max_bar_time,
+    "eligible_long", id.eligible_long,
+    "eligible_short", id.eligible_short,
+    "excluded_rows", id.excluded_rows,
+    "exclusion_breakdown", sortedEntries(id.exclusion_breakdown),
+    reportPayloadV6(long), reportPayloadV6(short),
+    "ordered_cell_digest", orderedCellHashDigest,
+  ];
+}
