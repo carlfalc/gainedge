@@ -179,7 +179,11 @@ Deno.serve(async (req) => {
   };
 
   try {
-    let cursor: string | null = body.start ? new Date(body.start).toISOString() : null;
+    let cursor: string | null = body.start
+      ? new Date(body.start).toISOString()
+      : liveMode
+        ? new Date(Date.now() - liveLookbackHours * 3_600_000).toISOString()
+        : null;
     const batches: any[] = [];
     for (let i = 0; i < maxBatches; i++) {
       const res = await runBatch(cursor);
@@ -196,13 +200,14 @@ Deno.serve(async (req) => {
       for (const [k, v] of Object.entries(s)) t[k] = (t[k] ?? 0) + v;
     };
     const agg = {
-      ok: true, quality_version: RON_QUALITY_VERSION, persisted: persist,
+      ok: true, quality_version: qualityVersion, persisted: persist,
       batches: batches.length,
       inspected: 0, clean_bars: 0, flags_written: 0,
       child_coverage: { verifiable: 0, unverifiable: 0 },
       by_rule: {} as Record<string, number>, by_severity: {} as Record<string, number>,
       by_session: {} as Record<string, number>, by_month: {} as Record<string, number>,
       venue_break_bars: [] as string[],
+      premature_bars: [] as unknown[],
       reconciliation_failures: [] as unknown[],
       first_bar: batches[0].first_bar,
       last_bar: batches[batches.length - 1].last_bar,
@@ -215,6 +220,7 @@ Deno.serve(async (req) => {
       add(agg.by_rule, b.by_rule); add(agg.by_severity, b.by_severity);
       add(agg.by_session, b.by_session); add(agg.by_month, b.by_month);
       agg.venue_break_bars.push(...b.venue_break_bars);
+      agg.premature_bars.push(...(b.premature_bars ?? []));
       agg.reconciliation_failures.push(...b.reconciliation_failures);
     }
     return json(agg);
