@@ -50,6 +50,14 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* defaults */ }
   const limit = Math.max(1, Math.min(Number(body.limit ?? 500), 1000));
   const persist = body.persist !== false;
+  /** Pin an explicit quality_version for audit replay; defaults to the current one. */
+  const qualityVersion = Math.max(1, Math.min(Number(body.quality_version ?? RON_QUALITY_VERSION), RON_QUALITY_VERSION));
+  /**
+   * `mode: "live"` — idempotent maintenance sweep over recently ingested bars so newly
+   * persisted artifacts are flagged without a full historical walk.
+   */
+  const liveMode = body.mode === "live";
+  const liveLookbackHours = Math.max(1, Math.min(Number(body.lookback_hours ?? 72), 720));
   /** `all: true` walks the whole history in sequential bounded batches (same detector). */
   const walkAll = body.all === true;
   const maxBatches = walkAll ? Math.max(1, Math.min(Number(body.max_batches ?? 40), 60)) : 1;
@@ -57,7 +65,7 @@ Deno.serve(async (req) => {
   const runBatch = async (startIso: string | null) => {
     let q = supabase
       .from("candle_history")
-      .select("timestamp, open, high, low, close, volume")
+      .select("timestamp, open, high, low, close, volume, created_at")
       .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
       .order("timestamp", { ascending: true }).limit(limit);
     if (startIso) q = q.gte("timestamp", startIso);
@@ -98,6 +106,7 @@ Deno.serve(async (req) => {
     const bySession: Record<string, number> = {};
     const byMonth: Record<string, number> = {};
     const venueBreakBars: string[] = [];
+    const prematureBars: { bar_time: string; evidence: Record<string, unknown> }[] = [];
     const reconciliationFailures: { bar_time: string; evidence: Record<string, unknown> }[] = [];
     let verifiable = 0, unverifiable = 0, clean = 0;
     const rows: Record<string, unknown>[] = [];
@@ -109,9 +118,12 @@ Deno.serve(async (req) => {
         time: t, open: Number(b.open), high: Number(b.high),
         low: Number(b.low), close: Number(b.close),
         volume: b.volume == null ? null : Number(b.volume),
+        created_at: (b as any).created_at ? new Date((b as any).created_at).getTime() : null,
       };
       const kids = children.get(t) ?? [];
-      const flags: QualityFlag[] = detectBarQuality(bar, kids, { barMinutes: BAR_MINUTES, venueOpen: xauVenueOpen });
+      const flags: QualityFlag[] = detectBarQuality(bar, kids, {
+        barMinutes: BAR_MINUTES, venueOpen: xauVenueOpen, qualityVersion,
+      });
       if (!flags.length) { clean++; verifiable++; continue; }
 
       for (const f of flags) {
@@ -122,6 +134,7 @@ Deno.serve(async (req) => {
         bySession[`${f.rule_code}:${sess}`] = (bySession[`${f.rule_code}:${sess}`] ?? 0) + 1;
         byMonth[`${f.rule_code}:${month}`] = (byMonth[`${f.rule_code}:${month}`] ?? 0) + 1;
         if (f.rule_code === "venue_break_bar") venueBreakBars.push(f.bar_time);
+        if (f.rule_code === "premature_bar_persisted") prematureBars.push({ bar_time: f.bar_time, evidence: f.evidence });
         if (f.rule_code === "unverifiable_1m_coverage") unverifiable++; else verifiable++;
         if (f.rule_code === "ohlc_reconciliation_mismatch") {
           reconciliationFailures.push({ bar_time: f.bar_time, evidence: f.evidence });
@@ -148,7 +161,7 @@ Deno.serve(async (req) => {
 
     return {
       ok: true,
-      quality_version: RON_QUALITY_VERSION,
+      quality_version: qualityVersion,
       persisted: persist,
       inspected: bars.length,
       first_bar: new Date(first).toISOString(),
@@ -158,6 +171,7 @@ Deno.serve(async (req) => {
       flags_written: rows.length,
       by_rule: byRule, by_severity: bySeverity, by_session: bySession, by_month: byMonth,
       venue_break_bars: venueBreakBars,
+      premature_bars: prematureBars,
       reconciliation_failures: reconciliationFailures,
       hashes: body.with_hashes ? hashes : undefined,
       next_cursor: new Date(new Date(bars[bars.length - 1].timestamp).getTime() + 1).toISOString(),
