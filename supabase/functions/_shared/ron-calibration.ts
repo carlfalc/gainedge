@@ -674,6 +674,20 @@ export interface RunIdentityV6 extends RunIdentityV2 {
   canonical_source_max_bar_time: string | null;
 }
 
+/** 15m bar grid used by the market-data availability contract. */
+export const CALIBRATION_BAR_MINUTES = 15;
+
+/**
+ * Phase 2B.2 (Defect D): the ONLY admissible `source_bar_cutoff` for a frozen
+ * `source_as_of` — the last anchor whose 15m completion PLUS the 60m forward horizon had
+ * already elapsed at the frozen instant.
+ */
+export function deriveSourceBarCutoff(sourceAsOf: string): string {
+  const grid = CALIBRATION_BAR_MINUTES * 60_000;
+  const floored = Math.floor(new Date(sourceAsOf).getTime() / grid) * grid;
+  return new Date(floored - (CALIBRATION_BAR_MINUTES + CALIBRATION_HORIZON_MINUTES) * 60_000).toISOString();
+}
+
 /**
  * v6 definition payload. Identical in spirit to v5, but the ADX bucket SPEC (labels,
  * boundaries and inclusivity) is hashed rather than two bare numbers.
