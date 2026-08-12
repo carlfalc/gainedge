@@ -1343,6 +1343,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_rebuild_jobs: {
+        Row: {
+          batches: number
+          completed_at: string | null
+          created_at: string
+          cursor: string | null
+          error_count: number
+          id: string
+          last_detail: Json
+          last_error: string | null
+          processed: number
+          range_end: string | null
+          range_start: string | null
+          stage: string
+          stage_order: number
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+        }
+        Insert: {
+          batches?: number
+          completed_at?: string | null
+          created_at?: string
+          cursor?: string | null
+          error_count?: number
+          id?: string
+          last_detail?: Json
+          last_error?: string | null
+          processed?: number
+          range_end?: string | null
+          range_start?: string | null
+          stage: string
+          stage_order: number
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+        }
+        Update: {
+          batches?: number
+          completed_at?: string | null
+          created_at?: string
+          cursor?: string | null
+          error_count?: number
+          id?: string
+          last_detail?: Json
+          last_error?: string | null
+          processed?: number
+          range_end?: string | null
+          range_start?: string | null
+          stage?: string
+          stage_order?: number
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ron_snapshot_outcomes: {
         Row: {
           anchor_price: number
@@ -1935,6 +1995,8 @@ export type Database = {
         Args: { _fn: string; _payload?: Json }
         Returns: number
       }
+      ron_rebuild_cron_tick: { Args: never; Returns: undefined }
+      ron_rebuild_finish: { Args: never; Returns: boolean }
       ron_snapshot_cron_tick: { Args: never; Returns: undefined }
       ron_verify_cron_token: { Args: { _token: string }; Returns: boolean }
     }
