@@ -10,6 +10,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { computeRonSnapshot, RON_FEATURE_VERSION } from "../_shared/ron-features.ts";
+import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-quality-contract.ts";
 import type { Candle } from "../_shared/falconer-strategy.ts";
 
 const SYMBOL = "XAUUSD";
@@ -25,6 +26,9 @@ const WARMUP_BARS = 400;      // >= EMA200 + ADX warmup
  */
 const CANONICAL_WINDOW = 1500;
 const BAR_MS = 15 * 60 * 1000;
+const BAR_MINUTES = 15;
+
+type SourceCandle = Candle & { created_at?: number | null };
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -86,15 +90,23 @@ Deno.serve(async (req) => {
   const mode = body.mode === "backfill" ? "backfill" : "live";
 
   try {
+    /**
+     * Phase 2C.1 — CENTRAL ELIGIBILITY CONTRACT.
+     * Built once per request and applied identically to the live path and the backfill
+     * path. Quarantined bars are removed from the anchor set AND from every recursive
+     * input window, so a contaminated bar can never leak forward through EMA/RSI/ADX state.
+     */
+    const contract = await buildEligibilityContract(supabase, SYMBOL, TIMEFRAME, RON_QUALITY_VERSION);
+
     // ── load candles for the working window ──────────────────────────
-    const loadCandles = async (fromIso: string | null, toIso: string): Promise<Candle[]> => {
+    const loadCandles = async (fromIso: string | null, toIso: string): Promise<SourceCandle[]> => {
       const rows: any[] = [];
       let cursor = toIso;
       // page backwards so we never rely on a single 1000-row page
       for (let page = 0; page < 12; page++) {
         let q = supabase
           .from("candle_history")
-          .select("timestamp, open, high, low, close, volume")
+          .select("timestamp, open, high, low, close, volume, created_at")
           .eq("symbol", SYMBOL)
           .eq("timeframe", TIMEFRAME)
           .lte("timestamp", cursor)
@@ -113,8 +125,15 @@ Deno.serve(async (req) => {
           time: new Date(c.timestamp).getTime(),
           open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
           volume: c.volume == null ? undefined : Number(c.volume),
+          created_at: c.created_at ? new Date(c.created_at).getTime() : null,
         }))
         .sort((a, b) => a.time - b.time);
+    };
+
+    /** Remove every quarantined bar from a candle window. Returns the clean window + count. */
+    const cleanWindow = (win: SourceCandle[]) => {
+      const clean = win.filter((c) => !contract.isQuarantined(c, BAR_MINUTES));
+      return { clean, excluded: win.length - clean.length };
     };
 
     const upsert = async (snaps: any[]) => {
@@ -141,17 +160,20 @@ Deno.serve(async (req) => {
       if (!latest) return json({ ok: true, mode, skipped: "no_candles" });
 
       const targetIso = new Date(latest.timestamp).toISOString();
-      // ── Phase 2C quarantine ────────────────────────────────────────
-      // A bar whose OPEN falls outside the tradable venue schedule (the DST-aware
-      // NY 17:00-18:00 break, weekends) is a provider rollup artifact, never a genuine
-      // opportunity. It must never become the "current" RON snapshot. The raw candle is
-      // left untouched in candle_history; only the opportunity write is refused.
-      if (!marketOpen(new Date(targetIso))) {
+      // ── Phase 2C.1 quarantine (central contract) ───────────────────
+      // A critically flagged source bar is a provider/ingestion artifact, never a genuine
+      // opportunity. The raw candle is left untouched in candle_history; only the RON
+      // opportunity write is refused.
+      const targetBar = {
+        time: new Date(targetIso).getTime(),
+        created_at: (latest as any).created_at ? new Date((latest as any).created_at).getTime() : null,
+      };
+      if (contract.isQuarantined(targetBar, BAR_MINUTES)) {
         return json({
           ok: true, mode,
           skipped: "source_bar_quarantined",
-          rule_code: "venue_break_bar",
-          quality_version: 1,
+          rule_code: contract.reasonFor(targetBar, BAR_MINUTES),
+          quality_version: RON_QUALITY_VERSION,
           bar_time: targetIso,
           presentation: "SOURCE ANOMALY QUARANTINED",
         });
@@ -167,10 +189,15 @@ Deno.serve(async (req) => {
       }
 
       const loaded = await loadCandles(null, targetIso);
-      const candles = loaded.slice(-CANONICAL_WINDOW);
+      const { clean, excluded } = cleanWindow(loaded);
+      const candles = clean.slice(-CANONICAL_WINDOW);
       if (candles.length < 30) return json({ ok: true, mode, skipped: "insufficient_history" });
 
-      const snap = computeRonSnapshot(SYMBOL, TIMEFRAME, candles, { source: "candle_history" });
+      const snap = computeRonSnapshot(SYMBOL, TIMEFRAME, candles, {
+        source: "candle_history",
+        quarantinedExcluded: excluded,
+        qualityVersion: RON_QUALITY_VERSION,
+      });
       // Freshness: only call the feed stale when the market should actually be open.
       const ageMin = (nowMs - new Date(targetIso).getTime()) / 60000;
       const isOpen = marketOpen(new Date(nowMs));
