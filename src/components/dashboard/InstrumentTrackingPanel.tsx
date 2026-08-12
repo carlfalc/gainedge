@@ -441,7 +441,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 {sparkData ? (
                   <Sparkline data={sparkData} color={sparkColor} w={120} h={32} />
                 ) : (
-                  <span style={{ fontSize: 9, color: C.text, fontStyle: "italic" }}>No live price feed</span>
+                  <span style={{ fontSize: 9, color: C.text, fontStyle: "italic" }} title="No genuine intraday series available; nothing is synthesised.">
+                    No sparkline series
+                  </span>
                 )}
               </div>
 
