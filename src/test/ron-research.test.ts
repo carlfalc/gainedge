@@ -8,10 +8,17 @@ import {
   deriveStateV1, stateSpecPayload, RON_STATE_VARIABLES, RON_STATE_TOLERANCES,
 } from "../../supabase/functions/_shared/ron-state-spec";
 import {
+  deriveStateV2, stateSpecPayloadV2, RON_STATE_SPEC_VERSION_V2,
+} from "../../supabase/functions/_shared/ron-state-spec";
+import {
   buildPurgedFolds, evaluateCandidateFold, evaluateCandidate, buildCandidateSet,
   candidateSpecPayload, researchDigest, topBuckets, bucketKeyFor,
   PURGE_MINUTES, PROMOTION_GATE, MIN_TEST_OBS_PER_FOLD, BASELINE_CANDIDATE,
   type ResearchObs, type CandidateSpec,
+} from "../../supabase/functions/_shared/ron-research";
+import {
+  buildCoverageEpochs, buildGapAwareFolds, topBucketsV2,
+  COVERAGE_EPOCH_GAP_HOURS, RESEARCH_VERSION,
 } from "../../supabase/functions/_shared/ron-research";
 
 const FEATURES = {
