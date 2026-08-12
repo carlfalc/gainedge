@@ -298,6 +298,7 @@ Deno.serve(async (req) => {
     return json({
       ok: true,
       mode,
+      targets: targets.length,
       processed: snaps.length,
       skipped_warmup: skippedWarmup,
       skipped_quarantined: skippedQuarantined,
