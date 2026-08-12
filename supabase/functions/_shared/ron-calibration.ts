@@ -75,15 +75,68 @@ export const CALIBRATION_CONTRACT_V4: CalibrationContract = {
 export const CALIBRATION_CONTRACT_V5: CalibrationContract = {
   calibration_version: 5, feature_version: 4, label_version: 5,
 };
+/**
+ * Phase 2B.2 reproducibility corrections (same clean lineage as v4/v5: quality v3 +
+ * feature v4 + label v5) with materially changed deterministic identity:
+ *   - the ADX bucket SPEC (labels + boundaries + inclusivity) is the single source of
+ *     truth for both classification and the definition hash,
+ *   - holdout regime/adx-bucket coverage participates in the run hash,
+ *   - the canonical source min/max bar times participate in the run identity,
+ *   - `source_bar_cutoff` must equal the value derived from the frozen `source_as_of`,
+ *   - the run hash covers the ordered cell-hash digest.
+ * A new calibration_version is mandatory so v5 history can never be overwritten.
+ */
+export const CALIBRATION_CONTRACT_V6: CalibrationContract = {
+  calibration_version: 6, feature_version: 4, label_version: 5,
+};
 export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   2: CALIBRATION_CONTRACT_V2,
   3: CALIBRATION_CONTRACT_V3,
   4: CALIBRATION_CONTRACT_V4,
   5: CALIBRATION_CONTRACT_V5,
+  6: CALIBRATION_CONTRACT_V6,
 };
 
-/** Exact ADX bucket boundaries — part of the definition hash, never implicit. */
-export const ADX_BUCKET_BOUNDS: readonly number[] = [20, 30];
+/**
+ * Phase 2B.2 (Defect A): the ADX bucket SPECIFICATION is the single source of truth.
+ * `adxBucket()` classifies from this spec — there are no duplicated 20/30 literals in the
+ * classifier — and the v6 definition payload hashes the spec verbatim, so changing a
+ * boundary or a label necessarily changes BOTH classification and definition identity.
+ *
+ * Semantics: bands are evaluated in order; a band matches when `adx < lt`
+ * (upper bound EXCLUSIVE). The final band has `lt: null` (unbounded above).
+ */
+export interface AdxBucketBand { label: string; lt: number | null; }
+export interface AdxBucketSpec {
+  version: number;
+  /** Upper bounds are exclusive; the lower edge of each band is the previous upper bound. */
+  upper_bound_inclusive: boolean;
+  unknown_label: string;
+  bands: readonly AdxBucketBand[];
+}
+export const ADX_BUCKET_SPEC: AdxBucketSpec = {
+  version: 1,
+  upper_bound_inclusive: false,
+  unknown_label: "unknown",
+  bands: [
+    { label: "adx_lt20", lt: 20 },
+    { label: "adx_20_30", lt: 30 },
+    { label: "adx_gte30", lt: null },
+  ],
+};
+/** Derived from the spec (never re-declared) so v5 replay hashes stay byte-identical. */
+export const ADX_BUCKET_BOUNDS: readonly number[] =
+  ADX_BUCKET_SPEC.bands.filter((b) => b.lt != null).map((b) => b.lt as number);
+
+/** Deterministic, order-stable serialisation of the bucket spec for hashing. */
+export function adxBucketSpecPayload(spec: AdxBucketSpec = ADX_BUCKET_SPEC) {
+  return [
+    "adx_bucket_spec_version", spec.version,
+    "upper_bound_inclusive", spec.upper_bound_inclusive,
+    "unknown_label", spec.unknown_label,
+    "bands", spec.bands.map((b) => [b.label, b.lt]),
+  ];
+}
 /** Hierarchy/fallback resolution policy: deepest floor-qualifying cell, else broader, else null. */
 export const HIERARCHY_POLICY_VERSION = 1;
 
@@ -152,12 +205,14 @@ export interface EligibleObs {
   success: boolean;
 }
 
-/** Coarse ADX buckets — three levels only, no sparse-cell theatre. */
-export function adxBucket(adx: number | null | undefined): string {
-  if (adx == null || !Number.isFinite(adx)) return "unknown";
-  if (adx < 20) return "adx_lt20";
-  if (adx < 30) return "adx_20_30";
-  return "adx_gte30";
+/** Coarse ADX buckets — classification is driven ONLY by the hashed spec. */
+export function adxBucket(adx: number | null | undefined, spec: AdxBucketSpec = ADX_BUCKET_SPEC): string {
+  if (adx == null || !Number.isFinite(adx)) return spec.unknown_label;
+  for (const b of spec.bands) {
+    if (b.lt == null) return b.label;
+    if (spec.upper_bound_inclusive ? adx <= b.lt : adx < b.lt) return b.label;
+  }
+  return spec.unknown_label;
 }
 
 export function normSession(s: string | null | undefined): string {
