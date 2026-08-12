@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  detectBarQuality, RON_QUALITY_VERSION, isQuarantined,
+  detectBarQuality, RON_QUALITY_VERSION, RON_QUALITY_VERSION_V3, isQuarantined,
 } from "../../supabase/functions/_shared/ron-data-quality";
 import {
   canonicalFeatureWindow, buildEligibleSeries, RON_WINDOW_CONTRACT, RON_CANONICAL_WINDOW,
@@ -11,7 +11,10 @@ const MIN = 60_000;
 const alwaysOpen = () => true;
 
 describe("Phase 2C.2 — quality v3 multi-finding", () => {
-  it("is version 3", () => expect(RON_QUALITY_VERSION).toBe(3));
+  it("pins v3 and keeps the current version at or beyond it", () => {
+    expect(RON_QUALITY_VERSION_V3).toBe(3);
+    expect(RON_QUALITY_VERSION).toBeGreaterThanOrEqual(3);
+  });
 
   it("reports BOTH the premature-write critical rule and the reconciliation evidence", () => {
     const barOpen = Date.UTC(2026, 7, 10, 1, 45);
@@ -28,7 +31,7 @@ describe("Phase 2C.2 — quality v3 multi-finding", () => {
     expect(codes).toContain("premature_bar_persisted");
     expect(codes).toContain("ohlc_reconciliation_mismatch");
     expect(isQuarantined(flags)).toBe(true);
-    expect(flags.every((f) => f.quality_version === 3)).toBe(true);
+    expect(flags.every((f) => f.quality_version === RON_QUALITY_VERSION)).toBe(true);
   });
 
   it("emits no flags for a clean, reconciled, on-time bar", () => {

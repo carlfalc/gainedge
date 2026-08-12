@@ -19,9 +19,21 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-/** Ordered pipeline: a stage only starts once every earlier stage is `completed`. */
-const STAGE_ORDER = ["quality_v3", "feature_v4", "label_v5"] as const;
-type Stage = typeof STAGE_ORDER[number];
+/**
+ * Ordered pipeline: a stage only starts once every earlier stage is `completed`.
+ * Stage names are `<kind>_v<version>` so a new versioned lineage (Phase 2D.1e:
+ * quality_v4 -> feature_v5 -> label_v6) is driven by data, never by editing this list.
+ */
+const STAGE_ORDER = ["quality_v3", "feature_v4", "label_v5", "quality_v4", "feature_v5", "label_v6"] as const;
+type Stage = string;
+
+/** `quality_v4` -> { kind: "quality", version: 4 } */
+function parseStage(stage: string): { kind: "quality" | "feature" | "label"; version: number } {
+  const m = /^(quality|feature|label)_v(\d+)$/.exec(stage);
+  if (!m) throw new Error(`unknown rebuild stage: ${stage}`);
+  return { kind: m[1] as "quality" | "feature" | "label", version: Number(m[2]) };
+}
+void STAGE_ORDER;
 
 interface BatchResult {
   next_cursor: string | null;
@@ -45,10 +57,11 @@ async function callWorker(fn: string, payload: Record<string, unknown>): Promise
 }
 
 async function runBatch(stage: Stage, cursor: string | null, endIso: string | null): Promise<BatchResult> {
-  if (stage === "quality_v3") {
+  const { kind, version } = parseStage(stage);
+  if (kind === "quality") {
     const limit = 500;
     const b = await callWorker("ron-quality", {
-      start: cursor, end: endIso ?? undefined, limit, quality_version: 3, persist: true,
+      start: cursor, end: endIso ?? undefined, limit, quality_version: version, persist: true,
     });
     const inspected = Number(b.inspected ?? 0);
     return {
@@ -58,7 +71,7 @@ async function runBatch(stage: Stage, cursor: string | null, endIso: string | nu
       detail: { inspected, flags_written: b.flags_written ?? 0, by_rule: b.by_rule ?? {} },
     };
   }
-  if (stage === "feature_v4") {
+  if (kind === "feature") {
     const limit = 400;
     const b = await callWorker("ron-snapshot", {
       mode: "backfill", start: cursor, end: endIso ?? undefined, limit,
@@ -71,11 +84,11 @@ async function runBatch(stage: Stage, cursor: string | null, endIso: string | nu
       detail: { targets, processed: b.processed ?? 0, skipped_quarantined: b.skipped_quarantined ?? 0 },
     };
   }
-  // label_v5
+  // label stage
   const limit = 300;
   const b = await callWorker("ron-label", {
     mode: "backfill", start: cursor, end: endIso ?? undefined, limit,
-    label_version: 5, horizons: [60],
+    label_version: version, horizons: [60],
   });
   const snapshots = Number(b.snapshots ?? 0);
   return {
