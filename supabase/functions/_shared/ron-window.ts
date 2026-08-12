@@ -1,4 +1,30 @@
 /**
+ * Precompute the eligible series ONCE for a whole batch. `bars` must be ascending.
+ * `excludedAtOrBefore[i]` is the number of quarantined bars at or before `eligible[i]`.
+ * This is the batch form of the very same contract `canonicalFeatureWindow` applies to a
+ * single target, so backfill and live cannot drift.
+ */
+export function buildEligibleSeries<T extends WindowBar>(
+  bars: T[],
+  barMinutes: number,
+  isQuarantined: (bar: WindowBar, barMinutes: number) => boolean,
+): { eligible: T[]; excludedAtOrBefore: number[] } {
+  const eligible: T[] = [];
+  const excludedAtOrBefore: number[] = [];
+  let excluded = 0;
+  for (const b of bars) {
+    if (isQuarantined(b, barMinutes)) { excluded++; continue; }
+    eligible.push(b);
+    excludedAtOrBefore.push(excluded);
+  }
+  return { eligible, excludedAtOrBefore };
+}
+
+/** Window for eligible index `i` under the canonical contract. */
+export function windowAtEligibleIndex<T>(eligible: T[], i: number, windowSize = RON_CANONICAL_WINDOW): T[] {
+  return eligible.slice(Math.max(0, i - windowSize + 1), i + 1);
+}
+/**
  * RON Phase 2C.2 — THE canonical feature window helper.
  *
  * Feature v4 window contract (`last_1500_quality_eligible`):
