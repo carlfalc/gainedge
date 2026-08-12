@@ -5,7 +5,11 @@ import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "l
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
-import { useRonSnapshots, useRonOutcomeStats, useRonDataQuality, ronStateFrom, ronStateColor } from "@/services/ron-snapshots";
+import {
+  useRonSnapshots, useRonOutcomeStats, useRonDataQuality, useRonRebuildStatus,
+  ronStateFrom, ronStateColor,
+  CURRENT_RON_FEATURE_VERSION, CURRENT_RON_LABEL_VERSION, CURRENT_RON_QUALITY_VERSION,
+} from "@/services/ron-snapshots";
 import { assessDataHealth } from "@/lib/market-hours";
 import { classifyRonSession } from "@/lib/ron-sessions";
 
@@ -62,6 +66,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   const { snapshots } = useRonSnapshots();
   const outcomeStats = useRonOutcomeStats();
   const dataQuality = useRonDataQuality();
+  const rebuild = useRonRebuildStatus();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -369,10 +374,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 <div>
                   <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
                   {(() => {
-                    // Phase 2C: a quarantined source anchor (a provider rollup artifact
-                    // opening inside the venue break) is never shown as a tradable setup.
-                    const quarantined = inst.symbol === "XAUUSD" && !!dataQuality?.latestCriticalBar &&
-                      (!snap || new Date(dataQuality.latestCriticalBar).getTime() > new Date(snap.bar_time).getTime());
+                    // Phase 2C.2: the headline is a statement about the CURRENT source bar
+                    // only. Historical flag counts are detail, never the current verdict.
+                    const quarantined = inst.symbol === "XAUUSD" && !!dataQuality?.currentSourceQuarantined;
                     return (
                       <>
                         <div style={{ fontSize: 12, fontWeight: 700, color: quarantined ? "#F59E0B" : ron ? ronStateColor(ron.state) : C.text, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -380,8 +384,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                         </div>
                         {inst.symbol === "XAUUSD" && dataQuality && (
                           <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.text }}
-                               title={`Deterministic source-data quality v${1}: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags. Raw candle history is never modified.`}>
-                            Data integrity: {quarantined ? "Source anomaly quarantined" : "Healthy"}
+                               title={`Deterministic source-data quality v${CURRENT_RON_QUALITY_VERSION}. Historical detail: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags across all stored history. Raw candle history is never modified.`}>
+                            Current source: {quarantined ? "Quarantined" : "Healthy"}
                           </div>
                         )}
                       </>
