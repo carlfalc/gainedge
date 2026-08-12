@@ -156,19 +156,20 @@ Deno.serve(async (req) => {
     for (const s of snaps) {
       const t = new Date(s.bar_time).getTime();
       /**
-       * Phase 2C quarantine. A critical source-quality anchor (quality_version=1:
-       * `venue_break_bar` — the bar OPENS while the venue is closed) can never be a
+       * Phase 2C.1 quarantine, via the CENTRAL eligibility contract. A critical
+       * source-quality anchor (venue_break_bar, premature_bar_persisted) can never be a
        * measurable opportunity, so it can never produce an outcome row. It is SKIPPED
        * rather than written with mutated values: existing stored rows stay byte-identical
        * for audit, and no new outcome evidence is ever created from a quarantined bar.
        */
-      if (!xauVenueOpen(new Date(t))) {
+      const anchorBar = { time: t, created_at: barCreatedAt.get(new Date(t).toISOString()) ?? null };
+      if (contract.isQuarantined(anchorBar, BAR_MINUTES)) {
         summary.quarantined_source_quality = (summary.quarantined_source_quality ?? 0) + 1;
         quarantinedBars.push({
           bar_time: new Date(t).toISOString(),
           quality_version: RON_QUALITY_VERSION,
-          rule_code: "venue_break_bar",
-          exclusion_reason: "source_quality_critical_venue_break",
+          rule_code: contract.reasonFor(anchorBar, BAR_MINUTES) ?? "venue_break_bar",
+          exclusion_reason: "source_quality_critical",
         });
         continue;
       }
