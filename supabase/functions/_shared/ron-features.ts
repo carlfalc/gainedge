@@ -381,7 +381,7 @@ export function computeRonSnapshot(
     model_signals: {
       falconer_v7_tp3: { evaluated: false, trigger: null, distance_to_trigger: null, note: "not evaluated in slice 1A" },
     },
-    feature_version: RON_FEATURE_VERSION,
+    feature_version: featureVersion,
     data_health: insufficient ? "insufficient" : "healthy",
     source: opts.source ?? "candle_history",
   };
