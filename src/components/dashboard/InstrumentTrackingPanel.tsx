@@ -343,7 +343,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 background: C.card,
                 border: `1px solid ${isDragOver ? C.jade : C.border}`,
                 borderRadius: 14, padding: 18,
-                opacity: dragIndex === idx ? 0.5 : expired ? 0.9 : 1,
+                opacity: dragIndex === idx ? 0.5 : hasSignal && !active ? 0.9 : 1,
                 transition: "opacity 0.3s, border-color 0.2s",
                 cursor: "grab",
               }}
@@ -351,9 +351,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {hasSignal && !expired && sigDir === "LONG" ? (
+                    {active && sigDir === "LONG" ? (
                       <ArrowUp size={16} color="#22C55E" strokeWidth={3} />
-                    ) : hasSignal && !expired && sigDir === "SHORT" ? (
+                    ) : active && sigDir === "SHORT" ? (
                       <ArrowDown size={16} color="#EF4444" strokeWidth={3} />
                     ) : (
                       <Circle size={16} color="#555F73" fill="#555F73" />
@@ -620,16 +620,23 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     <summary style={{ cursor: "pointer", fontSize: 10, color: C.text, overflowWrap: "anywhere" }}
                              title="Historical Falconer signal — separate from RON analysis">
                       Falconer {sigDir} · printed {formatPrintedLocal(inst.scanned_at!)} · {formatAge(inst.scanned_at!)}
-                      {expired ? " · Expired / historical" : ""}
+                      {!active ? (sig.isOpenFalconerSignal ? " · Expired / historical" : " · Closed") : ""}
                     </summary>
                     <div style={{ fontSize: 10, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
-                      {expired && (
-                        <div style={{ color: "#F59E0B", fontWeight: 600, marginBottom: 2 }}>Expired / historical — not a current signal.</div>
+                      {!active && (
+                        <div style={{ color: "#F59E0B", fontWeight: 600, marginBottom: 2 }}>
+                          {sig.isOpenFalconerSignal
+                            ? "Expired / historical — not a current signal."
+                            : "Closed trade — not a current signal."}
+                        </div>
+                      )}
+                      {sig.closedMeta && (
+                        <div style={{ opacity: 0.85 }}>{sig.closedMeta}</div>
                       )}
                       <div style={{ fontFamily: "'JetBrains Mono', monospace" }}>
                         Entry {inst.entry_price ?? "—"} · SL {inst.stop_loss ?? "—"} · TP {inst.take_profit ?? "—"} · R:R {inst.risk_reward ?? "—"}
                       </div>
-                      <div style={{ opacity: 0.85 }}>Source: Falconer · status {inst.verdict}{inst.reasoning ? ` · ${inst.reasoning}` : ""}</div>
+                      <div style={{ opacity: 0.85 }}>Source: Falconer · status {sig.status ?? "—"}{inst.reasoning ? ` · ${inst.reasoning}` : ""}</div>
                     </div>
                   </details>
                 ) : (
@@ -649,7 +656,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 )}
               </div>
 
-              {hasSignal && expired && (
+              {hasSignal && !active && (
                 <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.text, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                   <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
                 </div>
