@@ -197,6 +197,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       return ai - bi;
     });
 
+  // Genuine broker quotes for the visible tiles only (single bounded poll loop).
+  const { quotes: liveQuotes } = useLiveQuotes(visibleScans.map(s => s.symbol));
+
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
     e.dataTransfer.effectAllowed = "move";
