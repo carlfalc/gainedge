@@ -164,7 +164,12 @@ export interface RonDataQuality {
    * completed source bar only. Historical warning/info counts are detail, not the headline.
    */
   currentSourceQuarantined: boolean;
-  currentBar: string;
+  /**
+   * The exact source anchor the headline describes: the latest clean RON snapshot bar
+   * (feature v4). Null when no clean snapshot exists — the headline must then say
+   * "Unavailable", never "Healthy".
+   */
+  currentBar: string | null;
 }
 
 export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
