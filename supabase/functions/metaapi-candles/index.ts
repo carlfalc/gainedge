@@ -17,6 +17,38 @@ const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.london.agiliumtrad
 
 const METAAPI_TIMEOUT_MS = 30_000;
 
+// Canonical → broker symbol variants, tried in order. Shared by price/prices actions.
+const SYMBOL_VARIANTS: Record<string, string[]> = {
+  NAS100: ["NDX100", "NAS100", "USTEC", "NAS100.i"],
+  US30: ["US30", "DJ30", "US30.i"],
+  XAUUSD: ["XAUUSD", "GOLD", "XAUUSD.i"],
+  XAGUSD: ["XAGUSD", "SILVER", "XAGUSD.i"],
+  SPX500: ["SPX500", "SP500", "SPX500.i"],
+  UK100: ["UK100", "FTSE100", "UK100.i"],
+  GER40: ["GER40", "DAX40", "DE40", "GER40.i"],
+  HK50: ["HK50", "HK50.i"],
+  JP225: ["JP225", "JPN225", "JP225.i"],
+  AUS200: ["AUS200", "AUS200.i"],
+  USOUSD: ["XTIUSD", "USOUSD", "XTIUSD.i", "WTI"],
+  UKOUSD: ["XBRUSD", "UKOUSD", "XBRUSD.i", "BRENT"],
+  XNGUSD: ["XNGUSD", "NGAS", "XNGUSD.i"],
+  XCUUSD: ["XCUUSD", "COPPER", "XCUUSD.i"],
+  AUDUSD: ["AUDUSD.i", "AUDUSD"],
+  NZDUSD: ["NZDUSD.i", "NZDUSD"],
+  EURUSD: ["EURUSD.i", "EURUSD"],
+  GBPUSD: ["GBPUSD.i", "GBPUSD"],
+  USDJPY: ["USDJPY.i", "USDJPY"],
+  USDCAD: ["USDCAD.i", "USDCAD"],
+  USDCHF: ["USDCHF.i", "USDCHF"],
+  GBPJPY: ["GBPJPY.i", "GBPJPY"],
+  EURJPY: ["EURJPY.i", "EURJPY"],
+  AUDJPY: ["AUDJPY.i", "AUDJPY"],
+  NZDJPY: ["NZDJPY.i", "NZDJPY"],
+  EURGBP: ["EURGBP.i", "EURGBP"],
+  AUDNZD: ["AUDNZD.i", "AUDNZD"],
+  CADCHF: ["CADCHF.i", "CADCHF"],
+};
+
 // Hard price ranges for validation — catches decimal errors from MetaApi
 const PRICE_RANGES: Record<string, { min: number; max: number }> = {
   XAUUSD: { min: 1000, max: 10000 }, XAGUSD: { min: 10, max: 100 },
@@ -297,6 +329,65 @@ Deno.serve(async (req: Request) => {
     }
 
     // ─── PRICE: Get current tick/price ───
+    // ─── PRICES: bounded batch of current quotes for the dashboard ───
+    if (action === "prices") {
+      const requested: unknown = body.symbols;
+      if (!Array.isArray(requested) || requested.length === 0) {
+        return new Response(JSON.stringify({ error: "Missing symbols[]" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const symbols = [...new Set(
+        requested.filter((s): s is string => typeof s === "string" && s.length > 0 && s.length <= 20),
+      )].slice(0, 25);
+
+      async function quoteFor(canonical: string) {
+        const variants = SYMBOL_VARIANTS[canonical] || [canonical];
+        let lastError: string | null = null;
+        for (const variant of variants) {
+          try {
+            const url = `${CLIENT_URL}/users/current/accounts/${accountId}/symbols/${encodeURIComponent(variant)}/current-price`;
+            const r = await fetchWithTimeout(url, { headers: { "auth-token": METAAPI_TOKEN } });
+            const p = await r.json();
+            if (r.ok && typeof p?.bid === "number" && typeof p?.ask === "number") {
+              return {
+                symbol: canonical,
+                broker_symbol: variant,
+                bid: p.bid,
+                ask: p.ask,
+                broker_time: typeof p.time === "string" ? p.time : null,
+                fetched_at: new Date().toISOString(),
+                error: null as string | null,
+              };
+            }
+            lastError = typeof p?.message === "string" ? p.message : `HTTP ${r.status}`;
+          } catch (err) {
+            lastError = getErrorMessage(err);
+          }
+        }
+        return {
+          symbol: canonical,
+          broker_symbol: null,
+          bid: null,
+          ask: null,
+          broker_time: null,
+          fetched_at: new Date().toISOString(),
+          error: lastError ?? "PRICE_UNAVAILABLE",
+        };
+      }
+
+      // Bounded concurrency (3 at a time) so a wide watchlist can't storm MetaApi.
+      const quotes: Awaited<ReturnType<typeof quoteFor>>[] = [];
+      for (let i = 0; i < symbols.length; i += 3) {
+        quotes.push(...await Promise.all(symbols.slice(i, i + 3).map(quoteFor)));
+      }
+
+      return new Response(JSON.stringify({ success: true, quotes, server_time: new Date().toISOString() }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "price") {
       if (!symbol) {
         return new Response(JSON.stringify({ error: "Missing symbol" }), {
@@ -306,37 +397,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // Try symbol variants for broker compatibility (e.g. XAUUSD -> XAUUSD.i)
-      const PRICE_SYMBOL_VARIANTS: Record<string, string[]> = {
-        NAS100: ["NDX100", "NAS100", "USTEC", "NAS100.i"],
-        US30: ["US30", "DJ30", "US30.i"],
-        XAUUSD: ["XAUUSD", "GOLD", "XAUUSD.i"],
-        XAGUSD: ["XAGUSD", "SILVER", "XAGUSD.i"],
-        SPX500: ["SPX500", "SP500", "SPX500.i"],
-        UK100: ["UK100", "FTSE100", "UK100.i"],
-        GER40: ["GER40", "DAX40", "DE40", "GER40.i"],
-        HK50: ["HK50", "HK50.i"],
-        JP225: ["JP225", "JPN225", "JP225.i"],
-        AUS200: ["AUS200", "AUS200.i"],
-        USOUSD: ["XTIUSD", "USOUSD", "XTIUSD.i", "WTI"],
-        UKOUSD: ["XBRUSD", "UKOUSD", "XBRUSD.i", "BRENT"],
-        XNGUSD: ["XNGUSD", "NGAS", "XNGUSD.i"],
-        XCUUSD: ["XCUUSD", "COPPER", "XCUUSD.i"],
-        AUDUSD: ["AUDUSD.i", "AUDUSD"],
-        NZDUSD: ["NZDUSD.i", "NZDUSD"],
-        EURUSD: ["EURUSD.i", "EURUSD"],
-        GBPUSD: ["GBPUSD.i", "GBPUSD"],
-        USDJPY: ["USDJPY.i", "USDJPY"],
-        USDCAD: ["USDCAD.i", "USDCAD"],
-        USDCHF: ["USDCHF.i", "USDCHF"],
-        GBPJPY: ["GBPJPY.i", "GBPJPY"],
-        EURJPY: ["EURJPY.i", "EURJPY"],
-        AUDJPY: ["AUDJPY.i", "AUDJPY"],
-        NZDJPY: ["NZDJPY.i", "NZDJPY"],
-        EURGBP: ["EURGBP.i", "EURGBP"],
-        AUDNZD: ["AUDNZD.i", "AUDNZD"],
-        CADCHF: ["CADCHF.i", "CADCHF"],
-      };
-      const variants = PRICE_SYMBOL_VARIANTS[symbol] || [symbol];
+      const variants = SYMBOL_VARIANTS[symbol] || [symbol];
 
       let lastError: any = null;
       for (const variant of variants) {

@@ -5,6 +5,7 @@ import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "l
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
+import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
 import {
   useRonSnapshots, useRonOutcomeStats, useRonDataQuality, useRonRebuildStatus,
   ronStateFrom, ronStateColor,
@@ -196,6 +197,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       return ai - bi;
     });
 
+  // Genuine broker quotes for the visible tiles only (single bounded poll loop).
+  const { quotes: liveQuotes } = useLiveQuotes(visibleScans.map(s => s.symbol));
+
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
     e.dataTransfer.effectAllowed = "move";
@@ -285,6 +289,11 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           // Prefer the live feed only while it is actually fresh; otherwise fall back to the
           // RON snapshot so the indicator row can never contradict RON's own reasoning.
           const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
+          // Headline quote — genuine broker feed only. Never live_market_data, never a RON close.
+          const quote = liveQuotes.get(inst.symbol);
+          const quoteFresh = isQuoteFresh(quote);
+          const quoteInstant = quote?.broker_time ?? quote?.fetched_at ?? null;
+          const quoteSourceLabel = quote?.broker_time ? "broker quote time" : "server fetch time";
           // Truthfulness: only real AND fresh price paths are plotted. No synthetic sparkline,
           // and never a stale series presented as live.
           const sparkData = liveFresh && live?.sparkline_data?.length ? live.sparkline_data : null;
@@ -326,13 +335,33 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                       {tf}
                     </span>
-                    {live && (
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: live.market_open ? "#22C55E" : "#555F73", display: "inline-block" }} title={live.market_open ? "Market open" : "Market closed"} />
+                    {quote && (
+                      <span
+                        style={{ width: 6, height: 6, borderRadius: "50%", background: quoteFresh ? "#22C55E" : "#555F73", display: "inline-block" }}
+                        title={quoteFresh ? "Live broker quote streaming" : "No fresh broker quote"}
+                      />
                     )}
                   </div>
-                  {live?.last_price && (
-                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: live.price_direction === "up" ? C.green : live.price_direction === "down" ? C.red : C.text, marginTop: 2 }}>
-                      ${live.last_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                  {quote && quote.bid != null ? (
+                    <div style={{ marginTop: 2 }}>
+                      <div
+                        style={{
+                          fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
+                          color: !quoteFresh ? C.text : quote.direction === "up" ? C.green : quote.direction === "down" ? C.red : C.text,
+                        }}
+                        title={`${quote.symbol} → ${quote.broker_symbol ?? "—"} · bid ${quote.bid} / ask ${quote.ask ?? "—"} · ${quoteSourceLabel} ${quoteInstant}`}
+                      >
+                        {quote.bid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
+                      </div>
+                      <div style={{ fontSize: 9, color: quoteFresh ? C.text : "#F59E0B", fontFamily: "'JetBrains Mono', monospace" }}>
+                        {quoteFresh
+                          ? `Live broker bid · ask ${quote.ask ?? "—"} · ${formatAge(quoteInstant!)}`
+                          : `Market closed / feed idle · last quote ${formatAge(quoteInstant!)}`}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 2, fontStyle: "italic" }}>
+                      No live price feed
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text }}>
@@ -412,7 +441,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 {sparkData ? (
                   <Sparkline data={sparkData} color={sparkColor} w={120} h={32} />
                 ) : (
-                  <span style={{ fontSize: 9, color: C.text, fontStyle: "italic" }}>No live price feed</span>
+                  <span style={{ fontSize: 9, color: C.text, fontStyle: "italic" }} title="No genuine intraday series available; nothing is synthesised.">
+                    No sparkline series
+                  </span>
                 )}
               </div>
 
