@@ -19,11 +19,14 @@ import {
   type CalibrationInputRow, type Direction,
 } from "../_shared/ron-calibration.ts";
 import { loadQuarantinedBarTimes } from "../_shared/ron-quality-contract.ts";
-import { RON_STATE_SPEC_VERSION, deriveStateV1, stateSpecPayload } from "../_shared/ron-state-spec.ts";
 import {
-  BASELINE_CANDIDATE, PROMOTION_GATE, PURGE_MINUTES, REQUESTED_FOLDS, RESEARCH_VERSION,
-  buildCandidateSet, buildPurgedFolds, candidateSpecPayload, evaluateCandidate,
-  researchDigest, topBuckets,
+  RON_STATE_SPEC_VERSION_V2, deriveStateV2, stateSpecPayloadV2,
+} from "../_shared/ron-state-spec.ts";
+import {
+  BASELINE_CANDIDATE, COVERAGE_EPOCH_GAP_HOURS, FOLD_DEFINITION_VERSION, PROMOTION_GATE,
+  PURGE_MINUTES, REQUESTED_FOLDS, RESEARCH_VERSION,
+  buildCandidateSet, buildGapAwareFolds, candidateSpecPayload, evaluateCandidate,
+  researchDigest, topBucketsV2,
   type CandidateResult, type FoldResult, type ResearchObs,
 } from "../_shared/ron-research.ts";
 
@@ -149,7 +152,7 @@ Deno.serve(async (req) => {
       continue;
     }
     if (!snap) { bump("missing_feature_v4_snapshot"); continue; }
-    const state = deriveStateV1(f, snap.patterns, row.session);
+    const state = deriveStateV2(f, snap.patterns, row.session);
     for (const dir of ["long", "short"] as Direction[]) {
       const e = eligibleFor(row, dir);
       if (e) obs[dir].push({ bar_time: e.bar_time, t: e.t, success: e.success, state });
@@ -168,16 +171,16 @@ Deno.serve(async (req) => {
   const canonicalMax = outcomes.length ? new Date(outcomes[outcomes.length - 1].bar_time).toISOString() : null;
 
   // ---- purged walk-forward folds shared by both directions ----------------
-  const plan = buildPurgedFolds([obs.long, obs.short], folds);
+  const plan = buildGapAwareFolds([obs.long, obs.short], folds);
   if (!plan.folds.length) {
     return json({ error: "NO_DEFENSIBLE_FOLDS", fold_plan: plan }, 422);
   }
 
-  const stateSpecHash = await sha256(stateSpecPayload());
+  const stateSpecHash = await sha256(stateSpecPayloadV2());
   const candidateSpecHash = await sha256(candidateSpecPayload());
   const definitionHash = await sha256([
     "research_version", RESEARCH_VERSION,
-    "state_spec_version", RON_STATE_SPEC_VERSION,
+    "state_spec_version", RON_STATE_SPEC_VERSION_V2,
     SYMBOL, TIMEFRAME,
     "quality_version", QUALITY_V,
     "feature_version", CONTRACT.feature_version,
@@ -188,10 +191,16 @@ Deno.serve(async (req) => {
     "source_as_of", frozenAsOf,
     "source_bar_cutoff", sourceBarCutoff,
     "purge_minutes", PURGE_MINUTES,
+    "fold_definition_version", FOLD_DEFINITION_VERSION,
+    "coverage_epoch_gap_hours", COVERAGE_EPOCH_GAP_HOURS,
     "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.accepted_folds,
-      plan.min_test_obs_per_fold, plan.folds.map((f) => [f.fold, f.purge_start, f.test_start, f.test_end])],
+      plan.min_test_obs_per_fold,
+      plan.epochs.map((e) => [e.epoch, e.start, e.end, e.n_times, e.max_internal_gap_minutes]),
+      plan.folds.map((f) => [f.fold, f.coverage_epoch, f.purge_start, f.test_start, f.test_end,
+        f.max_internal_gap_minutes])],
     "state_spec_hash", stateSpecHash,
     "candidate_spec_hash", candidateSpecHash,
+    "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
   ]);
 
   // ---- evaluate: baseline first, then every predeclared candidate ---------
@@ -210,7 +219,7 @@ Deno.serve(async (req) => {
       results.push(r.result);
       evaluated.push(r);
     }
-    evidence[dir] = topBuckets(evaluated);
+    evidence[dir] = topBucketsV2(evaluated);
   }
 
   const resultsDigest = await researchDigest(definitionHash, results);
