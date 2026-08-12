@@ -39,13 +39,6 @@ const rsiLabel = (v: number) =>
 const stochLabel = (v: number) =>
   v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
 
-const directionColor = (dir: string) => {
-  if (dir === "BUY") return "#22C55E";
-  if (dir === "SELL") return "#EF4444";
-  if (dir === "WAIT") return "#F59E0B";
-  return "#555F73";
-};
-
 const num = (v: unknown, dp = 1): string =>
   v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(dp);
 
