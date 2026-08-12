@@ -358,7 +358,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       <X size={14} color={C.text} />
                     </button>
                   </div>
-                  <span style={{ fontSize: 9, color: countdown === -1 ? "#F59E0B" : C.sec, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
+                  <span style={{ fontSize: 9, color: countdown === -1 ? "#F59E0B" : C.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
                     <Clock size={9} /> {countdown === -1 ? "Market closed" : `Next scan: ${formatCountdown(countdown)}`}
                   </span>
                 </div>
@@ -378,7 +378,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                           {quarantined ? "NO TRADABLE SETUP" : ron ? ron.state : "DATA BUILDING"}
                         </div>
                         {inst.symbol === "XAUUSD" && dataQuality && (
-                          <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.sec }}
+                          <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.text }}
                                title={`Deterministic source-data quality v${1}: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags. Raw candle history is never modified.`}>
                             Data integrity: {quarantined ? "Source anomaly quarantined" : "Healthy"}
                           </div>
@@ -469,7 +469,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                 <div><span style={{ color: C.text }}>R:R:</span> <span style={{ color: expired ? "rgba(255,255,255,0.5)" : C.text, fontFamily: "'JetBrains Mono', monospace" }}>{inst.risk_reward ?? "—"}</span></div>
               </div>
 
-              <div style={{ fontSize: 11, color: expired ? "rgba(255,255,255,0.7)" : C.sec, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
+              <div style={{ fontSize: 11, color: expired ? "rgba(255,255,255,0.7)" : C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}`, opacity: expired ? 0.75 : 1 }}>
                 {expired && (
                   <div style={{ fontSize: 10, color: "#F59E0B", fontWeight: 600, marginBottom: 4 }}>
                     (Expired — {formatAge(inst.scanned_at)})
@@ -488,7 +488,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               </div>
 
               {expired && (
-                <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.sec, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.text, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                   <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
                 </div>
               )}
