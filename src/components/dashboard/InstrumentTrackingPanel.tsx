@@ -293,7 +293,13 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {visibleScans.map((inst, idx) => {
           const tf = instrumentTfs.get(inst.symbol) || "15m";
-          const expired = isDynamicallyExpired(inst.scanned_at, tf);
+          // Signal history (Falconer) — explicitly NOT RON analysis.
+          const hasSignal = !!inst.scanned_at && !!inst.direction;
+          const expired = hasSignal ? isDynamicallyExpired(inst.scanned_at!, tf) : false;
+          const sigDir = (inst.direction || "").toLowerCase() === "long" ? "LONG"
+            : (inst.direction || "").toLowerCase() === "short" ? "SHORT" : (inst.direction || "").toUpperCase();
+          const badgeText = !hasSignal ? "NO SIGNAL" : expired ? `HISTORICAL ${sigDir}` : `FALCONER ${sigDir}`;
+          const badgeColor = !hasSignal || expired ? C.muted : sigDir === "LONG" ? C.green : C.red;
           const countdown = nextScanSeconds(tf);
           const live = liveData.get(inst.symbol);
           const snap = snapshots.get(inst.symbol);
