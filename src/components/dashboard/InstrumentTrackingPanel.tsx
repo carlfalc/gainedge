@@ -456,9 +456,11 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     Completed bar close — not a live tick quote.
                   </span>
                   <span style={{ gridColumn: "1 / -1", color: C.text, fontSize: 10 }}>
-                    Outcome labels (research only, label v4, feature v3, XAUUSD 15m sample slices): {outcomeStats
-                      ? `${outcomeStats.labelled.toLocaleString()} labelled, ${outcomeStats.excluded.toLocaleString()} excluded (venue-closed minutes and/or missing 1m candles). Nothing shown on this dashboard is derived from them.`
-                      : "loading"}
+                    {rebuild && !rebuild.complete
+                      ? `Historical evidence: rebuilding (clean lineage quality v${CURRENT_RON_QUALITY_VERSION} · feature v${CURRENT_RON_FEATURE_VERSION} · label v${CURRENT_RON_LABEL_VERSION}). Nothing on this dashboard is derived from it.`
+                      : `Outcome labels (research only, label v${CURRENT_RON_LABEL_VERSION}, feature v${CURRENT_RON_FEATURE_VERSION}, XAUUSD 15m): ${outcomeStats
+                        ? `${outcomeStats.labelled.toLocaleString()} labelled, ${outcomeStats.excluded.toLocaleString()} excluded (venue-closed minutes and/or missing 1m candles). Nothing shown on this dashboard is derived from them.`
+                        : "loading"}`}
                   </span>
                 </div>
               ) : (
