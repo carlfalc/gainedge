@@ -510,6 +510,37 @@ export function definitionPayloadV2(id: RunIdentityV2, ctx: CalibrationContract 
 }
 
 /** Full deterministic report payload — reliability, fallback and session counts included. */
+/**
+ * calibration_version >= 5 definition payload. Every ACTUAL run parameter participates:
+ * contract versions, quality lineage, horizon/barrier, holdout fraction, exact ADX bucket
+ * boundaries, sample floors, hierarchy/fallback policy version, ineligible anchor sessions
+ * and the frozen market-data source cut + common split cutoff.
+ */
+export function definitionPayloadV5(
+  id: RunIdentityV2,
+  ctx: CalibrationContract,
+  qualityVersion: number,
+) {
+  return [
+    "calibration_version", ctx.calibration_version,
+    CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+    id.symbol, id.timeframe,
+    "feature_version", ctx.feature_version,
+    "label_version", ctx.label_version,
+    "quality_version", qualityVersion,
+    "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+    "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+    "holdout_fraction", id.holdout_fraction,
+    "sample_floors", [0, 1, 2, 3].map((l) => [l, SAMPLE_FLOORS[l]]),
+    "adx_bucket_bounds", [...ADX_BUCKET_BOUNDS],
+    "hierarchy_policy_version", HIERARCHY_POLICY_VERSION,
+    "ineligible_anchor_sessions", [...INELIGIBLE_ANCHOR_SESSIONS].sort(),
+    "source_as_of", id.source_as_of,
+    "source_bar_cutoff", id.source_bar_cutoff,
+    "split_cutoff", id.split_cutoff,
+  ];
+}
+
 export function reportPayloadV2(r: DirectionReport) {
   return [
     r.direction, r.n_eligible, r.n_fit, r.n_holdout,
