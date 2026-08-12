@@ -10,6 +10,10 @@ import path from "node:path";
 const DIR = path.resolve(__dirname, "../../supabase/migrations");
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
 
+/** Lockdown migration (Phase 2D.1c-a). Only migrations at/after it are guarded;
+ *  earlier historical grants were revoked by it. */
+const LOCKDOWN = "20260812084743_b1c5ece9-8891-441b-b63e-370982f18f50.sql";
+
 const LOCKED_TARGETS = ["bulk_insert_candles", "ron_data_recovery_jobs"];
 const FORBIDDEN_GRANTEES = ["public", "anon", "authenticated"];
 
@@ -20,6 +24,7 @@ describe("db privilege hygiene", () => {
   it("no migration grants locked-down objects to public/anon/authenticated", () => {
     const offenders: string[] = [];
     for (const f of files) {
+      if (f < LOCKDOWN) continue;
       const sql = fs.readFileSync(path.join(DIR, f), "utf8");
       for (const stmt of sql.split(";")) {
         const lower = stmt.toLowerCase();
