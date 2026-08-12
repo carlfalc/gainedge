@@ -26,6 +26,11 @@ const DAILY_LOOKBACK = 320;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+/** Bar lengths used only by the closed-bar ingestion guard. */
+const TF_MS_GUARD: Record<string, number> = {
+  "1m": 60_000, "5m": 300_000, "15m": 900_000, "30m": 1_800_000,
+  "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+};
 
 interface Settings {
   user_id: string;
@@ -172,7 +177,15 @@ async function refreshCandles(
         close: Number(c.close),
         volume: Math.round(Number(c.tickVolume ?? c.volume ?? 0)),
       }))
-      .filter((r: any) => r.timestamp && Number.isFinite(r.open) && Number.isFinite(r.close));
+      .filter((r: any) => r.timestamp && Number.isFinite(r.open) && Number.isFinite(r.close))
+      // INGESTION GUARD (Phase 2C.1): only genuinely CLOSED bars may be persisted.
+      // Writing the still-forming bar produced `premature_bar_persisted` artifacts whose
+      // OHLC is a partial-period snapshot; those rows then contaminated RON feature windows.
+      .filter((r: any) => {
+        const barMs = TF_MS_GUARD[timeframe];
+        if (!barMs) return true;
+        return new Date(r.timestamp).getTime() + barMs <= Date.now();
+      });
     if (rows.length === 0) return 0;
     const { data: inserted, error } = await supabase.rpc("bulk_insert_candles", { candles: rows });
     if (error) {

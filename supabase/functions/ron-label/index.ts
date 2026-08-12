@@ -16,13 +16,13 @@ import { labelOutcome, metricHash, type FwdBar } from "../_shared/ron-outcomes.t
 import { labelOutcomeV2, metricHashV2 } from "../_shared/ron-outcomes-v2.ts";
 import { labelOutcomeV3, metricHashV3 } from "../_shared/ron-outcomes-v3.ts";
 import { classifyRonSession, xauVenueOpen } from "../_shared/ron-sessions.ts";
-import { RON_QUALITY_VERSION } from "../_shared/ron-data-quality.ts";
+import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-quality-contract.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
-const FEATURE_VERSION = 2;
-const DEFAULT_LABEL_VERSION = 3;   // v1 and v2 rows are preserved untouched for audit
+const DEFAULT_LABEL_VERSION = 4;   // v1..v3 rows are preserved untouched for audit
 const BAR_MS = 15 * 60 * 1000;
+const BAR_MINUTES = 15;
 const RES_MS = 60 * 1000;              // 1-minute forward resolution
 const RES_LABEL = "1m";
 const DEFAULT_HORIZONS = [15, 30, 60, 120, 240];
@@ -60,7 +60,13 @@ Deno.serve(async (req) => {
     : DEFAULT_HORIZONS;
   const maxHorizon = Math.max(...horizons);
   const requested = Number(body.label_version ?? DEFAULT_LABEL_VERSION);
-  const LABEL_VERSION = requested === 1 ? 1 : requested === 2 ? 2 : 3;
+  const LABEL_VERSION = [1, 2, 3, 4].includes(requested) ? requested : DEFAULT_LABEL_VERSION;
+  /**
+   * Provenance contract: label v4 is derived ONLY from feature_version=3 snapshots (whose
+   * input windows are quarantine-free). Legacy label versions stay pinned to feature v2
+   * so previously stored rows remain reproducible byte-for-byte.
+   */
+  const FEATURE_VERSION = LABEL_VERSION >= 4 ? 3 : 2;
 
   /**
    * `data_end` truncates the visible future and exists ONLY for the no-lookahead
@@ -141,6 +147,22 @@ Deno.serve(async (req) => {
 
     const nowMs = Date.now();
     const rows: any[] = [];
+    // Central eligibility contract + genuine write instants for the anchors in this batch.
+    const contract = await buildEligibilityContract(supabase, SYMBOL, TIMEFRAME, RON_QUALITY_VERSION);
+    const barCreatedAt = new Map<string, number | null>();
+    {
+      const firstIso = new Date(snaps[0].bar_time).toISOString();
+      const lastIso = new Date(snaps[snaps.length - 1].bar_time).toISOString();
+      const { data: srcRows } = await supabase
+        .from("candle_history")
+        .select("timestamp, created_at")
+        .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
+        .gte("timestamp", firstIso).lte("timestamp", lastIso)
+        .order("timestamp", { ascending: true }).limit(1000);
+      for (const rw of (srcRows ?? []) as any[]) {
+        barCreatedAt.set(new Date(rw.timestamp).toISOString(), rw.created_at ? new Date(rw.created_at).getTime() : null);
+      }
+    }
     const hashes: Record<string, string> = {};
     const summary: Record<string, number> = {};
     const quarantinedBars: {
@@ -150,19 +172,20 @@ Deno.serve(async (req) => {
     for (const s of snaps) {
       const t = new Date(s.bar_time).getTime();
       /**
-       * Phase 2C quarantine. A critical source-quality anchor (quality_version=1:
-       * `venue_break_bar` — the bar OPENS while the venue is closed) can never be a
+       * Phase 2C.1 quarantine, via the CENTRAL eligibility contract. A critical
+       * source-quality anchor (venue_break_bar, premature_bar_persisted) can never be a
        * measurable opportunity, so it can never produce an outcome row. It is SKIPPED
        * rather than written with mutated values: existing stored rows stay byte-identical
        * for audit, and no new outcome evidence is ever created from a quarantined bar.
        */
-      if (!xauVenueOpen(new Date(t))) {
+      const anchorBar = { time: t, created_at: barCreatedAt.get(new Date(t).toISOString()) ?? null };
+      if (contract.isQuarantined(anchorBar, BAR_MINUTES)) {
         summary.quarantined_source_quality = (summary.quarantined_source_quality ?? 0) + 1;
         quarantinedBars.push({
           bar_time: new Date(t).toISOString(),
           quality_version: RON_QUALITY_VERSION,
-          rule_code: "venue_break_bar",
-          exclusion_reason: "source_quality_critical_venue_break",
+          rule_code: contract.reasonFor(anchorBar, BAR_MINUTES) ?? "venue_break_bar",
+          exclusion_reason: "source_quality_critical",
         });
         continue;
       }
@@ -173,7 +196,7 @@ Deno.serve(async (req) => {
       for (const h of horizons) {
         const horizonEnd = t + BAR_MS + h * 60_000;
 
-        if (LABEL_VERSION === 3) {
+        if (LABEL_VERSION >= 3) {
           const l = labelOutcomeV3(t, BAR_MS, anchor, atr, fwd, h, RES_MS, RES_LABEL, nowMs, xauVenueOpen);
           const key = `${new Date(t).toISOString()}|${h}`;
           const hash = await metricHashV3(l);
@@ -189,7 +212,7 @@ Deno.serve(async (req) => {
           rows.push({
             symbol: SYMBOL, timeframe: TIMEFRAME,
             bar_time: new Date(t).toISOString(),
-            feature_version: FEATURE_VERSION, label_version: 3,
+            feature_version: FEATURE_VERSION, label_version: LABEL_VERSION,
             horizon_minutes: h,
             session: ctx.session, session_overlap: ctx.overlap,
             anchor_price: anchor, atr_at_anchor: atr,

@@ -23,9 +23,15 @@ import { detectPatterns, type DetectedPattern } from "./ron-patterns.ts";
  *  v1 — initial Phase 1A slice (Asian window applied inconsistently across the backfill).
  *  v2 — Phase 1B: corrected Asian window 22:00–06:00 UTC applied to every row, plus
  *       explicit provenance metadata (warmup/completeness/source history).
- * v1 rows are preserved for audit; readers must pin a version explicitly.
+ *  v3 — Phase 2C.1: identical indicator MATH to v2, but the input window is guaranteed
+ *       QUARANTINE-FREE. Bars carrying a critical data-quality flag (venue_break_bar,
+ *       premature_bar_persisted) can never be the anchor NOR appear anywhere in the
+ *       recursive input window, so contaminated bars cannot leak forward through
+ *       EMA/RSI-Wilder/ADX state. Provenance records the exclusions.
+ * v1 and v2 rows are preserved for audit; readers must pin a version explicitly.
  */
-export const RON_FEATURE_VERSION = 2;
+export const RON_FEATURE_VERSION = 3;
+export const RON_FEATURE_VERSION_V2 = 2;
 
 export type Regime = "trending_up" | "trending_down" | "ranging" | "transition";
 
@@ -163,8 +169,18 @@ export function computeRonSnapshot(
   symbol: string,
   timeframe: string,
   candles: Candle[],
-  opts: { source?: string; spread?: number | null } = {},
+  opts: {
+    source?: string;
+    spread?: number | null;
+    /** Pin the stamped version (v2 replay). Defaults to the current canonical version. */
+    featureVersion?: number;
+    /** v3 provenance: how many quarantined source bars the caller removed from the window. */
+    quarantinedExcluded?: number;
+    /** v3 provenance: the quality_version whose critical rules produced those exclusions. */
+    qualityVersion?: number;
+  } = {},
 ): RonSnapshot {
+  const featureVersion = opts.featureVersion ?? RON_FEATURE_VERSION;
   const i = candles.length - 1;
   const bar = candles[i];
   const closes = candles.map(c => c.close);
@@ -330,7 +346,7 @@ export function computeRonSnapshot(
     // capped at the warmup requirement so they are identical for any window that is
     // at least warm.
     provenance: {
-      feature_version: RON_FEATURE_VERSION,
+      feature_version: featureVersion,
       asian_window_utc: "22:00-06:00",
       session_boundary: "NY_17:00_DST_aware",
       warmup_bars_required: 220,
@@ -338,6 +354,13 @@ export function computeRonSnapshot(
       source_last_bar: new Date(bar.time).toISOString(),
       ema200_warm: candles.length >= 200,
       adx14_warm: candles.length >= 29,
+      ...(featureVersion >= 3
+        ? {
+            input_window_contract: "quarantine_free",
+            quality_version: opts.qualityVersion ?? null,
+            quarantined_bars_excluded: opts.quarantinedExcluded ?? 0,
+          }
+        : {}),
     },
   };
 
@@ -358,7 +381,7 @@ export function computeRonSnapshot(
     model_signals: {
       falconer_v7_tp3: { evaluated: false, trigger: null, distance_to_trigger: null, note: "not evaluated in slice 1A" },
     },
-    feature_version: RON_FEATURE_VERSION,
+    feature_version: featureVersion,
     data_health: insufficient ? "insufficient" : "healthy",
     source: opts.source ?? "candle_history",
   };

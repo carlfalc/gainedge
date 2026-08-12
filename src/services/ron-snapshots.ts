@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from "react";
  * The ONLY snapshot feature version the UI reads. v1 rows stay in the table for audit
  * but must never be mixed into current-state queries.
  */
-export const CURRENT_RON_FEATURE_VERSION = 2;
+export const CURRENT_RON_FEATURE_VERSION = 3;
 
 export interface RonSnapshotRow {
   symbol: string;
@@ -115,7 +115,7 @@ export interface RonOutcomeStats {
  * must never be mixed into current-state queries: v2's coverage-cause classifier compared
  * aggregate counts and could report an open-market data hole as a session boundary.
  */
-export const CURRENT_RON_LABEL_VERSION = 3;
+export const CURRENT_RON_LABEL_VERSION = 4;
 
 export function useRonOutcomeStats() {
   const [stats, setStats] = useState<RonOutcomeStats | null>(null);
@@ -153,7 +153,7 @@ export function useRonOutcomeStats() {
  * the `ron-quality` detector. This reports SOURCE-DATA health only — it is never a
  * probability, a confidence score or a trading opinion.
  */
-export const CURRENT_RON_QUALITY_VERSION = 1;
+export const CURRENT_RON_QUALITY_VERSION = 2;
 
 export interface RonDataQuality {
   critical: number;

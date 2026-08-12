@@ -42,6 +42,29 @@ export const HOLDOUT_FRACTION = 0.3;
  */
 export const CALIBRATION_VERSION = 2;
 
+/**
+ * Phase 2C.1 — calibration contracts.
+ *   v2 (frozen, canonical for audit): feature_version=2, label_version=3.
+ *   v3: feature_version=3 (quarantine-free input windows) + label_version=4.
+ * The v2 payload shape is byte-identical to the previously stored runs: the contract is
+ * only threaded through as an explicit parameter that DEFAULTS to v2.
+ */
+export interface CalibrationContract {
+  calibration_version: number;
+  feature_version: number;
+  label_version: number;
+}
+export const CALIBRATION_CONTRACT_V2: CalibrationContract = {
+  calibration_version: 2, feature_version: 2, label_version: 3,
+};
+export const CALIBRATION_CONTRACT_V3: CalibrationContract = {
+  calibration_version: 3, feature_version: 3, label_version: 4,
+};
+export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
+  2: CALIBRATION_CONTRACT_V2,
+  3: CALIBRATION_CONTRACT_V3,
+};
+
 /** A market-closed anchor can never be a user opportunity, so it can never be evidence. */
 export const INELIGIBLE_ANCHOR_SESSIONS: readonly string[] = ["market_closed"];
 
@@ -417,12 +440,12 @@ export interface RunIdentityV2 {
   exclusion_breakdown: Record<string, number>;
 }
 
-export function definitionPayloadV2(id: RunIdentityV2) {
+export function definitionPayloadV2(id: RunIdentityV2, ctx: CalibrationContract = CALIBRATION_CONTRACT_V2) {
   return [
-    "calibration_version", CALIBRATION_VERSION,
+    "calibration_version", ctx.calibration_version,
     CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
     id.symbol, id.timeframe,
-    CALIBRATION_FEATURE_VERSION, CALIBRATION_LABEL_VERSION,
+    ctx.feature_version, ctx.label_version,
     CALIBRATION_HORIZON_MINUTES, CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
     id.holdout_fraction,
     SAMPLE_FLOORS[0], SAMPLE_FLOORS[1], SAMPLE_FLOORS[2], SAMPLE_FLOORS[3],
@@ -469,10 +492,10 @@ export interface CellPersistedV2 {
 }
 
 /** Canonical cell payload covering every deterministic persisted column. */
-export function cellPayloadV2(c: CellStat, p: CellPersistedV2) {
+export function cellPayloadV2(c: CellStat, p: CellPersistedV2, ctx: CalibrationContract = CALIBRATION_CONTRACT_V2) {
   return [
-    CALIBRATION_VERSION, CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
-    CALIBRATION_FEATURE_VERSION, CALIBRATION_LABEL_VERSION, CALIBRATION_HORIZON_MINUTES,
+    ctx.calibration_version, CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+    ctx.feature_version, ctx.label_version, CALIBRATION_HORIZON_MINUTES,
     CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
     c.direction, c.level, c.cell_key, c.dim_session, c.dim_regime, c.dim_adx_bucket,
     p.source_as_of, p.source_bar_cutoff, p.split_cutoff,
