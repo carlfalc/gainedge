@@ -392,8 +392,15 @@ export interface DirectionReport {
   cells: CellStat[];
 }
 
-export function calibrateDirection(dir: Direction, obs: EligibleObs[], holdoutFraction = HOLDOUT_FRACTION): DirectionReport {
-  const { cutoff, fit, holdout } = chronoSplit(obs, holdoutFraction);
+export function calibrateDirection(
+  dir: Direction,
+  obs: EligibleObs[],
+  holdoutFraction = HOLDOUT_FRACTION,
+  commonCutoff?: string | null,
+): DirectionReport {
+  const { cutoff, fit, holdout } = commonCutoff !== undefined
+    ? splitAtCutoff(obs, commonCutoff)
+    : chronoSplit(obs, holdoutFraction);
   const cells = buildCells(dir, fit, holdout);
   const map = new Map(cells.map((c) => [c.cell_key, c]));
   const global = map.get(cellKey(0, dir, { session: "", regime: "", adx_bucket: "" }));
