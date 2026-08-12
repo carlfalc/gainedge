@@ -115,7 +115,7 @@ export interface RonOutcomeStats {
  * must never be mixed into current-state queries: v2's coverage-cause classifier compared
  * aggregate counts and could report an open-market data hole as a session boundary.
  */
-export const CURRENT_RON_LABEL_VERSION = 4;
+export const CURRENT_RON_LABEL_VERSION = 5;
 
 export function useRonOutcomeStats() {
   const [stats, setStats] = useState<RonOutcomeStats | null>(null);
@@ -153,12 +153,18 @@ export function useRonOutcomeStats() {
  * the `ron-quality` detector. This reports SOURCE-DATA health only — it is never a
  * probability, a confidence score or a trading opinion.
  */
-export const CURRENT_RON_QUALITY_VERSION = 2;
+export const CURRENT_RON_QUALITY_VERSION = 3;
 
 export interface RonDataQuality {
   critical: number;
   warning: number;
   latestCriticalBar: string | null;
+  /**
+   * Phase 2C.2 truthfulness: the CURRENT source state is a statement about the latest
+   * completed source bar only. Historical warning/info counts are detail, not the headline.
+   */
+  currentSourceQuarantined: boolean;
+  currentBar: string;
 }
 
 export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
@@ -171,23 +177,61 @@ export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
         .select("id", { count: "exact", head: true })
         .eq("symbol", symbol).eq("timeframe", timeframe)
         .eq("quality_version", CURRENT_RON_QUALITY_VERSION);
-      const [crit, warn, latest] = await Promise.all([
+      const barMs = 15 * 60 * 1000;
+      const currentBar = new Date(Math.floor(Date.now() / barMs) * barMs - barMs).toISOString();
+      const [crit, warn, latest, current] = await Promise.all([
         base().eq("severity", "critical"),
         base().eq("severity", "warning"),
         supabase.from("ron_data_quality_flags").select("bar_time")
           .eq("symbol", symbol).eq("timeframe", timeframe)
           .eq("quality_version", CURRENT_RON_QUALITY_VERSION).eq("severity", "critical")
           .order("bar_time", { ascending: false }).limit(1).maybeSingle(),
+        base().eq("severity", "critical").eq("bar_time", currentBar),
       ]);
       if (cancelled) return;
       setQuality({
         critical: crit.count ?? 0,
         warning: warn.count ?? 0,
         latestCriticalBar: (latest.data as any)?.bar_time ?? null,
+        currentSourceQuarantined: (current.count ?? 0) > 0,
+        currentBar,
       });
     })();
     return () => { cancelled = true; };
   }, [symbol, timeframe]);
 
   return quality;
+}
+
+/**
+ * Durable rebuild progress for the clean v4/v5 research lineage. While any stage is still
+ * running the dashboard must say `Historical evidence: rebuilding` rather than implying
+ * the evidence base is complete.
+ */
+export interface RonRebuildStatus {
+  complete: boolean;
+  stages: { stage: string; status: string; processed: number }[];
+}
+
+export function useRonRebuildStatus() {
+  const [status, setStatus] = useState<RonRebuildStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("ron_rebuild_jobs")
+        .select("stage, status, processed")
+        .order("stage_order", { ascending: true });
+      if (cancelled) return;
+      const stages = (data ?? []) as { stage: string; status: string; processed: number }[];
+      setStatus({
+        complete: stages.length > 0 && stages.every((s) => s.status === "completed"),
+        stages,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return status;
 }
