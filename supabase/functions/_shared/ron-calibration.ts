@@ -75,15 +75,68 @@ export const CALIBRATION_CONTRACT_V4: CalibrationContract = {
 export const CALIBRATION_CONTRACT_V5: CalibrationContract = {
   calibration_version: 5, feature_version: 4, label_version: 5,
 };
+/**
+ * Phase 2B.2 reproducibility corrections (same clean lineage as v4/v5: quality v3 +
+ * feature v4 + label v5) with materially changed deterministic identity:
+ *   - the ADX bucket SPEC (labels + boundaries + inclusivity) is the single source of
+ *     truth for both classification and the definition hash,
+ *   - holdout regime/adx-bucket coverage participates in the run hash,
+ *   - the canonical source min/max bar times participate in the run identity,
+ *   - `source_bar_cutoff` must equal the value derived from the frozen `source_as_of`,
+ *   - the run hash covers the ordered cell-hash digest.
+ * A new calibration_version is mandatory so v5 history can never be overwritten.
+ */
+export const CALIBRATION_CONTRACT_V6: CalibrationContract = {
+  calibration_version: 6, feature_version: 4, label_version: 5,
+};
 export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   2: CALIBRATION_CONTRACT_V2,
   3: CALIBRATION_CONTRACT_V3,
   4: CALIBRATION_CONTRACT_V4,
   5: CALIBRATION_CONTRACT_V5,
+  6: CALIBRATION_CONTRACT_V6,
 };
 
-/** Exact ADX bucket boundaries — part of the definition hash, never implicit. */
-export const ADX_BUCKET_BOUNDS: readonly number[] = [20, 30];
+/**
+ * Phase 2B.2 (Defect A): the ADX bucket SPECIFICATION is the single source of truth.
+ * `adxBucket()` classifies from this spec — there are no duplicated 20/30 literals in the
+ * classifier — and the v6 definition payload hashes the spec verbatim, so changing a
+ * boundary or a label necessarily changes BOTH classification and definition identity.
+ *
+ * Semantics: bands are evaluated in order; a band matches when `adx < lt`
+ * (upper bound EXCLUSIVE). The final band has `lt: null` (unbounded above).
+ */
+export interface AdxBucketBand { label: string; lt: number | null; }
+export interface AdxBucketSpec {
+  version: number;
+  /** Upper bounds are exclusive; the lower edge of each band is the previous upper bound. */
+  upper_bound_inclusive: boolean;
+  unknown_label: string;
+  bands: readonly AdxBucketBand[];
+}
+export const ADX_BUCKET_SPEC: AdxBucketSpec = {
+  version: 1,
+  upper_bound_inclusive: false,
+  unknown_label: "unknown",
+  bands: [
+    { label: "adx_lt20", lt: 20 },
+    { label: "adx_20_30", lt: 30 },
+    { label: "adx_gte30", lt: null },
+  ],
+};
+/** Derived from the spec (never re-declared) so v5 replay hashes stay byte-identical. */
+export const ADX_BUCKET_BOUNDS: readonly number[] =
+  ADX_BUCKET_SPEC.bands.filter((b) => b.lt != null).map((b) => b.lt as number);
+
+/** Deterministic, order-stable serialisation of the bucket spec for hashing. */
+export function adxBucketSpecPayload(spec: AdxBucketSpec = ADX_BUCKET_SPEC) {
+  return [
+    "adx_bucket_spec_version", spec.version,
+    "upper_bound_inclusive", spec.upper_bound_inclusive,
+    "unknown_label", spec.unknown_label,
+    "bands", spec.bands.map((b) => [b.label, b.lt]),
+  ];
+}
 /** Hierarchy/fallback resolution policy: deepest floor-qualifying cell, else broader, else null. */
 export const HIERARCHY_POLICY_VERSION = 1;
 
@@ -152,12 +205,14 @@ export interface EligibleObs {
   success: boolean;
 }
 
-/** Coarse ADX buckets — three levels only, no sparse-cell theatre. */
-export function adxBucket(adx: number | null | undefined): string {
-  if (adx == null || !Number.isFinite(adx)) return "unknown";
-  if (adx < 20) return "adx_lt20";
-  if (adx < 30) return "adx_20_30";
-  return "adx_gte30";
+/** Coarse ADX buckets — classification is driven ONLY by the hashed spec. */
+export function adxBucket(adx: number | null | undefined, spec: AdxBucketSpec = ADX_BUCKET_SPEC): string {
+  if (adx == null || !Number.isFinite(adx)) return spec.unknown_label;
+  for (const b of spec.bands) {
+    if (b.lt == null) return b.label;
+    if (spec.upper_bound_inclusive ? adx <= b.lt : adx < b.lt) return b.label;
+  }
+  return spec.unknown_label;
 }
 
 export function normSession(s: string | null | undefined): string {
@@ -172,7 +227,11 @@ export function normRegime(r: string | null | undefined): string {
  * Strict eligibility gate for ONE direction. Anything ambiguous, uncovered or
  * unmeasurable is dropped — never coerced to false.
  */
-export function eligibleFor(row: CalibrationInputRow, dir: Direction): EligibleObs | null {
+export function eligibleFor(
+  row: CalibrationInputRow,
+  dir: Direction,
+  spec: AdxBucketSpec = ADX_BUCKET_SPEC,
+): EligibleObs | null {
   if (!row.coverage_ok) return null;
   if (row.coverage_class !== "complete") return null;
   if (row.atr_at_anchor == null) return null;
@@ -186,7 +245,7 @@ export function eligibleFor(row: CalibrationInputRow, dir: Direction): EligibleO
     t: new Date(row.bar_time).getTime(),
     session: normSession(row.session),
     regime: normRegime(row.regime),
-    adx_bucket: adxBucket(row.adx),
+    adx_bucket: adxBucket(row.adx, spec),
     success,
   };
 }
@@ -389,6 +448,9 @@ export interface DirectionReport {
   reliability: ReliabilityBin[];
   fallback_levels: Record<string, number>;
   session_counts: Record<string, number>;
+  /** Phase 2B.2 (Defect B): holdout coverage across the other calibration dimensions. */
+  regime_counts: Record<string, number>;
+  adx_bucket_counts: Record<string, number>;
   cells: CellStat[];
 }
 
@@ -410,9 +472,13 @@ export function calibrateDirection(
   const naivePreds: { p: number; y: boolean }[] = [];
   const fallback: Record<string, number> = { L3: 0, L2: 0, L1: 0, L0: 0, none: 0 };
   const sessions: Record<string, number> = {};
+  const regimes: Record<string, number> = {};
+  const adxBuckets: Record<string, number> = {};
   let successHold = 0;
   for (const o of holdout) {
     sessions[o.session] = (sessions[o.session] ?? 0) + 1;
+    regimes[o.regime] = (regimes[o.regime] ?? 0) + 1;
+    adxBuckets[o.adx_bucket] = (adxBuckets[o.adx_bucket] ?? 0) + 1;
     if (o.success) successHold++;
     const r = resolvePrediction(map, dir, o);
     if (r.p == null) { fallback.none++; continue; }
@@ -439,6 +505,8 @@ export function calibrateDirection(
     reliability: reliabilityBins(preds),
     fallback_levels: fallback,
     session_counts: sessions,
+    regime_counts: regimes,
+    adx_bucket_counts: adxBuckets,
     cells,
   };
 }
@@ -590,5 +658,116 @@ export function cellPayloadV2(c: CellStat, p: CellPersistedV2, ctx: CalibrationC
     c.sample_floor, c.meets_sample_floor,
     c.n_holdout, c.successes_holdout, c.holdout_rate,
     p.prediction_rate, p.brier, p.naive_brier,
+  ];
+}
+
+/* ------------------------------------------------------------------------- *
+ * calibration_version = 6 (Phase 2B.2) payloads.
+ *
+ * Strictly additive: v2..v5 payload functions above are untouched, so every historical
+ * run replays to a byte-identical definition_hash / run_hash / cell_hash.
+ * ------------------------------------------------------------------------- */
+
+export interface RunIdentityV6 extends RunIdentityV2 {
+  /** Min/max bar_time of the EXACT frozen canonical outcome rows selected for the run. */
+  canonical_source_min_bar_time: string | null;
+  canonical_source_max_bar_time: string | null;
+}
+
+/** 15m bar grid used by the market-data availability contract. */
+export const CALIBRATION_BAR_MINUTES = 15;
+
+/**
+ * Phase 2B.2 (Defect D): the ONLY admissible `source_bar_cutoff` for a frozen
+ * `source_as_of` — the last anchor whose 15m completion PLUS the 60m forward horizon had
+ * already elapsed at the frozen instant.
+ */
+export function deriveSourceBarCutoff(sourceAsOf: string): string {
+  const grid = CALIBRATION_BAR_MINUTES * 60_000;
+  const floored = Math.floor(new Date(sourceAsOf).getTime() / grid) * grid;
+  return new Date(floored - (CALIBRATION_BAR_MINUTES + CALIBRATION_HORIZON_MINUTES) * 60_000).toISOString();
+}
+
+/**
+ * v6 definition payload. Identical in spirit to v5, but the ADX bucket SPEC (labels,
+ * boundaries and inclusivity) is hashed rather than two bare numbers.
+ */
+export function definitionPayloadV6(
+  id: RunIdentityV6,
+  ctx: CalibrationContract,
+  qualityVersion: number,
+  spec: AdxBucketSpec = ADX_BUCKET_SPEC,
+) {
+  return [
+    "calibration_version", ctx.calibration_version,
+    CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+    id.symbol, id.timeframe,
+    "feature_version", ctx.feature_version,
+    "label_version", ctx.label_version,
+    "quality_version", qualityVersion,
+    "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+    "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+    "holdout_fraction", id.holdout_fraction,
+    "sample_floors", [0, 1, 2, 3].map((l) => [l, SAMPLE_FLOORS[l]]),
+    adxBucketSpecPayload(spec),
+    "hierarchy_policy_version", HIERARCHY_POLICY_VERSION,
+    "ineligible_anchor_sessions", [...INELIGIBLE_ANCHOR_SESSIONS].sort(),
+    "source_as_of", id.source_as_of,
+    "source_bar_cutoff", id.source_bar_cutoff,
+    "split_cutoff", id.split_cutoff,
+  ];
+}
+
+/** v6 direction report payload — adds holdout regime and ADX-bucket coverage. */
+export function reportPayloadV6(r: DirectionReport) {
+  return [
+    r.direction, r.n_eligible, r.n_fit, r.n_holdout,
+    r.fit_range, r.holdout_range,
+    r.global_fit_rate, r.holdout_observed_rate,
+    r.n_predicted, r.n_unpredicted,
+    r.brier, r.naive_brier, r.ece,
+    r.reliability.map((b) => [b.lo, b.hi, b.n, b.mean_pred, b.observed]),
+    "fallback_levels", sortedEntries(r.fallback_levels),
+    "session_counts", sortedEntries(r.session_counts),
+    "regime_counts", sortedEntries(r.regime_counts),
+    "adx_bucket_counts", sortedEntries(r.adx_bucket_counts),
+    r.cells.map(cellPayload),
+  ];
+}
+
+/**
+ * Ordered digest over the v6 cell hashes in (direction, cell_key) order. Cell hashes are
+ * computable from the definition hash plus the deterministic persisted cell payload, so
+ * this never depends on a database-assigned run_id.
+ */
+export async function orderedCellDigest(
+  cells: { direction: Direction; cell_key: string; cell_hash: string }[],
+): Promise<{ digest: string; ordered: string[] }> {
+  const ordered = [...cells]
+    .sort((a, b) =>
+      (a.direction < b.direction ? -1 : a.direction > b.direction ? 1 : 0) ||
+      (a.cell_key < b.cell_key ? -1 : a.cell_key > b.cell_key ? 1 : 0))
+    .map((c) => `${c.direction}|${c.cell_key}|${c.cell_hash}`);
+  return { digest: await sha256(ordered), ordered };
+}
+
+export function runPayloadV6(
+  id: RunIdentityV6,
+  defHash: string,
+  long: DirectionReport,
+  short: DirectionReport,
+  orderedCellHashDigest: string | null,
+) {
+  return [
+    defHash,
+    "canonical_rows", id.canonical_rows,
+    "canonical_source_min_bar_time", id.canonical_source_min_bar_time,
+    "canonical_source_max_bar_time", id.canonical_source_max_bar_time,
+    "eligible_long", id.eligible_long,
+    "eligible_short", id.eligible_short,
+    "excluded_rows", id.excluded_rows,
+    "exclusion_breakdown", sortedEntries(id.exclusion_breakdown),
+    reportPayloadV6(long), reportPayloadV6(short),
+    "ordered_cell_digest", orderedCellHashDigest,
   ];
 }

@@ -1145,6 +1145,8 @@ export type Database = {
           barrier_version: number
           calibration_version: number
           canonical_rows: number
+          canonical_source_max_bar_time: string | null
+          canonical_source_min_bar_time: string | null
           created_at: string
           definition_hash: string
           eligible_long: number
@@ -1175,6 +1177,8 @@ export type Database = {
           barrier_version: number
           calibration_version?: number
           canonical_rows?: number
+          canonical_source_max_bar_time?: string | null
+          canonical_source_min_bar_time?: string | null
           created_at?: string
           definition_hash: string
           eligible_long?: number
@@ -1205,6 +1209,8 @@ export type Database = {
           barrier_version?: number
           calibration_version?: number
           canonical_rows?: number
+          canonical_source_max_bar_time?: string | null
+          canonical_source_min_bar_time?: string | null
           created_at?: string
           definition_hash?: string
           eligible_long?: number
