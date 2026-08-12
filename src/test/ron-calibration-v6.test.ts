@@ -36,8 +36,8 @@ const identity: RunIdentityV6 = {
 const defHash6 = (id = identity, qv = 3, spec: AdxBucketSpec = ADX_BUCKET_SPEC) =>
   sha256(definitionPayloadV6(id, CALIBRATION_CONTRACT_V6, qv, spec));
 
-const longRep = () => calibrateDirection("long", Array.from({ length: 200 }, (_, i) => obsAt(i, i % 3 === 0)), 0.3, identity.split_cutoff);
-const shortRep = () => calibrateDirection("short", Array.from({ length: 200 }, (_, i) => obsAt(i, i % 5 === 0)), 0.3, identity.split_cutoff);
+const longRep = () => calibrateDirection("long", Array.from({ length: 200 }, (_, i) => obsAt(i, i % 3 === 0)), 0.3);
+const shortRep = () => calibrateDirection("short", Array.from({ length: 200 }, (_, i) => obsAt(i, i % 5 === 0)), 0.3);
 
 const runHash6 = async (
   id: RunIdentityV6 = identity,
@@ -143,7 +143,7 @@ describe("defect D — source_bar_cutoff is derived, never caller-chosen", () =>
   });
   it("is deterministic for the same frozen instant", () => {
     expect(deriveSourceBarCutoff(asOf)).toBe(derived);
-    expect(deriveSourceBarCutoff("2026-08-12T05:59:59.000Z")).toBe(derived);
+    expect(deriveSourceBarCutoff("2026-08-12T05:44:59.000Z")).toBe(derived);
   });
   it("an exactly matching caller cutoff is accepted, any other is a mismatch", () => {
     const accept = (supplied: string) => supplied === derived;
