@@ -172,7 +172,15 @@ async function refreshCandles(
         close: Number(c.close),
         volume: Math.round(Number(c.tickVolume ?? c.volume ?? 0)),
       }))
-      .filter((r: any) => r.timestamp && Number.isFinite(r.open) && Number.isFinite(r.close));
+      .filter((r: any) => r.timestamp && Number.isFinite(r.open) && Number.isFinite(r.close))
+      // INGESTION GUARD (Phase 2C.1): only genuinely CLOSED bars may be persisted.
+      // Writing the still-forming bar produced `premature_bar_persisted` artifacts whose
+      // OHLC is a partial-period snapshot; those rows then contaminated RON feature windows.
+      .filter((r: any) => {
+        const barMs = TF_MS_GUARD[timeframe];
+        if (!barMs) return true;
+        return new Date(r.timestamp).getTime() + barMs <= Date.now();
+      });
     if (rows.length === 0) return 0;
     const { data: inserted, error } = await supabase.rpc("bulk_insert_candles", { candles: rows });
     if (error) {
