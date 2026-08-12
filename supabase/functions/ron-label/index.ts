@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
       for (const h of horizons) {
         const horizonEnd = t + BAR_MS + h * 60_000;
 
-        if (LABEL_VERSION === 3) {
+        if (LABEL_VERSION >= 3) {
           const l = labelOutcomeV3(t, BAR_MS, anchor, atr, fwd, h, RES_MS, RES_LABEL, nowMs, xauVenueOpen);
           const key = `${new Date(t).toISOString()}|${h}`;
           const hash = await metricHashV3(l);
@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
           rows.push({
             symbol: SYMBOL, timeframe: TIMEFRAME,
             bar_time: new Date(t).toISOString(),
-            feature_version: FEATURE_VERSION, label_version: 3,
+            feature_version: FEATURE_VERSION, label_version: LABEL_VERSION,
             horizon_minutes: h,
             session: ctx.session, session_overlap: ctx.overlap,
             anchor_price: anchor, atr_at_anchor: atr,
