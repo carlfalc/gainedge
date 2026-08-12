@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
       const nowMs = Date.now();
       const { data: latest, error: le } = await supabase
         .from("candle_history")
-        .select("timestamp")
+        .select("timestamp, created_at")
         .eq("symbol", SYMBOL)
         .eq("timeframe", TIMEFRAME)
         .lte("timestamp", new Date(nowMs - BAR_MS).toISOString())
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
     // Targets to snapshot, ascending from `start`.
     let tq = supabase
       .from("candle_history")
-      .select("timestamp")
+      .select("timestamp, created_at")
       .eq("symbol", SYMBOL)
       .eq("timeframe", TIMEFRAME)
       .lte("timestamp", endIso)
@@ -241,18 +241,42 @@ Deno.serve(async (req) => {
 
     const snaps: any[] = [];
     let skippedWarmup = 0;
+    let skippedQuarantined = 0;
+    const quarantinedAnchors: { bar_time: string; rule_code: string | null }[] = [];
     // Phase 1B correction: no arbitrary warmup skip. computeRonSnapshot is proven safe
     // with <30 bars (indicators return null, data_health = "insufficient"), so every
     // genuine source bar gets a row. `min_bars` can still be set explicitly if needed.
     const minBars = Math.max(1, Number(body.min_bars ?? 1));
     for (const t of targets) {
       const ms = new Date(t.timestamp).getTime();
+      const anchorBar = {
+        time: ms,
+        created_at: (t as any).created_at ? new Date((t as any).created_at).getTime() : null,
+      };
+      // Quarantined bars can never be an anchor (feature_version=3 contract).
+      if (contract.isQuarantined(anchorBar, BAR_MINUTES)) {
+        skippedQuarantined++;
+        if (quarantinedAnchors.length < 50) {
+          quarantinedAnchors.push({
+            bar_time: new Date(ms).toISOString(),
+            rule_code: contract.reasonFor(anchorBar, BAR_MINUTES),
+          });
+        }
+        continue;
+      }
       const idx = indexOfTime.get(ms);
       if (idx === undefined) continue;
       if (idx + 1 < minBars) { skippedWarmup++; continue; }
       // NO LOOKAHEAD: slice ends at the target bar (inclusive).
-      const window = all.slice(Math.max(0, idx - CANONICAL_WINDOW + 1), idx + 1);
-      snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, window, { source: "candle_history_backfill" }));
+      // ...and NO CONTAMINATION: quarantined bars are removed from the input window too.
+      const raw = all.slice(Math.max(0, idx - CANONICAL_WINDOW + 1), idx + 1);
+      const { clean, excluded } = cleanWindow(raw);
+      if (!clean.length) { skippedQuarantined++; continue; }
+      snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, clean, {
+        source: "candle_history_backfill",
+        quarantinedExcluded: excluded,
+        qualityVersion: RON_QUALITY_VERSION,
+      }));
     }
 
     for (let k = 0; k < snaps.length; k += 200) await upsert(snaps.slice(k, k + 200));
@@ -262,9 +286,15 @@ Deno.serve(async (req) => {
       mode,
       processed: snaps.length,
       skipped_warmup: skippedWarmup,
+      skipped_quarantined: skippedQuarantined,
+      quarantined_anchors: quarantinedAnchors,
+      feature_version: RON_FEATURE_VERSION,
+      quality_version: RON_QUALITY_VERSION,
       first_bar: snaps[0]?.bar_time ?? null,
       last_bar: snaps[snaps.length - 1]?.bar_time ?? null,
-      next_cursor: snaps.length ? new Date(new Date(snaps[snaps.length - 1].bar_time).getTime() + 1).toISOString() : null,
+      next_cursor: targets.length
+        ? new Date(new Date(targets[targets.length - 1].timestamp).getTime() + 1).toISOString()
+        : null,
     });
   } catch (e) {
     console.error("ron-snapshot error", e);
