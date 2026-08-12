@@ -34,13 +34,13 @@ export const CALIBRATION_BARRIER_VERSION = 1;
 export const HOLDOUT_FRACTION = 0.3;
 
 /**
- * Runner/input-contract version.
- *   v1 (historical, preserved in the DB): row membership frozen by mutable `labelled_at`,
- *       partial hash coverage, market_closed anchors could enter the sample.
- *   v2 (canonical): membership frozen by immutable market time (`source_bar_cutoff`),
- *       full deterministic hash coverage, market_closed anchors always ineligible.
+ * RETIRED (Phase 2D.1e): the bare `CALIBRATION_VERSION = 2` export.
+ * It named the historical input-contract revision, not the current runtime version, and
+ * was routinely misread as "the version the runner uses". The contract REGISTRY
+ * (`CALIBRATION_CONTRACTS`) plus `CALIBRATION_CONTRACT_CURRENT` are now the single source
+ * of truth. Historical semantics are unchanged: every hash-selection branch keys off
+ * `ctx.calibration_version`.
  */
-export const CALIBRATION_VERSION = 2;
 
 /**
  * Phase 2C.1 — calibration contracts.
@@ -89,13 +89,31 @@ export const CALIBRATION_CONTRACT_V5: CalibrationContract = {
 export const CALIBRATION_CONTRACT_V6: CalibrationContract = {
   calibration_version: 6, feature_version: 4, label_version: 5,
 };
+/**
+ * Phase 2D.1e — recovered-source lineage: quality v4 + feature v5 + label v6.
+ * Identical calibration MECHANICS to v6 (common split cutoff, ADX bucket spec hashing,
+ * ordered cell digest, derived source_bar_cutoff). Only the INPUT lineage changes, which
+ * mandates a new calibration_version so v4/v5/v6 history can never be overwritten.
+ */
+export const CALIBRATION_CONTRACT_V7: CalibrationContract = {
+  calibration_version: 7, feature_version: 5, label_version: 6,
+};
 export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   2: CALIBRATION_CONTRACT_V2,
   3: CALIBRATION_CONTRACT_V3,
   4: CALIBRATION_CONTRACT_V4,
   5: CALIBRATION_CONTRACT_V5,
   6: CALIBRATION_CONTRACT_V6,
+  7: CALIBRATION_CONTRACT_V7,
 };
+/**
+ * THE single source of truth for "which calibration contract is current".
+ * The old bare `CALIBRATION_VERSION = 2` export was ambiguous (it named the historical
+ * input-contract revision, not the current runtime version) and has been retired.
+ * Hash selection must always key off `ctx.calibration_version`, never off this pointer,
+ * so historical runs stay byte-identical.
+ */
+export const CALIBRATION_CONTRACT_CURRENT: CalibrationContract = CALIBRATION_CONTRACT_V7;
 
 /**
  * Phase 2B.2 (Defect A): the ADX bucket SPECIFICATION is the single source of truth.

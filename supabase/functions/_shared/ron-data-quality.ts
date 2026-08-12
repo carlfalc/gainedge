@@ -28,8 +28,15 @@
  *        findings. Detection no longer returns early after the first critical rule, so a
  *        premature bar still produces its proven child-coverage / OHLC reconciliation
  *        evidence. v1 and v2 rows are preserved untouched.
+ *   v4 — Phase 2D.1e: IDENTICAL detector semantics to v3 (multi-finding, same rules, same
+ *        evidence shape), re-evaluated against the RECOVERED genuine XAUUSD 1m source.
+ *        The stale v3 `unverifiable_1m_coverage` findings inside the recovered
+ *        2026-05-15 -> 2026-07-31 window were produced when no 1m children existed; v4
+ *        recomputes child coverage from the now-present genuine minutes instead of
+ *        copying the old verdict. v1..v3 rows are preserved untouched.
  */
-export const RON_QUALITY_VERSION = 3;
+export const RON_QUALITY_VERSION = 4;
+export const RON_QUALITY_VERSION_V3 = 3;
 export const RON_QUALITY_VERSION_V2 = 2;
 export const RON_QUALITY_VERSION_V1 = 1;
 

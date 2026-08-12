@@ -20,7 +20,7 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION, CALIBRATION_FEATURE_VERSION,
   CALIBRATION_LABEL_VERSION, CALIBRATION_HORIZON_MINUTES, CALIBRATION_BARRIER_ATR_MULT,
-  CALIBRATION_BARRIER_VERSION, CALIBRATION_VERSION, HOLDOUT_FRACTION, SAMPLE_FLOORS,
+  CALIBRATION_BARRIER_VERSION, HOLDOUT_FRACTION, SAMPLE_FLOORS,
   INELIGIBLE_ANCHOR_SESSIONS, anchorSessionEligible,
   calibrateDirection, cellPayloadV2, definitionPayloadV2, definitionPayloadV5,
   commonSplitCutoff, eligibleFor, resolvePrediction,
@@ -28,7 +28,7 @@ import {
   CALIBRATION_CONTRACTS, CALIBRATION_CONTRACT_V3,
   CALIBRATION_CONTRACT_V4, CALIBRATION_CONTRACT_V5,
   ADX_BUCKET_BOUNDS, HIERARCHY_POLICY_VERSION,
-  ADX_BUCKET_SPEC, CALIBRATION_CONTRACT_V6,
+  ADX_BUCKET_SPEC, CALIBRATION_CONTRACT_V6, CALIBRATION_CONTRACT_CURRENT,
   definitionPayloadV6, runPayloadV6, orderedCellDigest, deriveSourceBarCutoff,
   type CalibrationInputRow, type Direction, type EligibleObs,
   type RunIdentityV2, type RunIdentityV6,
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
    * Phase 2B.2 (Defect E): omission defaults to the current contract (v6). An explicitly
    * supplied version is NEVER silently substituted — unknown/non-integer fails 400.
    */
-  const DEFAULT_CAL_VERSION = CALIBRATION_CONTRACT_V6.calibration_version;
+  const DEFAULT_CAL_VERSION = CALIBRATION_CONTRACT_CURRENT.calibration_version;
   let CONTRACT = CALIBRATION_CONTRACTS[DEFAULT_CAL_VERSION];
   if (body.calibration_version !== undefined && body.calibration_version !== null) {
     const requested = Number(body.calibration_version);
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
   const FEATURE_V = CONTRACT.feature_version;
   const LABEL_V = CONTRACT.label_version;
   /** Quality lineage pinned per calibration contract; older runs replay their own qv. */
-  const QUALITY_V = CAL_VERSION >= 4 ? 3 : CAL_VERSION === 3 ? 2 : 1;
+  const QUALITY_V = CAL_VERSION >= 7 ? 4 : CAL_VERSION >= 4 ? 3 : CAL_VERSION === 3 ? 2 : 1;
   /** v5+: one common cutoff for both directions; v2..v4 replay their per-direction split. */
   const COMMON_SPLIT = CAL_VERSION >= 5;
   /** v6+: canonical source range, coverage hashing and ordered-cell-digest run identity. */

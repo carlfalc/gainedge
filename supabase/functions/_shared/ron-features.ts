@@ -33,9 +33,15 @@ import { detectPatterns, type DetectedPattern } from "./ron-patterns.ts";
  *       are removed from the at-or-before set FIRST and only then are the last 1500
  *       eligible bars taken. v3 filtered after slicing, so live and backfill could
  *       disagree around critical events. Provenance is loader-independent.
+ *  v5 — Phase 2D.1e: identical indicator MATH and identical window contract to v4, but
+ *       the eligibility lineage is quality_version=4, recomputed against the recovered
+ *       genuine XAUUSD 1m source. A new feature_version is mandatory because the eligible
+ *       input series (and therefore recursive indicator state) is now derived from a
+ *       different quality lineage. v1..v4 rows are preserved untouched.
  * v1..v3 rows are preserved for audit; readers must pin a version explicitly.
  */
-export const RON_FEATURE_VERSION = 4;
+export const RON_FEATURE_VERSION = 5;
+export const RON_FEATURE_VERSION_V4 = 4;
 export const RON_FEATURE_VERSION_V3 = 3;
 export const RON_FEATURE_VERSION_V2 = 2;
 
