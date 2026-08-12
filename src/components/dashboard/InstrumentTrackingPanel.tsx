@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { C as CBase } from "@/lib/mock-data";
-const C = { ...CBase, text: "#FFFFFF", sec: "#FFFFFF" };
 import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
@@ -10,6 +9,7 @@ import { useRonSnapshots, useRonOutcomeStats, useRonDataQuality, ronStateFrom, r
 import { assessDataHealth } from "@/lib/market-hours";
 import { classifyRonSession } from "@/lib/ron-sessions";
 
+const C = { ...CBase, text: "#FFFFFF", sec: "#FFFFFF" };
 interface ScanResult {
   id: string; symbol: string; direction: string;
   entry_price: number | null; take_profit: number | null; stop_loss: number | null;
