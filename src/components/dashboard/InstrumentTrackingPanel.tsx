@@ -5,6 +5,7 @@ import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink } from "l
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
 import { useLiveMarketData } from "@/services/broker-data";
+import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
 import {
   useRonSnapshots, useRonOutcomeStats, useRonDataQuality, useRonRebuildStatus,
   ronStateFrom, ronStateColor,
