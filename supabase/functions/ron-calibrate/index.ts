@@ -29,7 +29,7 @@ import {
   CALIBRATION_CONTRACT_V4, CALIBRATION_CONTRACT_V5,
   ADX_BUCKET_BOUNDS, HIERARCHY_POLICY_VERSION,
   ADX_BUCKET_SPEC, CALIBRATION_CONTRACT_V6,
-  definitionPayloadV6, runPayloadV6, orderedCellDigest,
+  definitionPayloadV6, runPayloadV6, orderedCellDigest, deriveSourceBarCutoff,
   type CalibrationInputRow, type Direction, type EligibleObs,
   type RunIdentityV2, type RunIdentityV6,
 } from "../_shared/ron-calibration.ts";
@@ -40,12 +40,7 @@ const TIMEFRAME = "15m";
 const PAGE = 1000;
 const BAR_MINUTES = 15;
 
-/** Immutable market-time boundary derived purely from the frozen instant. */
-function deriveSourceBarCutoff(sourceAsOf: string): string {
-  const grid = BAR_MINUTES * 60_000;
-  const floored = Math.floor(new Date(sourceAsOf).getTime() / grid) * grid;
-  return new Date(floored - (BAR_MINUTES + CALIBRATION_HORIZON_MINUTES) * 60_000).toISOString();
-}
+void BAR_MINUTES;   // grid lives in the shared availability contract
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
