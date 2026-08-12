@@ -383,9 +383,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                           {quarantined ? "NO TRADABLE SETUP" : ron ? ron.state : "DATA BUILDING"}
                         </div>
                         {inst.symbol === "XAUUSD" && dataQuality && (
-                          <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.text }}
-                               title={`Deterministic source-data quality v${CURRENT_RON_QUALITY_VERSION}. Historical detail: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags across all stored history. Raw candle history is never modified.`}>
-                            Current source: {quarantined ? "Quarantined" : "Healthy"}
+                         <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.text }}
+                              title={`Deterministic source-data quality v${CURRENT_RON_QUALITY_VERSION} for source anchor ${dataQuality.currentBar ?? "unavailable"}. Historical detail: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags across all stored history. Raw candle history is never modified.`}>
+                            Current source: {!dataQuality.currentBar ? "Unavailable" : quarantined ? "Quarantined" : "Healthy"}
                           </div>
                         )}
                       </>
