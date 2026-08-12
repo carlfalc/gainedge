@@ -13,9 +13,19 @@ import {
   SAMPLE_FLOORS, brier, ece, round6, sha256, wilson95,
   type Direction,
 } from "./ron-calibration.ts";
-import { RON_STATE_SPEC_VERSION, stateSpecPayload, type RonStateVector } from "./ron-state-spec.ts";
+import {
+  RON_STATE_SPEC_VERSION_V2, stateSpecPayloadV2, type RonStateVector,
+} from "./ron-state-spec.ts";
 
-export const RESEARCH_VERSION = 1;
+export const RESEARCH_VERSION = 2;
+/**
+ * Phase 2D.1a fold contract. Predeclared, data-availability-only continuity rule:
+ * adjacent eligible anchors more than this many clock hours apart start a NEW coverage
+ * epoch. Normal weekend/venue closures for XAUUSD are ~50h; the known genuine 1m
+ * provider outage is ~77 days, so 72h separates the two without touching outcomes.
+ */
+export const COVERAGE_EPOCH_GAP_HOURS = 72;
+export const FOLD_DEFINITION_VERSION = 2;
 /** Outcome horizon in clock minutes — the purge/embargo width at every train→test boundary. */
 export const PURGE_MINUTES = 60;
 export const REQUESTED_FOLDS = 4;
@@ -98,7 +108,7 @@ export function buildCandidateSet(): CandidateSpec[] {
 export function candidateSpecPayload() {
   return [
     "research_version", RESEARCH_VERSION,
-    "state_spec_version", RON_STATE_SPEC_VERSION,
+    "state_spec_version", RON_STATE_SPEC_VERSION_V2,
     "singles", [...SINGLE_CANDIDATES],
     "pairs", PAIR_CANDIDATES.map((p) => [...p]),
     "baseline", [BASELINE_CANDIDATE.name, BASELINE_CANDIDATE.variables,
@@ -108,12 +118,14 @@ export function candidateSpecPayload() {
     "purge_minutes", PURGE_MINUTES,
     "initial_train_fraction", INITIAL_TRAIN_FRACTION,
     "min_test_obs_per_fold", MIN_TEST_OBS_PER_FOLD,
+    "fold_definition_version", FOLD_DEFINITION_VERSION,
+    "coverage_epoch_gap_hours", COVERAGE_EPOCH_GAP_HOURS,
     "logloss_clip", [LOGLOSS_CLIP.lo, LOGLOSS_CLIP.hi],
     "promotion_gate", Object.keys(PROMOTION_GATE).sort()
       .map((k) => [k, (PROMOTION_GATE as Record<string, unknown>)[k]]),
     "bucket_evidence", Object.keys(BUCKET_EVIDENCE).sort()
       .map((k) => [k, (BUCKET_EVIDENCE as Record<string, unknown>)[k]]),
-    stateSpecPayload(),
+    stateSpecPayloadV2(),
   ];
 }
 
@@ -478,7 +490,7 @@ export async function evaluateCandidate(
   spec: CandidateSpec,
   dir: Direction,
   obs: ResearchObs[],
-  plan: FoldPlan,
+  plan: { folds: PurgedFold[] },
   baseline: FoldResult[] | null,
   definitionHash: string,
 ): Promise<{ result: CandidateResult; folds: FoldResult[] }> {
@@ -599,4 +611,266 @@ export async function researchDigest(
     .sort((a, b) => (a.direction < b.direction ? -1 : a.direction > b.direction ? 1 : a.candidate < b.candidate ? -1 : 1))
     .map((r) => [r.direction, r.candidate, r.result_hash]);
   return await sha256([definitionHash, ordered]);
+}
+
+/* ==========================================================================
+ * Phase 2D.1a — gap-aware contiguous coverage epochs (fold_definition_version=2)
+ * ========================================================================== */
+
+const MS_PER_MIN = 60_000;
+const EPOCH_GAP_MS = COVERAGE_EPOCH_GAP_HOURS * 60 * MS_PER_MIN;
+
+export interface CoverageEpoch {
+  epoch: number;
+  start: string;
+  end: string;
+  n_times: number;
+  /** index range into the ordered distinct eligible times, end EXCLUSIVE */
+  start_index: number;
+  end_index: number;
+  max_internal_gap_minutes: number;
+}
+
+/** Split ordered distinct eligible anchor times into contiguous coverage epochs. */
+export function buildCoverageEpochs(times: number[]): CoverageEpoch[] {
+  const out: CoverageEpoch[] = [];
+  if (!times.length) return out;
+  let lo = 0;
+  const push = (a: number, b: number) => {
+    let maxGap = 0;
+    for (let i = a + 1; i < b; i++) maxGap = Math.max(maxGap, times[i] - times[i - 1]);
+    out.push({
+      epoch: out.length + 1,
+      start: new Date(times[a]).toISOString(),
+      end: new Date(times[b - 1]).toISOString(),
+      n_times: b - a,
+      start_index: a,
+      end_index: b,
+      max_internal_gap_minutes: round6(maxGap / MS_PER_MIN),
+    });
+  };
+  for (let i = 1; i < times.length; i++) {
+    if (times[i] - times[i - 1] > EPOCH_GAP_MS) { push(lo, i); lo = i; }
+  }
+  push(lo, times.length);
+  return out;
+}
+
+export interface GapAwareFold extends PurgedFold {
+  coverage_epoch: number;
+  max_internal_gap_minutes: number;
+}
+
+export interface GapAwareFoldPlan {
+  fold_definition_version: number;
+  purge_minutes: number;
+  coverage_epoch_gap_hours: number;
+  initial_train_fraction: number;
+  requested_folds: number;
+  accepted_folds: number;
+  min_test_obs_per_fold: number;
+  distinct_eligible_times: number;
+  epochs: CoverageEpoch[];
+  reduction_reason: string | null;
+  folds: GapAwareFold[];
+}
+
+/** D'Hondt allocation of `total` folds across segments, capped by segment capacity. */
+function allocateFolds(sizes: number[], caps: number[], total: number): number[] {
+  const assigned = sizes.map(() => 0);
+  for (let k = 0; k < total; k++) {
+    let best = -1;
+    let bestQ = -1;
+    for (let i = 0; i < sizes.length; i++) {
+      if (assigned[i] >= caps[i]) continue;
+      const q = sizes[i] / (assigned[i] + 1);
+      if (q > bestQ) { bestQ = q; best = i; }
+    }
+    if (best < 0) break;
+    assigned[best]++;
+  }
+  return assigned;
+}
+
+function maxGapInRange(times: number[], lo: number, hi: number): number {
+  const inside = times.filter((t) => t >= lo && t < hi);
+  let g = 0;
+  for (let i = 1; i < inside.length; i++) g = Math.max(g, inside[i] - inside[i - 1]);
+  return round6(g / MS_PER_MIN);
+}
+
+/**
+ * Deterministic purged expanding-window folds that NEVER cross a coverage-epoch gap.
+ * Test blocks are contiguous within a single epoch; `test_end` is an exclusive bound set
+ * to the last eligible time of the block plus 1ms when the block ends an epoch, so a fold
+ * can never implicitly splice a provider outage into its calendar range.
+ */
+export function buildGapAwareFolds(
+  perDirection: ResearchObs[][],
+  requested = REQUESTED_FOLDS,
+): GapAwareFoldPlan {
+  const times = [...new Set(perDirection.flat().map((o) => o.t))].sort((a, b) => a - b);
+  const epochs = buildCoverageEpochs(times);
+  const plan: GapAwareFoldPlan = {
+    fold_definition_version: FOLD_DEFINITION_VERSION,
+    purge_minutes: PURGE_MINUTES,
+    coverage_epoch_gap_hours: COVERAGE_EPOCH_GAP_HOURS,
+    initial_train_fraction: INITIAL_TRAIN_FRACTION,
+    requested_folds: requested,
+    accepted_folds: 0,
+    min_test_obs_per_fold: MIN_TEST_OBS_PER_FOLD,
+    distinct_eligible_times: times.length,
+    epochs,
+    reduction_reason: null,
+    folds: [],
+  };
+  if (times.length < 2) {
+    plan.reduction_reason = "insufficient eligible anchors";
+    return plan;
+  }
+
+  const startIdx = Math.max(1, Math.floor(times.length * INITIAL_TRAIN_FRACTION));
+  // Test region restricted to each epoch, chronological.
+  const segs = epochs
+    .map((e) => ({ epoch: e.epoch, lo: Math.max(e.start_index, startIdx), hi: e.end_index }))
+    .filter((s) => s.hi > s.lo);
+
+  const countIn = (lo: number, hi: number) =>
+    perDirection.map((obs) => obs.filter((o) => o.t >= lo && o.t < hi).length);
+
+  for (let total = requested; total >= 1; total--) {
+    const sizes = segs.map((s) => s.hi - s.lo);
+    const caps = sizes.map((n) => Math.floor(n / MIN_TEST_OBS_PER_FOLD));
+    const alloc = allocateFolds(sizes, caps, total);
+    if (alloc.reduce((a, b) => a + b, 0) !== total) continue;
+
+    const folds: GapAwareFold[] = [];
+    let ok = true;
+    for (let si = 0; si < segs.length && ok; si++) {
+      const k = alloc[si];
+      if (!k) continue;
+      const { lo, hi, epoch } = segs[si];
+      const span = hi - lo;
+      for (let c = 0; c < k; c++) {
+        const a = lo + Math.floor((span * c) / k);
+        const b = lo + Math.floor((span * (c + 1)) / k);
+        if (b <= a) { ok = false; break; }
+        const testStart = times[a];
+        const testEndExclusive = b < hi ? times[b] : times[b - 1] + 1;
+        const counts = countIn(testStart, testEndExclusive);
+        if (counts.some((n) => n < MIN_TEST_OBS_PER_FOLD)) { ok = false; break; }
+        folds.push({
+          fold: folds.length + 1,
+          coverage_epoch: epoch,
+          train_start: new Date(times[0]).toISOString(),
+          train_end: null,
+          purge_start: new Date(testStart - PURGE_MINUTES * MS_PER_MIN).toISOString(),
+          test_start: new Date(testStart).toISOString(),
+          test_end: new Date(testEndExclusive).toISOString(),
+          max_internal_gap_minutes: maxGapInRange(times, testStart, testEndExclusive),
+        });
+      }
+    }
+    if (!ok || folds.length !== total) continue;
+    // No test block may contain an internal continuity break at/over the epoch threshold.
+    if (folds.some((f) => f.max_internal_gap_minutes > COVERAGE_EPOCH_GAP_HOURS * 60)) continue;
+
+    plan.accepted_folds = total;
+    plan.folds = folds;
+    if (total < requested) {
+      plan.reduction_reason =
+        `reduced from ${requested} to ${total} folds so every contiguous within-epoch test block holds >= ${MIN_TEST_OBS_PER_FOLD} observations in both directions`;
+    }
+    return plan;
+  }
+
+  plan.reduction_reason =
+    `no gap-aware fold configuration reaches ${MIN_TEST_OBS_PER_FOLD} test observations per contiguous within-epoch block`;
+  return plan;
+}
+
+/* ------------------------------- corrected stable-bucket evidence (Defect 3) */
+
+export interface StableBucketRow {
+  candidate: string;
+  bucket: string;
+  folds_present: number;
+  /** Latest fold in which the bucket met its training floor — NOT a pooled pseudo-sample. */
+  train_reference_fold: number;
+  train_n: number;
+  train_rate: number | null;
+  train_wilson_low: number | null;
+  train_wilson_high: number | null;
+  per_fold_train: { fold: number; n_train: number; train_rate: number | null; wilson_low: number | null; wilson_high: number | null }[];
+  /** Pooled across DISJOINT test folds only. */
+  oos_n: number;
+  oos_rate: number | null;
+  pooled_global_rate: number | null;
+  abs_deviation: number;
+}
+
+/**
+ * Top informative stable buckets for one direction.
+ * Expanding walk-forward train sets overlap heavily, so training counts are NEVER pooled;
+ * the headline training reference is the LATEST fold where the bucket met its floor, and
+ * the Wilson interval is computed from that single fold. Only the disjoint OOS test folds
+ * are pooled.
+ */
+export function topBucketsV2(
+  results: { result: CandidateResult; folds: FoldResult[] }[],
+  limit = BUCKET_EVIDENCE.max_rows_per_direction,
+): StableBucketRow[] {
+  const rows: StableBucketRow[] = [];
+
+  for (const { result, folds } of results) {
+    if (result.kind === "baseline_hierarchy") continue;
+    const globalWeighted = (() => {
+      let n = 0, s = 0;
+      for (const f of folds) { if (f.global_train_rate == null) continue; n += f.n_test; s += f.global_train_rate * f.n_test; }
+      return n ? s / n : null;
+    })();
+
+    const agg = new Map<string, {
+      testN: number; testS: number; folds: number;
+      perFold: { fold: number; n_train: number; successes_train: number; train_rate: number | null; wilson_low: number | null; wilson_high: number | null }[];
+    }>();
+    for (const f of folds) for (const b of f.buckets) {
+      if (!b.meets_floor) continue;
+      const a = agg.get(b.bucket) ?? { testN: 0, testS: 0, folds: 0, perFold: [] };
+      a.testN += b.n_test; a.testS += b.successes_test; a.folds++;
+      a.perFold.push({
+        fold: f.fold, n_train: b.n_train, successes_train: b.successes_train,
+        train_rate: b.train_rate, wilson_low: b.wilson_low, wilson_high: b.wilson_high,
+      });
+      agg.set(b.bucket, a);
+    }
+
+    for (const [bucket, a] of [...agg.entries()].sort((x, y) => (x[0] < y[0] ? -1 : 1))) {
+      if (a.testN < BUCKET_EVIDENCE.min_aggregate_test_n) continue;
+      const oos = a.testN ? a.testS / a.testN : null;
+      const ref = a.perFold.reduce((m, p) => (p.fold > m.fold ? p : m), a.perFold[0]);
+      rows.push({
+        candidate: result.candidate, bucket, folds_present: a.folds,
+        train_reference_fold: ref.fold,
+        train_n: ref.n_train,
+        train_rate: ref.train_rate,
+        train_wilson_low: ref.wilson_low,
+        train_wilson_high: ref.wilson_high,
+        per_fold_train: a.perFold.map((p) => ({
+          fold: p.fold, n_train: p.n_train, train_rate: p.train_rate,
+          wilson_low: p.wilson_low, wilson_high: p.wilson_high,
+        })),
+        oos_n: a.testN, oos_rate: oos == null ? null : round6(oos),
+        pooled_global_rate: globalWeighted == null ? null : round6(globalWeighted),
+        abs_deviation: round6(oos == null || globalWeighted == null ? 0 : Math.abs(oos - globalWeighted)),
+      });
+    }
+  }
+
+  return rows
+    .sort((a, b) =>
+      (b.folds_present >= BUCKET_EVIDENCE.prefer_min_folds ? 1 : 0) - (a.folds_present >= BUCKET_EVIDENCE.prefer_min_folds ? 1 : 0) ||
+      b.abs_deviation - a.abs_deviation ||
+      (a.candidate + a.bucket < b.candidate + b.bucket ? -1 : 1))
+    .slice(0, limit);
 }

@@ -212,3 +212,146 @@ export function stateSpecPayload() {
     "session_source", "canonical_calibration_session",
   ];
 }
+
+/* ==========================================================================
+ * RON_STATE_SPEC_V2 — Phase 2D.1a correction.
+ *
+ * V1 above is FROZEN and must never change: research_version=1 results are
+ * reproducible only against it. V2 replaces the single ambiguous `v < b.lt`
+ * helper with EXPLICIT interval descriptors carrying inclusive/exclusive
+ * endpoints, and hashes those comparator semantics into the spec payload.
+ * Everything else (variables, labels, tolerances, unknown handling, pattern
+ * confidence never read) is identical to V1.
+ * ========================================================================== */
+
+export const RON_STATE_SPEC_VERSION_V2 = 2;
+
+/** Explicit interval: null bound = unbounded on that side. */
+export interface IntervalBand {
+  label: string;
+  lower: number | null;
+  upper: number | null;
+  lower_inclusive: boolean;
+  upper_inclusive: boolean;
+}
+
+const band = (
+  label: string,
+  lower: number | null,
+  upper: number | null,
+  lower_inclusive: boolean,
+  upper_inclusive: boolean,
+): IntervalBand => ({ label, lower, upper, lower_inclusive, upper_inclusive });
+
+/** Classify against explicit intervals. Bands are disjoint and exhaustive by construction. */
+export function classifyInterval(v: number | null, bands: readonly IntervalBand[]): string {
+  if (v == null) return UNKNOWN;
+  for (const b of bands) {
+    const okLo = b.lower == null || (b.lower_inclusive ? v >= b.lower : v > b.lower);
+    const okHi = b.upper == null || (b.upper_inclusive ? v <= b.upper : v < b.upper);
+    if (okLo && okHi) return b.label;
+  }
+  return UNKNOWN;
+}
+
+/** RSI: <35 ; [35,45) ; [45,55) ; [55,65) ; >=65 */
+export const RSI_ZONE_BANDS_V2: readonly IntervalBand[] = [
+  band("rsi_lt35", null, 35, false, false),
+  band("rsi_35_45", 35, 45, true, false),
+  band("rsi_45_55", 45, 55, true, false),
+  band("rsi_55_65", 55, 65, true, false),
+  band("rsi_gte65", 65, null, true, false),
+];
+
+/** Stoch: <20 ; [20,40) ; [40,60) ; [60,80) ; >=80 */
+export const STOCH_ZONE_BANDS_V2: readonly IntervalBand[] = [
+  band("stoch_lt20", null, 20, false, false),
+  band("stoch_20_40", 20, 40, true, false),
+  band("stoch_40_60", 40, 60, true, false),
+  band("stoch_60_80", 60, 80, true, false),
+  band("stoch_gte80", 80, null, true, false),
+];
+
+/** Position in day range: <25 ; [25,50) ; [50,75) ; >=75 */
+export const POSITION_DAY_BANDS_V2: readonly IntervalBand[] = [
+  band("pos_lt25", null, 25, false, false),
+  band("pos_25_50", 25, 50, true, false),
+  band("pos_50_75", 50, 75, true, false),
+  band("pos_gte75", 75, null, true, false),
+];
+
+/** Relative volume: <0.8 ; [0.8,1.2] ; >1.2 — 1.2 is INCLUSIVE in the middle band. */
+export const RELATIVE_VOLUME_BANDS_V2: readonly IntervalBand[] = [
+  band("rvol_lt0_8", null, 0.8, false, false),
+  band("rvol_0_8_1_2", 0.8, 1.2, true, true),
+  band("rvol_gt1_2", 1.2, null, false, false),
+];
+
+/** Nearest-level ATR ratio: <=0.5 ; (0.5,1] ; (1,2] ; >2 */
+export const NEAREST_LEVEL_ATR_BANDS_V2: readonly IntervalBand[] = [
+  band("lvl_lte0_5atr", null, 0.5, false, true),
+  band("lvl_0_5_1atr", 0.5, 1, false, true),
+  band("lvl_1_2atr", 1, 2, false, true),
+  band("lvl_gt2atr", 2, null, false, false),
+];
+
+/**
+ * Derive RON_STATE_SPEC_V2 for one anchor. Identical to V1 except that every binned
+ * variable uses explicit inclusive/exclusive interval endpoints.
+ */
+export function deriveStateV2(
+  features: Record<string, unknown> | null | undefined,
+  patterns: PatternLike[] | null | undefined,
+  canonicalSession: string | null | undefined,
+): RonStateVector {
+  const f = features ?? {};
+  const v1 = deriveStateV1(f, patterns, canonicalSession);
+
+  const atrPct = num(f.atr_pct);
+  const dSup = num(f.dist_to_support_pct);
+  const dRes = num(f.dist_to_resistance_pct);
+  const volAvailable = f.volume_available === true;
+
+  let nearestLevelAtrBucket = UNAVAILABLE;
+  if (dSup != null && dRes != null && atrPct != null && atrPct > 0) {
+    const minDist = Math.min(Math.abs(dSup), Math.abs(dRes));
+    nearestLevelAtrBucket = classifyInterval(minDist / atrPct, NEAREST_LEVEL_ATR_BANDS_V2);
+  }
+
+  return {
+    ...v1,
+    rsi_zone: classifyInterval(num(f.rsi14), RSI_ZONE_BANDS_V2),
+    stoch_zone: classifyInterval(num(f.stoch_rsi), STOCH_ZONE_BANDS_V2),
+    position_day_bucket: classifyInterval(num(f.position_in_day_range_pct), POSITION_DAY_BANDS_V2),
+    relative_volume_bucket: !volAvailable
+      ? UNKNOWN
+      : classifyInterval(num(f.relative_volume), RELATIVE_VOLUME_BANDS_V2),
+    nearest_level_atr_bucket: nearestLevelAtrBucket,
+  };
+}
+
+const bandPayload = (bands: readonly IntervalBand[]) =>
+  bands.map((b) => [b.label, b.lower, b.upper, b.lower_inclusive, b.upper_inclusive]);
+
+/**
+ * Ordered, hashable serialisation of RON_STATE_SPEC_V2, including the interval
+ * comparator semantics that V1 failed to hash.
+ */
+export function stateSpecPayloadV2() {
+  return [
+    "ron_state_spec_version", RON_STATE_SPEC_VERSION_V2,
+    "variables", [...RON_STATE_VARIABLES],
+    "tolerances", Object.keys(RON_STATE_TOLERANCES).sort()
+      .map((k) => [k, (RON_STATE_TOLERANCES as Record<string, number>)[k]]),
+    "interval_semantics", "explicit_lower_upper_with_inclusivity_flags",
+    "rsi_zone_bands", bandPayload(RSI_ZONE_BANDS_V2),
+    "stoch_zone_bands", bandPayload(STOCH_ZONE_BANDS_V2),
+    "position_day_bands", bandPayload(POSITION_DAY_BANDS_V2),
+    "relative_volume_bands", bandPayload(RELATIVE_VOLUME_BANDS_V2),
+    "nearest_level_atr_bands", bandPayload(NEAREST_LEVEL_ATR_BANDS_V2),
+    "unknown_label", UNKNOWN,
+    "unavailable_label", UNAVAILABLE,
+    "pattern_confidence_used", false,
+    "session_source", "canonical_calibration_session",
+  ];
+}

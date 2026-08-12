@@ -8,10 +8,17 @@ import {
   deriveStateV1, stateSpecPayload, RON_STATE_VARIABLES, RON_STATE_TOLERANCES,
 } from "../../supabase/functions/_shared/ron-state-spec";
 import {
+  deriveStateV2, stateSpecPayloadV2, RON_STATE_SPEC_VERSION_V2,
+} from "../../supabase/functions/_shared/ron-state-spec";
+import {
   buildPurgedFolds, evaluateCandidateFold, evaluateCandidate, buildCandidateSet,
   candidateSpecPayload, researchDigest, topBuckets, bucketKeyFor,
   PURGE_MINUTES, PROMOTION_GATE, MIN_TEST_OBS_PER_FOLD, BASELINE_CANDIDATE,
   type ResearchObs, type CandidateSpec,
+} from "../../supabase/functions/_shared/ron-research";
+import {
+  buildCoverageEpochs, buildGapAwareFolds, topBucketsV2,
+  COVERAGE_EPOCH_GAP_HOURS, RESEARCH_VERSION,
 } from "../../supabase/functions/_shared/ron-research";
 
 const FEATURES = {
@@ -204,5 +211,136 @@ describe("candidate evaluation, gate and hashes", () => {
       "long", s, plan, base.folds, "d",
     );
     for (const row of topBuckets([c])) expect(row.oos_n).toBeGreaterThanOrEqual(200);
+  });
+});
+/* ------------------------------------------------- Phase 2D.1a corrections */
+
+const lvl = (ratio: number) => ({
+  ...FEATURES, atr_pct: 1, dist_to_support_pct: ratio, dist_to_resistance_pct: 99,
+});
+const rvol = (v: number) => ({ ...FEATURES, volume_available: true, relative_volume: v });
+
+describe("RON_STATE_SPEC_V2 exact interval boundaries", () => {
+  it("is a separate, explicitly versioned spec", () => {
+    expect(RON_STATE_SPEC_VERSION_V2).toBe(2);
+    expect(RESEARCH_VERSION).toBe(2);
+    expect(JSON.stringify(stateSpecPayloadV2())).not.toBe(JSON.stringify(stateSpecPayload()));
+    expect(JSON.stringify(stateSpecPayloadV2())).toContain("interval_semantics");
+    expect(JSON.stringify(stateSpecPayloadV2())).toBe(JSON.stringify(stateSpecPayloadV2()));
+  });
+
+  it("relative volume uses <0.8 ; [0.8,1.2] ; >1.2", () => {
+    expect(deriveStateV2(rvol(0.79), [], "london").relative_volume_bucket).toBe("rvol_lt0_8");
+    expect(deriveStateV2(rvol(0.8), [], "london").relative_volume_bucket).toBe("rvol_0_8_1_2");
+    expect(deriveStateV2(rvol(1.2), [], "london").relative_volume_bucket).toBe("rvol_0_8_1_2");
+    expect(deriveStateV2(rvol(1.2000001), [], "london").relative_volume_bucket).toBe("rvol_gt1_2");
+    // V1 stays frozen with its exclusive-upper behaviour at exactly 1.2
+    expect(deriveStateV1(rvol(1.2), [], "london").relative_volume_bucket).toBe("rvol_gt1_2");
+  });
+
+  it("nearest-level ATR ratio uses <=0.5 ; (0.5,1] ; (1,2] ; >2", () => {
+    expect(deriveStateV2(lvl(0.49), [], "london").nearest_level_atr_bucket).toBe("lvl_lte0_5atr");
+    expect(deriveStateV2(lvl(0.5), [], "london").nearest_level_atr_bucket).toBe("lvl_lte0_5atr");
+    expect(deriveStateV2(lvl(0.51), [], "london").nearest_level_atr_bucket).toBe("lvl_0_5_1atr");
+    expect(deriveStateV2(lvl(1), [], "london").nearest_level_atr_bucket).toBe("lvl_0_5_1atr");
+    expect(deriveStateV2(lvl(1.01), [], "london").nearest_level_atr_bucket).toBe("lvl_1_2atr");
+    expect(deriveStateV2(lvl(2), [], "london").nearest_level_atr_bucket).toBe("lvl_1_2atr");
+    expect(deriveStateV2(lvl(2.01), [], "london").nearest_level_atr_bucket).toBe("lvl_gt2atr");
+    // V1 frozen: exact 0.5 fell into the second bucket
+    expect(deriveStateV1(lvl(0.5), [], "london").nearest_level_atr_bucket).toBe("lvl_0_5_1atr");
+  });
+
+  it("rsi / stoch / position bands keep left-closed right-open semantics", () => {
+    expect(deriveStateV2({ ...FEATURES, rsi14: 35 }, [], "london").rsi_zone).toBe("rsi_35_45");
+    expect(deriveStateV2({ ...FEATURES, rsi14: 34.99 }, [], "london").rsi_zone).toBe("rsi_lt35");
+    expect(deriveStateV2({ ...FEATURES, rsi14: 65 }, [], "london").rsi_zone).toBe("rsi_gte65");
+    expect(deriveStateV2({ ...FEATURES, stoch_rsi: 20 }, [], "london").stoch_zone).toBe("stoch_20_40");
+    expect(deriveStateV2({ ...FEATURES, stoch_rsi: 80 }, [], "london").stoch_zone).toBe("stoch_gte80");
+    expect(deriveStateV2({ ...FEATURES, position_in_day_range_pct: 25 }, [], "london").position_day_bucket).toBe("pos_25_50");
+    expect(deriveStateV2({ ...FEATURES, position_in_day_range_pct: 75 }, [], "london").position_day_bucket).toBe("pos_gte75");
+  });
+
+  it("never imputes missing inputs", () => {
+    const s = deriveStateV2({}, null, null);
+    expect(s.rsi_zone).toBe("unknown");
+    expect(s.relative_volume_bucket).toBe("unknown");
+    expect(s.nearest_level_atr_bucket).toBe("unavailable");
+  });
+});
+
+function gappedSeries(pre: number, post: number, gapHours: number): ResearchObs[] {
+  const a = obsSeries(pre);
+  const lastT = a[a.length - 1].t;
+  const start = lastT + gapHours * 3_600_000;
+  const b = Array.from({ length: post }, (_, i) => {
+    const t = start + i * 15 * 60_000;
+    return { ...a[i % a.length], bar_time: new Date(t).toISOString(), t };
+  });
+  return [...a, ...b];
+}
+
+describe("gap-aware coverage epochs and folds", () => {
+  it("splits the timeline only on breaks beyond the frozen threshold", () => {
+    const s = gappedSeries(3000, 3000, 24 * 77);
+    const times = [...new Set(s.map((o) => o.t))].sort((a, b) => a - b);
+    expect(buildCoverageEpochs(times).length).toBe(2);
+    const weekendish = gappedSeries(3000, 3000, 50);
+    const t2 = [...new Set(weekendish.map((o) => o.t))].sort((a, b) => a - b);
+    expect(buildCoverageEpochs(t2).length).toBe(1);
+    expect(COVERAGE_EPOCH_GAP_HOURS).toBe(72);
+  });
+
+  it("never allocates a test block that spans a coverage-epoch gap", () => {
+    const s = gappedSeries(6000, 3000, 24 * 77);
+    const plan = buildGapAwareFolds([s, s], 4);
+    expect(plan.accepted_folds).toBeGreaterThanOrEqual(1);
+    expect(plan.epochs.length).toBe(2);
+    const epochIds = new Set(plan.folds.map((f) => f.coverage_epoch));
+    expect(epochIds.size).toBeGreaterThan(1);
+    for (const f of plan.folds) {
+      expect(f.max_internal_gap_minutes).toBeLessThanOrEqual(COVERAGE_EPOCH_GAP_HOURS * 60);
+      const lo = new Date(f.test_start).getTime();
+      const hi = new Date(f.test_end!).getTime();
+      expect(s.filter((o) => o.t >= lo && o.t < hi).length).toBeGreaterThanOrEqual(MIN_TEST_OBS_PER_FOLD);
+      const ep = plan.epochs.find((e) => e.epoch === f.coverage_epoch)!;
+      expect(lo).toBeGreaterThanOrEqual(new Date(ep.start).getTime());
+      expect(hi).toBeLessThanOrEqual(new Date(ep.end).getTime() + 1);
+    }
+    expect(buildGapAwareFolds([s, s], 4)).toEqual(plan);
+  });
+
+  it("keeps the 60m purge rule at every boundary", () => {
+    const s = gappedSeries(4000, 3000, 24 * 77);
+    const plan = buildGapAwareFolds([s, s], 4);
+    for (const b of plan.folds) {
+      const r = evaluateCandidateFold(
+        { name: "regime", kind: "single", variables: ["regime"], floor: 200 }, s, b,
+      );
+      expect(new Date(r.train_end!).getTime() + PURGE_MINUTES * 60_000)
+        .toBeLessThanOrEqual(new Date(b.test_start).getTime());
+    }
+  });
+});
+
+describe("corrected stable-bucket accounting", () => {
+  it("uses the latest floor-meeting fold as the train reference instead of pooling", async () => {
+    const s = obsSeries(6000);
+    const plan = buildGapAwareFolds([s, s], 4);
+    const base = await evaluateCandidate(BASELINE_CANDIDATE, "long", s, plan, null, "d");
+    const c = await evaluateCandidate(
+      { name: "regime", kind: "single", variables: ["regime"], floor: 200 },
+      "long", s, plan, base.folds, "d",
+    );
+    const rows = topBucketsV2([c]);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.oos_n).toBeGreaterThanOrEqual(200);
+      const ref = row.per_fold_train.find((p) => p.fold === row.train_reference_fold)!;
+      expect(row.train_n).toBe(ref.n_train);
+      expect(row.train_reference_fold).toBe(Math.max(...row.per_fold_train.map((p) => p.fold)));
+      // never an inflated pseudo-sample
+      const pooled = row.per_fold_train.reduce((a, p) => a + p.n_train, 0);
+      if (row.per_fold_train.length > 1) expect(row.train_n).toBeLessThan(pooled);
+    }
   });
 });
