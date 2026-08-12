@@ -43,3 +43,6 @@ verify_jwt = true
 
 [functions.ron-rebuild]
 verify_jwt = true
+
+[functions.ron-research]
+verify_jwt = true

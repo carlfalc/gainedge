@@ -1409,6 +1409,176 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_research_candidate_results: {
+        Row: {
+          aggregate: Json
+          bucket_stability: Json
+          candidate: string
+          candidate_kind: string
+          created_at: string
+          direction: string
+          folds: Json
+          gate_reasons: Json
+          id: string
+          promising_for_2d2: boolean
+          research_version: number
+          result_hash: string
+          run_id: string
+          sample_floor: number
+          updated_at: string
+          variables: Json
+          vs_baseline: Json | null
+        }
+        Insert: {
+          aggregate?: Json
+          bucket_stability?: Json
+          candidate: string
+          candidate_kind: string
+          created_at?: string
+          direction: string
+          folds?: Json
+          gate_reasons?: Json
+          id?: string
+          promising_for_2d2?: boolean
+          research_version: number
+          result_hash: string
+          run_id: string
+          sample_floor: number
+          updated_at?: string
+          variables?: Json
+          vs_baseline?: Json | null
+        }
+        Update: {
+          aggregate?: Json
+          bucket_stability?: Json
+          candidate?: string
+          candidate_kind?: string
+          created_at?: string
+          direction?: string
+          folds?: Json
+          gate_reasons?: Json
+          id?: string
+          promising_for_2d2?: boolean
+          research_version?: number
+          result_hash?: string
+          run_id?: string
+          sample_floor?: number
+          updated_at?: string
+          variables?: Json
+          vs_baseline?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_research_candidate_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ron_research_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ron_research_runs: {
+        Row: {
+          barrier_atr_mult: number
+          barrier_version: number
+          bucket_evidence: Json
+          candidate_spec_hash: string
+          canonical_rows: number
+          canonical_source_max_bar_time: string | null
+          canonical_source_min_bar_time: string | null
+          created_at: string
+          definition_hash: string
+          eligible_long: number
+          eligible_short: number
+          event_definition: string
+          event_version: number
+          exclusion_breakdown: Json
+          feature_version: number
+          fold_plan: Json
+          horizon_minutes: number
+          id: string
+          label_version: number
+          purge_minutes: number
+          quality_version: number
+          research_version: number
+          results_digest: string
+          run_hash: string
+          source_as_of: string
+          source_bar_cutoff: string
+          state_spec_hash: string
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+        }
+        Insert: {
+          barrier_atr_mult: number
+          barrier_version: number
+          bucket_evidence?: Json
+          candidate_spec_hash: string
+          canonical_rows?: number
+          canonical_source_max_bar_time?: string | null
+          canonical_source_min_bar_time?: string | null
+          created_at?: string
+          definition_hash: string
+          eligible_long?: number
+          eligible_short?: number
+          event_definition: string
+          event_version: number
+          exclusion_breakdown?: Json
+          feature_version: number
+          fold_plan?: Json
+          horizon_minutes: number
+          id?: string
+          label_version: number
+          purge_minutes: number
+          quality_version: number
+          research_version: number
+          results_digest: string
+          run_hash: string
+          source_as_of: string
+          source_bar_cutoff: string
+          state_spec_hash: string
+          status?: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+        }
+        Update: {
+          barrier_atr_mult?: number
+          barrier_version?: number
+          bucket_evidence?: Json
+          candidate_spec_hash?: string
+          canonical_rows?: number
+          canonical_source_max_bar_time?: string | null
+          canonical_source_min_bar_time?: string | null
+          created_at?: string
+          definition_hash?: string
+          eligible_long?: number
+          eligible_short?: number
+          event_definition?: string
+          event_version?: number
+          exclusion_breakdown?: Json
+          feature_version?: number
+          fold_plan?: Json
+          horizon_minutes?: number
+          id?: string
+          label_version?: number
+          purge_minutes?: number
+          quality_version?: number
+          research_version?: number
+          results_digest?: string
+          run_hash?: string
+          source_as_of?: string
+          source_bar_cutoff?: string
+          state_spec_hash?: string
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ron_snapshot_outcomes: {
         Row: {
           anchor_price: number

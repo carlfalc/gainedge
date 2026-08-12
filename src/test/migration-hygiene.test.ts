@@ -36,6 +36,8 @@ const ALLOWLIST = new Set([
   "20260811112827_4b92214e-52e5-4653-893f-8524cc24893b.sql",
   "20260811125005_a8c0be90-3830-4240-9d58-084cfa94c0e9.sql",
   "20260812030646_8e61d41e-97b6-4820-9ae2-562571a1196d.sql",
+  // Phase 2D.1: CREATE FUNCTION body for public.ron_invoke_worker (worker allowlist only).
+  "20260812072740_c3f6ce80-55cd-4304-9c71-5606fef3d117.sql",
 ]);
 
 /** Phase 2B.2 test-harness versions — permanently neutralized, never allowlistable. */
