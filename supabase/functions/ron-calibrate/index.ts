@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("ron_snapshot_outcomes")
-      .select("bar_time, session, atr_at_anchor, coverage_ok, coverage_class, exclusion_reason, long_event_eligible, long_success, short_event_eligible, short_success, barrier_atr_mult, barrier_version, labelled_at")
+      .select("bar_time, session, atr_at_anchor, coverage_ok, coverage_class, exclusion_reason, long_event_eligible, long_success, short_event_eligible, short_success, barrier_atr_mult, barrier_version")
       .eq("symbol", SYMBOL).eq("timeframe", TIMEFRAME)
       .eq("feature_version", FEATURE_V)
       .eq("label_version", LABEL_V)
