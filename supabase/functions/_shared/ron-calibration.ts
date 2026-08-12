@@ -64,11 +64,28 @@ export const CALIBRATION_CONTRACT_V3: CalibrationContract = {
 export const CALIBRATION_CONTRACT_V4: CalibrationContract = {
   calibration_version: 4, feature_version: 4, label_version: 5,
 };
+/**
+ * Phase 2B.1 auditability corrections (same clean lineage as v4: quality v3 + feature v4
+ * + label v5) but materially changed calibration MECHANICS:
+ *   - ONE common chronological split cutoff shared by LONG and SHORT,
+ *   - definition hash covers every actual run parameter (quality version, ADX bucket
+ *     boundaries, sample floors, hierarchy/fallback policy version, frozen source cut).
+ * A new calibration_version is mandatory so v4 history can never be overwritten.
+ */
+export const CALIBRATION_CONTRACT_V5: CalibrationContract = {
+  calibration_version: 5, feature_version: 4, label_version: 5,
+};
 export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   2: CALIBRATION_CONTRACT_V2,
   3: CALIBRATION_CONTRACT_V3,
   4: CALIBRATION_CONTRACT_V4,
+  5: CALIBRATION_CONTRACT_V5,
 };
+
+/** Exact ADX bucket boundaries — part of the definition hash, never implicit. */
+export const ADX_BUCKET_BOUNDS: readonly number[] = [20, 30];
+/** Hierarchy/fallback resolution policy: deepest floor-qualifying cell, else broader, else null. */
+export const HIERARCHY_POLICY_VERSION = 1;
 
 /** A market-closed anchor can never be a user opportunity, so it can never be evidence. */
 export const INELIGIBLE_ANCHOR_SESSIONS: readonly string[] = ["market_closed"];
