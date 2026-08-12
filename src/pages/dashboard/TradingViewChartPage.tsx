@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useProfile } from "@/hooks/use-profile";
 import { supabase } from "@/integrations/supabase/client";
 import ChartTabPane from "@/components/dashboard/ChartTabPane";
@@ -43,6 +44,23 @@ export default function TradingViewChartPage() {
   const initial = loadTabs();
   const [tabs, setTabs] = useState<ChartTab[]>(initial.tabs);
   const [activeId, setActiveId] = useState<string>(initial.activeId);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  /* Deep link: /dashboard/charts?symbol=XAUUSD focuses (or opens) that symbol's tab. */
+  const requestedSymbol = searchParams.get("symbol");
+  useEffect(() => {
+    if (!requestedSymbol) return;
+    setTabs((prev) => {
+      const existing = prev.find((t) => t.symbol === requestedSymbol);
+      if (existing) { setActiveId(existing.id); return prev; }
+      const id = `${requestedSymbol}-manual-${Date.now()}`;
+      setActiveId(id);
+      return [...prev, { id, symbol: requestedSymbol, mode: "manual" as ChartMode }];
+    });
+    // Consume the param so a later manual tab switch isn't overridden, while
+    // keeping this a normal history entry so browser Back works.
+    setSearchParams({}, { replace: true });
+  }, [requestedSymbol, setSearchParams]);
 
   /* persist */
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs)); }, [tabs]);
