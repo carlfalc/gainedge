@@ -58,17 +58,34 @@ describe("pattern interpretation — grounded in real snapshot objects", () => {
     expect(without.strengthens).not.toMatch(/\d/);
   });
 
-  it("summarises conflict from the real multi-pattern snapshot", () => {
+  it("names the actual patterns in the real mixed snapshot", () => {
     expect(summariseStructure([DOUBLE_TOP, DOUBLE_BOTTOM, SUPPORT]))
-      .toBe("Structure is mixed: bearish reversal patterns are being opposed by bullish support.");
+      .toBe("Structure is mixed: bearish Double Top conflicts with bullish Double Bottom and Support.");
   });
 
-  it("summarises agreement and no-direction cases", () => {
-    expect(summariseStructure([DOUBLE_BOTTOM, SUPPORT])).toBe("Detected structures agree: all are bullish.");
+  it("never invents support/reversal wording for other mixes", () => {
+    const s = summariseStructure([
+      { pattern_name: "Bull Flag", direction: "bullish" },
+      { pattern_name: "Resistance", direction: "bearish" },
+    ])!;
+    expect(s).toBe("Structure is mixed: bearish Resistance conflicts with bullish Bull Flag.");
+    expect(s.toLowerCase()).not.toContain("support");
+    expect(s.toLowerCase()).not.toContain("reversal");
+    expect(s.toLowerCase()).not.toContain("continuation");
+  });
+
+  it("summarises agreement using the stored names", () => {
+    expect(summariseStructure([DOUBLE_BOTTOM, SUPPORT]))
+      .toBe("Detected structures agree bullish: Double Bottom + Support.");
     expect(summariseStructure([DOUBLE_TOP, { pattern_name: "Head & Shoulders", direction: "bearish" }]))
-      .toBe("Detected structures agree: all are bearish.");
+      .toBe("Detected structures agree bearish: Double Top + Head & Shoulders.");
+  });
+
+  it("falls back safely for unnamed / unknown-direction patterns", () => {
     expect(summariseStructure([])).toBeNull();
     expect(summariseStructure([{ pattern_name: "X" }])).toBeNull();
+    expect(summariseStructure([{ direction: "bullish" }, { direction: "bearish" }])).toBeNull();
+    expect(summariseStructure([SUPPORT])).toBeNull();
   });
 
   it("explains at most the three patterns the tile lists, in stored order", () => {

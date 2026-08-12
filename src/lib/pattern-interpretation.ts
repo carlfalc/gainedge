@@ -197,19 +197,30 @@ export function explainPattern(p: SnapshotPattern): PatternExplanation {
 
 /**
  * One deterministic sentence describing agreement/conflict across the displayed
- * patterns. Derived only from detected directions.
+ * patterns. Derived ONLY from the stored `pattern_name` + `direction` of the
+ * displayed objects — it never infers semantic categories (support, reversal,
+ * continuation) that the stored names do not literally provide.
  */
+function nameList(names: string[]): string {
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 export function summariseStructure(patterns: SnapshotPattern[]): string | null {
-  const dirs = patterns.map(p => normDirection(p.direction));
-  const bull = dirs.filter(d => d === "bullish").length;
-  const bear = dirs.filter(d => d === "bearish").length;
-  if (bull === 0 && bear === 0) return null;
-  if (bull > 0 && bear > 0) {
-    return "Structure is mixed: bearish reversal patterns are being opposed by bullish support.";
+  const named = (patterns || [])
+    .map(p => ({ name: (p?.pattern_name || "").trim(), dir: normDirection(p?.direction) }))
+    .filter(p => p.name && p.dir !== "unknown");
+  const bull = named.filter(p => p.dir === "bullish").map(p => p.name);
+  const bear = named.filter(p => p.dir === "bearish").map(p => p.name);
+  if (bull.length === 0 && bear.length === 0) return null;
+  if (bull.length > 0 && bear.length > 0) {
+    return `Structure is mixed: bearish ${nameList(bear)} conflicts with bullish ${nameList(bull)}.`;
   }
-  if (bull > 1) return "Detected structures agree: all are bullish.";
-  if (bear > 1) return "Detected structures agree: all are bearish.";
-  return null;
+  const side = bull.length ? "bullish" : "bearish";
+  const list = bull.length ? bull : bear;
+  if (list.length < 2) return null;
+  return `Detected structures agree ${side}: ${list.join(" + ")}.`;
 }
 
 /** Explanations for the same patterns the tile lists (max 3, in stored order). */
