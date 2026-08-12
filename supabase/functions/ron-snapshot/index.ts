@@ -11,6 +11,10 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { computeRonSnapshot, RON_FEATURE_VERSION } from "../_shared/ron-features.ts";
 import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-quality-contract.ts";
+import {
+  buildEligibleSeries, windowAtEligibleIndex,
+  RON_CANONICAL_WINDOW, RON_WINDOW_CONTRACT,
+} from "../_shared/ron-window.ts";
 import type { Candle } from "../_shared/falconer-strategy.ts";
 
 const SYMBOL = "XAUUSD";
@@ -24,7 +28,7 @@ const WARMUP_BARS = 400;      // >= EMA200 + ADX warmup
  * CANONICAL_WINDOW bars ending at (and including) the target bar. Shorter only when
  * less genuine history exists.
  */
-const CANONICAL_WINDOW = 1500;
+const CANONICAL_WINDOW = RON_CANONICAL_WINDOW;
 const BAR_MS = 15 * 60 * 1000;
 const BAR_MINUTES = 15;
 
@@ -103,7 +107,7 @@ Deno.serve(async (req) => {
       const rows: any[] = [];
       let cursor = toIso;
       // page backwards so we never rely on a single 1000-row page
-      for (let page = 0; page < 12; page++) {
+      for (let page = 0; page < 40; page++) {
         let q = supabase
           .from("candle_history")
           .select("timestamp, open, high, low, close, volume, created_at")
@@ -128,12 +132,6 @@ Deno.serve(async (req) => {
           created_at: c.created_at ? new Date(c.created_at).getTime() : null,
         }))
         .sort((a, b) => a.time - b.time);
-    };
-
-    /** Remove every quarantined bar from a candle window. Returns the clean window + count. */
-    const cleanWindow = (win: SourceCandle[]) => {
-      const clean = win.filter((c) => !contract.isQuarantined(c, BAR_MINUTES));
-      return { clean, excluded: win.length - clean.length };
     };
 
     const upsert = async (snaps: any[]) => {
