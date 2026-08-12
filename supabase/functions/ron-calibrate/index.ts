@@ -25,6 +25,7 @@ import {
   calibrateDirection, cellPayloadV2, definitionPayloadV2, eligibleFor, resolvePrediction,
   runPayloadV2, sha256, resolveSourceClockV2, NoGenuineSourceClockError,
   CALIBRATION_CONTRACTS, CALIBRATION_CONTRACT_V3,
+  CALIBRATION_CONTRACT_V4,
   type CalibrationInputRow, type Direction, type EligibleObs,
   type RunIdentityV2,
 } from "../_shared/ron-calibration.ts";
@@ -75,10 +76,12 @@ Deno.serve(async (req) => {
    * Phase 2C.1: calibration_version=3 is canonical (feature v3 + label v4). v2 remains
    * runnable for frozen audit replay and produces byte-identical hashes.
    */
-  const CONTRACT = CALIBRATION_CONTRACTS[Number(body.calibration_version ?? 3)] ?? CALIBRATION_CONTRACT_V3;
+  const CONTRACT = CALIBRATION_CONTRACTS[Number(body.calibration_version ?? 4)] ?? CALIBRATION_CONTRACT_V4;
   const CAL_VERSION = CONTRACT.calibration_version;
   const FEATURE_V = CONTRACT.feature_version;
   const LABEL_V = CONTRACT.label_version;
+  /** Quality lineage pinned per calibration contract; older runs replay their own qv. */
+  const QUALITY_V = CAL_VERSION >= 4 ? 3 : CAL_VERSION === 3 ? 2 : 1;
 
   // ---- frozen source cut -------------------------------------------------
   // v2 contract: the default source clock is GENUINE MARKET TIME — the latest stored
@@ -169,8 +172,7 @@ Deno.serve(async (req) => {
   const qualityCritical = new Set<string>();
   {
     // Central eligibility contract — one shared definition for every RON consumer.
-    const qv = CAL_VERSION >= 3 ? RON_QUALITY_VERSION : 1;
-    const set = await loadQuarantinedBarTimes(supabase, SYMBOL, TIMEFRAME, qv, PAGE);
+    const set = await loadQuarantinedBarTimes(supabase, SYMBOL, TIMEFRAME, QUALITY_V, PAGE);
     for (const iso of set) qualityCritical.add(iso);
   }
   let qualityQuarantinedRows = 0;
@@ -248,7 +250,7 @@ Deno.serve(async (req) => {
     source_bar_cutoff: sourceBarCutoff,
     source_clock: sourceClock,
     ineligible_anchor_sessions: INELIGIBLE_ANCHOR_SESSIONS,
-    quality_version: CAL_VERSION >= 3 ? RON_QUALITY_VERSION : 1,
+    quality_version: QUALITY_V,
     quality_critical_anchors: qualityCritical.size,
     quality_quarantined_rows: qualityQuarantinedRows,
     // > 0 would mean the quality rule changed calibration membership, which requires a NEW
