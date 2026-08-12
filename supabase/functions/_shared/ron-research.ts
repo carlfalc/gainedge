@@ -13,9 +13,19 @@ import {
   SAMPLE_FLOORS, brier, ece, round6, sha256, wilson95,
   type Direction,
 } from "./ron-calibration.ts";
-import { RON_STATE_SPEC_VERSION, stateSpecPayload, type RonStateVector } from "./ron-state-spec.ts";
+import {
+  RON_STATE_SPEC_VERSION_V2, stateSpecPayloadV2, type RonStateVector,
+} from "./ron-state-spec.ts";
 
-export const RESEARCH_VERSION = 1;
+export const RESEARCH_VERSION = 2;
+/**
+ * Phase 2D.1a fold contract. Predeclared, data-availability-only continuity rule:
+ * adjacent eligible anchors more than this many clock hours apart start a NEW coverage
+ * epoch. Normal weekend/venue closures for XAUUSD are ~50h; the known genuine 1m
+ * provider outage is ~77 days, so 72h separates the two without touching outcomes.
+ */
+export const COVERAGE_EPOCH_GAP_HOURS = 72;
+export const FOLD_DEFINITION_VERSION = 2;
 /** Outcome horizon in clock minutes — the purge/embargo width at every train→test boundary. */
 export const PURGE_MINUTES = 60;
 export const REQUESTED_FOLDS = 4;
@@ -98,7 +108,7 @@ export function buildCandidateSet(): CandidateSpec[] {
 export function candidateSpecPayload() {
   return [
     "research_version", RESEARCH_VERSION,
-    "state_spec_version", RON_STATE_SPEC_VERSION,
+    "state_spec_version", RON_STATE_SPEC_VERSION_V2,
     "singles", [...SINGLE_CANDIDATES],
     "pairs", PAIR_CANDIDATES.map((p) => [...p]),
     "baseline", [BASELINE_CANDIDATE.name, BASELINE_CANDIDATE.variables,
@@ -108,12 +118,14 @@ export function candidateSpecPayload() {
     "purge_minutes", PURGE_MINUTES,
     "initial_train_fraction", INITIAL_TRAIN_FRACTION,
     "min_test_obs_per_fold", MIN_TEST_OBS_PER_FOLD,
+    "fold_definition_version", FOLD_DEFINITION_VERSION,
+    "coverage_epoch_gap_hours", COVERAGE_EPOCH_GAP_HOURS,
     "logloss_clip", [LOGLOSS_CLIP.lo, LOGLOSS_CLIP.hi],
     "promotion_gate", Object.keys(PROMOTION_GATE).sort()
       .map((k) => [k, (PROMOTION_GATE as Record<string, unknown>)[k]]),
     "bucket_evidence", Object.keys(BUCKET_EVIDENCE).sort()
       .map((k) => [k, (BUCKET_EVIDENCE as Record<string, unknown>)[k]]),
-    stateSpecPayload(),
+    stateSpecPayloadV2(),
   ];
 }
 
