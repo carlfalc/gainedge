@@ -74,7 +74,11 @@ Deno.serve(async (req) => {
         global: { headers: { Authorization: `Bearer ${token}` } },
       });
       const { data: claims, error: claimsErr } = await authClient.auth.getClaims(token);
-      if (!claimsErr && claims?.claims?.sub) {
+      // AUTH HARDENING (2D.2k-a): a verified `sub` is NOT sufficient. The JWT must also
+      // carry the canonical Supabase `authenticated` role. anon / no-auth tokens are
+      // rejected and never reach `falconer_trades`.
+      const role = (claims?.claims as Record<string, unknown> | undefined)?.role;
+      if (!claimsErr && claims?.claims?.sub && role === "authenticated") {
         subjectBound = true;
         subjectClient = authClient;
         authorized = true;
@@ -148,11 +152,14 @@ Deno.serve(async (req) => {
     // query carries the caller's JWT, so it can only ever return that caller's own rows.
     let signalStateRows: FalconerTradeStateRow[] | null = null;
     if (subjectBound && subjectClient) {
+      const anchorIso = new Date(anchor).toISOString();
       const { data: trades, error: tradeErr } = await subjectClient
         .from("falconer_trades")
         .select(TRADE_STATE_COLUMNS)
         .eq("symbol", instrument).eq("timeframe", timeframe).eq("mode", "live")
-        .lte("opened_at", new Date(anchor).toISOString())
+        .lte("opened_at", anchorIso)
+        .lte("updated_at", anchorIso)
+        .or(`closed_at.is.null,closed_at.lte.${anchorIso}`)
         .order("updated_at", { ascending: false })
         .limit(50);
       if (tradeErr) throw tradeErr;
@@ -197,7 +204,11 @@ Deno.serve(async (req) => {
       source_rows_loaded: events.length,
       source_role: FALCONER_SIGNAL_SOURCE_SPEC_V1.source_contract.role,
       signal_state_contract: FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.status,
-      signal_state_available: subjectBound,
+      subject_binding_verified: subjectBound,
+      // Availability is a DATA fact, not an auth fact: true only when at least one
+      // replay-safe caller-owned row actually exists at the anchor.
+      signal_state_available: (signalStateRows?.length ?? 0) > 0,
+      signal_state_row_exists: (signalStateRows?.length ?? 0) > 0,
       signal_state_binding: subjectBound
         ? "caller_jwt_verified_rls_scoped"
         : "no_verified_subject_fail_closed",
