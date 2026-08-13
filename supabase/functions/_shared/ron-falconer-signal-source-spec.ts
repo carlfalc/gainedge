@@ -393,6 +393,10 @@ export function isMalformedTradeStateRow(r: FalconerTradeStateRow | null | undef
   if (typeof r.opened_at !== "number" || !Number.isFinite(r.opened_at)) return true;
   if (typeof r.updated_at !== "number" || !Number.isFinite(r.updated_at)) return true;
   if (r.closed_at != null && (typeof r.closed_at !== "number" || !Number.isFinite(r.closed_at))) return true;
+  // ordering + terminal-lifecycle integrity: never repaired, never assumed
+  if (r.opened_at > r.updated_at) return true;
+  if (r.closed_at != null && r.closed_at < r.opened_at) return true;
+  if (falconerLifecycleOf(r.status) === "terminal" && r.closed_at == null) return true;
   return false;
 }
 
@@ -421,7 +425,22 @@ export function canonicalFalconerTradeRows(rows: readonly FalconerTradeStateRow[
   return { rows: out, malformed };
 }
 
-/** Frozen as_of rule: newest safe source timestamp, never after the anchor. */
+/**
+ * REPLAY SAFETY (2D.2k-a). A row is only knowable at the anchor when EVERY mutation
+ * timestamp it carries is at or before the anchor. A row opened before the anchor but
+ * updated/closed after it carries FUTURE state and is excluded outright — never clamped.
+ */
+export function isReplaySafeTradeRow(r: FalconerTradeStateRow, anchor: number): boolean {
+  if (r.opened_at > anchor) return false;
+  if (r.updated_at > anchor) return false;
+  if (r.closed_at != null && r.closed_at > anchor) return false;
+  return true;
+}
+
+/**
+ * Frozen as_of rule: the EXACT newest source timestamp of a replay-safe row. No clamp is
+ * applied or needed, because rows with any future timestamp are already excluded.
+ */
 export function falconerStateAsOf(r: FalconerTradeStateRow, anchor: number): number {
   const raw = Math.max(r.opened_at, r.updated_at, r.closed_at ?? Number.NEGATIVE_INFINITY);
   return Math.min(raw, anchor);
