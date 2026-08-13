@@ -430,6 +430,19 @@ export function assertGrounded(
   const allowedTimestamps = new Set<string>([decision.as_of]);
   const allowedNumbers = new Set<string>();
   const allowedDirections = new Set<string>(["neutral", "unknown", "mixed", decision.direction]);
+  /** Every numeric token that literally occurs anywhere in the accepted evidence. */
+  const harvest = (v: unknown) => {
+    if (typeof v === "string") {
+      for (const t of v.match(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g) ?? []) allowedTimestamps.add(t);
+      const stripped = v.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, "");
+      for (const n of stripped.match(/\d+(?:\.\d+)?/g) ?? []) allowedNumbers.add(n);
+    } else if (typeof v === "number") allowedNumbers.add(String(v));
+    else if (Array.isArray(v)) v.forEach(harvest);
+    else if (v && typeof v === "object") {
+      for (const [k, val] of Object.entries(v)) { harvest(k); harvest(val); }
+    }
+  };
+  evidence.forEach(harvest);
   for (const e of evidence) {
     allowedTimestamps.add(e.as_of);
     for (const v of Object.values(e.source_timestamps)) allowedTimestamps.add(v);
