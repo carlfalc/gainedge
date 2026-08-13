@@ -162,7 +162,12 @@ Deno.serve(async (req) => {
 
       const stage = job.stage as Stage;
       try {
-        const res = await runBatch(stage, job.cursor ?? job.range_start ?? null, job.range_end ?? null);
+        const res = await runBatch(
+          stage,
+          job.cursor ?? job.range_start ?? null,
+          job.range_end ?? null,
+          job.source_as_of ?? null,
+        );
         const processed = Number(job.processed ?? 0) + res.advanced;
         const patch: Record<string, unknown> = {
           status: res.done ? "completed" : "running",
