@@ -11,6 +11,8 @@ import {
   FALCONER_SIGNAL_SOURCE_SPEC_V1, FALCONER_SOURCE_LOOKBACK_MINUTES,
   FALCONER_SOURCE_FRESH_MINUTES, FALCONER_SOURCE_MAX_ROWS, FALCONER_EVENT_TYPES_V1,
   FALCONER_CONTEXT_ALLOWED_KEYS, FALCONER_CONTEXT_FORBIDDEN_KEYS,
+  FALCONER_NO_SOURCE_FRESHNESS_MINUTES, FALCONER_LIVE_MANAGED_STATUSES,
+  FALCONER_CLOSED_STATUSES,
   buildFalconerSignalSourceEvidenceV1, falconerSignalSourceSpecHash,
   canonicalFalconerRows, normalizeEventType, FalconerSourceConflictError,
   type FalconerEventRow,
@@ -30,7 +32,7 @@ import { opportunityRiskSpecHash } from "../../supabase/functions/_shared/ron-op
 import { PROMOTED_STATE_VARIABLES } from "../../supabase/functions/_shared/ron-agentic-architecture.ts";
 
 /** EXACT frozen full hash of Falconer Signal Source Spec V1. */
-const FALCONER_SPEC_V1_HASH_PINNED = "92dbed258d498caecfb4c18b2e9537f755d53cc9a47286cea8019280d9dfdb45";
+const FALCONER_SPEC_V1_HASH_PINNED = "b7bc070dfdc47372ef0677959efee03c502e968da59232df3c71397e7571ff8e";
 
 /** EXACT sha256 of the FROZEN Falconer strategy module. It must never change. */
 const FALCONER_STRATEGY_SHA256 =
@@ -44,7 +46,6 @@ const row = (over: Partial<FalconerEventRow> & { id: string }): FalconerEventRow
   event_type: "stale_market_data",
   severity: "warning",
   created_at: ANCHOR - 10 * MIN,
-  context: { candle: "2026-08-13T09:30:00.000Z", timeframe: "15m" },
   ...over,
 });
 
@@ -122,9 +123,16 @@ describe("2D.2j — verified source contract", () => {
   it("names the verified production runtime table and its allowed projection only", () => {
     const c = FALCONER_SIGNAL_SOURCE_SPEC_V1.source_contract;
     expect(c.table).toBe("falconer_engine_events");
-    expect([...c.allowed_fields]).toEqual(["id", "symbol", "event_type", "severity", "created_at", "context"]);
-    expect([...c.forbidden_fields]).toEqual(["user_id", "message"]);
-    expect([...FALCONER_CONTEXT_ALLOWED_KEYS]).toEqual(["candle", "timeframe"]);
+    expect(c.sole_source).toBe(false);
+    expect(c.role).toBe("runtime_event_health_context_only");
+    expect(c.context_selected).toBe(false);
+    expect([...c.allowed_fields]).toEqual(["id", "symbol", "event_type", "severity", "created_at"]);
+    expect([...c.forbidden_fields]).toContain("user_id");
+    expect([...c.forbidden_fields]).toContain("message");
+    expect([...c.forbidden_fields]).toContain("context");
+    expect([...c.forbidden_fields]).toContain("direction");
+    expect([...c.forbidden_fields]).toContain("status");
+    expect([...FALCONER_CONTEXT_ALLOWED_KEYS]).toEqual([]);
     expect([...FALCONER_CONTEXT_FORBIDDEN_KEYS]).toContain("score");
     expect([...FALCONER_CONTEXT_FORBIDDEN_KEYS]).toContain("entry");
     expect(c.strategy_module_imported).toBe(false);
@@ -133,22 +141,42 @@ describe("2D.2j — verified source contract", () => {
     expect(c.wall_clock_allowed).toBe(false);
   });
 
-  it("surfaces only allowed context keys and never geometry or score", async () => {
-    const e = await build([row({
-      id: "a", event_type: "signal_created", severity: "info",
-      context: { candle: "2026-08-13T09:30:00.000Z", timeframe: "15m", score: 82, entry: 3421.5, sl: 3410, tp3: 3450, execution_path: "pineconnector" },
-    })]);
-    const text = JSON.stringify(e);
-    for (const forbidden of ["3421.5", "3410", "3450", "pineconnector", "tp3"]) {
-      expect(text).not.toContain(forbidden);
-    }
-    for (const o of e.observations) {
-      for (const forbidden of ["score", "entry", "sl", "tp", "execution_path"]) {
-        expect(o.key.toLowerCase().split("_")).not.toContain(forbidden);
+  it("declares the Falconer SIGNAL STATE contract as an explicit unaccepted gap (B2)", () => {
+    const g = FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract;
+    expect(g.status).toBe("unaccepted_gap");
+    expect(g.acceptance_decision).toBe("B2");
+    expect(g.signal_state_emitted).toBe(false);
+    expect(g.real_signal_state_table).toBe("falconer_trades");
+    expect(g.real_signal_state_table_is_user_scoped).toBe(true);
+    expect(g.ron_internal_user_subject_contract_exists).toBe(false);
+    expect(g.safe_signal_state_view_or_function_exists).toBe(false);
+    expect(g.service_role_scan_of_user_scoped_trades_allowed).toBe(false);
+    expect(g.engine_events_contain_xauusd_signal_created).toBe(false);
+    expect(g.engine_events_are_sole_signal_truth).toBe(false);
+    expect([...g.engine_live_managed_statuses]).toEqual(["open", "tp1_hit", "tp2_hit", "be_active"]);
+    expect([...g.engine_closed_statuses]).toEqual(["closed_sl", "closed_tp3", "closed_ha_flip"]);
+    expect([...FALCONER_LIVE_MANAGED_STATUSES]).toEqual([...g.engine_live_managed_statuses]);
+    expect([...FALCONER_CLOSED_STATUSES]).toEqual([...g.engine_closed_statuses]);
+    expect(FALCONER_SIGNAL_SOURCE_SPEC_V1.scope_class).toBe("falconer_runtime_event_context_only");
+    const sc = FALCONER_SIGNAL_SOURCE_SPEC_V1.safety_contract;
+    expect(sc.signal_state_emitted).toBe(false);
+    expect(sc.signal_status_emitted).toBe(false);
+    expect(sc.user_identifier_read).toBe(false);
+  });
+
+  it("emits the gap on every envelope and never a signal status, direction or trade field", async () => {
+    for (const e of [await build([]), await build([row({ id: "a" })])]) {
+      expect(obs(e, "falconer_signal_state_contract")?.value_text).toBe("unaccepted_gap");
+      expect(obs(e, "falconer_signal_state_available")?.value_text).toBe("false");
+      expect(obs(e, "falconer_scope_class")?.value_text).toBe("falconer_runtime_event_context_only");
+      const text = JSON.stringify(e).toLowerCase();
+      for (const forbidden of [
+        "falconer_trades", "opened_at", "closed_at", "be_active", "tp1_hit", "tp2_hit",
+        "closed_sl", "closed_tp3", "closed_ha_flip", "user_id", "trigger_type",
+      ]) {
+        expect(text).not.toContain(forbidden);
       }
-      expect(o.value_num).not.toBe(82);
     }
-    expect(obs(e, "newest_runtime_event_source_candle")?.value_text).toBe("2026-08-13T09:30:00.000Z");
   });
 
   it("normalizes unknown event types to the frozen fallback token", () => {
@@ -189,6 +217,14 @@ describe("2D.2j — deterministic producer semantics", () => {
     expect(e.recommendation).toBe("no_action");
     expect(obs(e, "falconer_runtime_state")?.value_text).toBe("insufficient_data");
     expect(JSON.stringify(e).toLowerCase()).not.toContain("wait");
+    // absent source data is NEVER represented as fresh or healthy
+    expect(e.data_health.status).toBe("degraded");
+    expect(e.data_health.completeness).toBe(0);
+    expect(e.data_health.freshness_minutes).toBe(FALCONER_NO_SOURCE_FRESHNESS_MINUTES);
+    expect(e.data_health.issues).toContain("no_source_timestamp_exists");
+    expect(obs(e, "falconer_source_timestamp_exists")?.value_text).toBe("false");
+    expect(e.as_of).toBe(new Date(ANCHOR - FALCONER_SOURCE_LOOKBACK_MINUTES * MIN).toISOString());
+    expect(e.as_of).not.toBe(new Date(ANCHOR).toISOString());
   });
 
   it("rows older than the whole lookback are unrepresentable", async () => {
@@ -248,14 +284,14 @@ describe("2D.2j — deterministic producer semantics", () => {
     const withSignal = await build([
       row({ id: "s", created_at: ANCHOR - 12 * MIN, event_type: "signal_created", severity: "info" }),
     ]);
-    expect(obs(withSignal, "falconer_signal_present_in_lookback")?.value_text).toBe("true");
+    expect(obs(withSignal, "falconer_runtime_signal_created_event_present")?.value_text).toBe("true");
     expect(obs(withSignal, "newest_signal_event_age_minutes")?.value_num).toBe(12);
     expect(obs(withSignal, "runtime_event_signal_created_count")?.value_num).toBe(1);
 
     const without = await build([row({ id: "x" })]);
-    expect(obs(without, "falconer_signal_present_in_lookback")?.value_text).toBe("false");
+    expect(obs(without, "falconer_runtime_signal_created_event_present")?.value_text).toBe("false");
     expect(obs(without, "runtime_event_signal_created_count")?.value_num).toBe(0);
-    expect(without.uncertainty.limitations.join(" | ")).toContain("no WAIT, setup or direction is manufactured");
+    expect(without.uncertainty.limitations.join(" | ")).toContain("no setup or direction is manufactured");
   });
 
   it("provenance cites only the spec and exact source event ids", async () => {
@@ -348,7 +384,8 @@ describe("2D.2j — purity and endpoint safety", () => {
   });
 
   it("the endpoint selects only the frozen allowed projection", () => {
-    expect(fnSrc).toContain('.select("id, symbol, event_type, severity, created_at, context")');
+    expect(fnSrc).toContain('.select("id, symbol, event_type, severity, created_at")');
+    expect(fnSrc).not.toContain("context");
     expect(fnSrc).not.toContain("user_id");
     expect(fnSrc).not.toContain("falconer_trades");
     expect(fnSrc).not.toContain("falconer-strategy");
