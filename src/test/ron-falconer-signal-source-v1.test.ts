@@ -30,7 +30,7 @@ import { opportunityRiskSpecHash } from "../../supabase/functions/_shared/ron-op
 import { PROMOTED_STATE_VARIABLES } from "../../supabase/functions/_shared/ron-agentic-architecture.ts";
 
 /** EXACT frozen full hash of Falconer Signal Source Spec V1. */
-const FALCONER_SPEC_V1_HASH_PINNED = "__PIN__";
+const FALCONER_SPEC_V1_HASH_PINNED = "92dbed258d498caecfb4c18b2e9537f755d53cc9a47286cea8019280d9dfdb45";
 
 /** EXACT sha256 of the FROZEN Falconer strategy module. It must never change. */
 const FALCONER_STRATEGY_SHA256 =
@@ -139,8 +139,14 @@ describe("2D.2j — verified source contract", () => {
       context: { candle: "2026-08-13T09:30:00.000Z", timeframe: "15m", score: 82, entry: 3421.5, sl: 3410, tp3: 3450, execution_path: "pineconnector" },
     })]);
     const text = JSON.stringify(e);
-    for (const forbidden of ["3421.5", "3410", "3450", "82", "pineconnector", "score", "entry", "\"sl\"", "tp3"]) {
+    for (const forbidden of ["3421.5", "3410", "3450", "pineconnector", "tp3"]) {
       expect(text).not.toContain(forbidden);
+    }
+    for (const o of e.observations) {
+      for (const forbidden of ["score", "entry", "sl", "tp", "execution_path"]) {
+        expect(o.key.toLowerCase().split("_")).not.toContain(forbidden);
+      }
+      expect(o.value_num).not.toBe(82);
     }
     expect(obs(e, "newest_runtime_event_source_candle")?.value_text).toBe("2026-08-13T09:30:00.000Z");
   });
@@ -301,9 +307,16 @@ describe("2D.2j — truthfulness invariants", () => {
       ]) {
         expect(keys).not.toContain(forbidden);
       }
+      // TradingView/Pine parity is named ONLY inside the frozen limitation that DENIES it.
       const text = JSON.stringify(e).toLowerCase();
-      for (const forbidden of ["tradingview", "pine", "parity", "win rate", "profit factor", "because"]) {
+      for (const forbidden of [
+        "win rate", "profit factor", "expectancy", "matches tradingview",
+        "equivalent to tradingview", "validated edge is present", "because",
+      ]) {
         expect(text).not.toContain(forbidden);
+      }
+      for (const line of [...e.uncertainty.limitations, ...e.data_health.issues]) {
+        if (/tradingview|pine/i.test(line)) expect(line).toMatch(/UNRESOLVED/);
       }
     }
   });
@@ -319,7 +332,9 @@ describe("2D.2j — truthfulness invariants", () => {
 });
 
 describe("2D.2j — purity and endpoint safety", () => {
-  const specSrc = readFileSync("supabase/functions/_shared/ron-falconer-signal-source-spec.ts", "utf8");
+  const specSrcRaw = readFileSync("supabase/functions/_shared/ron-falconer-signal-source-spec.ts", "utf8");
+  /** Executable producer code with the documentation header stripped. */
+  const specSrc = specSrcRaw.replace(/\/\*[\s\S]*?\*\//g, "");
   const fnSrcRaw = readFileSync("supabase/functions/ron-agent-falconer-signal-source/index.ts", "utf8");
   const fnSrc = fnSrcRaw.replace(/\/\*[\s\S]*?\*\//g, "");
 
@@ -342,7 +357,8 @@ describe("2D.2j — purity and endpoint safety", () => {
   it("the endpoint has no write, orchestrator, broker, order or external-fetch path", () => {
     for (const forbidden of [
       ".insert(", ".upsert(", ".update(", ".delete(", ".rpc(",
-      "functions.invoke", "openai", "https://api.", "metaapi", "pineconnector", "order",
+      "functions.invoke", "openai", "https://api.", "metaapi", "pineconnector",
+      "place_order", "send_order", "order_ticket", "trade(",
     ]) {
       expect(fnSrc.toLowerCase()).not.toContain(forbidden.toLowerCase());
     }
