@@ -184,9 +184,17 @@ export function holidayMap(year: number): Map<string, HolidayRule> {
 /** The holiday rule in force at a NY local instant, if any. */
 export function holidayAt(c: NyClock): HolidayRule | null {
   const h = holidayMap(c.y).get(keyOf(c.y, c.m, c.d));
-  if (!h) return null;
-  const w = CLOSURE_WINDOW[h.kind];
-  return c.minutes >= w.from && c.minutes < w.to ? h : null;
+  if (h) {
+    const w = CLOSURE_WINDOW[h.kind];
+    if (c.minutes >= w.from && c.minutes < w.to) return h;
+  }
+  // Eve of a full-day closure: the evening session never reopens.
+  if (c.minutes >= FULL_DAY_EVE_CLOSED_FROM) {
+    const n = shift(c.y, c.m, c.d, 1);
+    const next = holidayMap(n.y).get(keyOf(n.y, n.m, n.d));
+    if (next && next.kind === "full_day") return next;
+  }
+  return null;
 }
 
 /**
