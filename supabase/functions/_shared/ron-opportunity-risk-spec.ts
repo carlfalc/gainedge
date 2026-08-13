@@ -197,6 +197,12 @@ export async function buildOpportunityRiskEvidenceV1(
 ): Promise<EvidenceEnvelopeV1> {
   const S = OPPORTUNITY_RISK_SPEC_V1;
   const spec_hash = await opportunityRiskSpecHash();
+  // Anchor validity is checked BEFORE any date conversion: `isIsoUtc` is the accepted
+  // canonical validator, so malformed, non-UTC/local, impossible or empty anchors fail
+  // closed deterministically and never reach `toISOString()`.
+  if (!isIsoUtc(input.evaluation_anchor)) {
+    throw new OpportunityRiskContractError("evaluation_anchor_not_utc_iso");
+  }
   const anchorMs = Date.parse(input.evaluation_anchor);
   const at = new Date(anchorMs).toISOString();
 
@@ -258,9 +264,6 @@ export async function buildOpportunityRiskEvidenceV1(
     return envelope("blocked", "critical", "unknown", "no_action");
   };
 
-  if (!Number.isFinite(anchorMs)) {
-    return fail("blocked_contract_mismatch", ["evaluation_anchor_not_utc_iso"]);
-  }
   if (!S.instrument_scope.includes(input.instrument as "XAUUSD")
     || !S.timeframe_scope.includes(input.timeframe as "15m")) {
     return fail("blocked_contract_mismatch", ["out_of_scope_instrument_or_timeframe"]);
