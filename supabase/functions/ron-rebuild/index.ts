@@ -93,7 +93,10 @@ export async function runBatch(
     };
   }
   if (kind === "feature") {
-    const limit = 400;
+    // Phase 2D.1g infra: smaller bounded batches keep each ron-snapshot call well
+    // inside the Postgres statement timeout. Purely operational; feature math,
+    // eligibility semantics and provenance are unchanged.
+    const limit = 150;
     const b = await callWorker("ron-snapshot", {
       mode: "backfill", start: cursor, end: endIso ?? undefined, limit,
     });
@@ -179,6 +182,9 @@ Deno.serve(async (req) => {
           processed,
           batches: Number(job.batches ?? 0) + 1,
           last_error: null,
+          // Transient infra failures (statement timeouts) must not accumulate across
+          // successful batches; the failure budget applies to consecutive failures.
+          error_count: 0,
           last_detail: res.detail,
           completed_at: res.done ? new Date().toISOString() : null,
         };
