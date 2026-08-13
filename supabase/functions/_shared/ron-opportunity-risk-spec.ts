@@ -162,6 +162,20 @@ export interface OpportunityRiskInputV1 {
   trace_id: string;
 }
 
+/**
+ * Deterministic, typed contract rejection of a pure input. Thrown BEFORE any date
+ * conversion so a malformed anchor can never raise a RangeError and can never be
+ * substituted with a wall-clock or invented market timestamp. Evidence V1 requires a
+ * UTC-ISO `as_of`; with no admissible anchor there is no honest `as_of` to emit, so the
+ * producer refuses the input instead of fabricating one.
+ */
+export class OpportunityRiskContractError extends Error {
+  override readonly name = "OpportunityRiskContractError";
+  constructor(readonly reason: string) {
+    super(`opportunity_risk_contract_error: ${reason}`);
+  }
+}
+
 const num = (key: string, value: number, at: string, unit?: string): Observation =>
   ({ key, kind: "measurement", value_num: value, ...(unit ? { unit } : {}), at });
 const state = (key: string, value: string, at: string): Observation =>
