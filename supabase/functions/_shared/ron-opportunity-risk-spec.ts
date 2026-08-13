@@ -23,7 +23,7 @@
  * a trade authorization and never emits geometry in V1.
  */
 import {
-  evidenceHash, evidenceTtlMinutes, validateEvidence, hashCanonical,
+  evidenceHash, evidenceTtlMinutes, isIsoUtc, validateEvidence, hashCanonical,
   type EvidenceEnvelopeV1, type EvidenceStatus, type Observation,
   type QualitativeDirection, type RecommendationV1, type RonAgentId,
 } from "./ron-agent-contracts.ts";
