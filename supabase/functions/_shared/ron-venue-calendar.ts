@@ -93,8 +93,7 @@ const WD: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri
 
 export interface NyClock { y: number; m: number; d: number; dow: number; minutes: number }
 
-/** NY local wall-clock breakdown of a UTC instant. */
-export function nyClock(d: Date): NyClock {
+function nyClockSlow(d: Date): NyClock {
   const p = fmt.formatToParts(d);
   const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
   return {
@@ -102,6 +101,46 @@ export function nyClock(d: Date): NyClock {
     dow: WD[g("weekday")] ?? 0,
     minutes: (Number(g("hour")) % 24) * 60 + Number(g("minute")),
   };
+}
+
+/**
+ * NY local wall-clock breakdown of a UTC instant.
+ *
+ * The IANA offset is resolved once per UTC hour and cached, then minute arithmetic is
+ * exact. DST transitions land on hour boundaries in America/New_York, so this is
+ * identical to formatting every minute — just fast enough to scan a year of minutes.
+ */
+const offsetCache = new Map<number, number>();
+export function nyClock(d: Date): NyClock {
+  const t = d.getTime();
+  const hourKey = Math.floor(t / 3_600_000);
+  let off = offsetCache.get(hourKey);
+  if (off === undefined) {
+    const base = new Date(hourKey * 3_600_000);
+    const c = nyClockSlow(base);
+    const utc = Date.UTC(c.y, c.m - 1, c.d, Math.floor(c.minutes / 60), c.minutes % 60);
+    off = Math.round((utc - hourKey * 3_600_000) / 60_000);
+    if (offsetCache.size > 40_000) offsetCache.clear();
+    offsetCache.set(hourKey, off);
+  }
+  const local = new Date(t + off * 60_000);
+  return {
+    y: local.getUTCFullYear(), m: local.getUTCMonth() + 1, d: local.getUTCDate(),
+    dow: local.getUTCDay(),
+    minutes: local.getUTCHours() * 60 + local.getUTCMinutes(),
+  };
+}
+
+/**
+ * The ACCEPTED base weekly schedule, expressed on the cached NY clock. Byte-equivalent to
+ * `xauVenueOpen()` from ron-sessions.ts (asserted in the 2D.1f test suite).
+ */
+function baseOpen(c: NyClock): boolean {
+  if (c.dow === 6) return false;
+  if (c.dow === 5 && c.minutes >= 17 * 60) return false;
+  if (c.dow === 0 && c.minutes < 17 * 60) return false;
+  if (c.minutes >= 17 * 60 && c.minutes < 18 * 60) return false;
+  return true;
 }
 
 /** Day-of-week of a NY calendar date (proleptic Gregorian, timezone-free). */
@@ -203,19 +242,20 @@ export function holidayAt(c: NyClock): HolidayRule | null {
  */
 export function expectedOpen(t: number | Date): boolean {
   const d = t instanceof Date ? t : new Date(t);
-  if (!xauVenueOpen(d)) return false;
-  return holidayAt(nyClock(d)) === null;
+  const c = nyClock(d);
+  if (!baseOpen(c)) return false;
+  return holidayAt(c) === null;
 }
 
 /** Why an instant is expected-closed (null when it is expected-open). */
 export function expectedClosedReason(t: number | Date): string | null {
   const d = t instanceof Date ? t : new Date(t);
-  if (!xauVenueOpen(d)) {
-    const c = nyClock(d);
+  const c = nyClock(d);
+  if (!baseOpen(c)) {
     if (c.minutes >= 17 * 60 && c.minutes < 18 * 60) return "daily_break_1700_1800_ny";
     return "weekly_closure_fri1700_sun1700_ny";
   }
-  const h = holidayAt(nyClock(d));
+  const h = holidayAt(c);
   return h ? `${h.code}:${h.kind}` : null;
 }
 
