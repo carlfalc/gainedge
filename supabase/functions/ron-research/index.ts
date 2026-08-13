@@ -13,6 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION, CALIBRATION_CONTRACT_V4,
+  CALIBRATION_CONTRACT_V7,
   CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION, CALIBRATION_HORIZON_MINUTES,
   INELIGIBLE_ANCHOR_SESSIONS, NoGenuineSourceClockError, anchorSessionEligible,
   deriveSourceBarCutoff, eligibleFor, resolveSourceClockV2, sha256,
@@ -26,15 +27,24 @@ import {
   BASELINE_CANDIDATE, COVERAGE_EPOCH_GAP_HOURS, FOLD_DEFINITION_VERSION, PROMOTION_GATE,
   PURGE_MINUTES, REQUESTED_FOLDS, RESEARCH_VERSION,
   buildCandidateSet, buildGapAwareFolds, candidateSpecPayload, evaluateCandidate,
-  researchDigest, topBucketsV2,
+  evaluateCandidateFold, researchDigest, topBucketsV2,
   type CandidateResult, type FoldResult, type ResearchObs,
 } from "../_shared/ron-research.ts";
+import {
+  CONTINUITY_CONTRACT_VERSION, FOLD_DEFINITION_VERSION_V3, RESEARCH_VERSION_V3,
+  analyseContinuity, buildVenueAwareFolds, candidateSpecPayloadV3, holdoutFold,
+  v3ContractHashes,
+} from "../_shared/ron-research-v3.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
 const PAGE = 1000;
-const CONTRACT = CALIBRATION_CONTRACT_V4;
-const QUALITY_V = 3;
+
+/** Accepted, frozen input lineage per research version. Never mutated by research. */
+const LINEAGE = {
+  2: { contract: CALIBRATION_CONTRACT_V4, quality_version: 3 },
+  3: { contract: CALIBRATION_CONTRACT_V7, quality_version: 4 },
+} as const;
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -63,6 +73,9 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body allowed */ }
   const folds = Number.isInteger(body.folds) ? Number(body.folds) : REQUESTED_FOLDS;
   const persist = body.persist !== false;
+  const rv = body.research_version === 3 ? RESEARCH_VERSION_V3 : RESEARCH_VERSION;
+  const CONTRACT = LINEAGE[rv as 2 | 3].contract;
+  const QUALITY_V = LINEAGE[rv as 2 | 3].quality_version;
 
   // ---- frozen immutable source clock (identical contract to calibration) --
   let sourceAsOf = typeof body.source_as_of === "string" ? body.source_as_of : null;
