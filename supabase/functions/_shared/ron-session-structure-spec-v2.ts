@@ -344,7 +344,9 @@ export async function buildSessionStructureEvidenceV2(
   const expected_closed_slots = count("expected_closed");
   const expected_open_slots = admissible_slots + critical_excluded_slots + unexpected_missing_slots;
   const native_present_slots = admissible_slots + critical_excluded_slots;
-  const completeness = expected_open_slots === 0 ? 0 : admissible_slots / expected_open_slots;
+  // No expected-open slot in the interval means nothing could be missing: completeness is
+  // 1 by definition. Expected closures never reduce completeness.
+  const completeness = expected_open_slots === 0 ? 1 : admissible_slots / expected_open_slots;
 
   const segments = segmentSlots(slots);
   const last = segments.at(-1) ?? null;
