@@ -392,6 +392,18 @@ export function validateEvidence(e: unknown): string[] {
       }
       const ob = o as Record<string, unknown>;
       if (typeof ob.key !== "string" || !ob.key.length) r.push(`observation_missing_key: ${i}`);
+      else {
+        const nk = ob.key.toLowerCase();
+        if (PROBABILITY_KEY_TOKENS.some((t) => nk.includes(t))) {
+          r.push(`probability_key_forbidden at $.observations[${i}].key`);
+        }
+        if (SECRET_KEY_TOKENS.some((t) => nk.includes(t))) {
+          r.push(`secret_or_private_account_key_forbidden at $.observations[${i}].key`);
+        }
+        if (CAUSAL_KEY_TOKENS.some((t) => nk.includes(t))) {
+          r.push(`causal_claim_key_forbidden at $.observations[${i}].key`);
+        }
+      }
       if (!OBSERVATION_KINDS.includes(ob.kind as ObservationKind)) {
         r.push(`observation_unknown_kind: ${i}:${String(ob.kind)}`);
       }
