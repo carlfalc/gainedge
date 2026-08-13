@@ -16,6 +16,7 @@ import {
   buildFalconerSignalSourceEvidenceV1, falconerSignalSourceSpecHash,
   canonicalFalconerRows, normalizeEventType, FalconerSourceConflictError,
   canonicalFalconerTradeRows, falconerLifecycleOf, falconerStateAsOf,
+  isReplaySafeTradeRow,
   type FalconerEventRow, type FalconerTradeStateRow,
 } from "../../supabase/functions/_shared/ron-falconer-signal-source-spec.ts";
 import {
