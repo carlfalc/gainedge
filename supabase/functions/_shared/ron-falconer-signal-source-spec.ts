@@ -1,11 +1,24 @@
 /**
- * RON Phase 2D.2j-a — FALCONER RUNTIME-EVENT CONTEXT spec V1 (pure producer).
+ * RON Phase 2D.2k — FALCONER SIGNAL SOURCE spec V1 (pure producer).
  *
- * ACCEPTANCE DECISION 2D.2j-a = B2 (SOURCE CONTRACT GAP).
+ * ACCEPTANCE PATH 2D.2k = K1 (EXISTING JWT / RLS SUBJECT-BOUND READ).
  *
- * The registered rank-6 specialist `falconer_signal_source` CANNOT supply Falconer
- * SIGNAL STATE under the current RON internal contract, and this module must never
- * pretend otherwise:
+ * The 2D.2j-a gap is resolved WITHOUT new core orchestrator plumbing and WITHOUT any
+ * service-role scan of user-scoped data:
+ *   - The real production Falconer signal-state source is `falconer_trades`, which is
+ *     user-scoped under RLS (`auth.uid() = user_id` for `authenticated` SELECT).
+ *   - Signal state is therefore only ever read through a client instantiated with the
+ *     CALLER's verified JWT, so Postgres RLS — not application code — is the isolation
+ *     boundary. A request with no verified subject NEVER touches `falconer_trades` and
+ *     reports `signal_state_available = false` (fail closed).
+ *   - The subject is used only to authorize the read. The user id is never accepted from
+ *     the request body, never stored, never passed into this pure producer and never
+ *     represented in evidence, provenance, dependencies or hashes.
+ *   - `falconer_engine_events` remains RUNTIME/EVENT-HEALTH CONTEXT ONLY. For XAUUSD it
+ *     contains exclusively `stale_market_data` rows and ZERO `signal_created` rows, so it
+ *     is provably not a signal-state source and is never treated as one.
+ *
+ * Historic note (2D.2j-a = B2), kept because it constrains this contract:
  *   - The real production Falconer signal-state source is `falconer_trades`, which the
  *     existing truthful badge helper (`src/lib/falconer-signal-state.ts`) and the
  *     Dashboard / Signals readers use. That table is USER-SCOPED under RLS.
@@ -18,9 +31,10 @@
  *     contains exclusively `stale_market_data` rows and ZERO `signal_created` rows, so
  *     it is provably not a signal-state source.
  *
- * Therefore this spec is deliberately narrowed to RUNTIME EVENT CONTEXT ONLY and
- * declares the signal-state contract as an explicit, fail-closed UNACCEPTED GAP. Signal
- * state, direction, status, opened/closed timestamps and trade geometry are NOT emitted.
+ * Under K1 the signal-state contract is ACCEPTED but strictly subject-bound: signal state
+ * is emitted ONLY from caller-owned rows supplied by a JWT/RLS-scoped read, and never
+ * from the runtime event log. With no verified subject the producer stays fail closed and
+ * emits no signal state at all.
  *
  * HARD CONTRACT — enforced by the Evidence V1 validator and by the tests:
  *   - Falconer is STRATEGY CONTEXT ONLY. Never a truth label, calibration truth, outcome
@@ -32,7 +46,10 @@
  *   - No trade geometry (entry, stop, targets, R:R, size) and no routing field. The
  *     source `context` JSON blob is NOT SELECTED AT ALL, because exact safe JSON-key
  *     projection is unavailable and it demonstrably carries forbidden material.
- *   - No user identifier is read, requested or represented.
+ *   - No user identifier is read, requested or represented. The pure producer has no
+ *     user_id field anywhere in its input or output types.
+ *   - Trade geometry, routing, size, PnL, rating, broker ids, payloads, notes, tags and
+ *     features are NEVER selected from `falconer_trades`.
  *   - No causal claim, no prediction, no execution intent. `execution_path` stays
  *     `signal_only`, `allow_live_execution` stays false.
  *   - Envelope `direction` is `neutral` (supported) or `unknown` (otherwise). RON never
@@ -112,19 +129,26 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
   instrument_scope: ["XAUUSD"],
   timeframe_scope: ["15m"],
 
-  scope_class: "falconer_runtime_event_context_only",
+  scope_class: "falconer_subject_bound_signal_state_with_runtime_event_context",
 
   signal_state_contract: {
-    status: "unaccepted_gap",
-    acceptance_decision: "B2",
-    signal_state_emitted: false,
+    status: "accepted_subject_bound_jwt_rls",
+    acceptance_path: "K1",
+    supersedes_acceptance_decision: "B2",
+    signal_state_emitted: true,
+    signal_state_requires_verified_subject: true,
+    subject_binding: "caller_jwt_verified_then_rls_scoped_read",
+    rls_predicate: "auth.uid() = user_id",
+    body_supplied_user_id_accepted: false,
+    default_or_global_user_allowed: false,
+    service_role_read_of_trades_allowed: false,
+    cross_user_merge_allowed: false,
+    user_identifier_in_evidence: false,
     real_signal_state_table: "falconer_trades",
     real_signal_state_table_is_user_scoped: true,
-    ron_internal_user_subject_contract_exists: false,
-    safe_signal_state_view_or_function_exists: false,
-    service_role_scan_of_user_scoped_trades_allowed: false,
-    engine_events_contain_xauusd_signal_created: false,
+    mode_scope: ["live"],
     engine_events_are_sole_signal_truth: false,
+    engine_events_contain_xauusd_signal_created: false,
     existing_production_readers: [
       "src/lib/falconer-signal-state.ts",
       "src/pages/dashboard/DashboardHome.tsx",
@@ -132,7 +156,27 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
     ],
     engine_live_managed_statuses: FALCONER_LIVE_MANAGED_STATUSES,
     engine_closed_statuses: FALCONER_CLOSED_STATUSES,
-    gap_resolution_requires_separately_approved_phase: true,
+    allowed_fields: [
+      "id", "symbol", "timeframe", "mode", "direction", "trigger_type",
+      "status", "opened_at", "closed_at", "updated_at",
+    ],
+    forbidden_fields: [
+      "user_id", "execution_path", "entry_price", "sl_price", "tp1_price", "tp2_price",
+      "tp3_price", "be_level", "qty", "qty1", "qty2", "qty3", "pnl_usd", "setup_score",
+      "commission_usd", "swap_usd", "slippage_points", "metaapi_position_ids",
+      "broker_deal_ids", "raw_alert_payload", "notes", "tags", "features",
+      "actual_entry_price", "actual_exit_price", "backtest_run_id",
+    ],
+    as_of_rule: "max_of_updated_at_closed_at_opened_at_clamped_to_anchor",
+    selection_rule: "newest_caller_owned_live_row_by_as_of_then_opened_at_then_id",
+    future_row_policy: "ignore_rows_opened_after_anchor",
+    unrecognized_status_policy: "fail_closed_no_lifecycle_invented",
+    lifecycle_tokens: ["managed", "terminal", "unrecognized"],
+    fresh_minutes: 60,
+    stale_managed_recommendation: "no_action",
+    terminal_recommendation: "no_action",
+    no_row_representation: "insufficient_data_unknown_no_action_degraded",
+    backtest_or_other_symbol_fallback_allowed: false,
   },
 
   source_contract: {
@@ -199,9 +243,11 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
     expected_value_emitted: false,
     edge_or_rating_emitted: false,
     setup_score_emitted: false,
-    signal_state_emitted: false,
-    signal_status_emitted: false,
+    signal_state_emitted: true,
+    signal_status_emitted: true,
+    signal_state_requires_verified_subject: true,
     user_identifier_read: false,
+    user_identifier_emitted: false,
     win_rate_emitted: false,
     profit_factor_emitted: false,
     trade_geometry_emitted: false,
@@ -213,6 +259,7 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
     execution_path: "signal_only",
     order_or_broker_invocation: false,
     persistence_in_phase_2d2j: false,
+    persistence_in_phase_2d2k: false,
   },
 } as const;
 
@@ -288,6 +335,77 @@ export function canonicalFalconerRows(rows: readonly FalconerEventRow[]): {
 
 /* ------------------------------------------------------------- the producer */
 
+/**
+ * Exactly the accepted `falconer_trades` signal-state projection. There is NO user
+ * identifier, no geometry, no size, no PnL, no rating and no routing field.
+ */
+export interface FalconerTradeStateRow {
+  id: string;
+  symbol: string;
+  timeframe: string;
+  mode: string;
+  direction: string;
+  trigger_type: string;
+  status: string;
+  /** epoch ms */
+  opened_at: number;
+  /** epoch ms, or null while not closed */
+  closed_at: number | null;
+  /** epoch ms */
+  updated_at: number;
+}
+
+export type FalconerLifecycle = "managed" | "terminal" | "unrecognized";
+
+export function falconerLifecycleOf(status: string): FalconerLifecycle {
+  if ((FALCONER_LIVE_MANAGED_STATUSES as readonly string[]).includes(status)) return "managed";
+  if ((FALCONER_CLOSED_STATUSES as readonly string[]).includes(status)) return "terminal";
+  return "unrecognized";
+}
+
+export function isMalformedTradeStateRow(r: FalconerTradeStateRow | null | undefined): boolean {
+  if (!r) return true;
+  for (const k of ["id", "symbol", "timeframe", "mode", "direction", "trigger_type", "status"] as const) {
+    if (typeof r[k] !== "string" || !r[k].length) return true;
+  }
+  if (!["long", "short"].includes(r.direction)) return true;
+  if (typeof r.opened_at !== "number" || !Number.isFinite(r.opened_at)) return true;
+  if (typeof r.updated_at !== "number" || !Number.isFinite(r.updated_at)) return true;
+  if (r.closed_at != null && (typeof r.closed_at !== "number" || !Number.isFinite(r.closed_at))) return true;
+  return false;
+}
+
+function tradeIdentity(r: FalconerTradeStateRow): string {
+  return [r.symbol, r.timeframe, r.mode, r.direction, r.trigger_type, r.status,
+    r.opened_at, r.closed_at ?? "null", r.updated_at].join("|");
+}
+
+/** Exact duplicates collapse; contradictory rows sharing one id FAIL CLOSED. */
+export function canonicalFalconerTradeRows(rows: readonly FalconerTradeStateRow[]): {
+  rows: FalconerTradeStateRow[];
+  malformed: number;
+} {
+  const byId = new Map<string, { row: FalconerTradeStateRow; identity: string }>();
+  let malformed = 0;
+  for (const r of rows ?? []) {
+    if (isMalformedTradeStateRow(r)) { malformed++; continue; }
+    const identity = tradeIdentity(r);
+    const seen = byId.get(r.id);
+    if (!seen) { byId.set(r.id, { row: r, identity }); continue; }
+    if (seen.identity !== identity) throw new FalconerSourceConflictError(r.id);
+  }
+  const out = [...byId.values()].map((v) => v.row).sort((a, b) =>
+    a.opened_at - b.opened_at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  );
+  return { rows: out, malformed };
+}
+
+/** Frozen as_of rule: newest safe source timestamp, never after the anchor. */
+export function falconerStateAsOf(r: FalconerTradeStateRow, anchor: number): number {
+  const raw = Math.max(r.opened_at, r.updated_at, r.closed_at ?? Number.NEGATIVE_INFINITY);
+  return Math.min(raw, anchor);
+}
+
 export interface FalconerSignalSourceInputV1 {
   instrument: string;
   timeframe: string;
@@ -296,6 +414,13 @@ export interface FalconerSignalSourceInputV1 {
   events: FalconerEventRow[];
   run_id: string;
   trace_id: string;
+  /**
+   * Caller-owned safe `falconer_trades` projection, supplied ONLY when the endpoint has
+   * verified a real subject and read the rows under that subject's RLS scope.
+   * `null`/`undefined` means NO subject binding: the producer then emits no signal state.
+   * There is deliberately no user identifier in this contract.
+   */
+  signal_state_rows?: readonly FalconerTradeStateRow[] | null;
 }
 
 const num = (key: string, value: number, at?: string, unit?: string): Observation =>
@@ -323,8 +448,8 @@ export async function buildFalconerSignalSourceEvidenceV1(
     "this specialist performs no strategy evaluation: it only replays what the frozen Falconer runtime already wrote to its production event log",
     "the runtime rating, trade geometry and routing fields present in source rows are deliberately NOT surfaced",
     "the absence of a runtime event is an absence of SOURCE DATA, not proof that the strategy had nothing to say",
-    "FALCONER SIGNAL STATE IS AN UNACCEPTED SOURCE CONTRACT GAP: the real signal-state source is user-scoped and RON holds no accepted internal user/subject contract; no signal state, status, direction or open/close timestamp is emitted here",
-    "this source is a runtime/event-health log only and is NOT the production signal-state source used by the existing Falconer readers",
+    "falconer_engine_events is a runtime/event-health log only and is NEVER signal state",
+    "signal state, when present, is a SUBJECT-BOUND read of the caller's own falconer_trades rows under RLS; it is strategy context only and carries no probability, geometry or execution intent",
     "the source context JSON blob is never selected: exact safe key projection is unsupported and production rows carry geometry and rating material",
   ];
   const issues: string[] = [];
@@ -336,7 +461,6 @@ export async function buildFalconerSignalSourceEvidenceV1(
     num("source_fresh_window_minutes", FALCONER_SOURCE_FRESH_MINUTES, iso(anchor), "minutes"),
     state("falconer_scope_class", FALCONER_SIGNAL_SOURCE_SPEC_V1.scope_class, iso(anchor)),
     state("falconer_signal_state_contract", FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.status, iso(anchor)),
-    state("falconer_signal_state_available", "false", iso(anchor)),
   ];
   const dependencies = [`falconer_runtime_events:${input.instrument}`];
 
@@ -368,6 +492,124 @@ export async function buildFalconerSignalSourceEvidenceV1(
     direction,
     recommendation,
   });
+
+  interface Desc {
+    as_of: number;
+    status: EvidenceStatus;
+    health: "healthy" | "degraded" | "critical";
+    direction: QualitativeDirection;
+    recommendation: RecommendationV1;
+    completeness: number;
+    freshness_minutes: number;
+  }
+
+  // ---- 0. SUBJECT-BOUND SIGNAL STATE (K1). `signal_state_rows == null` means the caller
+  // had no verified subject, so nothing at all is read or claimed about signal state.
+  const subjectBound = input.signal_state_rows != null;
+  observations.push(state("falconer_signal_state_available", subjectBound ? "true" : "false", iso(anchor)));
+  observations.push(state(
+    "falconer_signal_state_mode",
+    subjectBound ? "subject_bound_caller_scoped" : "no_subject_binding_fail_closed",
+    iso(anchor),
+  ));
+
+  let sig: Desc | null = null;
+  if (!subjectBound) {
+    limitations.push("no verified subject accompanied this evaluation, so the user-scoped Falconer signal-state source was never read; signal state is unavailable rather than assumed");
+  } else {
+    dependencies.push(`falconer_signal_state:${input.instrument}:${input.timeframe}`);
+    provenance_refs.push("source:falconer_trades:subject_bound_rls");
+    limitations.push("signal state reflects ONLY the requesting subject's own live Falconer rows as enforced by row-level security; it is not a global or cross-user view");
+
+    let tradeRows: FalconerTradeStateRow[] = [];
+    let tradeMalformed = 0;
+    let tradeConflict = false;
+    try {
+      const c = canonicalFalconerTradeRows(input.signal_state_rows ?? []);
+      tradeRows = c.rows;
+      tradeMalformed = c.malformed;
+    } catch (err) {
+      if (err instanceof FalconerSourceConflictError) tradeConflict = true;
+      else throw err;
+    }
+
+    if (tradeConflict) {
+      issues.push("conflicting_duplicate_signal_state_row_id");
+      limitations.push("two contradictory caller-owned rows share one falconer_trades id; no winner is invented");
+      observations.push(state("falconer_signal_lifecycle", "blocked", iso(anchor)));
+      sig = { as_of: anchor, status: "blocked", health: "critical", direction: "unknown", recommendation: "no_action", completeness: 0, freshness_minutes: 0 };
+    } else {
+      if (tradeMalformed > 0) {
+        issues.push(`malformed_signal_state_rows_excluded:${tradeMalformed}`);
+        observations.push(num("malformed_signal_state_rows_excluded", tradeMalformed, iso(anchor), "rows"));
+      }
+      const eligible = tradeRows.filter((r) =>
+        r.symbol === input.instrument && r.timeframe === input.timeframe
+        && (FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.mode_scope as readonly string[]).includes(r.mode)
+        && r.opened_at <= anchor);
+      observations.push(num("signal_state_rows_eligible", eligible.length, iso(anchor), "rows"));
+
+      if (!eligible.length) {
+        issues.push("no_caller_owned_live_falconer_row");
+        limitations.push("the requesting subject owns no live Falconer row for this instrument and timeframe at this anchor; no backtest row, other symbol or other subject is ever substituted");
+        observations.push(
+          state("falconer_signal_lifecycle", "insufficient_data", iso(anchor)),
+          state("falconer_signal_state_row_exists", "false", iso(anchor)),
+        );
+        sig = {
+          as_of: lookbackStart, status: "insufficient_data", health: "degraded",
+          direction: "unknown", recommendation: "no_action", completeness: 0,
+          freshness_minutes: FALCONER_NO_SOURCE_FRESHNESS_MINUTES,
+        };
+      } else {
+        const scored = eligible
+          .map((r) => ({ r, at: falconerStateAsOf(r, anchor) }))
+          .sort((a, b) => a.at - b.at || a.r.opened_at - b.r.opened_at
+            || (a.r.id < b.r.id ? -1 : a.r.id > b.r.id ? 1 : 0));
+        const picked = scored[scored.length - 1];
+        const row = picked.r;
+        const at = iso(picked.at);
+        const lifecycle = falconerLifecycleOf(row.status);
+        const ageMin = Math.max(0, Math.round((anchor - picked.at) / 60_000));
+
+        source_timestamps.falconer_signal_state_as_of = at;
+        provenance_refs.push(`falconer_trade:${row.id}:${at}`);
+        observations.push(
+          state("falconer_signal_state_row_exists", "true", at),
+          ref("falconer_signal_row_id", row.id, at),
+          state("falconer_signal_status", row.status, at),
+          state("falconer_signal_direction", row.direction, at),
+          state("falconer_trigger_type", row.trigger_type, at),
+          state("falconer_opened_at", iso(row.opened_at), at),
+          state("falconer_closed_at", row.closed_at == null ? "none" : iso(row.closed_at), at),
+          state("falconer_signal_lifecycle", lifecycle, at),
+          num("falconer_signal_state_age_minutes", ageMin, iso(anchor), "minutes"),
+        );
+        limitations.push("falconer_signal_direction is the strategy's own recorded side; it is namespaced, non-binding and never becomes RON's direction");
+
+        if (lifecycle === "unrecognized") {
+          issues.push(`unrecognized_falconer_status:${row.status}`);
+          limitations.push("the stored status is outside the frozen engine taxonomy; no lifecycle meaning is invented");
+          sig = { as_of: picked.at, status: "blocked", health: "critical", direction: "unknown", recommendation: "no_action", completeness: 0, freshness_minutes: ageMin };
+        } else if (ageMin > FALCONER_SOURCE_FRESH_MINUTES) {
+          issues.push(`falconer_signal_state_older_than_fresh_window:${ageMin}m`);
+          sig = { as_of: picked.at, status: "stale", health: "degraded", direction: "unknown", recommendation: "no_action", completeness: 1, freshness_minutes: ageMin };
+        } else if (lifecycle === "terminal") {
+          limitations.push("the newest caller-owned row is in a terminal engine state: it is historical strategy context, never an actionable signal");
+          sig = { as_of: picked.at, status: "supported", health: "healthy", direction: "neutral", recommendation: "no_action", completeness: 1, freshness_minutes: ageMin };
+        } else {
+          sig = { as_of: picked.at, status: "supported", health: "healthy", direction: "neutral", recommendation: "context_only", completeness: 1, freshness_minutes: ageMin };
+        }
+      }
+    }
+  }
+
+  /** Signal state is the primary contract and wins whenever it is subject-bound. */
+  const finish = (ev: Desc): EvidenceEnvelopeV1 => {
+    const d = sig ?? ev;
+    return envelope(d.as_of, d.status, d.health, d.direction, d.recommendation,
+      d.completeness, d.freshness_minutes);
+  };
 
   // ---- 1. canonical rows; contradictory duplicate ids fail closed.
   let canonical: FalconerEventRow[];
@@ -416,8 +658,11 @@ export async function buildFalconerSignalSourceEvidenceV1(
     );
     // as_of is the frozen lookback-start sentinel: the oldest instant this producer could
     // have observed. It is never the anchor, never wall clock, never an invented source time.
-    return envelope(lookbackStart, "insufficient_data", "degraded",
-      "unknown", "no_action", 0, FALCONER_NO_SOURCE_FRESHNESS_MINUTES);
+    return finish({
+      as_of: lookbackStart, status: "insufficient_data", health: "degraded",
+      direction: "unknown", recommendation: "no_action", completeness: 0,
+      freshness_minutes: FALCONER_NO_SOURCE_FRESHNESS_MINUTES,
+    });
   }
 
   const newest = admitted[admitted.length - 1];
@@ -466,12 +711,16 @@ export async function buildFalconerSignalSourceEvidenceV1(
     issues.push(`newest_runtime_event_older_than_fresh_window:${ageMinutes}m`);
     limitations.push("the newest Falconer runtime event is older than the canonical evidence freshness budget; this strategy context is stale, not current");
     observations.push(state("falconer_runtime_state", "stale", newestAt));
-    return envelope(newest.created_at, "stale", "degraded", "unknown", "no_action", 1, ageMinutes);
+    return finish({
+      as_of: newest.created_at, status: "stale", health: "degraded", direction: "unknown",
+      recommendation: "no_action", completeness: 1, freshness_minutes: ageMinutes,
+    });
   }
 
   observations.push(state("falconer_runtime_state", "runtime_events_present", newestAt));
-  return envelope(
-    newest.created_at, "supported", malformed > 0 ? "degraded" : "healthy",
-    "neutral", "context_only", 1, ageMinutes,
-  );
+  return finish({
+    as_of: newest.created_at, status: "supported",
+    health: malformed > 0 ? "degraded" : "healthy", direction: "neutral",
+    recommendation: "context_only", completeness: 1, freshness_minutes: ageMinutes,
+  });
 }

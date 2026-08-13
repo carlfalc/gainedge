@@ -16,8 +16,12 @@ import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-qu
 import {
   buildFalconerSignalSourceEvidenceV1, falconerSignalSourceSpecHash,
   FALCONER_SIGNAL_SOURCE_SPEC_V1, FALCONER_SOURCE_LOOKBACK_MINUTES,
-  FALCONER_SOURCE_MAX_ROWS, type FalconerEventRow,
+  FALCONER_SOURCE_MAX_ROWS, type FalconerEventRow, type FalconerTradeStateRow,
 } from "../_shared/ron-falconer-signal-source-spec.ts";
+
+/** Safe, explicit signal-state projection. Never `*`, never a private/geometry field. */
+const TRADE_STATE_COLUMNS =
+  "id, symbol, timeframe, mode, direction, trigger_type, status, opened_at, closed_at, updated_at";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,14 +52,36 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
   if (!token) return json({ error: "unauthorized: internal service-role endpoint" }, 401);
 
-  let authorized = !!serviceKey && timingSafeEq(token, serviceKey);
+  const isServiceRole = !!serviceKey && timingSafeEq(token, serviceKey);
+  let authorized = isServiceRole;
   if (!authorized) {
     const probe = createClient(supabaseUrl, token, { auth: { persistSession: false } });
     const { error: probeErr } = await probe
       .from("ron_agent_registry").select("agent_id").limit(1);
     authorized = !probeErr;
   }
-  if (!authorized) return json({ error: "unauthorized: internal service-role endpoint" }, 401);
+
+  // ---- SUBJECT BINDING (K1). A verified end-user JWT — never a body-supplied id, never a
+  // default/global user — is the ONLY way user-scoped Falconer signal state is reachable,
+  // and the read runs through that caller's JWT so Postgres RLS is the isolation boundary.
+  let subjectBound = false;
+  let subjectClient: ReturnType<typeof createClient> | null = null;
+  if (!isServiceRole) {
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    if (anonKey) {
+      const authClient = createClient(supabaseUrl, anonKey, {
+        auth: { persistSession: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: claims, error: claimsErr } = await authClient.auth.getClaims(token);
+      if (!claimsErr && claims?.claims?.sub) {
+        subjectBound = true;
+        subjectClient = authClient;
+        authorized = true;
+      }
+    }
+  }
+  if (!authorized) return json({ error: "unauthorized: service-role or authenticated subject required" }, 401);
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body allowed */ }
@@ -67,7 +93,10 @@ Deno.serve(async (req) => {
     return json({ error: "out_of_scope_for_falconer_signal_source_spec_v1", instrument, timeframe }, 400);
   }
 
-  const db = createClient(supabaseUrl, serviceKey || token, { auth: { persistSession: false } });
+  // Non-subject reads use the internal client; subject callers read everything under RLS.
+  const db = isServiceRole || !subjectClient
+    ? createClient(supabaseUrl, serviceKey || token, { auth: { persistSession: false } })
+    : subjectClient;
 
   try {
     // ---- evaluation anchor: explicit (replay) or the newest SAFE COMPLETED XAU 15m bar
@@ -115,9 +144,35 @@ Deno.serve(async (req) => {
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
+    // Subject-bound signal-state read. RLS ("auth.uid() = user_id") is the boundary: this
+    // query carries the caller's JWT, so it can only ever return that caller's own rows.
+    let signalStateRows: FalconerTradeStateRow[] | null = null;
+    if (subjectBound && subjectClient) {
+      const { data: trades, error: tradeErr } = await subjectClient
+        .from("falconer_trades")
+        .select(TRADE_STATE_COLUMNS)
+        .eq("symbol", instrument).eq("timeframe", timeframe).eq("mode", "live")
+        .lte("opened_at", new Date(anchor).toISOString())
+        .order("updated_at", { ascending: false })
+        .limit(50);
+      if (tradeErr) throw tradeErr;
+      signalStateRows = (trades ?? []).map((r: Record<string, unknown>) => ({
+        id: String(r.id),
+        symbol: String(r.symbol ?? ""),
+        timeframe: String(r.timeframe ?? ""),
+        mode: String(r.mode ?? ""),
+        direction: String(r.direction ?? ""),
+        trigger_type: String(r.trigger_type ?? ""),
+        status: String(r.status ?? ""),
+        opened_at: new Date(String(r.opened_at)).getTime(),
+        closed_at: r.closed_at == null ? null : new Date(String(r.closed_at)).getTime(),
+        updated_at: new Date(String(r.updated_at)).getTime(),
+      }));
+    }
+
     const build = () => buildFalconerSignalSourceEvidenceV1({
       instrument, timeframe, evaluation_anchor: anchor, events,
-      run_id: runId, trace_id: traceId,
+      run_id: runId, trace_id: traceId, signal_state_rows: signalStateRows,
     });
 
     const envelope = await build();
@@ -142,7 +197,11 @@ Deno.serve(async (req) => {
       source_rows_loaded: events.length,
       source_role: FALCONER_SIGNAL_SOURCE_SPEC_V1.source_contract.role,
       signal_state_contract: FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.status,
-      signal_state_available: false,
+      signal_state_available: subjectBound,
+      signal_state_binding: subjectBound
+        ? "caller_jwt_verified_rls_scoped"
+        : "no_verified_subject_fail_closed",
+      signal_state_rows_loaded: signalStateRows?.length ?? 0,
       registered_ttl_minutes: evidenceTtlMinutes("falconer_signal_source", timeframe),
       evidence: sealed,
       numeric_probability: null,
