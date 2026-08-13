@@ -113,6 +113,20 @@ describe("migration hygiene", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("no migration keeps an executable calibration-validation specialist invocation", () => {
+    // Phase 2D.2c: the calibration/model-validation specialist is read-only, but a
+    // replayable one-off invocation harness is still forbidden — production smokes are
+    // triggered ephemerally, never from a migration.
+    const offenders: string[] = [];
+    for (const f of files) {
+      const code = read(f).split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").toLowerCase();
+      if (code.includes("ron-agent-calibration-validation")) {
+        offenders.push(`${f} -> executable reference to the calibration-validation specialist`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("the Phase 2D.2b-CORR worker allow-list migration is definition-only and service-role scoped", () => {
     const sql = read("20260813090242_525bbba0-acde-406d-8eb7-e5d27af09b0f.sql");
     expect(sql).toContain("CREATE OR REPLACE FUNCTION public.ron_invoke_worker");
