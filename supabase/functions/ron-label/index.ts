@@ -20,7 +20,7 @@ import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-qu
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
-const DEFAULT_LABEL_VERSION = 6;   // v1..v5 rows are preserved untouched for audit
+const DEFAULT_LABEL_VERSION = 7;   // v1..v6 rows are preserved untouched for audit
 const BAR_MS = 15 * 60 * 1000;
 const BAR_MINUTES = 15;
 const RES_MS = 60 * 1000;              // 1-minute forward resolution
@@ -60,14 +60,15 @@ Deno.serve(async (req) => {
     : DEFAULT_HORIZONS;
   const maxHorizon = Math.max(...horizons);
   const requested = Number(body.label_version ?? DEFAULT_LABEL_VERSION);
-  const LABEL_VERSION = [1, 2, 3, 4, 5, 6].includes(requested) ? requested : DEFAULT_LABEL_VERSION;
+  const LABEL_VERSION = [1, 2, 3, 4, 5, 6, 7].includes(requested) ? requested : DEFAULT_LABEL_VERSION;
   /**
    * Provenance contract: label v4 is derived ONLY from feature_version=3 snapshots (whose
    * input windows are quarantine-free). Legacy label versions stay pinned to feature v2
    * so previously stored rows remain reproducible byte-for-byte. Phase 2D.1e adds
-   * label v6 on feature v5 (quality v4 lineage, recovered genuine 1m source).
+   * label v6 on feature v5 (quality v4 lineage, recovered genuine 1m source), and Phase
+   * 2D.1g adds label v7 on feature v6 (quality v5 lineage, recovered native 15m source).
    */
-  const FEATURE_VERSION = LABEL_VERSION >= 6 ? 5 : LABEL_VERSION >= 5 ? 4 : LABEL_VERSION >= 4 ? 3 : 2;
+  const FEATURE_VERSION = LABEL_VERSION >= 7 ? 6 : LABEL_VERSION >= 6 ? 5 : LABEL_VERSION >= 5 ? 4 : LABEL_VERSION >= 4 ? 3 : 2;
 
   /**
    * `data_end` truncates the visible future and exists ONLY for the no-lookahead

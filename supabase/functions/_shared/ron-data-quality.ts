@@ -34,8 +34,15 @@
  *        2026-05-15 -> 2026-07-31 window were produced when no 1m children existed; v4
  *        recomputes child coverage from the now-present genuine minutes instead of
  *        copying the old verdict. v1..v3 rows are preserved untouched.
+ *   v5 — Phase 2D.1g: IDENTICAL detector semantics to v3/v4 (multi-finding, same rules,
+ *        same evidence shape), re-evaluated after the accepted Phase 2D.1f-c recovery of
+ *        552 genuine broker-native XAUUSD 15m bars. Those bars simply did not exist as
+ *        source rows when qv4 ran, so qv4 could not classify them at all. v5 is a pure
+ *        additive re-evaluation over the current genuine native-15m + genuine-1m
+ *        evidence. No source candle is rewritten and v1..v4 rows are preserved untouched.
  */
-export const RON_QUALITY_VERSION = 4;
+export const RON_QUALITY_VERSION = 5;
+export const RON_QUALITY_VERSION_V4 = 4;
 export const RON_QUALITY_VERSION_V3 = 3;
 export const RON_QUALITY_VERSION_V2 = 2;
 export const RON_QUALITY_VERSION_V1 = 1;
