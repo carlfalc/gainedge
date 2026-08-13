@@ -1,0 +1,1 @@
+select cron.unschedule('ron-calibrate-v7-once') where exists (select 1 from cron.job where jobname='ron-calibrate-v7-once');
