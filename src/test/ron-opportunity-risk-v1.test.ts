@@ -328,7 +328,7 @@ describe("2D.2i-a — invalid evaluation anchors fail closed without throwing Ra
       const a = await attempt().catch((e) => e);
       const b = await attempt().catch((e) => e);
       expect(a).toBeInstanceOf(OpportunityRiskContractError);
-      expect((a as OpportunityRiskContractError).name).toBe("RangeErrorGuard".replace("RangeErrorGuard", "OpportunityRiskContractError"));
+      expect((a as OpportunityRiskContractError).name).toBe("OpportunityRiskContractError");
       expect((a as Error).constructor.name).not.toBe("RangeError");
       expect((a as OpportunityRiskContractError).reason).toBe("evaluation_anchor_not_utc_iso");
       expect((b as Error).message).toBe((a as Error).message);
