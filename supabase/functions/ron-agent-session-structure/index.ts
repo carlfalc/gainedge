@@ -134,6 +134,10 @@ Deno.serve(async (req) => {
         instrument, timeframe, as_of: asOf, bars,
         isQuarantined: (b, m) => contract.isQuarantined(b, m),
         run_id: runId, trace_id: traceId,
+        // FROZEN: the persisted V1 audit artifact was sealed with these refs. They are
+        // wrong (decorative) which is exactly why V2 exists, but they must stay on the
+        // V1 replay path or the accepted evidence_hash becomes unreproducible.
+        lineage_refs: [`feature_version:6`, `label_version:7`],
         newest_source_bar: newestSourceBar,
       })
       : buildSessionStructureEvidenceV2({
