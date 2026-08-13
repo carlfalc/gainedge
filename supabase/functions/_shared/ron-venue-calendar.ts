@@ -38,6 +38,13 @@ export interface HolidayRule {
 }
 
 /**
+ * A `full_day` holiday also suppresses the PRECEDING evening session: the venue closes at
+ * 17:00 NY on the eve and does not reopen at 18:00 NY, resuming only at 18:00 NY on the
+ * holiday itself. `early_close_1300` days keep their normal preceding evening session.
+ */
+const FULL_DAY_EVE_CLOSED_FROM = 18 * 60;
+
+/**
  * FROZEN holiday set for the CME/COMEX-linked XAUUSD venue.
  * `early_close_1300` = 13:00 NY halt with the normal 18:00 NY reopen (the standard COMEX
  * US-holiday session). `full_day` = no trading until 18:00 NY.
