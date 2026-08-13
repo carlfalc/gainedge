@@ -1,8 +1,12 @@
 /**
- * RON Phase 2D.2b — internal endpoint for the session_market_structure specialist.
+ * RON Phase 2D.2b / 2D.2b-CORR — internal endpoint for the session_market_structure
+ * specialist.
  *
  * Service-role only. Reads genuine broker-native XAUUSD 15m closed bars, applies the
  * accepted central quality contract, and returns ONE sealed Evidence V1 envelope.
+ *
+ * Spec V2 is the DEFAULT. Spec V1 remains reachable with `spec_version: 1` purely so the
+ * already-persisted V1 audit artifact stays replayable; it is never written to again.
  *
  * It never places a trade, never calls Falconer, never calls an LLM, never invents a bar,
  * and (by default) never persists — no orchestrator decision is produced from a single
@@ -15,6 +19,10 @@ import {
   buildSessionStructureEvidence, sessionStructureSpecHash,
   SESSION_STRUCTURE_SPEC_V1, type StructureBar,
 } from "../_shared/ron-session-structure-spec.ts";
+import {
+  buildSessionStructureEvidenceV2, sessionStructureSpecHashV2,
+  SESSION_STRUCTURE_SPEC_V2,
+} from "../_shared/ron-session-structure-spec-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,8 +71,10 @@ Deno.serve(async (req) => {
 
   const instrument = typeof body.instrument === "string" ? body.instrument : SYMBOL;
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : TIMEFRAME;
-  if (!SESSION_STRUCTURE_SPEC_V1.instrument_scope.includes(instrument as "XAUUSD")
-    || !SESSION_STRUCTURE_SPEC_V1.timeframe_scope.includes(timeframe as "15m")) {
+  const specVersion = body.spec_version === 1 ? 1 : 2;
+  const spec = specVersion === 1 ? SESSION_STRUCTURE_SPEC_V1 : SESSION_STRUCTURE_SPEC_V2;
+  if (!spec.instrument_scope.includes(instrument as "XAUUSD")
+    || !spec.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_spec_v1", instrument, timeframe }, 400);
   }
 
@@ -96,7 +106,7 @@ Deno.serve(async (req) => {
     }
 
     // Bounded lookback only — never an unbounded history scan.
-    const fromIso = new Date(asOf - (SESSION_STRUCTURE_SPEC_V1.lookback_bars_max + 200) * BAR_MS).toISOString();
+    const fromIso = new Date(asOf - (spec.lookback_bars_max + 200) * BAR_MS).toISOString();
     const { data: rows, error } = await db
       .from("candle_history")
       .select("timestamp, open, high, low, close, created_at")
@@ -116,26 +126,31 @@ Deno.serve(async (req) => {
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
-    const envelope = await buildSessionStructureEvidence({
-      instrument, timeframe, as_of: asOf, bars,
-      isQuarantined: (b, m) => contract.isQuarantined(b, m),
-      run_id: runId, trace_id: traceId,
-      lineage_refs: [`feature_version:6`, `label_version:7`],
-      newest_source_bar: newestSourceBar,
-    });
+    // Lineage refs cite ONLY what this specialist actually reads. It queries genuine
+    // candle rows and the central quality contract; it never reads features, labels or
+    // calibration, so those must not be advertised as provenance.
+    const build = () => (specVersion === 1
+      ? buildSessionStructureEvidence({
+        instrument, timeframe, as_of: asOf, bars,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+      })
+      : buildSessionStructureEvidenceV2({
+        instrument, timeframe, as_of: asOf, bars,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+      }));
+
+    const envelope = await build();
 
     const errs = validateEvidence(envelope);
     if (errs.length) return json({ error: "evidence_contract_violation", reasons: errs }, 500);
     const sealed = await sealEvidence(envelope);
 
     // Determinism proof on every call: rebuild and compare the content hash.
-    const replay = await sealEvidence(await buildSessionStructureEvidence({
-      instrument, timeframe, as_of: asOf, bars,
-      isQuarantined: (b, m) => contract.isQuarantined(b, m),
-      run_id: runId, trace_id: traceId,
-      lineage_refs: [`feature_version:6`, `label_version:7`],
-      newest_source_bar: newestSourceBar,
-    }));
+    const replay = await sealEvidence(await build());
     if (replay.evidence_hash !== sealed.evidence_hash) {
       return json({ error: "nondeterministic_specialist" }, 500);
     }
@@ -163,8 +178,8 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      spec_version: SESSION_STRUCTURE_SPEC_V1.spec_version,
-      spec_hash: await sessionStructureSpecHash(),
+      spec_version: spec.spec_version,
+      spec_hash: specVersion === 1 ? await sessionStructureSpecHash() : await sessionStructureSpecHashV2(),
       quality_version: RON_QUALITY_VERSION,
       evidence: sealed,
       numeric_probability: null,
