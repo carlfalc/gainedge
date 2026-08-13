@@ -32,7 +32,7 @@ import { opportunityRiskSpecHash } from "../../supabase/functions/_shared/ron-op
 import { PROMOTED_STATE_VARIABLES } from "../../supabase/functions/_shared/ron-agentic-architecture.ts";
 
 /** EXACT frozen full hash of Falconer Signal Source Spec V1. */
-const FALCONER_SPEC_V1_HASH_PINNED = "b7bc070dfdc47372ef0677959efee03c502e968da59232df3c71397e7571ff8e";
+const FALCONER_SPEC_V1_HASH_PINNED = "f8b75ea72fdfec0cad24c159d7f2f33f15937b1d25c37bc9a05af2fe3d3b5048";
 
 /** EXACT sha256 of the FROZEN Falconer strategy module. It must never change. */
 const FALCONER_STRATEGY_SHA256 =
