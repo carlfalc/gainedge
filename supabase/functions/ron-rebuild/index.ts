@@ -24,7 +24,11 @@ const json = (b: unknown, s = 200) =>
  * Stage names are `<kind>_v<version>` so a new versioned lineage (Phase 2D.1e:
  * quality_v4 -> feature_v5 -> label_v6) is driven by data, never by editing this list.
  */
-const STAGE_ORDER = ["quality_v3", "feature_v4", "label_v5", "quality_v4", "feature_v5", "label_v6"] as const;
+const STAGE_ORDER = [
+  "quality_v3", "feature_v4", "label_v5",
+  "quality_v4", "feature_v5", "label_v6",
+  "quality_v5", "feature_v6", "label_v7",
+] as const;
 type Stage = string;
 
 /**
