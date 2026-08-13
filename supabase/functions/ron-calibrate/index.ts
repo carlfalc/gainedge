@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
   const FEATURE_V = CONTRACT.feature_version;
   const LABEL_V = CONTRACT.label_version;
   /** Quality lineage pinned per calibration contract; older runs replay their own qv. */
-  const QUALITY_V = CAL_VERSION >= 7 ? 4 : CAL_VERSION >= 4 ? 3 : CAL_VERSION === 3 ? 2 : 1;
+  const QUALITY_V = CAL_VERSION >= 8 ? 5 : CAL_VERSION >= 7 ? 4 : CAL_VERSION >= 4 ? 3 : CAL_VERSION === 3 ? 2 : 1;
   /** v5+: one common cutoff for both directions; v2..v4 replay their per-direction split. */
   const COMMON_SPLIT = CAL_VERSION >= 5;
   /** v6+: canonical source range, coverage hashing and ordered-cell-digest run identity. */
