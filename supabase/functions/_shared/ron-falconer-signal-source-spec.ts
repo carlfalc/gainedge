@@ -526,22 +526,6 @@ export function readFalconerAvailabilityFacts(
   return facts;
 }
 
-interface FalconerSignalSourceInputV1Legacy {
-  instrument: string;
-  timeframe: string;
-  /** epoch ms of the explicit, source-grounded evaluation anchor. */
-  evaluation_anchor: number;
-  events: FalconerEventRow[];
-  run_id: string;
-  trace_id: string;
-  /**
-   * Caller-owned safe `falconer_trades` projection, supplied ONLY when the endpoint has
-   * verified a real subject and read the rows under that subject's RLS scope.
-   * `null`/`undefined` means NO subject binding: the producer then emits no signal state.
-   * There is deliberately no user identifier in this contract.
-   */
-  signal_state_rows?: readonly FalconerTradeStateRow[] | null;
-}
 
 const num = (key: string, value: number, at?: string, unit?: string): Observation =>
   ({ key, kind: "measurement", value_num: value, ...(unit ? { unit } : {}), ...(at ? { at } : {}) });
