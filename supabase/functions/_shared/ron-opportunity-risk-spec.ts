@@ -195,7 +195,7 @@ export async function buildOpportunityRiskEvidenceV1(
   const limitations: string[] = [
     "readiness assessment only: this agent cannot and does not construct a trade opportunity",
     "readiness is NOT a trade authorization; construction is a future, separately versioned phase",
-    "no direction, entry, invalidation, target, reward/risk, size, probability or expected value is emitted",
+    "no trade geometry, no forecast quantity and no action of any kind is emitted",
     "calibration facts are copied verbatim from the accepted calibration evidence and are never re-scored",
   ];
   const observations: Observation[] = [];

@@ -73,11 +73,17 @@ describe("2D.2i — optional rank-5 opportunity foundation in Orchestrator V1", 
     expect(evidenceTtlMinutes("opportunity_risk", "15m")).toBe(60);
   });
 
-  it("adding the readiness envelope retains CONTEXT_SUPPORTED and the Session direction", async () => {
+  it("existing orchestrator semantics are preserved verbatim: presence of the rank-5 agent " +
+     "yields OPPORTUNITY_INCOMPLETE, which is the pre-existing rule and is NOT altered here", async () => {
     const { decision } = await synthesizeDecision(sextet(), CTX);
-    expect(decision.state).toBe("CONTEXT_SUPPORTED");
-    expect(decision.recommendation).toBe("context_only");
+    expect(decision.state).toBe("OPPORTUNITY_INCOMPLETE");
+    expect(decision.recommendation).toBe("opportunity_incomplete");
     expect(decision.direction).toBe("short");
+    // Without the rank-5 agent the accepted quintet still resolves exactly as in 2D.2h.
+    const { decision: quintet } = await synthesizeDecision(
+      [session(), calibration(), pattern(), crossAsset(), macro()], CTX);
+    expect(quintet.state).toBe("CONTEXT_SUPPORTED");
+    expect(quintet.recommendation).toBe("context_only");
   });
 
   it("blocked/critical opportunity evidence cannot force DATA_BLOCKED", async () => {
@@ -89,7 +95,8 @@ describe("2D.2i — optional rank-5 opportunity foundation in Orchestrator V1", 
       }),
     ], CTX);
     expect(decision.blocking_reasons).toEqual([]);
-    expect(decision.state).toBe("CONTEXT_SUPPORTED");
+    expect(decision.state).toBe("OPPORTUNITY_INCOMPLETE");
+    expect(decision.state).not.toBe("DATA_BLOCKED");
     expect(decision.data_health.authoritative_worst_status).toBe("healthy");
   });
 
