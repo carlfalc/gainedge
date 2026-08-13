@@ -126,6 +126,11 @@ export const SESSION_STRUCTURE_SPEC_V2 = {
     requested_instant_channel: "envelope.as_of + as_of_bar_status observation",
   },
 
+  evidence_interval: {
+    definition: "15m slot grid ending at as_of, starting at max(lookback cap, oldest genuine bar supplied)",
+    rationale: "slots before any source coverage are outside the claim and are not reported as missing",
+  },
+
   lookback_bars_max: 500,
   lookahead: "none",
 } as const;
@@ -334,7 +339,11 @@ export async function buildSessionStructureEvidenceV2(
   // Bounded evidence interval: a fixed slot grid ending at as_of. No lookahead is
   // representable because every bar after as_of is dropped before classification.
   const atOrBefore = input.bars.filter((b) => b.time <= asOf).sort((a, b) => a.time - b.time);
-  const windowStart = asOf - (SESSION_STRUCTURE_SPEC_V2.lookback_bars_max - 1) * BAR_MS;
+  // The evidence interval is the OBSERVED interval: the lookback cap, tightened to the
+  // oldest genuine bar actually supplied. Slots before any source coverage are outside
+  // the claim and must not be reported as missing.
+  const capStart = asOf - (SESSION_STRUCTURE_SPEC_V2.lookback_bars_max - 1) * BAR_MS;
+  const windowStart = atOrBefore.length ? Math.max(capStart, atOrBefore[0].time) : asOf;
   const slots = classifySlots(windowStart, asOf, atOrBefore, input.isQuarantined);
 
   const count = (c: SlotClass) => slots.filter((s) => s.cls === c).length;
@@ -368,7 +377,7 @@ export async function buildSessionStructureEvidenceV2(
     source_timestamps.oldest_admissible_bar = iso(admissibleAll[0].time);
     source_timestamps.newest_admissible_bar = iso(admissibleAll.at(-1)!.time);
   }
-  if (asOfSlot.bar) {
+  if (asOfSlot.cls === "admissible") {
     source_timestamps.as_of_bar_open = iso(asOf);
     source_timestamps.as_of_bar_completed_close = iso(asOfClose);
   }

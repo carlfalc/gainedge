@@ -132,13 +132,15 @@ describe("segmentation never bridges a defect", () => {
   });
 
   it("an expected closure does NOT cut the history", () => {
-    // Friday 20:45Z close -> Sunday 22:00Z reopen: the weekend slots are expected_closed
-    const fri = Date.UTC(2026, 6, 17, 20, 0);
+    // last open Friday slot -> Sunday reopen: every slot between is expected_closed
+    const sun = Date.UTC(2026, 6, 19, 22, 0);
+    let fri = sun;
+    do { fri -= BAR; } while (!expectedOpenSlot(fri));
     const bars: StructureBar[] = [
       { time: fri, open: 1, high: 2, low: 1, close: 2 },
-      { time: Date.UTC(2026, 6, 19, 22, 0), open: 1, high: 2, low: 1, close: 2 },
+      { time: sun, open: 1, high: 2, low: 1, close: 2 },
     ];
-    const segs = segmentSlots(classifySlots(fri, Date.UTC(2026, 6, 19, 22, 0), bars, never));
+    const segs = segmentSlots(classifySlots(fri, sun, bars, never));
     expect(segs).toHaveLength(1);
     expect(segs[0].bars).toHaveLength(2);
   });
@@ -256,7 +258,7 @@ describe("V2 evidence envelope", () => {
     expect(g("critical_excluded_slots")).toBe(0);
     expect(g("unexpected_missing_slots")).toBe(0);
     expect(g("expected_open_slots")).toBe(bars.length);
-    expect(g("expected_closed_slots")! > 0).toBe(true); // weekend inside the 500-slot window
+    expect(g("expected_closed_slots")).toBe(0); // contiguous open-venue interval
     expect(e.data_health.completeness).toBe(1);         // closures never reduce completeness
     expect(e.data_health.status).toBe("healthy");
   });
