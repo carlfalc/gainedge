@@ -21,7 +21,7 @@ import { crossAssetSpecHash } from "../../supabase/functions/_shared/ron-cross-a
 import { macroNewsSpecHash } from "../../supabase/functions/_shared/ron-macro-news-geopolitics-spec.ts";
 import { patternContextSpecHash } from "../../supabase/functions/_shared/ron-pattern-context-spec.ts";
 
-const OPPORTUNITY_RISK_SPEC_V1_HASH_PINNED = "__PIN__";
+const OPPORTUNITY_RISK_SPEC_V1_HASH_PINNED = "cb547444826d7a49479d869ad558ee7344733140f0ad0ae0a4d3c8f71461173a";
 
 const TRACE = "ron-2d2i-fixture";
 const ANCHOR = "2026-08-13T10:00:00Z";
