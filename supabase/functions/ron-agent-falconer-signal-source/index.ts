@@ -16,7 +16,8 @@ import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-qu
 import {
   buildFalconerSignalSourceEvidenceV1, falconerSignalSourceSpecHash,
   FALCONER_SIGNAL_SOURCE_SPEC_V1, FALCONER_SOURCE_LOOKBACK_MINUTES,
-  FALCONER_SOURCE_MAX_ROWS, type FalconerEventRow, type FalconerTradeStateRow,
+  FALCONER_SOURCE_MAX_ROWS, readFalconerAvailabilityFacts, FalconerAvailabilityParityError,
+  type FalconerEventRow, type FalconerTradeStateRow,
 } from "../_shared/ron-falconer-signal-source-spec.ts";
 
 /** Safe, explicit signal-state projection. Never `*`, never a private/geometry field. */
@@ -192,6 +193,21 @@ Deno.serve(async (req) => {
       return json({ error: "nondeterministic_specialist" }, 500);
     }
 
+    // 2D.2k-b — availability is read BACK OUT of the sealed evidence, never recomputed
+    // from the raw safe projection, so the response can never disagree with Evidence V1.
+    let facts;
+    try {
+      facts = readFalconerAvailabilityFacts(sealed);
+    } catch (e) {
+      if (e instanceof FalconerAvailabilityParityError) {
+        return json({ error: "availability_parity_violation", reason: e.reason }, 500);
+      }
+      throw e;
+    }
+    if (facts.subject_binding_verified !== subjectBound) {
+      return json({ error: "availability_parity_violation", reason: "subject_binding_mismatch" }, 500);
+    }
+
     return json({
       spec_version: FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version,
       spec_hash: await falconerSignalSourceSpecHash(),
@@ -204,14 +220,16 @@ Deno.serve(async (req) => {
       source_rows_loaded: events.length,
       source_role: FALCONER_SIGNAL_SOURCE_SPEC_V1.source_contract.role,
       signal_state_contract: FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.status,
-      subject_binding_verified: subjectBound,
-      // Availability is a DATA fact, not an auth fact: true only when at least one
-      // replay-safe caller-owned row actually exists at the anchor.
-      signal_state_available: (signalStateRows?.length ?? 0) > 0,
-      signal_state_row_exists: (signalStateRows?.length ?? 0) > 0,
+      subject_binding_verified: facts.subject_binding_verified,
+      // Availability is a DATA fact derived from ELIGIBLE evidence, not from the number of
+      // rows loaded: it is read from the sealed Evidence V1 observations.
+      signal_state_available: facts.signal_state_available,
+      signal_state_row_exists: facts.signal_state_row_exists,
+      availability_parity_source: "sealed_evidence_observations",
       signal_state_binding: subjectBound
         ? "caller_jwt_verified_rls_scoped"
         : "no_verified_subject_fail_closed",
+      // Raw safe-projection count. Deliberately NOT an availability signal.
       signal_state_rows_loaded: signalStateRows?.length ?? 0,
       registered_ttl_minutes: evidenceTtlMinutes("falconer_signal_source", timeframe),
       evidence: sealed,
