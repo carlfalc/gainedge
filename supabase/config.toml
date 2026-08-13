@@ -74,3 +74,7 @@ verify_jwt = false
 # is read-only and has no persistence branch.
 [functions.ron-agent-pattern-context]
 verify_jwt = false
+
+# EPHEMERAL Phase 2D.2e audit harness. Removed at the end of the phase.
+[functions.ron-2d2e-audit]
+verify_jwt = false
