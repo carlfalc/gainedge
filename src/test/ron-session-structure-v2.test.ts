@@ -357,4 +357,21 @@ describe("V2 purity guarantees", () => {
     expect(src).not.toMatch(/metaapi-trade|place_order|ron_orchestrator_decisions/i);
     expect(src).toMatch(/execution_allowed: false/);
   });
+
+  it("config pins verify_jwt=false while the in-code service-role boundary stays mandatory", async () => {
+    const fs = await import("node:fs/promises");
+    const cfg = await fs.readFile("supabase/config.toml", "utf8");
+    // exactly one stanza, pinned false: the platform gate is deliberately NOT the boundary
+    const stanzas = cfg.match(/^\[functions\.ron-agent-session-structure\]$/gm) ?? [];
+    expect(stanzas).toHaveLength(1);
+    const after = cfg.split("[functions.ron-agent-session-structure]")[1];
+    expect(after.split("[")[0]).toMatch(/verify_jwt\s*=\s*false/);
+
+    // ...therefore the endpoint MUST still fail closed on its own.
+    const src = await fs.readFile("supabase/functions/ron-agent-session-structure/index.ts", "utf8");
+    expect(src).toMatch(/if \(!token\) return json\(\{ error: "unauthorized: internal service-role endpoint" \}, 401\)/);
+    expect(src).toMatch(/if \(!authorized\) return json\(\{ error: "unauthorized: internal service-role endpoint" \}, 401\)/);
+    expect(src).toMatch(/timingSafeEq\(token, serviceKey\)/);
+    expect(src).toMatch(/from\("ron_agent_registry"\)/); // capability proof
+  });
 });
