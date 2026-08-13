@@ -73,7 +73,9 @@ describe("Phase 2D.1f — XAUUSD venue calendar v1", () => {
       checked++;
     }
     expect(checked).toBeGreaterThan(28_000);
-  });
+    // Harness-only: this minute-grain sweep runs ~3.3s and can exceed the default 5s
+    // budget on a loaded runner. Assertions are unchanged.
+  }, 30_000);
 
   it("is DST-aware on both sides of the year", () => {
     expect(nyClock(new Date(ms("2026-01-14T22:00:00Z"))).minutes).toBe(17 * 60); // EST
