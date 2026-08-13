@@ -1139,6 +1139,173 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_agent_evidence: {
+        Row: {
+          agent_id: string
+          agent_version: number
+          as_of: string
+          conflicts: Json
+          created_at: string
+          data_health: Json
+          dependencies: Json
+          direction: string | null
+          envelope: Json
+          evidence_hash: string
+          id: string
+          instrument: string
+          observations: Json
+          provenance_refs: Json
+          recommendation: string
+          run_id: string
+          schema_version: number
+          source_timestamps: Json
+          status: string
+          timeframe: string
+          trace_id: string
+          uncertainty: Json
+        }
+        Insert: {
+          agent_id: string
+          agent_version: number
+          as_of: string
+          conflicts?: Json
+          created_at?: string
+          data_health: Json
+          dependencies?: Json
+          direction?: string | null
+          envelope: Json
+          evidence_hash: string
+          id?: string
+          instrument: string
+          observations?: Json
+          provenance_refs?: Json
+          recommendation: string
+          run_id: string
+          schema_version: number
+          source_timestamps?: Json
+          status: string
+          timeframe: string
+          trace_id: string
+          uncertainty: Json
+        }
+        Update: {
+          agent_id?: string
+          agent_version?: number
+          as_of?: string
+          conflicts?: Json
+          created_at?: string
+          data_health?: Json
+          dependencies?: Json
+          direction?: string | null
+          envelope?: Json
+          evidence_hash?: string
+          id?: string
+          instrument?: string
+          observations?: Json
+          provenance_refs?: Json
+          recommendation?: string
+          run_id?: string
+          schema_version?: number
+          source_timestamps?: Json
+          status?: string
+          timeframe?: string
+          trace_id?: string
+          uncertainty?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_agent_evidence_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ron_agent_runs"
+            referencedColumns: ["run_id"]
+          },
+        ]
+      }
+      ron_agent_registry: {
+        Row: {
+          agent_id: string
+          agent_version: number
+          authority_class: string
+          authority_rank: number
+          created_at: string
+          id: string
+          non_authoritative: boolean
+          purpose: string
+          registry_hash: string
+          registry_version: number
+          source_health_authoritative: boolean
+          ttl_multiplier: number
+        }
+        Insert: {
+          agent_id: string
+          agent_version: number
+          authority_class: string
+          authority_rank: number
+          created_at?: string
+          id?: string
+          non_authoritative?: boolean
+          purpose: string
+          registry_hash: string
+          registry_version: number
+          source_health_authoritative?: boolean
+          ttl_multiplier?: number
+        }
+        Update: {
+          agent_id?: string
+          agent_version?: number
+          authority_class?: string
+          authority_rank?: number
+          created_at?: string
+          id?: string
+          non_authoritative?: boolean
+          purpose?: string
+          registry_hash?: string
+          registry_version?: number
+          source_health_authoritative?: boolean
+          ttl_multiplier?: number
+        }
+        Relationships: []
+      }
+      ron_agent_runs: {
+        Row: {
+          agent_id: string
+          agent_version: number
+          as_of: string
+          created_at: string
+          id: string
+          instrument: string
+          run_id: string
+          schema_version: number
+          timeframe: string
+          trace_id: string
+        }
+        Insert: {
+          agent_id: string
+          agent_version: number
+          as_of: string
+          created_at?: string
+          id?: string
+          instrument: string
+          run_id: string
+          schema_version: number
+          timeframe: string
+          trace_id: string
+        }
+        Update: {
+          agent_id?: string
+          agent_version?: number
+          as_of?: string
+          created_at?: string
+          id?: string
+          instrument?: string
+          run_id?: string
+          schema_version?: number
+          timeframe?: string
+          trace_id?: string
+        }
+        Relationships: []
+      }
       ron_calibration_runs: {
         Row: {
           barrier_atr_mult: number
@@ -1370,6 +1537,48 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_decision_evidence: {
+        Row: {
+          agent_id: string
+          authority_rank: number
+          created_at: string
+          decision_id: string
+          evidence_hash: string
+          ordinal: number
+        }
+        Insert: {
+          agent_id: string
+          authority_rank: number
+          created_at?: string
+          decision_id: string
+          evidence_hash: string
+          ordinal: number
+        }
+        Update: {
+          agent_id?: string
+          authority_rank?: number
+          created_at?: string
+          decision_id?: string
+          evidence_hash?: string
+          ordinal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_decision_evidence_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "ron_orchestrator_decisions"
+            referencedColumns: ["decision_id"]
+          },
+          {
+            foreignKeyName: "ron_decision_evidence_evidence_hash_fkey"
+            columns: ["evidence_hash"]
+            isOneToOne: false
+            referencedRelation: "ron_agent_evidence"
+            referencedColumns: ["evidence_hash"]
+          },
+        ]
+      }
       ron_market_snapshots: {
         Row: {
           bar_time: string
@@ -1427,6 +1636,81 @@ export type Database = {
           symbol?: string
           timeframe?: string
           volume?: number | null
+        }
+        Relationships: []
+      }
+      ron_orchestrator_decisions: {
+        Row: {
+          as_of: string
+          created_at: string
+          decision: Json
+          decision_hash: string
+          decision_id: string
+          decision_schema_version: number
+          direction: string
+          evidence_schema_version: number
+          execution_allowed: boolean
+          execution_path: string
+          explanation: Json
+          explanation_hash: string
+          id: string
+          instrument: string
+          numeric_probability: number | null
+          orchestrator_version: number
+          recommendation: string
+          registry_hash: string
+          state: string
+          timeframe: string
+          trace_id: string
+          ttl_policy_version: number
+        }
+        Insert: {
+          as_of: string
+          created_at?: string
+          decision: Json
+          decision_hash: string
+          decision_id: string
+          decision_schema_version: number
+          direction: string
+          evidence_schema_version: number
+          execution_allowed?: boolean
+          execution_path?: string
+          explanation: Json
+          explanation_hash: string
+          id?: string
+          instrument: string
+          numeric_probability?: number | null
+          orchestrator_version: number
+          recommendation: string
+          registry_hash: string
+          state: string
+          timeframe: string
+          trace_id: string
+          ttl_policy_version: number
+        }
+        Update: {
+          as_of?: string
+          created_at?: string
+          decision?: Json
+          decision_hash?: string
+          decision_id?: string
+          decision_schema_version?: number
+          direction?: string
+          evidence_schema_version?: number
+          execution_allowed?: boolean
+          execution_path?: string
+          explanation?: Json
+          explanation_hash?: string
+          id?: string
+          instrument?: string
+          numeric_probability?: number | null
+          orchestrator_version?: number
+          recommendation?: string
+          registry_hash?: string
+          state?: string
+          timeframe?: string
+          trace_id?: string
+          ttl_policy_version?: number
         }
         Relationships: []
       }
