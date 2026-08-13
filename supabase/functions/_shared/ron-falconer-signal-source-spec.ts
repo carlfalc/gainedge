@@ -1,28 +1,43 @@
 /**
- * RON Phase 2D.2j — FALCONER SIGNAL SOURCE spec V1 (pure producer).
+ * RON Phase 2D.2j-a — FALCONER RUNTIME-EVENT CONTEXT spec V1 (pure producer).
  *
- * Seventh registered specialist and the LOWEST authority one (rank 6,
- * `strategy_context`, `non_authoritative: true`). It reports, deterministically and
- * without interpretation, WHAT THE FALCONER RUNTIME ITSELF EMITTED into its production
- * event log before an explicit, source-grounded evaluation anchor.
+ * ACCEPTANCE DECISION 2D.2j-a = B2 (SOURCE CONTRACT GAP).
+ *
+ * The registered rank-6 specialist `falconer_signal_source` CANNOT supply Falconer
+ * SIGNAL STATE under the current RON internal contract, and this module must never
+ * pretend otherwise:
+ *   - The real production Falconer signal-state source is `falconer_trades`, which the
+ *     existing truthful badge helper (`src/lib/falconer-signal-state.ts`) and the
+ *     Dashboard / Signals readers use. That table is USER-SCOPED under RLS.
+ *   - RON internal specialists are instrument/timeframe scoped and carry NO accepted
+ *     user/subject identity, so a service-role read of `falconer_trades` would merge or
+ *     leak multiple users' rows. That is forbidden.
+ *   - No safe view, function or endpoint exists that exposes current Falconer signal
+ *     state without private/geometry fields.
+ *   - `falconer_engine_events` is a RUNTIME/EVENT-HEALTH log only. For XAUUSD it
+ *     contains exclusively `stale_market_data` rows and ZERO `signal_created` rows, so
+ *     it is provably not a signal-state source.
+ *
+ * Therefore this spec is deliberately narrowed to RUNTIME EVENT CONTEXT ONLY and
+ * declares the signal-state contract as an explicit, fail-closed UNACCEPTED GAP. Signal
+ * state, direction, status, opened/closed timestamps and trade geometry are NOT emitted.
  *
  * HARD CONTRACT — enforced by the Evidence V1 validator and by the tests:
- *   - Falconer is STRATEGY CONTEXT ONLY. It is never a truth label, never calibration
- *     truth, never outcome truth, never source-health authority and never promotion
- *     evidence.
+ *   - Falconer is STRATEGY CONTEXT ONLY. Never a truth label, calibration truth, outcome
+ *     truth, source-health authority or promotion evidence.
  *   - Historical TradingView / Pine parity is UNRESOLVED. No parity, win-rate, profit
- *     factor, expectancy, edge or performance claim may ever appear here.
- *   - No probability, confidence, expected value, score or rating. The runtime's own
- *     setup score is DELIBERATELY NOT SURFACED.
- *   - No trade geometry: entry, stop, targets and R:R exist in the source event context
- *     and are explicitly FORBIDDEN fields here.
+ *     factor, expectancy, edge or performance claim.
+ *   - No probability, confidence, expected value, rating. The runtime setup rating is
+ *     DELIBERATELY NOT SURFACED.
+ *   - No trade geometry (entry, stop, targets, R:R, size) and no routing field. The
+ *     source `context` JSON blob is NOT SELECTED AT ALL, because exact safe JSON-key
+ *     projection is unavailable and it demonstrably carries forbidden material.
+ *   - No user identifier is read, requested or represented.
  *   - No causal claim, no prediction, no execution intent. `execution_path` stays
- *     `signal_only` and `allow_live_execution` stays false.
- *   - No secret / account / broker / balance / equity / user identifier is read.
- *   - Envelope `direction` is `neutral` (supported) or `unknown` (not supported). The
- *     verified production source carries NO directional field at all, so RON never gains
- *     a Falconer direction; if a future source row ever carried one it could only be
- *     surfaced as the namespaced `falconer_signal_direction` strategy metadata.
+ *     `signal_only`, `allow_live_execution` stays false.
+ *   - Envelope `direction` is `neutral` (supported) or `unknown` (otherwise). RON never
+ *     gains a Falconer direction from this source.
+ *   - Absent source rows are NEVER represented as fresh, healthy source data.
  *
  * The Falconer strategy implementation (`_shared/falconer-strategy.ts`) is FROZEN and is
  * neither imported nor re-implemented here. This module performs NO strategy evaluation.
@@ -60,14 +75,27 @@ export type FalconerEventType = typeof FALCONER_EVENT_TYPES_V1[number] | "other_
 export const FALCONER_SEVERITIES_V1 = ["info", "warning", "error", "critical"] as const;
 
 /**
- * The ONLY `context` keys that may ever be read out of a source row. `score`,
- * `threshold`, `entry`, `sl`, `tp3` and `execution_path` genuinely exist in production
- * rows and are explicitly forbidden: they are geometry / rating, not strategy state.
+ * NO `context` key may be read. Exact safe JSON-key projection is not supported by the
+ * source contract, and production rows genuinely carry `score`, `threshold`, `entry`,
+ * `sl`, `tp3` and `execution_path`. The whole blob is therefore never SELECTed.
  */
-export const FALCONER_CONTEXT_ALLOWED_KEYS = ["candle", "timeframe"] as const;
+export const FALCONER_CONTEXT_ALLOWED_KEYS = [] as const;
 export const FALCONER_CONTEXT_FORBIDDEN_KEYS = [
   "score", "threshold", "entry", "sl", "tp1", "tp2", "tp3", "execution_path", "qty", "risk",
 ] as const;
+
+/**
+ * Deterministic no-source representation. With no admissible source row there is no
+ * source timestamp at all, so freshness is pinned to the frozen lookback bound (the
+ * oldest instant this producer could have observed) and health is `degraded` with zero
+ * completeness. Wall clock is never used and no market/source timestamp is invented.
+ */
+export const FALCONER_NO_SOURCE_FRESHNESS_MINUTES = FALCONER_SOURCE_LOOKBACK_MINUTES;
+
+/** Statuses the frozen Falconer engine treats as live/managed, per `falconer-engine`. */
+export const FALCONER_LIVE_MANAGED_STATUSES = ["open", "tp1_hit", "tp2_hit", "be_active"] as const;
+/** Terminal statuses the frozen Falconer engine writes. */
+export const FALCONER_CLOSED_STATUSES = ["closed_sl", "closed_tp3", "closed_ha_flip"] as const;
 
 export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
   spec_id: "ron_falconer_signal_source",
@@ -84,12 +112,43 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
   instrument_scope: ["XAUUSD"],
   timeframe_scope: ["15m"],
 
+  scope_class: "falconer_runtime_event_context_only",
+
+  signal_state_contract: {
+    status: "unaccepted_gap",
+    acceptance_decision: "B2",
+    signal_state_emitted: false,
+    real_signal_state_table: "falconer_trades",
+    real_signal_state_table_is_user_scoped: true,
+    ron_internal_user_subject_contract_exists: false,
+    safe_signal_state_view_or_function_exists: false,
+    service_role_scan_of_user_scoped_trades_allowed: false,
+    engine_events_contain_xauusd_signal_created: false,
+    engine_events_are_sole_signal_truth: false,
+    existing_production_readers: [
+      "src/lib/falconer-signal-state.ts",
+      "src/pages/dashboard/DashboardHome.tsx",
+      "src/pages/dashboard/SignalsPage.tsx",
+    ],
+    engine_live_managed_statuses: FALCONER_LIVE_MANAGED_STATUSES,
+    engine_closed_statuses: FALCONER_CLOSED_STATUSES,
+    gap_resolution_requires_separately_approved_phase: true,
+  },
+
   source_contract: {
     table: "falconer_engine_events",
-    sole_source: true,
+    sole_source: false,
+    role: "runtime_event_health_context_only",
     verified_against_production_runtime: true,
-    allowed_fields: ["id", "symbol", "event_type", "severity", "created_at", "context"],
-    forbidden_fields: ["user_id", "message"],
+    allowed_fields: ["id", "symbol", "event_type", "severity", "created_at"],
+    forbidden_fields: [
+      "user_id", "message", "context",
+      "direction", "status", "opened_at", "closed_at", "trigger_type",
+      "entry_price", "sl_price", "tp1_price", "tp2_price", "tp3_price",
+      "qty", "pnl_usd", "setup_score", "execution_path", "metaapi_position_ids",
+      "broker_deal_ids", "raw_alert_payload", "notes", "features",
+    ],
+    context_selected: false,
     context_allowed_keys: FALCONER_CONTEXT_ALLOWED_KEYS,
     context_forbidden_keys: FALCONER_CONTEXT_FORBIDDEN_KEYS,
     known_event_types: FALCONER_EVENT_TYPES_V1,
@@ -108,6 +167,14 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
     wall_clock_allowed: false,
     external_fetch_allowed: false,
     broker_reads_allowed: false,
+    no_source_representation: {
+      status: "insufficient_data",
+      data_health_status: "degraded",
+      completeness: 0,
+      freshness_minutes: FALCONER_NO_SOURCE_FRESHNESS_MINUTES,
+      as_of_rule: "frozen_lookback_start_sentinel",
+      fresh_or_healthy_when_absent: false,
+    },
   },
 
   authority_contract: {
@@ -132,6 +199,9 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
     expected_value_emitted: false,
     edge_or_rating_emitted: false,
     setup_score_emitted: false,
+    signal_state_emitted: false,
+    signal_status_emitted: false,
+    user_identifier_read: false,
     win_rate_emitted: false,
     profit_factor_emitted: false,
     trade_geometry_emitted: false,
