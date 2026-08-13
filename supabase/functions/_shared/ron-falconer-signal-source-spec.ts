@@ -546,7 +546,7 @@ export async function buildFalconerSignalSourceEvidenceV1(
   // ---- 0. SUBJECT-BOUND SIGNAL STATE (K1). `signal_state_rows == null` means the caller
   // had no verified subject, so nothing at all is read or claimed about signal state.
   const subjectBound = input.signal_state_rows != null;
-  observations.push(state("falconer_signal_state_available", subjectBound ? "true" : "false", iso(anchor)));
+  observations.push(state("falconer_subject_binding_verified", subjectBound ? "true" : "false", iso(anchor)));
   observations.push(state(
     "falconer_signal_state_mode",
     subjectBound ? "subject_bound_caller_scoped" : "no_subject_binding_fail_closed",
@@ -555,6 +555,10 @@ export async function buildFalconerSignalSourceEvidenceV1(
 
   let sig: Desc | null = null;
   if (!subjectBound) {
+    observations.push(
+      state("falconer_signal_state_available", "false", iso(anchor)),
+      state("falconer_signal_state_row_exists", "false", iso(anchor)),
+    );
     limitations.push("no verified subject accompanied this evaluation, so the user-scoped Falconer signal-state source was never read; signal state is unavailable rather than assumed");
   } else {
     dependencies.push(`falconer_signal_state:${input.instrument}:${input.timeframe}`);
@@ -576,17 +580,29 @@ export async function buildFalconerSignalSourceEvidenceV1(
     if (tradeConflict) {
       issues.push("conflicting_duplicate_signal_state_row_id");
       limitations.push("two contradictory caller-owned rows share one falconer_trades id; no winner is invented");
-      observations.push(state("falconer_signal_lifecycle", "blocked", iso(anchor)));
+      observations.push(
+        state("falconer_signal_state_available", "false", iso(anchor)),
+        state("falconer_signal_state_row_exists", "false", iso(anchor)),
+        state("falconer_signal_lifecycle", "blocked", iso(anchor)),
+      );
       sig = { as_of: anchor, status: "blocked", health: "critical", direction: "unknown", recommendation: "no_action", completeness: 0, freshness_minutes: 0 };
     } else {
       if (tradeMalformed > 0) {
         issues.push(`malformed_signal_state_rows_excluded:${tradeMalformed}`);
         observations.push(num("malformed_signal_state_rows_excluded", tradeMalformed, iso(anchor), "rows"));
       }
-      const eligible = tradeRows.filter((r) =>
+      const scopeRows = tradeRows.filter((r) =>
         r.symbol === input.instrument && r.timeframe === input.timeframe
-        && (FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.mode_scope as readonly string[]).includes(r.mode)
-        && r.opened_at <= anchor);
+        && (FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.mode_scope as readonly string[]).includes(r.mode));
+      // REPLAY SAFETY: any row carrying a mutation timestamp after the anchor is dropped
+      // outright. Future status/closed_at can never leak backward into a past replay.
+      const eligible = scopeRows.filter((r) => isReplaySafeTradeRow(r, anchor));
+      const futureExcluded = scopeRows.length - eligible.length;
+      if (futureExcluded > 0) {
+        issues.push(`signal_state_rows_excluded_future_mutation:${futureExcluded}`);
+        limitations.push("rows whose opened_at, updated_at or closed_at falls after the evaluation anchor were EXCLUDED, never clamped: their later lifecycle was not knowable at this anchor");
+        observations.push(num("signal_state_rows_excluded_future_mutation", futureExcluded, iso(anchor), "rows"));
+      }
       observations.push(num("signal_state_rows_eligible", eligible.length, iso(anchor), "rows"));
 
       if (!eligible.length) {
@@ -594,6 +610,7 @@ export async function buildFalconerSignalSourceEvidenceV1(
         limitations.push("the requesting subject owns no live Falconer row for this instrument and timeframe at this anchor; no backtest row, other symbol or other subject is ever substituted");
         observations.push(
           state("falconer_signal_lifecycle", "insufficient_data", iso(anchor)),
+          state("falconer_signal_state_available", "false", iso(anchor)),
           state("falconer_signal_state_row_exists", "false", iso(anchor)),
         );
         sig = {
@@ -615,6 +632,7 @@ export async function buildFalconerSignalSourceEvidenceV1(
         source_timestamps.falconer_signal_state_as_of = at;
         provenance_refs.push(`falconer_trade:${row.id}:${at}`);
         observations.push(
+          state("falconer_signal_state_available", "true", at),
           state("falconer_signal_state_row_exists", "true", at),
           ref("falconer_signal_row_id", row.id, at),
           state("falconer_signal_status", row.status, at),
