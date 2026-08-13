@@ -1443,6 +1443,7 @@ export type Database = {
           processed: number
           range_end: string | null
           range_start: string | null
+          source_as_of: string | null
           stage: string
           stage_order: number
           status: string
@@ -1462,6 +1463,7 @@ export type Database = {
           processed?: number
           range_end?: string | null
           range_start?: string | null
+          source_as_of?: string | null
           stage: string
           stage_order: number
           status?: string
@@ -1481,6 +1483,7 @@ export type Database = {
           processed?: number
           range_end?: string | null
           range_start?: string | null
+          source_as_of?: string | null
           stage?: string
           stage_order?: number
           status?: string

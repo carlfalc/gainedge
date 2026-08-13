@@ -28,11 +28,16 @@ const STAGE_ORDER = ["quality_v3", "feature_v4", "label_v5", "quality_v4", "feat
 type Stage = string;
 
 /**
- * Phase 2D.1e frozen source clock — the latest genuine XAUUSD 1m bar recorded at the
- * checkpoint start. The label stage of the v6 lineage is clamped to this instant so the
- * rebuild is reproducible and can never consume 1m data published after the freeze.
+ * Phase 2D.1e-a provenance contract.
+ *
+ * The canonical source clock is NEVER hard-coded here. It lives durably on each
+ * `public.ron_rebuild_jobs` row (`source_as_of`), so a future versioned lineage can never
+ * inherit an older checkpoint's frozen clock. Label stages at this version or above MUST
+ * carry a persisted `source_as_of`; the orchestrator FAILS CLOSED otherwise rather than
+ * falling back to wall clock. Historical label stages (v5 and earlier) keep their legacy
+ * unclamped replay semantics and may leave the column NULL.
  */
-const SOURCE_AS_OF_2D1E = "2026-08-12T22:14:00.000Z";
+export const LABEL_SOURCE_AS_OF_REQUIRED_FROM_VERSION = 6;
 
 /** `quality_v4` -> { kind: "quality", version: 4 } */
 function parseStage(stage: string): { kind: "quality" | "feature" | "label"; version: number } {
@@ -63,7 +68,12 @@ async function callWorker(fn: string, payload: Record<string, unknown>): Promise
   return body;
 }
 
-async function runBatch(stage: Stage, cursor: string | null, endIso: string | null): Promise<BatchResult> {
+export async function runBatch(
+  stage: Stage,
+  cursor: string | null,
+  endIso: string | null,
+  sourceAsOf: string | null = null,
+): Promise<BatchResult> {
   const { kind, version } = parseStage(stage);
   if (kind === "quality") {
     const limit = 500;
@@ -92,18 +102,24 @@ async function runBatch(stage: Stage, cursor: string | null, endIso: string | nu
     };
   }
   // label stage
+  if (version >= LABEL_SOURCE_AS_OF_REQUIRED_FROM_VERSION && !sourceAsOf) {
+    throw new Error(
+      `rebuild stage ${stage} requires a durable job.source_as_of (label_version >= ` +
+      `${LABEL_SOURCE_AS_OF_REQUIRED_FROM_VERSION} must be clamped to a persisted source clock)`,
+    );
+  }
   const limit = 300;
   const b = await callWorker("ron-label", {
     mode: "backfill", start: cursor, end: endIso ?? undefined, limit,
     label_version: version, horizons: [60],
-    ...(version >= 6 ? { source_as_of: SOURCE_AS_OF_2D1E } : {}),
+    ...(sourceAsOf ? { source_as_of: sourceAsOf } : {}),
   });
   const snapshots = Number(b.snapshots ?? 0);
   return {
     next_cursor: b.next_cursor ?? cursor,
     advanced: snapshots,
     done: snapshots === 0 || snapshots < limit,
-    detail: { snapshots, rows: b.rows ?? 0 },
+    detail: { snapshots, rows: b.rows ?? 0, source_as_of: sourceAsOf },
   };
 }
 
@@ -146,7 +162,12 @@ Deno.serve(async (req) => {
 
       const stage = job.stage as Stage;
       try {
-        const res = await runBatch(stage, job.cursor ?? job.range_start ?? null, job.range_end ?? null);
+        const res = await runBatch(
+          stage,
+          job.cursor ?? job.range_start ?? null,
+          job.range_end ?? null,
+          job.source_as_of ?? null,
+        );
         const processed = Number(job.processed ?? 0) + res.advanced;
         const patch: Record<string, unknown> = {
           status: res.done ? "completed" : "running",
