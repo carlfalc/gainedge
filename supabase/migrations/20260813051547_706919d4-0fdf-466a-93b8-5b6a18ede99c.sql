@@ -1,0 +1,1 @@
+SELECT cron.schedule('ron-rebuild-tick', '20 seconds', $cron$ SELECT public.ron_rebuild_cron_tick(); $cron$);
