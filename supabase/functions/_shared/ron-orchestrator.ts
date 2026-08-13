@@ -419,6 +419,19 @@ const CAUSAL_PHRASES = [
   "drove", "as a result", "so it will", "which means it will",
 ];
 
+/** Narrative fields subject to grounding. Identifiers and hashes are deliberately excluded. */
+export const GROUNDED_EXPLANATION_FIELDS = [
+  "why", "what_would_change", "missing_or_conflicting", "data_health", "source_refs",
+] as const;
+
+/**
+ * The ONLY sentences allowed to use the word "probability": explicit statements that RON
+ * has none. Asserting a probability stays forbidden.
+ */
+export const PROBABILITY_NEGATIONS: readonly string[] = [
+  "no calibrated conditional probability exists: zero promoted state variables",
+] as const;
+
 /** Returns every grounding violation found in an explanation payload. */
 export function assertGrounded(
   payload: Record<string, unknown>,
@@ -456,20 +469,24 @@ export function assertGrounded(
   }
   for (const n of decision.timeframe.match(/\d+(?:\.\d+)?/g) ?? []) allowedNumbers.add(n);
 
+  // Only NARRATIVE fields are grounded. Structural identifiers (decision_id, trace_id,
+  // hashes) are content addresses, not claims, so their hex digits are not "invented
+  // numbers" and must not be scanned.
   const strings: string[] = [];
   const walk = (v: unknown) => {
     if (typeof v === "string") strings.push(v);
     else if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === "object") Object.values(v).forEach(walk);
   };
-  walk(payload);
+  for (const f of GROUNDED_EXPLANATION_FIELDS) if (f in payload) walk(payload[f]);
 
   for (const s of strings) {
     const lower = s.toLowerCase();
     for (const p of CAUSAL_PHRASES) {
       if (lower.includes(p)) bad.push(`causal_overclaim "${p}" in "${s}"`);
     }
-    if (/\d\s*%/.test(s) || /\bprobab|\bconfidence\b|\blikelihood\b|\bodds\b/i.test(s)) {
+    if (!PROBABILITY_NEGATIONS.includes(lower)
+      && (/\d\s*%/.test(s) || /\bprobab|\bconfidence\b|\blikelihood\b|\bodds\b/i.test(s))) {
       bad.push(`probability_language in "${s}"`);
     }
     // Timestamps must exist in evidence or the decision.
