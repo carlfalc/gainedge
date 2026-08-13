@@ -370,7 +370,9 @@ describe("2D.2j — verified source contract", () => {
     expect(isReplaySafeTradeRow(trade({ id: "x", updated_at: ANCHOR + 99 * MIN }), ANCHOR)).toBe(false);
     const dup = trade({ id: "d" });
     expect(canonicalFalconerTradeRows([dup, { ...dup }]).rows).toHaveLength(1);
-    expect(() => canonicalFalconerTradeRows([dup, { ...dup, status: "closed_sl" }]))
+    expect(() => canonicalFalconerTradeRows([
+      dup, { ...dup, status: "closed_sl", closed_at: ANCHOR - 2 * MIN },
+    ]))
       .toThrow(FalconerSourceConflictError);
     expect(canonicalFalconerTradeRows([{ ...dup, direction: "sideways" }]).malformed).toBe(1);
   });
