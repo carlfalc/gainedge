@@ -129,8 +129,12 @@ describe("2D.2i — Opportunity/Risk Foundation spec identity", () => {
       .then((fs) => fs.readFile("supabase/functions/_shared/ron-opportunity-risk-spec.ts", "utf8"));
     // Strip comments: the doc block deliberately DISCUSSES what the code must never do.
     const code = raw_src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").toLowerCase();
-    for (const t of ["date.now(", "new date()", "createclient", "fetch(", "deno.env", "from(\"", "falconer", "metaapi"]) {
+    for (const t of ["date.now(", "new date()", "createclient", "fetch(", "deno.env", "from(\"", "metaapi"]) {
       expect(code).not.toContain(t);
+    }
+    // "falconer" may appear ONLY as an explicitly false contract declaration.
+    for (const line of code.split("\n").filter((l) => l.includes("falconer"))) {
+      expect(line.trim()).toMatch(/^falconer_is_[a-z_]+: false,$/);
     }
   });
 });
