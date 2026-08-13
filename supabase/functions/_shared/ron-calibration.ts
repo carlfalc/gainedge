@@ -98,6 +98,16 @@ export const CALIBRATION_CONTRACT_V6: CalibrationContract = {
 export const CALIBRATION_CONTRACT_V7: CalibrationContract = {
   calibration_version: 7, feature_version: 5, label_version: 6,
 };
+/**
+ * Phase 2D.1g — native-15m-recovered lineage: quality v5 + feature v6 + label v7.
+ * Infrastructure-only binding change: event definition, hierarchy semantics, fit/holdout
+ * chronology, Wilson/Brier/ECE and fallback methodology are byte-identical to v6/v7.
+ * Only the INPUT lineage changes, which mandates a new calibration_version so that
+ * calv2..calv7 history can never be overwritten.
+ */
+export const CALIBRATION_CONTRACT_V8: CalibrationContract = {
+  calibration_version: 8, feature_version: 6, label_version: 7,
+};
 export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   2: CALIBRATION_CONTRACT_V2,
   3: CALIBRATION_CONTRACT_V3,
@@ -105,6 +115,7 @@ export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
   5: CALIBRATION_CONTRACT_V5,
   6: CALIBRATION_CONTRACT_V6,
   7: CALIBRATION_CONTRACT_V7,
+  8: CALIBRATION_CONTRACT_V8,
 };
 /**
  * THE single source of truth for "which calibration contract is current".
@@ -113,7 +124,7 @@ export const CALIBRATION_CONTRACTS: Record<number, CalibrationContract> = {
  * Hash selection must always key off `ctx.calibration_version`, never off this pointer,
  * so historical runs stay byte-identical.
  */
-export const CALIBRATION_CONTRACT_CURRENT: CalibrationContract = CALIBRATION_CONTRACT_V7;
+export const CALIBRATION_CONTRACT_CURRENT: CalibrationContract = CALIBRATION_CONTRACT_V8;
 
 /**
  * Phase 2B.2 (Defect A): the ADX bucket SPECIFICATION is the single source of truth.
