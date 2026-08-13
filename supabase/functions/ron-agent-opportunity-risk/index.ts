@@ -61,8 +61,10 @@ Deno.serve(async (req) => {
     return json({ error: "out_of_scope_for_opportunity_risk_spec_v1", instrument, timeframe }, 400);
   }
 
+  // Fail closed on the canonical UTC-ISO validator (same rule the pure producer applies);
+  // local/non-Z, impossible, empty and non-string anchors are all rejected here.
   const anchor = body.evaluation_anchor;
-  if (typeof anchor !== "string" || !Number.isFinite(Date.parse(anchor))) {
+  if (!isIsoUtc(anchor)) {
     return json({ error: "missing_or_invalid_evaluation_anchor" }, 400);
   }
   const evidence = body.evidence;
@@ -74,7 +76,7 @@ Deno.serve(async (req) => {
 
     const build = () => buildOpportunityRiskEvidenceV1({
       instrument, timeframe,
-      evaluation_anchor: anchor,
+      evaluation_anchor: anchor as string,
       evidence: evidence as EvidenceEnvelopeV1[],
       promoted_state_variables: PROMOTED_STATE_VARIABLES,
       run_id, trace_id,
@@ -96,7 +98,7 @@ Deno.serve(async (req) => {
     return json({
       spec_version: S.spec_version,
       spec_hash: await opportunityRiskSpecHash(),
-      evaluation_anchor: new Date(Date.parse(anchor)).toISOString(),
+      evaluation_anchor: sealed.as_of,
       readiness_state: readiness,
       construction_allowed: construction,
       blocking_reasons: sealed.observations.filter((o) => o.key === "blocking_reason").map((o) => o.value_text),
@@ -110,6 +112,9 @@ Deno.serve(async (req) => {
       persisted: false,
     });
   } catch (err) {
+    if (err instanceof OpportunityRiskContractError) {
+      return json({ error: err.name, reason: err.reason }, 400);
+    }
     return json({ error: String((err as Error)?.message ?? err) }, 500);
   }
 });
