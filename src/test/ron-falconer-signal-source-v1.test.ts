@@ -724,7 +724,7 @@ describe("2D.2k-b — endpoint / Evidence V1 availability parity", () => {
   it("7. Falconer authority, rank, TTL and spec hash are unchanged by this correction", async () => {
     expect(await falconerSignalSourceSpecHash()).toBe(FALCONER_SPEC_V1_HASH_PINNED);
     const s = agentSpec("falconer_signal_source")!;
-    expect(s.authority_rank).toBe(6);
+    expect(s.authority_class).toBe("strategy_context");
     expect(s.non_authoritative).toBe(true);
     expect(s.source_health_authoritative).toBe(false);
     expect(evidenceTtlMinutes("falconer_signal_source", "15m")).toBe(60);
