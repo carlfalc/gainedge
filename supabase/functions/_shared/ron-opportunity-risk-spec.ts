@@ -23,7 +23,7 @@
  * a trade authorization and never emits geometry in V1.
  */
 import {
-  evidenceHash, evidenceTtlMinutes, validateEvidence, hashCanonical,
+  evidenceHash, evidenceTtlMinutes, isIsoUtc, validateEvidence, hashCanonical,
   type EvidenceEnvelopeV1, type EvidenceStatus, type Observation,
   type QualitativeDirection, type RecommendationV1, type RonAgentId,
 } from "./ron-agent-contracts.ts";
@@ -162,6 +162,20 @@ export interface OpportunityRiskInputV1 {
   trace_id: string;
 }
 
+/**
+ * Deterministic, typed contract rejection of a pure input. Thrown BEFORE any date
+ * conversion so a malformed anchor can never raise a RangeError and can never be
+ * substituted with a wall-clock or invented market timestamp. Evidence V1 requires a
+ * UTC-ISO `as_of`; with no admissible anchor there is no honest `as_of` to emit, so the
+ * producer refuses the input instead of fabricating one.
+ */
+export class OpportunityRiskContractError extends Error {
+  override readonly name = "OpportunityRiskContractError";
+  constructor(readonly reason: string) {
+    super(`opportunity_risk_contract_error: ${reason}`);
+  }
+}
+
 const num = (key: string, value: number, at: string, unit?: string): Observation =>
   ({ key, kind: "measurement", value_num: value, ...(unit ? { unit } : {}), at });
 const state = (key: string, value: string, at: string): Observation =>
@@ -183,6 +197,12 @@ export async function buildOpportunityRiskEvidenceV1(
 ): Promise<EvidenceEnvelopeV1> {
   const S = OPPORTUNITY_RISK_SPEC_V1;
   const spec_hash = await opportunityRiskSpecHash();
+  // Anchor validity is checked BEFORE any date conversion: `isIsoUtc` is the accepted
+  // canonical validator, so malformed, non-UTC/local, impossible or empty anchors fail
+  // closed deterministically and never reach `toISOString()`.
+  if (!isIsoUtc(input.evaluation_anchor)) {
+    throw new OpportunityRiskContractError("evaluation_anchor_not_utc_iso");
+  }
   const anchorMs = Date.parse(input.evaluation_anchor);
   const at = new Date(anchorMs).toISOString();
 
@@ -244,9 +264,6 @@ export async function buildOpportunityRiskEvidenceV1(
     return envelope("blocked", "critical", "unknown", "no_action");
   };
 
-  if (!Number.isFinite(anchorMs)) {
-    return fail("blocked_contract_mismatch", ["evaluation_anchor_not_utc_iso"]);
-  }
   if (!S.instrument_scope.includes(input.instrument as "XAUUSD")
     || !S.timeframe_scope.includes(input.timeframe as "15m")) {
     return fail("blocked_contract_mismatch", ["out_of_scope_instrument_or_timeframe"]);
