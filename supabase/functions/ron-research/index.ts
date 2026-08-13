@@ -337,8 +337,14 @@ Deno.serve(async (req) => {
       if (spec.kind === "baseline_hierarchy") continue;
       const r = await evaluateCandidate(spec, dir, obs[dir], plan, baselineFolds, definitionHash);
       results.push(r.result);
+      // Operational memory hygiene ONLY: per-prediction arrays are fully consumed by
+      // `evaluateCandidate`'s aggregation and are read by nothing downstream
+      // (`topBucketsV2` uses bucket stats; persisted folds omit `preds`). Releasing them
+      // keeps the isolate inside its memory budget and cannot change any value or hash.
+      for (const f of r.folds) (f as unknown as { preds: unknown[] }).preds = [];
       evaluated.push(r);
     }
+    for (const f of baselineFolds) (f as unknown as { preds: unknown[] }).preds = [];
     evidence[dir] = topBucketsV2(evaluated);
   }
 
