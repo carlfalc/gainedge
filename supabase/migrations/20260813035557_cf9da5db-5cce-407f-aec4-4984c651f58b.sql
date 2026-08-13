@@ -1,0 +1,2 @@
+-- Phase 2D.1f-c one-off recovery invocation (already executed in production).
+-- Permanently neutralized: replay must have no side effect.

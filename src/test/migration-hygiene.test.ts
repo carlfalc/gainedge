@@ -40,12 +40,16 @@ const ALLOWLIST = new Set([
   "20260812072740_c3f6ce80-55cd-4304-9c71-5606fef3d117.sql",
 ]);
 
-/** Phase 2B.2 test-harness versions — permanently neutralized, never allowlistable. */
+/** Test-harness / one-off invocation versions — permanently neutralized, never allowlistable. */
 const NEUTRALIZED = [
   "20260812061529_b2715105-428c-4f08-b298-f65690659378.sql",
   "20260812061605_c1786ff3-16b0-4902-814d-b557f17f79bb.sql",
   "20260812061631_74b8ba37-7192-46a5-899b-ca6f8ca5fcd2.sql",
   "20260812061708_3949a756-b215-422c-bfd1-8fbc03996ea3.sql",
+  // Phase 2D.1f-c one-off native-15m recovery invocations.
+  "20260813035523_806f0f2a-8d0d-4687-9a97-8cfe8cd2bda2.sql",
+  "20260813035557_cf9da5db-5cce-407f-aec4-4984c651f58b.sql",
+  "20260813035902_ec0d16c3-c9b6-4879-93ba-15e731efb928.sql",
 ];
 
 const read = (f: string) => fs.readFileSync(path.join(DIR, f), "utf8");
@@ -68,7 +72,7 @@ describe("migration hygiene", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("Phase 2B.2 test-harness migrations stay inert", () => {
+  it("neutralized harness/one-off migrations stay inert", () => {
     for (const f of NEUTRALIZED) {
       const sql = read(f);
       const lower = sql.toLowerCase();

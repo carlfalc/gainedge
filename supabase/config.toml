@@ -49,3 +49,6 @@ verify_jwt = true
 
 [functions.ron-recover-candles]
 verify_jwt = true
+
+[functions.ron-recover-15m]
+verify_jwt = true
