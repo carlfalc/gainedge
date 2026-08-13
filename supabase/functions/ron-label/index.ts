@@ -20,7 +20,7 @@ import { buildEligibilityContract, RON_QUALITY_VERSION } from "../_shared/ron-qu
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
-const DEFAULT_LABEL_VERSION = 6;   // v1..v5 rows are preserved untouched for audit
+const DEFAULT_LABEL_VERSION = 7;   // v1..v6 rows are preserved untouched for audit
 const BAR_MS = 15 * 60 * 1000;
 const BAR_MINUTES = 15;
 const RES_MS = 60 * 1000;              // 1-minute forward resolution
