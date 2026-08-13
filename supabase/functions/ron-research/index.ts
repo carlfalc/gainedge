@@ -13,6 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION, CALIBRATION_CONTRACT_V4,
+  CALIBRATION_CONTRACT_V7,
   CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION, CALIBRATION_HORIZON_MINUTES,
   INELIGIBLE_ANCHOR_SESSIONS, NoGenuineSourceClockError, anchorSessionEligible,
   deriveSourceBarCutoff, eligibleFor, resolveSourceClockV2, sha256,
@@ -26,15 +27,24 @@ import {
   BASELINE_CANDIDATE, COVERAGE_EPOCH_GAP_HOURS, FOLD_DEFINITION_VERSION, PROMOTION_GATE,
   PURGE_MINUTES, REQUESTED_FOLDS, RESEARCH_VERSION,
   buildCandidateSet, buildGapAwareFolds, candidateSpecPayload, evaluateCandidate,
-  researchDigest, topBucketsV2,
+  evaluateCandidateFold, researchDigest, topBucketsV2,
   type CandidateResult, type FoldResult, type ResearchObs,
 } from "../_shared/ron-research.ts";
+import {
+  CONTINUITY_CONTRACT_VERSION, FOLD_DEFINITION_VERSION_V3, RESEARCH_VERSION_V3,
+  analyseContinuity, buildVenueAwareFolds, candidateSpecPayloadV3, holdoutFold,
+  v3ContractHashes,
+} from "../_shared/ron-research-v3.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
 const PAGE = 1000;
-const CONTRACT = CALIBRATION_CONTRACT_V4;
-const QUALITY_V = 3;
+
+/** Accepted, frozen input lineage per research version. Never mutated by research. */
+const LINEAGE = {
+  2: { contract: CALIBRATION_CONTRACT_V4, quality_version: 3 },
+  3: { contract: CALIBRATION_CONTRACT_V7, quality_version: 4 },
+} as const;
 
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -63,6 +73,9 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body allowed */ }
   const folds = Number.isInteger(body.folds) ? Number(body.folds) : REQUESTED_FOLDS;
   const persist = body.persist !== false;
+  const rv = body.research_version === 3 ? RESEARCH_VERSION_V3 : RESEARCH_VERSION;
+  const CONTRACT = LINEAGE[rv as 2 | 3].contract;
+  const QUALITY_V = LINEAGE[rv as 2 | 3].quality_version;
 
   // ---- frozen immutable source clock (identical contract to calibration) --
   let sourceAsOf = typeof body.source_as_of === "string" ? body.source_as_of : null;
@@ -171,37 +184,80 @@ Deno.serve(async (req) => {
   const canonicalMax = outcomes.length ? new Date(outcomes[outcomes.length - 1].bar_time).toISOString() : null;
 
   // ---- purged walk-forward folds shared by both directions ----------------
-  const plan = buildGapAwareFolds([obs.long, obs.short], folds);
+  // V3 replaces V2's wall-clock epoch heuristic with the EXPECTED-OPEN venue-minute
+  // continuity contract, and reserves an untouched final holdout.
+  const continuity = rv === RESEARCH_VERSION_V3
+    ? analyseContinuity(outcomes.map((o) => new Date(o.bar_time).getTime()))
+    : null;
+  const plan: any = rv === RESEARCH_VERSION_V3
+    ? buildVenueAwareFolds([obs.long, obs.short], continuity!, folds)
+    : buildGapAwareFolds([obs.long, obs.short], folds);
   if (!plan.folds.length) {
-    return json({ error: "NO_DEFENSIBLE_FOLDS", fold_plan: plan }, 422);
+    return json({ error: "NO_DEFENSIBLE_FOLDS", fold_plan: plan, continuity }, 422);
   }
 
+  const v3hashes = rv === RESEARCH_VERSION_V3 ? await v3ContractHashes() : null;
   const stateSpecHash = await sha256(stateSpecPayloadV2());
-  const candidateSpecHash = await sha256(candidateSpecPayload());
-  const definitionHash = await sha256([
-    "research_version", RESEARCH_VERSION,
-    "state_spec_version", RON_STATE_SPEC_VERSION_V2,
-    SYMBOL, TIMEFRAME,
-    "quality_version", QUALITY_V,
-    "feature_version", CONTRACT.feature_version,
-    "label_version", CONTRACT.label_version,
-    "event", CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
-    "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
-    "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
-    "source_as_of", frozenAsOf,
-    "source_bar_cutoff", sourceBarCutoff,
-    "purge_minutes", PURGE_MINUTES,
-    "fold_definition_version", FOLD_DEFINITION_VERSION,
-    "coverage_epoch_gap_hours", COVERAGE_EPOCH_GAP_HOURS,
-    "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.accepted_folds,
-      plan.min_test_obs_per_fold,
-      plan.epochs.map((e) => [e.epoch, e.start, e.end, e.n_times, e.max_internal_gap_minutes]),
-      plan.folds.map((f) => [f.fold, f.coverage_epoch, f.purge_start, f.test_start, f.test_end,
-        f.max_internal_gap_minutes])],
-    "state_spec_hash", stateSpecHash,
-    "candidate_spec_hash", candidateSpecHash,
-    "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
-  ]);
+  const candidateSpecHash = rv === RESEARCH_VERSION_V3
+    ? await sha256(candidateSpecPayloadV3())
+    : await sha256(candidateSpecPayload());
+  const definitionHash = rv === RESEARCH_VERSION_V3
+    ? await sha256([
+      "research_version", RESEARCH_VERSION_V3,
+      "state_spec_version", RON_STATE_SPEC_VERSION_V2,
+      SYMBOL, TIMEFRAME,
+      "quality_version", QUALITY_V,
+      "feature_version", CONTRACT.feature_version,
+      "label_version", CONTRACT.label_version,
+      "event", CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+      "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+      "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+      "source_as_of", frozenAsOf,
+      "source_bar_cutoff", sourceBarCutoff,
+      "purge_minutes", PURGE_MINUTES,
+      "fold_definition_version", FOLD_DEFINITION_VERSION_V3,
+      "continuity_contract_version", CONTINUITY_CONTRACT_VERSION,
+      "continuity", [continuity!.venue_calendar_version, continuity!.source_bars,
+        continuity!.splitting_defects, continuity!.split_boundaries,
+        continuity!.defects.map((d) => [d.start, d.end, d.missing_expected_open_minutes, d.splits_epoch])],
+      "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.holdout_fraction,
+        plan.accepted_folds, plan.min_test_obs_per_fold,
+        plan.segments.map((s: any) => [s.segment, s.start, s.end, s.n_times]),
+        [plan.holdout.used, plan.holdout.test_start, plan.holdout.n_times],
+        plan.folds.map((f: any) => [f.fold, f.continuity_segment, f.purge_start, f.test_start,
+          f.test_end, f.max_internal_missing_expected_open_minutes])],
+      "venue_calendar_hash", v3hashes!.venue_calendar_hash,
+      "continuity_contract_hash", v3hashes!.continuity_contract_hash,
+      "fold_definition_hash", v3hashes!.fold_definition_hash,
+      "promotion_gate_hash", v3hashes!.promotion_gate_hash,
+      "state_spec_hash", stateSpecHash,
+      "candidate_spec_hash", candidateSpecHash,
+      "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
+    ])
+    : await sha256([
+      "research_version", RESEARCH_VERSION,
+      "state_spec_version", RON_STATE_SPEC_VERSION_V2,
+      SYMBOL, TIMEFRAME,
+      "quality_version", QUALITY_V,
+      "feature_version", CONTRACT.feature_version,
+      "label_version", CONTRACT.label_version,
+      "event", CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+      "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+      "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+      "source_as_of", frozenAsOf,
+      "source_bar_cutoff", sourceBarCutoff,
+      "purge_minutes", PURGE_MINUTES,
+      "fold_definition_version", FOLD_DEFINITION_VERSION,
+      "coverage_epoch_gap_hours", COVERAGE_EPOCH_GAP_HOURS,
+      "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.accepted_folds,
+        plan.min_test_obs_per_fold,
+        plan.epochs.map((e: any) => [e.epoch, e.start, e.end, e.n_times, e.max_internal_gap_minutes]),
+        plan.folds.map((f: any) => [f.fold, f.coverage_epoch, f.purge_start, f.test_start, f.test_end,
+          f.max_internal_gap_minutes])],
+      "state_spec_hash", stateSpecHash,
+      "candidate_spec_hash", candidateSpecHash,
+      "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
+    ]);
 
   // ---- evaluate: baseline first, then every predeclared candidate ---------
   const specs = buildCandidateSet();
@@ -222,6 +278,31 @@ Deno.serve(async (req) => {
     evidence[dir] = topBucketsV2(evaluated);
   }
 
+  // ---- untouched final holdout: evaluated ONLY after every gate decision ---
+  const hf = rv === RESEARCH_VERSION_V3 ? holdoutFold(plan) : null;
+  const holdoutReport: Record<string, unknown> = hf
+    ? { used: true, definition: plan.holdout, note: "evaluated after candidate selection; never used for gating" }
+    : { used: false, reason: rv === RESEARCH_VERSION_V3 ? plan.holdout?.reason ?? null : "not applicable" };
+  if (hf) {
+    for (const dir of ["long", "short"] as Direction[]) {
+      const base = evaluateCandidateFold(BASELINE_CANDIDATE, obs[dir], hf);
+      const rows = specs.filter((s) => s.kind !== "baseline_hierarchy").map((s) => {
+        const f = evaluateCandidateFold(s, obs[dir], hf);
+        return {
+          candidate: s.name, n_test: f.n_test, brier: f.brier, ece: f.ece, log_loss: f.log_loss,
+          non_global_coverage: f.non_global_coverage,
+          brier_delta_vs_baseline: f.brier != null && base.brier != null ? Number((base.brier - f.brier).toFixed(6)) : null,
+        };
+      });
+      holdoutReport[dir] = {
+        n_test: base.n_test, n_train: base.n_train, n_purged: base.n_purged,
+        observed_test_rate: base.observed_test_rate,
+        baseline: { brier: base.brier, naive_brier: base.naive_brier, ece: base.ece, log_loss: base.log_loss },
+        candidates: rows,
+      };
+    }
+  }
+
   const resultsDigest = await researchDigest(definitionHash, results);
   const runHash = await sha256([
     definitionHash,
@@ -229,6 +310,7 @@ Deno.serve(async (req) => {
     canonicalMin, canonicalMax,
     Object.keys(exclusion).sort().map((k) => [k, exclusion[k]]),
     plan, resultsDigest, evidence,
+    ...(rv === RESEARCH_VERSION_V3 ? [continuity, holdoutReport, v3hashes] : []),
   ]);
 
   let runId: string | null = null;
@@ -237,7 +319,7 @@ Deno.serve(async (req) => {
     const { data: run, error: runErr } = await supabase
       .from("ron_research_runs")
       .upsert({
-        research_version: RESEARCH_VERSION,
+        research_version: rv,
         symbol: SYMBOL, timeframe: TIMEFRAME,
         quality_version: QUALITY_V,
         feature_version: CONTRACT.feature_version,
@@ -263,6 +345,9 @@ Deno.serve(async (req) => {
         run_hash: runHash,
         results_digest: resultsDigest,
         bucket_evidence: evidence,
+        contract_hashes: v3hashes ?? {},
+        continuity_report: continuity ?? {},
+        holdout_report: holdoutReport,
         status: "complete",
       }, { onConflict: "definition_hash" })
       .select("id").single();
@@ -273,7 +358,7 @@ Deno.serve(async (req) => {
     for (let i = 0; i < results.length; i += 50) {
       const chunk = results.slice(i, i + 50).map((r) => ({
         run_id: runId,
-        research_version: RESEARCH_VERSION,
+        research_version: rv,
         direction: r.direction,
         candidate: r.candidate,
         candidate_kind: r.kind,
@@ -299,7 +384,7 @@ Deno.serve(async (req) => {
     .map((r) => ({ direction: r.direction, candidate: r.candidate, aggregate_brier_delta: r.vs_baseline?.aggregate_brier_delta ?? null }));
 
   return json({
-    research_version: RESEARCH_VERSION,
+    research_version: rv,
     research_only: true,
     probability_surfaced: false,
     persisted: persist,
@@ -318,6 +403,9 @@ Deno.serve(async (req) => {
     },
     state_spec_hash: stateSpecHash,
     candidate_spec_hash: candidateSpecHash,
+    contract_hashes: v3hashes,
+    continuity_report: continuity,
+    holdout_report: holdoutReport,
     definition_hash: definitionHash,
     run_hash: runHash,
     results_digest: resultsDigest,

@@ -1570,6 +1570,8 @@ export type Database = {
           canonical_rows: number
           canonical_source_max_bar_time: string | null
           canonical_source_min_bar_time: string | null
+          continuity_report: Json
+          contract_hashes: Json
           created_at: string
           definition_hash: string
           eligible_long: number
@@ -1579,6 +1581,7 @@ export type Database = {
           exclusion_breakdown: Json
           feature_version: number
           fold_plan: Json
+          holdout_report: Json
           horizon_minutes: number
           id: string
           label_version: number
@@ -1603,6 +1606,8 @@ export type Database = {
           canonical_rows?: number
           canonical_source_max_bar_time?: string | null
           canonical_source_min_bar_time?: string | null
+          continuity_report?: Json
+          contract_hashes?: Json
           created_at?: string
           definition_hash: string
           eligible_long?: number
@@ -1612,6 +1617,7 @@ export type Database = {
           exclusion_breakdown?: Json
           feature_version: number
           fold_plan?: Json
+          holdout_report?: Json
           horizon_minutes: number
           id?: string
           label_version: number
@@ -1636,6 +1642,8 @@ export type Database = {
           canonical_rows?: number
           canonical_source_max_bar_time?: string | null
           canonical_source_min_bar_time?: string | null
+          continuity_report?: Json
+          contract_hashes?: Json
           created_at?: string
           definition_hash?: string
           eligible_long?: number
@@ -1645,6 +1653,7 @@ export type Database = {
           exclusion_breakdown?: Json
           feature_version?: number
           fold_plan?: Json
+          holdout_report?: Json
           horizon_minutes?: number
           id?: string
           label_version?: number
