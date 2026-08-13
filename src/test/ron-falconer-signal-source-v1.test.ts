@@ -16,7 +16,8 @@ import {
   buildFalconerSignalSourceEvidenceV1, falconerSignalSourceSpecHash,
   canonicalFalconerRows, normalizeEventType, FalconerSourceConflictError,
   canonicalFalconerTradeRows, falconerLifecycleOf, falconerStateAsOf,
-  isReplaySafeTradeRow,
+  isReplaySafeTradeRow, readFalconerAvailabilityFacts, readCanonicalFalconerBoolean,
+  FalconerAvailabilityParityError, FALCONER_AVAILABILITY_OBSERVATION_KEYS,
   type FalconerEventRow, type FalconerTradeStateRow,
 } from "../../supabase/functions/_shared/ron-falconer-signal-source-spec.ts";
 import {
@@ -634,5 +635,99 @@ describe("2D.2j — purity and endpoint safety", () => {
     expect(FALCONER_SOURCE_MAX_ROWS).toBe(200);
     expect(FALCONER_SOURCE_LOOKBACK_MINUTES).toBe(240);
     expect(FALCONER_SOURCE_FRESH_MINUTES).toBe(60);
+  });
+});
+
+describe("2D.2k-b — endpoint / Evidence V1 availability parity", () => {
+  const fnSrc = readFileSync("supabase/functions/ron-agent-falconer-signal-source/index.ts", "utf8");
+
+  /** Mirrors exactly what the endpoint now does: read facts back out of sealed evidence. */
+  const endpointFacts = (e: Parameters<typeof readFalconerAvailabilityFacts>[0]) =>
+    readFalconerAvailabilityFacts(e);
+
+  it("1. malformed loaded row => evidence and endpoint both false while rows_loaded is 1", async () => {
+    const bad = { ...trade({ id: "t-malformed" }), direction: "sideways" } as FalconerTradeStateRow;
+    const e = await buildBound([bad]);
+    expect(obs(e, "falconer_signal_state_available")?.value_text).toBe("false");
+    expect(endpointFacts(e)).toEqual({
+      subject_binding_verified: true, signal_state_available: false, signal_state_row_exists: false,
+    });
+    expect(obs(e, "malformed_signal_state_rows_excluded")?.value_num).toBe(1);
+  });
+
+  it("2. terminal status with null closed_at => parity false", async () => {
+    const e = await buildBound([trade({ id: "t-term", status: "closed_sl", closed_at: null })]);
+    expect(obs(e, "falconer_signal_state_available")?.value_text).toBe("false");
+    expect(endpointFacts(e).signal_state_available).toBe(false);
+    expect(endpointFacts(e).signal_state_row_exists).toBe(false);
+  });
+
+  it("3. valid eligible row => evidence and endpoint both true", async () => {
+    const e = await buildBound([trade({ id: "t-ok" })]);
+    expect(obs(e, "falconer_signal_state_available")?.value_text).toBe("true");
+    expect(endpointFacts(e)).toEqual({
+      subject_binding_verified: true, signal_state_available: true, signal_state_row_exists: true,
+    });
+  });
+
+  it("4. subject bound with zero rows => binding true, availability false", async () => {
+    const e = await buildBound([]);
+    expect(endpointFacts(e)).toEqual({
+      subject_binding_verified: true, signal_state_available: false, signal_state_row_exists: false,
+    });
+    expect(obs(e, "signal_state_rows_eligible")?.value_num).toBe(0);
+  });
+
+  it("4b. no subject binding => everything false and fail closed", async () => {
+    const e = await buildBound(null);
+    expect(endpointFacts(e)).toEqual({
+      subject_binding_verified: false, signal_state_available: false, signal_state_row_exists: false,
+    });
+  });
+
+  it("5. the endpoint no longer derives availability from signalStateRows.length", () => {
+    expect(fnSrc).not.toContain("signal_state_available: (signalStateRows?.length ?? 0) > 0");
+    expect(fnSrc).not.toContain("signal_state_row_exists: (signalStateRows?.length ?? 0) > 0");
+    expect(fnSrc).toContain("readFalconerAvailabilityFacts(sealed)");
+    expect(fnSrc).toContain("signal_state_available: facts.signal_state_available");
+    expect(fnSrc).toContain("signal_state_row_exists: facts.signal_state_row_exists");
+    expect(fnSrc).toContain('availability_parity_source: "sealed_evidence_observations"');
+    // raw projection count stays a separate, non-implying fact
+    expect(fnSrc).toContain("signal_state_rows_loaded: signalStateRows?.length ?? 0");
+  });
+
+  it("6. the canonical parser fails closed for missing, conflicting and invalid tokens", () => {
+    const K = FALCONER_AVAILABILITY_OBSERVATION_KEYS;
+    const st = (key: string, value_text: string) => ({ key, kind: "state" as const, value_text });
+    expect(() => readCanonicalFalconerBoolean({ observations: [] }, K.available))
+      .toThrow(FalconerAvailabilityParityError);
+    expect(() => readCanonicalFalconerBoolean(
+      { observations: [st(K.available, "true"), st(K.available, "false")] }, K.available))
+      .toThrow(/conflicting_duplicate_observation/);
+    expect(() => readCanonicalFalconerBoolean({ observations: [st(K.available, "TRUE")] }, K.available))
+      .toThrow(/invalid_boolean_token/);
+    expect(() => readCanonicalFalconerBoolean(
+      { observations: [{ key: K.available, kind: "measurement" as const, value_num: 1 }] }, K.available))
+      .toThrow(/non_state_observation/);
+    // identical duplicates are collapsed, not invented
+    expect(readCanonicalFalconerBoolean(
+      { observations: [st(K.available, "true"), st(K.available, "true")] }, K.available)).toBe(true);
+    // cross-fact coherence
+    expect(() => readFalconerAvailabilityFacts({ observations: [
+      st(K.subject_binding, "true"), st(K.available, "true"), st(K.row_exists, "false"),
+    ] })).toThrow(/availability_row_exists_disagree/);
+    expect(() => readFalconerAvailabilityFacts({ observations: [
+      st(K.subject_binding, "false"), st(K.available, "true"), st(K.row_exists, "true"),
+    ] })).toThrow(/available_without_subject_binding/);
+  });
+
+  it("7. Falconer authority, rank, TTL and spec hash are unchanged by this correction", async () => {
+    expect(await falconerSignalSourceSpecHash()).toBe(FALCONER_SPEC_V1_HASH_PINNED);
+    const s = agentSpec("falconer_signal_source")!;
+    expect(s.authority_class).toBe("strategy_context");
+    expect(s.non_authoritative).toBe(true);
+    expect(s.source_health_authoritative).toBe(false);
+    expect(evidenceTtlMinutes("falconer_signal_source", "15m")).toBe(60);
+    expect(FALCONER_AUTHORITY).toBe("strategy_context_only");
   });
 });

@@ -463,6 +463,70 @@ export interface FalconerSignalSourceInputV1 {
   signal_state_rows?: readonly FalconerTradeStateRow[] | null;
 }
 
+/**
+ * 2D.2k-b — canonical availability parity. The ENDPOINT must never recompute availability
+ * from the raw safe projection: it reads these facts back out of the SEALED evidence, so
+ * the HTTP response and Evidence V1 can never disagree. Fails closed and never guesses.
+ */
+export class FalconerAvailabilityParityError extends Error {
+  constructor(public readonly reason: string) {
+    super(`falconer_availability_parity_violation:${reason}`);
+    this.name = "FalconerAvailabilityParityError";
+  }
+}
+
+export const FALCONER_AVAILABILITY_OBSERVATION_KEYS = {
+  subject_binding: "falconer_subject_binding_verified",
+  available: "falconer_signal_state_available",
+  row_exists: "falconer_signal_state_row_exists",
+} as const;
+
+/** Reads exactly one canonical literal `true` / `false` state observation. */
+export function readCanonicalFalconerBoolean(
+  envelope: { observations?: readonly Observation[] } | null | undefined,
+  key: string,
+): boolean {
+  const rows = (envelope?.observations ?? []).filter((o) => o?.key === key);
+  if (!rows.length) throw new FalconerAvailabilityParityError(`missing_observation:${key}`);
+  const tokens = new Set<string>();
+  for (const o of rows) {
+    if (o.kind !== "state") throw new FalconerAvailabilityParityError(`non_state_observation:${key}`);
+    const t = o.value_text;
+    if (t !== "true" && t !== "false") {
+      throw new FalconerAvailabilityParityError(`invalid_boolean_token:${key}`);
+    }
+    tokens.add(t);
+  }
+  if (tokens.size !== 1) throw new FalconerAvailabilityParityError(`conflicting_duplicate_observation:${key}`);
+  return tokens.has("true");
+}
+
+export interface FalconerAvailabilityFacts {
+  subject_binding_verified: boolean;
+  signal_state_available: boolean;
+  signal_state_row_exists: boolean;
+}
+
+/** Single source of truth for endpoint availability semantics. */
+export function readFalconerAvailabilityFacts(
+  envelope: { observations?: readonly Observation[] } | null | undefined,
+): FalconerAvailabilityFacts {
+  const K = FALCONER_AVAILABILITY_OBSERVATION_KEYS;
+  const facts = {
+    subject_binding_verified: readCanonicalFalconerBoolean(envelope, K.subject_binding),
+    signal_state_available: readCanonicalFalconerBoolean(envelope, K.available),
+    signal_state_row_exists: readCanonicalFalconerBoolean(envelope, K.row_exists),
+  };
+  if (facts.signal_state_available !== facts.signal_state_row_exists) {
+    throw new FalconerAvailabilityParityError("availability_row_exists_disagree");
+  }
+  if (facts.signal_state_available && !facts.subject_binding_verified) {
+    throw new FalconerAvailabilityParityError("available_without_subject_binding");
+  }
+  return facts;
+}
+
+
 const num = (key: string, value: number, at?: string, unit?: string): Observation =>
   ({ key, kind: "measurement", value_num: value, ...(unit ? { unit } : {}), ...(at ? { at } : {}) });
 const state = (key: string, value: string, at?: string): Observation =>
