@@ -64,6 +64,21 @@ describe("2D.2e — detector + spec pins", () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  // Phase 2D.2e-CORR: exact regression pin of the accepted Pattern Context V1 identity.
+  // The spec is frozen; any change to it must be a NEW version, never a silent re-hash.
+  it("pins the FULL accepted Pattern Context V1 spec hash", async () => {
+    expect(await patternContextSpecHash())
+      .toBe("9983d79b80e691655bfdd9179c2dabab14ec41494fa7e738cc540b1727de663d");
+  });
+
+  it("pins the FULL accepted pattern detector source digest", () => {
+    expect(PATTERN_DETECTOR_SOURCE_SHA256)
+      .toBe("2086613c1cc164c9c057e26d14272332444268918d8805b663c14e3a3efaf756");
+    const src = readFileSync("supabase/functions/_shared/ron-patterns.ts");
+    expect(createHash("sha256").update(src).digest("hex"))
+      .toBe("2086613c1cc164c9c057e26d14272332444268918d8805b663c14e3a3efaf756");
+  });
+
   it("pins the FULL accepted Session V2 spec hash as its segmentation dependency", async () => {
     expect(await sessionStructureSpecHashV2()).toBe(SESSION_STRUCTURE_SPEC_V2_HASH_PINNED);
     expect(PATTERN_CONTEXT_SPEC_V1.segmentation_dependency.spec_hash)
