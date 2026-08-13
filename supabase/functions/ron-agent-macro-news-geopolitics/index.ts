@@ -6,6 +6,8 @@
  * impact`. It never selects `ai_reason_short` or `sentiment_direction`, never touches the
  * legacy `news_impact_results` table, never calls an LLM, never fetches the web, never
  * calls the orchestrator and has NO persistence branch of any kind in this phase.
+ *
+ * Non-persisting in Phase 2D.2h: the response returns a sealed envelope only.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { sealEvidence, validateEvidence } from "../_shared/ron-agent-contracts.ts";
