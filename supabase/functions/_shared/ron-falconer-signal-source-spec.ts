@@ -145,7 +145,7 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
       "user_id", "message", "context",
       "direction", "status", "opened_at", "closed_at", "trigger_type",
       "entry_price", "sl_price", "tp1_price", "tp2_price", "tp3_price",
-      "qty", "pnl_usd", "setup_score", "execution_path", "metaapi_position_ids",
+      "qty", "pnl_usd", "setup_score", "execution_path", "broker_position_ids",
       "broker_deal_ids", "raw_alert_payload", "notes", "features",
     ],
     context_selected: false,
@@ -323,9 +323,9 @@ export async function buildFalconerSignalSourceEvidenceV1(
     "this specialist performs no strategy evaluation: it only replays what the frozen Falconer runtime already wrote to its production event log",
     "the runtime rating, trade geometry and routing fields present in source rows are deliberately NOT surfaced",
     "the absence of a runtime event is an absence of SOURCE DATA, not proof that the strategy had nothing to say",
-    "FALCONER SIGNAL STATE IS AN UNACCEPTED SOURCE CONTRACT GAP: the real signal-state source (falconer_trades) is user-scoped and RON has no accepted internal user/subject contract, so no signal state, status, direction or opened/closed timestamp is emitted here",
-    "falconer_engine_events is a runtime/event-health log only and is NOT the production signal-state source used by the existing Falconer readers",
-    "the source context JSON blob is never selected, because exact safe key projection is unsupported and production rows carry geometry and rating material",
+    "FALCONER SIGNAL STATE IS AN UNACCEPTED SOURCE CONTRACT GAP: the real signal-state source is user-scoped and RON holds no accepted internal user/subject contract; no signal state, status, direction or open/close timestamp is emitted here",
+    "this source is a runtime/event-health log only and is NOT the production signal-state source used by the existing Falconer readers",
+    "the source context JSON blob is never selected: exact safe key projection is unsupported and production rows carry geometry and rating material",
   ];
   const issues: string[] = [];
   const source_timestamps: Record<string, string> = { evaluation_anchor: iso(anchor) };
