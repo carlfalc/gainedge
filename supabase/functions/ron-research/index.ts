@@ -278,6 +278,31 @@ Deno.serve(async (req) => {
     evidence[dir] = topBucketsV2(evaluated);
   }
 
+  // ---- untouched final holdout: evaluated ONLY after every gate decision ---
+  const hf = rv === RESEARCH_VERSION_V3 ? holdoutFold(plan) : null;
+  const holdoutReport: Record<string, unknown> = hf
+    ? { used: true, definition: plan.holdout, note: "evaluated after candidate selection; never used for gating" }
+    : { used: false, reason: rv === RESEARCH_VERSION_V3 ? plan.holdout?.reason ?? null : "not applicable" };
+  if (hf) {
+    for (const dir of ["long", "short"] as Direction[]) {
+      const base = evaluateCandidateFold(BASELINE_CANDIDATE, obs[dir], hf);
+      const rows = specs.filter((s) => s.kind !== "baseline_hierarchy").map((s) => {
+        const f = evaluateCandidateFold(s, obs[dir], hf);
+        return {
+          candidate: s.name, n_test: f.n_test, brier: f.brier, ece: f.ece, log_loss: f.log_loss,
+          non_global_coverage: f.non_global_coverage,
+          brier_delta_vs_baseline: f.brier != null && base.brier != null ? Number((base.brier - f.brier).toFixed(6)) : null,
+        };
+      });
+      holdoutReport[dir] = {
+        n_test: base.n_test, n_train: base.n_train, n_purged: base.n_purged,
+        observed_test_rate: base.observed_test_rate,
+        baseline: { brier: base.brier, naive_brier: base.naive_brier, ece: base.ece, log_loss: base.log_loss },
+        candidates: rows,
+      };
+    }
+  }
+
   const resultsDigest = await researchDigest(definitionHash, results);
   const runHash = await sha256([
     definitionHash,
