@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   HOLIDAY_RULES, RON_VENUE_CALENDAR_VERSION, closedReasonHistogram, expectedClosedReason,
-  expectedOpen, expectedOpenMinutes, holidayMap, nyClock, venueCalendarPayload,
+  expectedOpen, expectedOpenMinutes, holidayMap, nyClock, venueCalendarPayload, xauVenueOpen,
 } from "../../supabase/functions/_shared/ron-venue-calendar.ts";
 import {
   DEFECT_MIN_EXPECTED_OPEN_MINUTES, SPLIT_MIN_EXPECTED_OPEN_MINUTES,
@@ -57,6 +57,22 @@ describe("Phase 2D.1f — XAUUSD venue calendar v1", () => {
     expect(missing).toBeLessThan(DEFECT_MIN_EXPECTED_OPEN_MINUTES);
     const reasons = closedReasonHistogram(ms("2026-04-03T00:00:00Z"), ms("2026-04-04T00:00:00Z"));
     expect(Object.keys(reasons).some((k) => k.startsWith("good_friday"))).toBe(true);
+  });
+
+  it("matches the accepted xauVenueOpen base schedule on every minute of a sample year", () => {
+    let checked = 0;
+    for (let t = ms("2026-01-01T00:00:00Z"); t < ms("2026-01-15T00:00:00Z"); t += 60_000) {
+      const d = new Date(t);
+      const holiday = expectedClosedReason(t)?.includes(":") ?? false;
+      if (!holiday) expect(expectedOpen(t)).toBe(xauVenueOpen(d));
+      checked++;
+    }
+    for (let t = ms("2026-03-06T00:00:00Z"); t < ms("2026-03-12T00:00:00Z"); t += 60_000) {
+      const d = new Date(t);            // spans the 2026 US DST transition
+      if (!(expectedClosedReason(t)?.includes(":") ?? false)) expect(expectedOpen(t)).toBe(xauVenueOpen(d));
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(28_000);
   });
 
   it("is DST-aware on both sides of the year", () => {

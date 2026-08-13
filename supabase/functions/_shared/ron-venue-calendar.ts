@@ -18,6 +18,9 @@
  */
 import { xauVenueOpen } from "./ron-sessions.ts";
 
+/** Re-exported so consumers can assert the accepted base schedule is what V3 uses. */
+export { xauVenueOpen };
+
 export const RON_VENUE_CALENDAR_VERSION = 1;
 
 /** Closure shapes, expressed in America/New_York LOCAL wall-clock minutes-from-midnight. */
