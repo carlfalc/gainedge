@@ -13,7 +13,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION, CALIBRATION_CONTRACT_V4,
-  CALIBRATION_CONTRACT_V7,
+  CALIBRATION_CONTRACT_V7, CALIBRATION_CONTRACT_V8,
   CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION, CALIBRATION_HORIZON_MINUTES,
   INELIGIBLE_ANCHOR_SESSIONS, NoGenuineSourceClockError, anchorSessionEligible,
   deriveSourceBarCutoff, eligibleFor, resolveSourceClockV2, sha256,
@@ -35,6 +35,13 @@ import {
   analyseContinuity, buildVenueAwareFolds, candidateSpecPayloadV3, holdoutFold,
   v3ContractHashes,
 } from "../_shared/ron-research-v3.ts";
+import {
+  CONTINUITY_BOUNDARY_MAPPING, CONTINUITY_CONTRACT_VERSION_V4, CONTINUITY_SOURCE_IDENTITY,
+  CONTINUITY_SOURCE_SPEC, FOLD_DEFINITION_VERSION_V4, PROMOTION_GATE_V4, RESEARCH_VERSION_V4,
+  analyseContinuityV4, buildVenueAwareFoldsV4, candidateSpecPayloadV4, evaluatePreHoldoutGateV4,
+  finalPromotionV4, v4ContractHashes,
+  type HoldoutObservation,
+} from "../_shared/ron-research-v4.ts";
 
 const SYMBOL = "XAUUSD";
 const TIMEFRAME = "15m";
@@ -44,6 +51,7 @@ const PAGE = 1000;
 const LINEAGE = {
   2: { contract: CALIBRATION_CONTRACT_V4, quality_version: 3 },
   3: { contract: CALIBRATION_CONTRACT_V7, quality_version: 4 },
+  4: { contract: CALIBRATION_CONTRACT_V8, quality_version: 5 },
 } as const;
 
 const json = (b: unknown, status = 200) =>
@@ -73,9 +81,12 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body allowed */ }
   const folds = Number.isInteger(body.folds) ? Number(body.folds) : REQUESTED_FOLDS;
   const persist = body.persist !== false;
-  const rv = body.research_version === 3 ? RESEARCH_VERSION_V3 : RESEARCH_VERSION;
-  const CONTRACT = LINEAGE[rv as 2 | 3].contract;
-  const QUALITY_V = LINEAGE[rv as 2 | 3].quality_version;
+  const rv = body.research_version === 4
+    ? RESEARCH_VERSION_V4
+    : body.research_version === 3 ? RESEARCH_VERSION_V3 : RESEARCH_VERSION;
+  const isV4 = rv === RESEARCH_VERSION_V4;
+  const CONTRACT = LINEAGE[rv as 2 | 3 | 4].contract;
+  const QUALITY_V = LINEAGE[rv as 2 | 3 | 4].quality_version;
 
   // ---- frozen immutable source clock (identical contract to calibration) --
   let sourceAsOf = typeof body.source_as_of === "string" ? body.source_as_of : null;
@@ -117,6 +128,8 @@ Deno.serve(async (req) => {
 
   // ---- feature v4 snapshots (features + persisted patterns) ---------------
   const snaps = new Map<string, { features: Record<string, unknown>; patterns: any[] }>();
+  /** V4 continuity source: the ORDERED accepted feature-grid, bounded by the frozen cutoff. */
+  const featureGridTimes: number[] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabase
       .from("ron_market_snapshots")
@@ -128,15 +141,21 @@ Deno.serve(async (req) => {
     if (error) return json({ error: error.message }, 500);
     const rows = data ?? [];
     for (const r of rows as any[]) {
-      snaps.set(new Date(r.bar_time).toISOString(), {
+      const iso = new Date(r.bar_time).toISOString();
+      snaps.set(iso, {
         features: r.features ?? {},
         patterns: Array.isArray(r.patterns) ? r.patterns : [],
       });
+      if (iso <= sourceBarCutoff) featureGridTimes.push(new Date(iso).getTime());
     }
     if (rows.length < PAGE) break;
   }
 
   const quarantined = await loadQuarantinedBarTimes(supabase, SYMBOL, TIMEFRAME, QUALITY_V, PAGE);
+  // Quality-v5 eligibility is applied by construction to the V4 continuity source.
+  const eligibleGridTimes = featureGridTimes
+    .filter((t) => !quarantined.has(new Date(t).toISOString()))
+    .sort((a, b) => a - b);
 
   const exclusion: Record<string, number> = {};
   const bump = (k: string) => { exclusion[k] = (exclusion[k] ?? 0) + 1; };
@@ -186,22 +205,67 @@ Deno.serve(async (req) => {
   // ---- purged walk-forward folds shared by both directions ----------------
   // V3 replaces V2's wall-clock epoch heuristic with the EXPECTED-OPEN venue-minute
   // continuity contract, and reserves an untouched final holdout.
-  const continuity = rv === RESEARCH_VERSION_V3
-    ? analyseContinuity(outcomes.map((o) => new Date(o.bar_time).getTime()))
-    : null;
-  const plan: any = rv === RESEARCH_VERSION_V3
-    ? buildVenueAwareFolds([obs.long, obs.short], continuity!, folds)
-    : buildGapAwareFolds([obs.long, obs.short], folds);
+  const continuity = isV4
+    ? analyseContinuityV4(eligibleGridTimes)
+    : rv === RESEARCH_VERSION_V3
+      ? analyseContinuity(outcomes.map((o) => new Date(o.bar_time).getTime()))
+      : null;
+  const plan: any = isV4
+    ? buildVenueAwareFoldsV4([obs.long, obs.short], continuity!, folds)
+    : rv === RESEARCH_VERSION_V3
+      ? buildVenueAwareFolds([obs.long, obs.short], continuity!, folds)
+      : buildGapAwareFolds([obs.long, obs.short], folds);
   if (!plan.folds.length) {
     return json({ error: "NO_DEFENSIBLE_FOLDS", fold_plan: plan, continuity }, 422);
   }
 
-  const v3hashes = rv === RESEARCH_VERSION_V3 ? await v3ContractHashes() : null;
+  const v3hashes = isV4
+    ? await v4ContractHashes()
+    : rv === RESEARCH_VERSION_V3 ? await v3ContractHashes() : null;
   const stateSpecHash = await sha256(stateSpecPayloadV2());
-  const candidateSpecHash = rv === RESEARCH_VERSION_V3
-    ? await sha256(candidateSpecPayloadV3())
-    : await sha256(candidateSpecPayload());
-  const definitionHash = rv === RESEARCH_VERSION_V3
+  const candidateSpecHash = isV4
+    ? await sha256(candidateSpecPayloadV4())
+    : rv === RESEARCH_VERSION_V3
+      ? await sha256(candidateSpecPayloadV3())
+      : await sha256(candidateSpecPayload());
+  const definitionHash = isV4
+    ? await sha256([
+      "research_version", RESEARCH_VERSION_V4,
+      "state_spec_version", RON_STATE_SPEC_VERSION_V2,
+      SYMBOL, TIMEFRAME,
+      "quality_version", QUALITY_V,
+      "feature_version", CONTRACT.feature_version,
+      "label_version", CONTRACT.label_version,
+      "event", CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+      "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+      "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+      "source_as_of", frozenAsOf,
+      "source_bar_cutoff", sourceBarCutoff,
+      "purge_minutes", PURGE_MINUTES,
+      "fold_definition_version", FOLD_DEFINITION_VERSION_V4,
+      "continuity_contract_version", CONTINUITY_CONTRACT_VERSION_V4,
+      "continuity_source_identity", CONTINUITY_SOURCE_IDENTITY,
+      "continuity_boundary_mapping", CONTINUITY_BOUNDARY_MAPPING,
+      "continuity", [continuity!.venue_calendar_version, continuity!.source_bars,
+        continuity!.splitting_defects, continuity!.split_boundaries,
+        continuity!.defects.map((d) => [d.start, d.end, d.missing_expected_open_minutes, d.splits_epoch])],
+      "mapped_split_boundaries", plan.mapped_split_boundaries,
+      "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.holdout_fraction,
+        plan.accepted_folds, plan.min_test_obs_per_fold,
+        plan.segments.map((s: any) => [s.segment, s.start, s.end, s.n_times]),
+        [plan.holdout.used, plan.holdout.test_start, plan.holdout.n_times],
+        plan.folds.map((f: any) => [f.fold, f.continuity_segment, f.purge_start, f.test_start,
+          f.test_end, f.max_internal_missing_expected_open_minutes])],
+      "venue_calendar_hash", v3hashes!.venue_calendar_hash,
+      "continuity_contract_hash", v3hashes!.continuity_contract_hash,
+      "continuity_source_hash", (v3hashes as any).continuity_source_hash,
+      "fold_definition_hash", v3hashes!.fold_definition_hash,
+      "promotion_gate_hash", v3hashes!.promotion_gate_hash,
+      "state_spec_hash", stateSpecHash,
+      "candidate_spec_hash", candidateSpecHash,
+      "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
+    ])
+    : rv === RESEARCH_VERSION_V3
     ? await sha256([
       "research_version", RESEARCH_VERSION_V3,
       "state_spec_version", RON_STATE_SPEC_VERSION_V2,
@@ -279,10 +343,10 @@ Deno.serve(async (req) => {
   }
 
   // ---- untouched final holdout: evaluated ONLY after every gate decision ---
-  const hf = rv === RESEARCH_VERSION_V3 ? holdoutFold(plan) : null;
+  const hf = rv === RESEARCH_VERSION_V3 || isV4 ? holdoutFold(plan) : null;
   const holdoutReport: Record<string, unknown> = hf
     ? { used: true, definition: plan.holdout, note: "evaluated after candidate selection; never used for gating" }
-    : { used: false, reason: rv === RESEARCH_VERSION_V3 ? plan.holdout?.reason ?? null : "not applicable" };
+    : { used: false, reason: rv === RESEARCH_VERSION_V3 || isV4 ? plan.holdout?.reason ?? null : "not applicable" };
   if (hf) {
     for (const dir of ["long", "short"] as Direction[]) {
       const base = evaluateCandidateFold(BASELINE_CANDIDATE, obs[dir], hf);
@@ -303,6 +367,61 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ---- V4 TWO-STAGE promotion gate (predeclared, frozen before this run) ---
+  // Stage 1 uses ONLY pre-holdout evidence. Stage 2 (untouched holdout) is consulted
+  // per candidate ONLY when stage 1 already passed, so it can never select, rank or
+  // tune anything. `supported_non_global_coverage` is the pooled OOS coverage counting
+  // only predictions served by a bucket that met its predeclared training support
+  // floor — the fold scorer never emits a non-global prediction otherwise.
+  const twoStageGate: Record<string, unknown> = {};
+  if (isV4) {
+    const holdoutFor = (dir: Direction, candidate: string): HoldoutObservation => {
+      const h = holdoutReport[dir] as any;
+      if (!hf || !h) return { feasible: false, reason: (plan.holdout?.reason ?? "holdout_unavailable") };
+      const row = (h.candidates ?? []).find((c: any) => c.candidate === candidate);
+      if (!row) return { feasible: false, reason: "candidate_absent_from_holdout" };
+      if (row.brier == null || h.baseline?.brier == null) {
+        return { feasible: false, reason: "holdout_brier_unavailable" };
+      }
+      return {
+        feasible: true,
+        candidate: { brier: row.brier, ece: row.ece },
+        baseline: { brier: h.baseline.brier, ece: h.baseline.ece },
+      };
+    };
+    for (const dir of ["long", "short"] as Direction[]) {
+      const baseRes = results.find((r) => r.direction === dir && r.kind === "baseline_hierarchy")!;
+      const perCandidate: Record<string, unknown> = {};
+      for (const r of results) {
+        if (r.direction !== dir || r.kind === "baseline_hierarchy") continue;
+        const pre = evaluatePreHoldoutGateV4(
+          {
+            brier: r.aggregate.brier,
+            ece: r.aggregate.ece,
+            supported_non_global_coverage: r.aggregate.non_global_coverage,
+          },
+          { brier: baseRes.aggregate.brier, ece: baseRes.aggregate.ece, supported_non_global_coverage: baseRes.aggregate.non_global_coverage },
+          {
+            aggregate_brier_delta: r.vs_baseline?.aggregate_brier_delta ?? null,
+            fold_deltas: r.vs_baseline?.fold_deltas ?? [],
+            folds_better: r.vs_baseline?.folds_better ?? 0,
+            worst_fold_degradation: r.vs_baseline?.worst_fold_degradation ?? null,
+          },
+          plan.folds.length,
+        );
+        const decision = finalPromotionV4(pre, () => holdoutFor(dir, r.candidate));
+        perCandidate[r.candidate] = decision;
+        // The V4 gate is strictly stricter than the V2 gate it reuses numerically.
+        r.promising_for_2D2 = decision.final_promotion_pass;
+        r.gate_reasons = decision.final_promotion_pass ? [] : decision.final_reasons;
+      }
+      twoStageGate[dir] = perCandidate;
+    }
+    holdoutReport.two_stage_gate = twoStageGate;
+    holdoutReport.gate_version = PROMOTION_GATE_V4.gate_version;
+    holdoutReport.continuity_source = CONTINUITY_SOURCE_SPEC;
+  }
+
   const resultsDigest = await researchDigest(definitionHash, results);
   const runHash = await sha256([
     definitionHash,
@@ -310,7 +429,7 @@ Deno.serve(async (req) => {
     canonicalMin, canonicalMax,
     Object.keys(exclusion).sort().map((k) => [k, exclusion[k]]),
     plan, resultsDigest, evidence,
-    ...(rv === RESEARCH_VERSION_V3 ? [continuity, holdoutReport, v3hashes] : []),
+    ...(rv === RESEARCH_VERSION_V3 || isV4 ? [continuity, holdoutReport, v3hashes] : []),
   ]);
 
   let runId: string | null = null;
@@ -411,7 +530,8 @@ Deno.serve(async (req) => {
     results_digest: resultsDigest,
     exclusion_breakdown: exclusion,
     fold_plan: plan,
-    promotion_gate: PROMOTION_GATE,
+    promotion_gate: isV4 ? PROMOTION_GATE_V4 : PROMOTION_GATE,
+    ...(isV4 ? { two_stage_gate: twoStageGate, continuity_source: CONTINUITY_SOURCE_SPEC } : {}),
     baseline: results.filter((r) => r.kind === "baseline_hierarchy"),
     candidates: results.filter((r) => r.kind !== "baseline_hierarchy"),
     promising_for_2D2: promising,
