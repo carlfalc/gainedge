@@ -184,37 +184,80 @@ Deno.serve(async (req) => {
   const canonicalMax = outcomes.length ? new Date(outcomes[outcomes.length - 1].bar_time).toISOString() : null;
 
   // ---- purged walk-forward folds shared by both directions ----------------
-  const plan = buildGapAwareFolds([obs.long, obs.short], folds);
+  // V3 replaces V2's wall-clock epoch heuristic with the EXPECTED-OPEN venue-minute
+  // continuity contract, and reserves an untouched final holdout.
+  const continuity = rv === RESEARCH_VERSION_V3
+    ? analyseContinuity(outcomes.map((o) => new Date(o.bar_time).getTime()))
+    : null;
+  const plan: any = rv === RESEARCH_VERSION_V3
+    ? buildVenueAwareFolds([obs.long, obs.short], continuity!, folds)
+    : buildGapAwareFolds([obs.long, obs.short], folds);
   if (!plan.folds.length) {
-    return json({ error: "NO_DEFENSIBLE_FOLDS", fold_plan: plan }, 422);
+    return json({ error: "NO_DEFENSIBLE_FOLDS", fold_plan: plan, continuity }, 422);
   }
 
+  const v3hashes = rv === RESEARCH_VERSION_V3 ? await v3ContractHashes() : null;
   const stateSpecHash = await sha256(stateSpecPayloadV2());
-  const candidateSpecHash = await sha256(candidateSpecPayload());
-  const definitionHash = await sha256([
-    "research_version", RESEARCH_VERSION,
-    "state_spec_version", RON_STATE_SPEC_VERSION_V2,
-    SYMBOL, TIMEFRAME,
-    "quality_version", QUALITY_V,
-    "feature_version", CONTRACT.feature_version,
-    "label_version", CONTRACT.label_version,
-    "event", CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
-    "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
-    "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
-    "source_as_of", frozenAsOf,
-    "source_bar_cutoff", sourceBarCutoff,
-    "purge_minutes", PURGE_MINUTES,
-    "fold_definition_version", FOLD_DEFINITION_VERSION,
-    "coverage_epoch_gap_hours", COVERAGE_EPOCH_GAP_HOURS,
-    "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.accepted_folds,
-      plan.min_test_obs_per_fold,
-      plan.epochs.map((e) => [e.epoch, e.start, e.end, e.n_times, e.max_internal_gap_minutes]),
-      plan.folds.map((f) => [f.fold, f.coverage_epoch, f.purge_start, f.test_start, f.test_end,
-        f.max_internal_gap_minutes])],
-    "state_spec_hash", stateSpecHash,
-    "candidate_spec_hash", candidateSpecHash,
-    "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
-  ]);
+  const candidateSpecHash = rv === RESEARCH_VERSION_V3
+    ? await sha256(candidateSpecPayloadV3())
+    : await sha256(candidateSpecPayload());
+  const definitionHash = rv === RESEARCH_VERSION_V3
+    ? await sha256([
+      "research_version", RESEARCH_VERSION_V3,
+      "state_spec_version", RON_STATE_SPEC_VERSION_V2,
+      SYMBOL, TIMEFRAME,
+      "quality_version", QUALITY_V,
+      "feature_version", CONTRACT.feature_version,
+      "label_version", CONTRACT.label_version,
+      "event", CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+      "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+      "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+      "source_as_of", frozenAsOf,
+      "source_bar_cutoff", sourceBarCutoff,
+      "purge_minutes", PURGE_MINUTES,
+      "fold_definition_version", FOLD_DEFINITION_VERSION_V3,
+      "continuity_contract_version", CONTINUITY_CONTRACT_VERSION,
+      "continuity", [continuity!.venue_calendar_version, continuity!.source_bars,
+        continuity!.splitting_defects, continuity!.split_boundaries,
+        continuity!.defects.map((d) => [d.start, d.end, d.missing_expected_open_minutes, d.splits_epoch])],
+      "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.holdout_fraction,
+        plan.accepted_folds, plan.min_test_obs_per_fold,
+        plan.segments.map((s: any) => [s.segment, s.start, s.end, s.n_times]),
+        [plan.holdout.used, plan.holdout.test_start, plan.holdout.n_times],
+        plan.folds.map((f: any) => [f.fold, f.continuity_segment, f.purge_start, f.test_start,
+          f.test_end, f.max_internal_missing_expected_open_minutes])],
+      "venue_calendar_hash", v3hashes!.venue_calendar_hash,
+      "continuity_contract_hash", v3hashes!.continuity_contract_hash,
+      "fold_definition_hash", v3hashes!.fold_definition_hash,
+      "promotion_gate_hash", v3hashes!.promotion_gate_hash,
+      "state_spec_hash", stateSpecHash,
+      "candidate_spec_hash", candidateSpecHash,
+      "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
+    ])
+    : await sha256([
+      "research_version", RESEARCH_VERSION,
+      "state_spec_version", RON_STATE_SPEC_VERSION_V2,
+      SYMBOL, TIMEFRAME,
+      "quality_version", QUALITY_V,
+      "feature_version", CONTRACT.feature_version,
+      "label_version", CONTRACT.label_version,
+      "event", CALIBRATION_EVENT, CALIBRATION_EVENT_VERSION,
+      "horizon_minutes", CALIBRATION_HORIZON_MINUTES,
+      "barrier", CALIBRATION_BARRIER_ATR_MULT, CALIBRATION_BARRIER_VERSION,
+      "source_as_of", frozenAsOf,
+      "source_bar_cutoff", sourceBarCutoff,
+      "purge_minutes", PURGE_MINUTES,
+      "fold_definition_version", FOLD_DEFINITION_VERSION,
+      "coverage_epoch_gap_hours", COVERAGE_EPOCH_GAP_HOURS,
+      "fold_plan", [plan.fold_definition_version, plan.initial_train_fraction, plan.accepted_folds,
+        plan.min_test_obs_per_fold,
+        plan.epochs.map((e: any) => [e.epoch, e.start, e.end, e.n_times, e.max_internal_gap_minutes]),
+        plan.folds.map((f: any) => [f.fold, f.coverage_epoch, f.purge_start, f.test_start, f.test_end,
+          f.max_internal_gap_minutes])],
+      "state_spec_hash", stateSpecHash,
+      "candidate_spec_hash", candidateSpecHash,
+      "bucket_evidence_accounting", "latest_floor_fold_train_reference_disjoint_pooled_oos",
+    ]);
 
   // ---- evaluate: baseline first, then every predeclared candidate ---------
   const specs = buildCandidateSet();
