@@ -1,9 +1,13 @@
-DO $$
-DECLARE v bigint;
-BEGIN
-  SELECT public.ron_invoke_worker(
-    'ron-agent-session-structure',
-    '{"instrument":"XAUUSD","timeframe":"15m","run_id":"2d2b-corr-smoke-run","trace_id":"2d2b-corr-smoke-trace","persist":false}'::jsonb
-  ) INTO v;
-  RAISE NOTICE 'smoke request id %', v;
-END $$;
+-- Phase 2D.2b-CORR — HISTORICAL MARKER ONLY. PERMANENTLY NEUTRALIZED.
+--
+-- This version originally contained a one-off DO block that invoked
+-- public.ron_invoke_worker('ron-agent-session-structure', ...) purely to launch the
+-- non-persisting V2 market-structure smoke against production during the 2D.2b-CORR
+-- audit. That invocation already served its one-off purpose and its result is recorded
+-- in the phase audit (evidence_hash 2350e152..., persist=false, execution_allowed=false).
+--
+-- It must NEVER execute again: replaying it in a fresh or rebuilt environment would fire
+-- an outbound HTTP request from a migration. All executable code has been removed, in
+-- line with the established recovery/harness-migration hygiene practice.
+--
+-- No schema, privilege, data, or lineage effect. Intentionally a no-op.
