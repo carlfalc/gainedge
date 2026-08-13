@@ -33,7 +33,7 @@ import { opportunityRiskSpecHash } from "../../supabase/functions/_shared/ron-op
 import { PROMOTED_STATE_VARIABLES } from "../../supabase/functions/_shared/ron-agentic-architecture.ts";
 
 /** EXACT frozen full hash of Falconer Signal Source Spec V1. */
-const FALCONER_SPEC_V1_HASH_PINNED = "09f82e33cca97046f90e5a4577c6b1486267b0ed0a8a3ebdcf019c907413f583";
+const FALCONER_SPEC_V1_HASH_PINNED = "40a4b6f9d465ae0362e1a0ada43e3b699c2674efa30c5dbe9e5a934dcd1005f3";
 
 /** EXACT sha256 of the FROZEN Falconer strategy module. It must never change. */
 const FALCONER_STRATEGY_SHA256 =
@@ -201,7 +201,9 @@ describe("2D.2j — verified source contract", () => {
     for (const e of [await build([]), await build([row({ id: "a" })])]) {
       expect(obs(e, "falconer_signal_state_contract")?.value_text)
         .toBe("accepted_subject_bound_jwt_rls");
+      expect(obs(e, "falconer_subject_binding_verified")?.value_text).toBe("false");
       expect(obs(e, "falconer_signal_state_available")?.value_text).toBe("false");
+      expect(obs(e, "falconer_signal_state_row_exists")?.value_text).toBe("false");
       expect(obs(e, "falconer_signal_state_mode")?.value_text)
         .toBe("no_subject_binding_fail_closed");
       expect(obs(e, "falconer_signal_status")).toBeUndefined();
@@ -215,6 +217,7 @@ describe("2D.2j — verified source contract", () => {
 
   it("with a verified subject it emits safe signal state and never a user identifier", async () => {
     const e = await buildBound([trade({ id: "t1" })]);
+    expect(obs(e, "falconer_subject_binding_verified")?.value_text).toBe("true");
     expect(obs(e, "falconer_signal_state_available")?.value_text).toBe("true");
     expect(obs(e, "falconer_signal_state_mode")?.value_text).toBe("subject_bound_caller_scoped");
     expect(obs(e, "falconer_signal_status")?.value_text).toBe("open");
@@ -243,6 +246,85 @@ describe("2D.2j — verified source contract", () => {
     expect(e.data_health.completeness).toBe(0);
     expect(e.data_health.freshness_minutes).toBe(FALCONER_NO_SOURCE_FRESHNESS_MINUTES);
     expect(obs(e, "falconer_signal_state_row_exists")?.value_text).toBe("false");
+  });
+
+  it("2D.2k-a: subject binding and state availability are separate facts", async () => {
+    const empty = await buildBound([]);
+    expect(obs(empty, "falconer_subject_binding_verified")?.value_text).toBe("true");
+    expect(obs(empty, "falconer_signal_state_available")?.value_text).toBe("false");
+    expect(obs(empty, "falconer_signal_state_row_exists")?.value_text).toBe("false");
+    expect(empty.status).toBe("insufficient_data");
+    expect(empty.direction).toBe("unknown");
+    expect(empty.recommendation).toBe("no_action");
+    expect(empty.data_health.status).toBe("degraded");
+  });
+
+  it("A. a row updated after the anchor is excluded; the future status never leaks", async () => {
+    const e = await buildBound([trade({
+      id: "leak", opened_at: ANCHOR - 60 * MIN, status: "closed_sl",
+      closed_at: ANCHOR - 5 * MIN, updated_at: ANCHOR + 60 * MIN,
+    })]);
+    expect(obs(e, "signal_state_rows_eligible")?.value_num).toBe(0);
+    expect(obs(e, "signal_state_rows_excluded_future_mutation")?.value_num).toBe(1);
+    expect(obs(e, "falconer_signal_state_available")?.value_text).toBe("false");
+    expect(JSON.stringify(e)).not.toContain("closed_sl");
+    expect(e.status).toBe("insufficient_data");
+  });
+
+  it("B. a terminal row closed after the anchor is excluded; lifecycle never leaks backward", async () => {
+    const e = await buildBound([trade({
+      id: "future_close", opened_at: ANCHOR - 45 * MIN, status: "closed_tp3",
+      closed_at: ANCHOR + 60 * MIN, updated_at: ANCHOR + 60 * MIN,
+    })]);
+    expect(obs(e, "signal_state_rows_eligible")?.value_num).toBe(0);
+    expect(JSON.stringify(e)).not.toContain("closed_tp3");
+    expect(e.status).toBe("insufficient_data");
+  });
+
+  it("C. a row entirely at or before the anchor keeps an EXACT unclamped as_of", async () => {
+    const r = trade({ id: "ok", opened_at: ANCHOR - 40 * MIN, updated_at: ANCHOR - 12 * MIN });
+    expect(isReplaySafeTradeRow(r, ANCHOR)).toBe(true);
+    expect(falconerStateAsOf(r, ANCHOR)).toBe(ANCHOR - 12 * MIN);
+    const e = await buildBound([r]);
+    expect(e.as_of).toBe(new Date(ANCHOR - 12 * MIN).toISOString());
+    expect(e.data_health.freshness_minutes).toBe(12);
+  });
+
+  it("D. a future-mutation row cannot influence selection next to an eligible older row", async () => {
+    const safe = trade({ id: "safe", opened_at: ANCHOR - 30 * MIN, updated_at: ANCHOR - 30 * MIN });
+    const future = trade({
+      id: "future", opened_at: ANCHOR - 20 * MIN, status: "closed_sl",
+      closed_at: ANCHOR + 30 * MIN, updated_at: ANCHOR + 30 * MIN,
+    });
+    const e = await buildBound([safe, future]);
+    expect(obs(e, "falconer_signal_row_id")?.value_text).toBe("safe");
+    expect(obs(e, "falconer_signal_status")?.value_text).toBe("open");
+    const only = await sealEvidence(await buildBound([safe]));
+    expect((await sealEvidence(e)).evidence_hash).not.toBe(only.evidence_hash); // exclusion is disclosed
+    expect(obs(e, "signal_state_rows_excluded_future_mutation")?.value_num).toBe(1);
+  });
+
+  it("E. reversed-order replay with future rows is byte-identical", async () => {
+    const rows = [
+      trade({ id: "safe", opened_at: ANCHOR - 30 * MIN, updated_at: ANCHOR - 30 * MIN }),
+      trade({ id: "future", opened_at: ANCHOR - 20 * MIN, updated_at: ANCHOR + 30 * MIN }),
+      trade({ id: "safe2", opened_at: ANCHOR - 50 * MIN, updated_at: ANCHOR - 50 * MIN }),
+    ];
+    const a = await sealEvidence(await buildBound(rows));
+    const b = await sealEvidence(await buildBound([...rows].reverse()));
+    expect(a.evidence_hash).toBe(b.evidence_hash);
+  });
+
+  it("2D.2k-a: terminal status without closed_at and reversed timestamps are malformed", () => {
+    expect(canonicalFalconerTradeRows([
+      trade({ id: "t", status: "closed_sl", closed_at: null }),
+    ]).malformed).toBe(1);
+    expect(canonicalFalconerTradeRows([
+      trade({ id: "u", opened_at: ANCHOR - 5 * MIN, updated_at: ANCHOR - 50 * MIN }),
+    ]).malformed).toBe(1);
+    expect(canonicalFalconerTradeRows([
+      trade({ id: "c", status: "closed_sl", opened_at: ANCHOR - 5 * MIN, closed_at: ANCHOR - 50 * MIN }),
+    ]).malformed).toBe(1);
   });
 
   it("never substitutes a backtest row, another symbol, another timeframe or a future row", async () => {
@@ -282,7 +364,9 @@ describe("2D.2j — verified source contract", () => {
     expect(falconerLifecycleOf("be_active")).toBe("managed");
     expect(falconerLifecycleOf("closed_tp3")).toBe("terminal");
     expect(falconerLifecycleOf("nonsense")).toBe("unrecognized");
-    expect(falconerStateAsOf(trade({ id: "x", updated_at: ANCHOR + 99 * MIN }), ANCHOR)).toBe(ANCHOR);
+    expect(falconerStateAsOf(trade({ id: "x", updated_at: ANCHOR - 4 * MIN }), ANCHOR))
+      .toBe(ANCHOR - 4 * MIN);
+    expect(isReplaySafeTradeRow(trade({ id: "x", updated_at: ANCHOR + 99 * MIN }), ANCHOR)).toBe(false);
     const dup = trade({ id: "d" });
     expect(canonicalFalconerTradeRows([dup, { ...dup }]).rows).toHaveLength(1);
     expect(() => canonicalFalconerTradeRows([dup, { ...dup, status: "closed_sl" }]))
