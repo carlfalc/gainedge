@@ -10,10 +10,13 @@
  * It cannot construct a trade opportunity: it reports readiness only.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { sealEvidence, validateEvidence, type EvidenceEnvelopeV1 } from "../_shared/ron-agent-contracts.ts";
+import {
+  isIsoUtc, sealEvidence, validateEvidence, type EvidenceEnvelopeV1,
+} from "../_shared/ron-agent-contracts.ts";
 import { PROMOTED_STATE_VARIABLES } from "../_shared/ron-agentic-architecture.ts";
 import {
   buildOpportunityRiskEvidenceV1, opportunityRiskSpecHash, OPPORTUNITY_RISK_SPEC_V1,
+  OpportunityRiskContractError,
 } from "../_shared/ron-opportunity-risk-spec.ts";
 
 const corsHeaders = {
