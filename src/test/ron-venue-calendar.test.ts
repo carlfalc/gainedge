@@ -37,8 +37,13 @@ describe("Phase 2D.1f — XAUUSD venue calendar v1", () => {
       expect(expectedOpen(ms(`${day}T16:59:00Z`))).toBe(true);
       expect(expectedOpen(ms(`${day}T17:00:00Z`))).toBe(false);
       expect(expectedClosedReason(ms(`${day}T18:00:00Z`))).toMatch(/early_close_1300$/);
-      expect(expectedOpen(ms(`${day}T22:00:00Z`))).toBe(true);
     }
+    // Memorial Day is a Monday, so the venue genuinely reopens that evening.
+    expect(expectedOpen(ms("2026-05-25T22:00:00Z"))).toBe(true);
+    // Juneteenth (Jun 19) and observed Independence Day (Jul 3) are Fridays, so the
+    // weekly Fri-17:00-NY closure takes over instead of an 18:00 NY reopen.
+    expect(expectedClosedReason(ms("2026-06-19T22:00:00Z"))).toBe("weekly_closure_fri1700_sun1700_ny");
+    expect(expectedClosedReason(ms("2026-07-03T22:00:00Z"))).toBe("weekly_closure_fri1700_sun1700_ny");
     // 13:00-17:00 NY = 240 expected-open minutes suppressed per holiday; x3 ~= the 714
     // missing minutes catalogued in Phase 2D.1b.
     const per = (day: string) => 240 - expectedOpenMinutes(ms(`${day}T17:00:00Z`), ms(`${day}T21:00:00Z`));
