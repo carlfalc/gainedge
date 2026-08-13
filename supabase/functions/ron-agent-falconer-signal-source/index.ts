@@ -3,8 +3,8 @@
  *
  * Service-role / capability-proof only. Performs ONE bounded read-only SELECT against
  * the verified production Falconer runtime log `falconer_engine_events`, projecting ONLY
- * `id, symbol, event_type, severity, created_at, context`. It never selects `user_id` or
- * `message`, never reads `falconer_trades`, never imports or evaluates the frozen
+ * `id, symbol, event_type, severity, created_at`. It never selects `user_id`, `message`
+ * or the `context` JSON blob, never reads `falconer_trades`, never imports or evaluates the frozen
  * strategy module, never calls a broker / MetaAPI / PineConnector, never calls the
  * orchestrator, never fetches the web or an LLM, and has NO persistence branch.
  *
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
 
     const { data: rows, error } = await db
       .from("falconer_engine_events")
-      .select("id, symbol, event_type, severity, created_at, context")
+      .select("id, symbol, event_type, severity, created_at")
       .eq("symbol", instrument)
       .gte("created_at", fromIso).lte("created_at", toIso)
       .order("created_at", { ascending: false })
@@ -110,8 +110,6 @@ Deno.serve(async (req) => {
       event_type: String(r.event_type ?? ""),
       severity: String(r.severity ?? ""),
       created_at: new Date(String(r.created_at)).getTime(),
-      context: (r.context && typeof r.context === "object" && !Array.isArray(r.context))
-        ? (r.context as Record<string, unknown>) : null,
     }));
 
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
@@ -142,6 +140,9 @@ Deno.serve(async (req) => {
       source_lookback_start: fromIso,
       source_window_end: toIso,
       source_rows_loaded: events.length,
+      source_role: FALCONER_SIGNAL_SOURCE_SPEC_V1.source_contract.role,
+      signal_state_contract: FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.status,
+      signal_state_available: false,
       registered_ttl_minutes: evidenceTtlMinutes("falconer_signal_source", timeframe),
       evidence: sealed,
       numeric_probability: null,

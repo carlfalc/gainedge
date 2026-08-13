@@ -1,28 +1,43 @@
 /**
- * RON Phase 2D.2j — FALCONER SIGNAL SOURCE spec V1 (pure producer).
+ * RON Phase 2D.2j-a — FALCONER RUNTIME-EVENT CONTEXT spec V1 (pure producer).
  *
- * Seventh registered specialist and the LOWEST authority one (rank 6,
- * `strategy_context`, `non_authoritative: true`). It reports, deterministically and
- * without interpretation, WHAT THE FALCONER RUNTIME ITSELF EMITTED into its production
- * event log before an explicit, source-grounded evaluation anchor.
+ * ACCEPTANCE DECISION 2D.2j-a = B2 (SOURCE CONTRACT GAP).
+ *
+ * The registered rank-6 specialist `falconer_signal_source` CANNOT supply Falconer
+ * SIGNAL STATE under the current RON internal contract, and this module must never
+ * pretend otherwise:
+ *   - The real production Falconer signal-state source is `falconer_trades`, which the
+ *     existing truthful badge helper (`src/lib/falconer-signal-state.ts`) and the
+ *     Dashboard / Signals readers use. That table is USER-SCOPED under RLS.
+ *   - RON internal specialists are instrument/timeframe scoped and carry NO accepted
+ *     user/subject identity, so a service-role read of `falconer_trades` would merge or
+ *     leak multiple users' rows. That is forbidden.
+ *   - No safe view, function or endpoint exists that exposes current Falconer signal
+ *     state without private/geometry fields.
+ *   - `falconer_engine_events` is a RUNTIME/EVENT-HEALTH log only. For XAUUSD it
+ *     contains exclusively `stale_market_data` rows and ZERO `signal_created` rows, so
+ *     it is provably not a signal-state source.
+ *
+ * Therefore this spec is deliberately narrowed to RUNTIME EVENT CONTEXT ONLY and
+ * declares the signal-state contract as an explicit, fail-closed UNACCEPTED GAP. Signal
+ * state, direction, status, opened/closed timestamps and trade geometry are NOT emitted.
  *
  * HARD CONTRACT — enforced by the Evidence V1 validator and by the tests:
- *   - Falconer is STRATEGY CONTEXT ONLY. It is never a truth label, never calibration
- *     truth, never outcome truth, never source-health authority and never promotion
- *     evidence.
+ *   - Falconer is STRATEGY CONTEXT ONLY. Never a truth label, calibration truth, outcome
+ *     truth, source-health authority or promotion evidence.
  *   - Historical TradingView / Pine parity is UNRESOLVED. No parity, win-rate, profit
- *     factor, expectancy, edge or performance claim may ever appear here.
- *   - No probability, confidence, expected value, score or rating. The runtime's own
- *     setup score is DELIBERATELY NOT SURFACED.
- *   - No trade geometry: entry, stop, targets and R:R exist in the source event context
- *     and are explicitly FORBIDDEN fields here.
+ *     factor, expectancy, edge or performance claim.
+ *   - No probability, confidence, expected value, rating. The runtime setup rating is
+ *     DELIBERATELY NOT SURFACED.
+ *   - No trade geometry (entry, stop, targets, R:R, size) and no routing field. The
+ *     source `context` JSON blob is NOT SELECTED AT ALL, because exact safe JSON-key
+ *     projection is unavailable and it demonstrably carries forbidden material.
+ *   - No user identifier is read, requested or represented.
  *   - No causal claim, no prediction, no execution intent. `execution_path` stays
- *     `signal_only` and `allow_live_execution` stays false.
- *   - No secret / account / broker / balance / equity / user identifier is read.
- *   - Envelope `direction` is `neutral` (supported) or `unknown` (not supported). The
- *     verified production source carries NO directional field at all, so RON never gains
- *     a Falconer direction; if a future source row ever carried one it could only be
- *     surfaced as the namespaced `falconer_signal_direction` strategy metadata.
+ *     `signal_only`, `allow_live_execution` stays false.
+ *   - Envelope `direction` is `neutral` (supported) or `unknown` (otherwise). RON never
+ *     gains a Falconer direction from this source.
+ *   - Absent source rows are NEVER represented as fresh, healthy source data.
  *
  * The Falconer strategy implementation (`_shared/falconer-strategy.ts`) is FROZEN and is
  * neither imported nor re-implemented here. This module performs NO strategy evaluation.
@@ -60,14 +75,27 @@ export type FalconerEventType = typeof FALCONER_EVENT_TYPES_V1[number] | "other_
 export const FALCONER_SEVERITIES_V1 = ["info", "warning", "error", "critical"] as const;
 
 /**
- * The ONLY `context` keys that may ever be read out of a source row. `score`,
- * `threshold`, `entry`, `sl`, `tp3` and `execution_path` genuinely exist in production
- * rows and are explicitly forbidden: they are geometry / rating, not strategy state.
+ * NO `context` key may be read. Exact safe JSON-key projection is not supported by the
+ * source contract, and production rows genuinely carry `score`, `threshold`, `entry`,
+ * `sl`, `tp3` and `execution_path`. The whole blob is therefore never SELECTed.
  */
-export const FALCONER_CONTEXT_ALLOWED_KEYS = ["candle", "timeframe"] as const;
+export const FALCONER_CONTEXT_ALLOWED_KEYS = [] as const;
 export const FALCONER_CONTEXT_FORBIDDEN_KEYS = [
   "score", "threshold", "entry", "sl", "tp1", "tp2", "tp3", "execution_path", "qty", "risk",
 ] as const;
+
+/**
+ * Deterministic no-source representation. With no admissible source row there is no
+ * source timestamp at all, so freshness is pinned to the frozen lookback bound (the
+ * oldest instant this producer could have observed) and health is `degraded` with zero
+ * completeness. Wall clock is never used and no market/source timestamp is invented.
+ */
+export const FALCONER_NO_SOURCE_FRESHNESS_MINUTES = FALCONER_SOURCE_LOOKBACK_MINUTES;
+
+/** Statuses the frozen Falconer engine treats as live/managed, per `falconer-engine`. */
+export const FALCONER_LIVE_MANAGED_STATUSES = ["open", "tp1_hit", "tp2_hit", "be_active"] as const;
+/** Terminal statuses the frozen Falconer engine writes. */
+export const FALCONER_CLOSED_STATUSES = ["closed_sl", "closed_tp3", "closed_ha_flip"] as const;
 
 export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
   spec_id: "ron_falconer_signal_source",
@@ -84,12 +112,43 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
   instrument_scope: ["XAUUSD"],
   timeframe_scope: ["15m"],
 
+  scope_class: "falconer_runtime_event_context_only",
+
+  signal_state_contract: {
+    status: "unaccepted_gap",
+    acceptance_decision: "B2",
+    signal_state_emitted: false,
+    real_signal_state_table: "falconer_trades",
+    real_signal_state_table_is_user_scoped: true,
+    ron_internal_user_subject_contract_exists: false,
+    safe_signal_state_view_or_function_exists: false,
+    service_role_scan_of_user_scoped_trades_allowed: false,
+    engine_events_contain_xauusd_signal_created: false,
+    engine_events_are_sole_signal_truth: false,
+    existing_production_readers: [
+      "src/lib/falconer-signal-state.ts",
+      "src/pages/dashboard/DashboardHome.tsx",
+      "src/pages/dashboard/SignalsPage.tsx",
+    ],
+    engine_live_managed_statuses: FALCONER_LIVE_MANAGED_STATUSES,
+    engine_closed_statuses: FALCONER_CLOSED_STATUSES,
+    gap_resolution_requires_separately_approved_phase: true,
+  },
+
   source_contract: {
     table: "falconer_engine_events",
-    sole_source: true,
+    sole_source: false,
+    role: "runtime_event_health_context_only",
     verified_against_production_runtime: true,
-    allowed_fields: ["id", "symbol", "event_type", "severity", "created_at", "context"],
-    forbidden_fields: ["user_id", "message"],
+    allowed_fields: ["id", "symbol", "event_type", "severity", "created_at"],
+    forbidden_fields: [
+      "user_id", "message", "context",
+      "direction", "status", "opened_at", "closed_at", "trigger_type",
+      "entry_price", "sl_price", "tp1_price", "tp2_price", "tp3_price",
+      "qty", "pnl_usd", "setup_score", "execution_path", "broker_position_ids",
+      "broker_deal_ids", "raw_alert_payload", "notes", "features",
+    ],
+    context_selected: false,
     context_allowed_keys: FALCONER_CONTEXT_ALLOWED_KEYS,
     context_forbidden_keys: FALCONER_CONTEXT_FORBIDDEN_KEYS,
     known_event_types: FALCONER_EVENT_TYPES_V1,
@@ -108,6 +167,14 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
     wall_clock_allowed: false,
     external_fetch_allowed: false,
     broker_reads_allowed: false,
+    no_source_representation: {
+      status: "insufficient_data",
+      data_health_status: "degraded",
+      completeness: 0,
+      freshness_minutes: FALCONER_NO_SOURCE_FRESHNESS_MINUTES,
+      as_of_rule: "frozen_lookback_start_sentinel",
+      fresh_or_healthy_when_absent: false,
+    },
   },
 
   authority_contract: {
@@ -132,6 +199,9 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
     expected_value_emitted: false,
     edge_or_rating_emitted: false,
     setup_score_emitted: false,
+    signal_state_emitted: false,
+    signal_status_emitted: false,
+    user_identifier_read: false,
     win_rate_emitted: false,
     profit_factor_emitted: false,
     trade_geometry_emitted: false,
@@ -162,7 +232,6 @@ export interface FalconerEventRow {
   severity: string;
   /** epoch ms of the DB `created_at`. */
   created_at: number;
-  context?: Record<string, unknown> | null;
 }
 
 export class FalconerSourceConflictError extends Error {
@@ -174,20 +243,8 @@ export class FalconerSourceConflictError extends Error {
   }
 }
 
-function safeContext(ctx: Record<string, unknown> | null | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!ctx || typeof ctx !== "object") return out;
-  for (const k of FALCONER_CONTEXT_ALLOWED_KEYS) {
-    const v = (ctx as Record<string, unknown>)[k];
-    if (typeof v === "string" && v.length && v.length <= 64) out[k] = v;
-  }
-  return out;
-}
-
 function rowIdentity(r: FalconerEventRow): string {
-  const ctx = safeContext(r.context);
-  const ctxKey = Object.keys(ctx).sort().map((k) => `${k}=${ctx[k]}`).join(",");
-  return `${r.symbol}|${r.event_type}|${r.severity}|${r.created_at}|${ctxKey}`;
+  return `${r.symbol}|${r.event_type}|${r.severity}|${r.created_at}`;
 }
 
 export function normalizeEventType(t: string): FalconerEventType {
@@ -266,6 +323,9 @@ export async function buildFalconerSignalSourceEvidenceV1(
     "this specialist performs no strategy evaluation: it only replays what the frozen Falconer runtime already wrote to its production event log",
     "the runtime rating, trade geometry and routing fields present in source rows are deliberately NOT surfaced",
     "the absence of a runtime event is an absence of SOURCE DATA, not proof that the strategy had nothing to say",
+    "FALCONER SIGNAL STATE IS AN UNACCEPTED SOURCE CONTRACT GAP: the real signal-state source is user-scoped and RON holds no accepted internal user/subject contract; no signal state, status, direction or open/close timestamp is emitted here",
+    "this source is a runtime/event-health log only and is NOT the production signal-state source used by the existing Falconer readers",
+    "the source context JSON blob is never selected: exact safe key projection is unsupported and production rows carry geometry and rating material",
   ];
   const issues: string[] = [];
   const source_timestamps: Record<string, string> = { evaluation_anchor: iso(anchor) };
@@ -274,6 +334,9 @@ export async function buildFalconerSignalSourceEvidenceV1(
     state("falconer_authority", FALCONER_SIGNAL_SOURCE_SPEC_V1.falconer_authority, iso(anchor)),
     num("source_lookback_minutes", FALCONER_SOURCE_LOOKBACK_MINUTES, iso(anchor), "minutes"),
     num("source_fresh_window_minutes", FALCONER_SOURCE_FRESH_MINUTES, iso(anchor), "minutes"),
+    state("falconer_scope_class", FALCONER_SIGNAL_SOURCE_SPEC_V1.scope_class, iso(anchor)),
+    state("falconer_signal_state_contract", FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.status, iso(anchor)),
+    state("falconer_signal_state_available", "false", iso(anchor)),
   ];
   const dependencies = [`falconer_runtime_events:${input.instrument}`];
 
@@ -344,10 +407,17 @@ export async function buildFalconerSignalSourceEvidenceV1(
 
   if (!admitted.length) {
     issues.push("no_falconer_runtime_events_in_lookback");
-    limitations.push("no falconer_engine_events row exists for this instrument inside the bounded lookback; no runtime state is invented");
-    observations.push(state("falconer_runtime_state", "insufficient_data", iso(anchor)));
-    return envelope(anchor, "insufficient_data", malformed > 0 ? "degraded" : "healthy",
-      "unknown", "no_action", 0, 0);
+    issues.push("no_source_timestamp_exists");
+    limitations.push("no falconer_engine_events row exists for this instrument inside the bounded lookback; no runtime state is invented and absent source data is NOT represented as fresh or healthy");
+    observations.push(
+      state("falconer_runtime_state", "insufficient_data", iso(anchor)),
+      state("falconer_source_timestamp_exists", "false", iso(anchor)),
+      num("no_source_freshness_sentinel_minutes", FALCONER_NO_SOURCE_FRESHNESS_MINUTES, iso(anchor), "minutes"),
+    );
+    // as_of is the frozen lookback-start sentinel: the oldest instant this producer could
+    // have observed. It is never the anchor, never wall clock, never an invented source time.
+    return envelope(lookbackStart, "insufficient_data", "degraded",
+      "unknown", "no_action", 0, FALCONER_NO_SOURCE_FRESHNESS_MINUTES);
   }
 
   const newest = admitted[admitted.length - 1];
@@ -366,15 +436,12 @@ export async function buildFalconerSignalSourceEvidenceV1(
     observations.push(num(`runtime_event_${t}_count`, counts.get(t) ?? 0, iso(anchor), "events"));
   }
 
-  const newestCtx = safeContext(newest.context);
   observations.push(
     ref("newest_runtime_event_id", newest.id, newestAt),
     state("newest_runtime_event_type", normalizeEventType(newest.event_type), newestAt),
     state("newest_runtime_event_severity", newest.severity, newestAt),
     num("newest_runtime_event_age_minutes", ageMinutes, iso(anchor), "minutes"),
   );
-  if (newestCtx.candle) observations.push(state("newest_runtime_event_source_candle", newestCtx.candle, newestAt));
-  if (newestCtx.timeframe) observations.push(state("newest_runtime_event_source_timeframe", newestCtx.timeframe, newestAt));
   provenance_refs.push(`falconer_engine_event:${newest.id}:${newestAt}`);
 
   // ---- 4. newest `signal_created` row, if the runtime actually emitted one.
@@ -384,14 +451,14 @@ export async function buildFalconerSignalSourceEvidenceV1(
     const at = iso(newestSignal.created_at);
     const sigAge = Math.max(0, Math.round((anchor - newestSignal.created_at) / 60_000));
     observations.push(
-      state("falconer_signal_present_in_lookback", "true", at),
+      state("falconer_runtime_signal_created_event_present", "true", at),
       ref("newest_signal_event_id", newestSignal.id, at),
       num("newest_signal_event_age_minutes", sigAge, iso(anchor), "minutes"),
     );
     provenance_refs.push(`falconer_engine_event:${newestSignal.id}:${at}`);
   } else {
-    observations.push(state("falconer_signal_present_in_lookback", "false", iso(anchor)));
-    limitations.push("the runtime emitted no signal_created event inside the lookback; no WAIT, setup or direction is manufactured");
+    observations.push(state("falconer_runtime_signal_created_event_present", "false", iso(anchor)));
+    limitations.push("the runtime emitted no signal_created event inside the lookback; no setup or direction is manufactured, and a signal_created event would in any case be runtime evidence, never signal state");
   }
 
   // ---- 5. freshness against the canonical 15m TTL budget. Never fake-fresh.
