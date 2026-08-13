@@ -88,3 +88,10 @@ verify_jwt = false
 # The endpoint is read-only over `news_items` and has no persistence branch.
 [functions.ron-agent-macro-news-geopolitics]
 verify_jwt = false
+
+# Internal service-role-only opportunity/risk FOUNDATION specialist (Phase 2D.2i).
+# verify_jwt is pinned false because the function performs its OWN fail-closed
+# service-role / capability check in code; the platform gate is not the security boundary.
+# The endpoint consumes explicit sealed evidence only and has no persistence branch.
+[functions.ron-agent-opportunity-risk]
+verify_jwt = false
