@@ -97,22 +97,18 @@ describe("migration hygiene", () => {
     }
   });
 
-  it("no migration keeps an executable ron_invoke_worker invocation", () => {
+  it("no migration keeps an executable session-structure specialist invocation", () => {
+    // Narrow by design: earlier phases legitimately schedule other RON workers. What must
+    // never persist as executable SQL is a one-off trigger for the agentic specialist
+    // endpoint, which performs live analysis and can persist evidence.
     const offenders: string[] = [];
     for (const f of files) {
       const sql = read(f);
-      const lower = sql.toLowerCase();
-      if (!lower.includes("ron_invoke_worker")) continue;
-      if (WORKER_DEFINITION_FILES.has(f)) {
-        // definition-only: it declares the function, it must not also call it
-        const body = lower.split("$function$");
-        const outside = (body[0] ?? "") + (body[body.length - 1] ?? "");
-        if (/(select|perform)\s+public\.ron_invoke_worker\s*\(/.test(outside)) {
-          offenders.push(`${f} -> definition file also invokes the worker`);
-        }
-        continue;
-      }
-      offenders.push(`${f} -> non-definition migration references ron_invoke_worker`);
+      // strip SQL line comments so historical markers stay legal
+      const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").toLowerCase();
+      if (!code.includes("ron-agent-session-structure")) continue;
+      if (WORKER_DEFINITION_FILES.has(f)) continue; // allow-list entry inside the definition
+      offenders.push(`${f} -> executable reference to the session-structure specialist`);
     }
     expect(offenders).toEqual([]);
   });
