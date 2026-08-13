@@ -95,3 +95,10 @@ verify_jwt = false
 # The endpoint consumes explicit sealed evidence only and has no persistence branch.
 [functions.ron-agent-opportunity-risk]
 verify_jwt = false
+
+# Internal service-role-only Falconer SIGNAL SOURCE specialist (Phase 2D.2j).
+# verify_jwt is pinned false because the function performs its OWN fail-closed
+# service-role / capability check in code; the platform gate is not the security boundary.
+# Read-only against falconer_engine_events; no writes, no broker path, no persistence.
+[functions.ron-agent-falconer-signal-source]
+verify_jwt = false
