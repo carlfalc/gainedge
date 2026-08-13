@@ -72,6 +72,7 @@ export function venueCalendarPayload() {
     "base_schedule", "xauVenueOpen: Sun 17:00 NY open -> Fri 17:00 NY close, daily 17:00-18:00 NY break, IANA DST-aware",
     "closure_windows", (Object.keys(CLOSURE_WINDOW) as ClosureKind[]).sort()
       .map((k) => [k, CLOSURE_WINDOW[k].from, CLOSURE_WINDOW[k].to]),
+    "full_day_eve_closed_from_ny_minutes", FULL_DAY_EVE_CLOSED_FROM,
     "holiday_rules", [...HOLIDAY_RULES]
       .sort((a, b) => (a.code < b.code ? -1 : 1))
       .map((h) => [h.code, h.kind, h.rule]),
