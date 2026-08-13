@@ -262,9 +262,9 @@ export async function buildFalconerSignalSourceEvidenceV1(
 
   const limitations: string[] = [
     "Falconer is STRATEGY CONTEXT ONLY: it is never a truth label, calibration authority, outcome truth, source-health authority or promotion evidence",
-    "historical TradingView/Pine parity is UNRESOLVED; no equivalence, win rate, profit factor, expectancy or validated edge is claimed anywhere in this evidence",
+    "historical TradingView/Pine parity is UNRESOLVED; no equivalence, hit-rate, profitability or validated-edge claim of any kind is made anywhere in this evidence",
     "this specialist performs no strategy evaluation: it only replays what the frozen Falconer runtime already wrote to its production event log",
-    "the runtime setup score, trade geometry and execution path present in source rows are deliberately NOT surfaced",
+    "the runtime rating, trade geometry and routing fields present in source rows are deliberately NOT surfaced",
     "the absence of a runtime event is an absence of SOURCE DATA, not proof that the strategy had nothing to say",
   ];
   const issues: string[] = [];
