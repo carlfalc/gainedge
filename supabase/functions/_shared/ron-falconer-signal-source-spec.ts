@@ -167,9 +167,30 @@ export const FALCONER_SIGNAL_SOURCE_SPEC_V1 = {
       "broker_deal_ids", "raw_alert_payload", "notes", "tags", "features",
       "actual_entry_price", "actual_exit_price", "backtest_run_id",
     ],
-    as_of_rule: "max_of_updated_at_closed_at_opened_at_clamped_to_anchor",
+    as_of_rule: "exact_max_of_opened_at_updated_at_closed_at_no_clamp",
     selection_rule: "newest_caller_owned_live_row_by_as_of_then_opened_at_then_id",
-    future_row_policy: "ignore_rows_opened_after_anchor",
+    future_row_policy: "exclude_any_row_with_opened_at_updated_at_or_closed_at_after_anchor",
+    replay_safety_rule:
+      "eligible requires opened_at <= anchor AND updated_at <= anchor AND (closed_at IS NULL OR closed_at <= anchor); future mutations are EXCLUDED, never clamped",
+    future_mutation_clamping_allowed: false,
+    lookahead_leak_allowed: false,
+    timestamp_ordering_rule: "opened_at <= updated_at AND (closed_at IS NULL OR opened_at <= closed_at)",
+    terminal_status_requires_closed_at: true,
+    endpoint_constrains_updated_at_lte_anchor: true,
+    producer_independently_enforces_replay_safety: true,
+    availability_semantics: {
+      subject_binding_observation: "falconer_subject_binding_verified",
+      availability_observation: "falconer_signal_state_available",
+      row_exists_observation: "falconer_signal_state_row_exists",
+      availability_requires_eligible_row: true,
+      binding_alone_implies_availability: false,
+    },
+    auth_contract: {
+      required_jwt_role: "authenticated",
+      anon_or_noauth_rejected: true,
+      body_supplied_user_id_accepted: false,
+      service_role_signal_state_read: false,
+    },
     unrecognized_status_policy: "fail_closed_no_lifecycle_invented",
     lifecycle_tokens: ["managed", "terminal", "unrecognized"],
     fresh_minutes: 60,
@@ -372,6 +393,10 @@ export function isMalformedTradeStateRow(r: FalconerTradeStateRow | null | undef
   if (typeof r.opened_at !== "number" || !Number.isFinite(r.opened_at)) return true;
   if (typeof r.updated_at !== "number" || !Number.isFinite(r.updated_at)) return true;
   if (r.closed_at != null && (typeof r.closed_at !== "number" || !Number.isFinite(r.closed_at))) return true;
+  // ordering + terminal-lifecycle integrity: never repaired, never assumed
+  if (r.opened_at > r.updated_at) return true;
+  if (r.closed_at != null && r.closed_at < r.opened_at) return true;
+  if (falconerLifecycleOf(r.status) === "terminal" && r.closed_at == null) return true;
   return false;
 }
 
@@ -400,10 +425,25 @@ export function canonicalFalconerTradeRows(rows: readonly FalconerTradeStateRow[
   return { rows: out, malformed };
 }
 
-/** Frozen as_of rule: newest safe source timestamp, never after the anchor. */
+/**
+ * REPLAY SAFETY (2D.2k-a). A row is only knowable at the anchor when EVERY mutation
+ * timestamp it carries is at or before the anchor. A row opened before the anchor but
+ * updated/closed after it carries FUTURE state and is excluded outright — never clamped.
+ */
+export function isReplaySafeTradeRow(r: FalconerTradeStateRow, anchor: number): boolean {
+  if (r.opened_at > anchor) return false;
+  if (r.updated_at > anchor) return false;
+  if (r.closed_at != null && r.closed_at > anchor) return false;
+  return true;
+}
+
+/**
+ * Frozen as_of rule: the EXACT newest source timestamp of a replay-safe row. No clamp is
+ * applied or needed, because rows with any future timestamp are already excluded.
+ */
 export function falconerStateAsOf(r: FalconerTradeStateRow, anchor: number): number {
-  const raw = Math.max(r.opened_at, r.updated_at, r.closed_at ?? Number.NEGATIVE_INFINITY);
-  return Math.min(raw, anchor);
+  void anchor;
+  return Math.max(r.opened_at, r.updated_at, r.closed_at ?? Number.NEGATIVE_INFINITY);
 }
 
 export interface FalconerSignalSourceInputV1 {
@@ -506,7 +546,7 @@ export async function buildFalconerSignalSourceEvidenceV1(
   // ---- 0. SUBJECT-BOUND SIGNAL STATE (K1). `signal_state_rows == null` means the caller
   // had no verified subject, so nothing at all is read or claimed about signal state.
   const subjectBound = input.signal_state_rows != null;
-  observations.push(state("falconer_signal_state_available", subjectBound ? "true" : "false", iso(anchor)));
+  observations.push(state("falconer_subject_binding_verified", subjectBound ? "true" : "false", iso(anchor)));
   observations.push(state(
     "falconer_signal_state_mode",
     subjectBound ? "subject_bound_caller_scoped" : "no_subject_binding_fail_closed",
@@ -515,6 +555,10 @@ export async function buildFalconerSignalSourceEvidenceV1(
 
   let sig: Desc | null = null;
   if (!subjectBound) {
+    observations.push(
+      state("falconer_signal_state_available", "false", iso(anchor)),
+      state("falconer_signal_state_row_exists", "false", iso(anchor)),
+    );
     limitations.push("no verified subject accompanied this evaluation, so the user-scoped Falconer signal-state source was never read; signal state is unavailable rather than assumed");
   } else {
     dependencies.push(`falconer_signal_state:${input.instrument}:${input.timeframe}`);
@@ -536,17 +580,29 @@ export async function buildFalconerSignalSourceEvidenceV1(
     if (tradeConflict) {
       issues.push("conflicting_duplicate_signal_state_row_id");
       limitations.push("two contradictory caller-owned rows share one falconer_trades id; no winner is invented");
-      observations.push(state("falconer_signal_lifecycle", "blocked", iso(anchor)));
+      observations.push(
+        state("falconer_signal_state_available", "false", iso(anchor)),
+        state("falconer_signal_state_row_exists", "false", iso(anchor)),
+        state("falconer_signal_lifecycle", "blocked", iso(anchor)),
+      );
       sig = { as_of: anchor, status: "blocked", health: "critical", direction: "unknown", recommendation: "no_action", completeness: 0, freshness_minutes: 0 };
     } else {
       if (tradeMalformed > 0) {
         issues.push(`malformed_signal_state_rows_excluded:${tradeMalformed}`);
         observations.push(num("malformed_signal_state_rows_excluded", tradeMalformed, iso(anchor), "rows"));
       }
-      const eligible = tradeRows.filter((r) =>
+      const scopeRows = tradeRows.filter((r) =>
         r.symbol === input.instrument && r.timeframe === input.timeframe
-        && (FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.mode_scope as readonly string[]).includes(r.mode)
-        && r.opened_at <= anchor);
+        && (FALCONER_SIGNAL_SOURCE_SPEC_V1.signal_state_contract.mode_scope as readonly string[]).includes(r.mode));
+      // REPLAY SAFETY: any row carrying a mutation timestamp after the anchor is dropped
+      // outright. Future status/closed_at can never leak backward into a past replay.
+      const eligible = scopeRows.filter((r) => isReplaySafeTradeRow(r, anchor));
+      const futureExcluded = scopeRows.length - eligible.length;
+      if (futureExcluded > 0) {
+        issues.push(`signal_state_rows_excluded_future_mutation:${futureExcluded}`);
+        limitations.push("rows whose opened_at, updated_at or closed_at falls after the evaluation anchor were EXCLUDED, never clamped: their later lifecycle was not knowable at this anchor");
+        observations.push(num("signal_state_rows_excluded_future_mutation", futureExcluded, iso(anchor), "rows"));
+      }
       observations.push(num("signal_state_rows_eligible", eligible.length, iso(anchor), "rows"));
 
       if (!eligible.length) {
@@ -554,6 +610,7 @@ export async function buildFalconerSignalSourceEvidenceV1(
         limitations.push("the requesting subject owns no live Falconer row for this instrument and timeframe at this anchor; no backtest row, other symbol or other subject is ever substituted");
         observations.push(
           state("falconer_signal_lifecycle", "insufficient_data", iso(anchor)),
+          state("falconer_signal_state_available", "false", iso(anchor)),
           state("falconer_signal_state_row_exists", "false", iso(anchor)),
         );
         sig = {
@@ -575,6 +632,7 @@ export async function buildFalconerSignalSourceEvidenceV1(
         source_timestamps.falconer_signal_state_as_of = at;
         provenance_refs.push(`falconer_trade:${row.id}:${at}`);
         observations.push(
+          state("falconer_signal_state_available", "true", at),
           state("falconer_signal_state_row_exists", "true", at),
           ref("falconer_signal_row_id", row.id, at),
           state("falconer_signal_status", row.status, at),
