@@ -82,13 +82,6 @@ verify_jwt = false
 [functions.ron-agent-cross-asset-correlation]
 verify_jwt = false
 
-# Internal service-role-only macro/news/geopolitics context specialist (Phase 2D.2h).
-# verify_jwt is pinned false because the function performs its OWN fail-closed
-# service-role / capability check in code; the platform gate is not the security
-# boundary. The endpoint is read-only and has no persistence branch.
-[functions.ron-agent-macro-news-geopolitics]
-verify_jwt = false
-
 # TEMPORARY 2D.2h audit harness — removed at the end of the phase.
 [functions.ron-audit-2d2h]
 verify_jwt = false
