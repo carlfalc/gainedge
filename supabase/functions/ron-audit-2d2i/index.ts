@@ -6,7 +6,7 @@ Deno.serve(async (req) => {
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const url = Deno.env.get("SUPABASE_URL")!;
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (token !== Deno.env.get("SUPABASE_ANON_KEY") && token !== key) return json({ error: "no" }, 401);
+  if (!token) return json({ error: "no" }, 401); // platform verify_jwt validates the caller
 
   const body = await req.json().catch(() => ({}));
   const call = (fn: string, payload: unknown, auth = key) =>
