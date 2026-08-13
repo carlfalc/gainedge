@@ -45,7 +45,10 @@ describe("2D.1f-a — V4 continuity source and boundary mapping", () => {
   it("declares an explicit snapshot-grid continuity source, never label-derived", () => {
     expect(RESEARCH_VERSION_V4).toBe(4);
     expect(CONTINUITY_SOURCE_SPEC.table).toBe("ron_market_snapshots");
-    expect(CONTINUITY_SOURCE_SPEC.feature_version).toBe(5);
+    expect(CONTINUITY_SOURCE_SPEC.feature_version).toBe(6);
+    expect(CONTINUITY_SOURCE_SPEC.quality_version).toBe(5);
+    expect(CONTINUITY_SOURCE_SPEC.label_version).toBe(7);
+    expect(CONTINUITY_SOURCE_IDENTITY).toBe("quality_v5_eligible_feature_v6_grid");
     expect(CONTINUITY_SOURCE_SPEC.derived_from_labels).toBe(false);
     const p = JSON.stringify(continuityContractPayloadV4());
     expect(p).toContain(CONTINUITY_SOURCE_IDENTITY);
