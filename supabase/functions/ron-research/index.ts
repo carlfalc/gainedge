@@ -310,6 +310,7 @@ Deno.serve(async (req) => {
     canonicalMin, canonicalMax,
     Object.keys(exclusion).sort().map((k) => [k, exclusion[k]]),
     plan, resultsDigest, evidence,
+    ...(rv === RESEARCH_VERSION_V3 ? [continuity, holdoutReport, v3hashes] : []),
   ]);
 
   let runId: string | null = null;
@@ -318,7 +319,7 @@ Deno.serve(async (req) => {
     const { data: run, error: runErr } = await supabase
       .from("ron_research_runs")
       .upsert({
-        research_version: RESEARCH_VERSION,
+        research_version: rv,
         symbol: SYMBOL, timeframe: TIMEFRAME,
         quality_version: QUALITY_V,
         feature_version: CONTRACT.feature_version,
@@ -344,6 +345,9 @@ Deno.serve(async (req) => {
         run_hash: runHash,
         results_digest: resultsDigest,
         bucket_evidence: evidence,
+        contract_hashes: v3hashes ?? {},
+        continuity_report: continuity ?? {},
+        holdout_report: holdoutReport,
         status: "complete",
       }, { onConflict: "definition_hash" })
       .select("id").single();
@@ -354,7 +358,7 @@ Deno.serve(async (req) => {
     for (let i = 0; i < results.length; i += 50) {
       const chunk = results.slice(i, i + 50).map((r) => ({
         run_id: runId,
-        research_version: RESEARCH_VERSION,
+        research_version: rv,
         direction: r.direction,
         candidate: r.candidate,
         candidate_kind: r.kind,
@@ -380,7 +384,7 @@ Deno.serve(async (req) => {
     .map((r) => ({ direction: r.direction, candidate: r.candidate, aggregate_brier_delta: r.vs_baseline?.aggregate_brier_delta ?? null }));
 
   return json({
-    research_version: RESEARCH_VERSION,
+    research_version: rv,
     research_only: true,
     probability_surfaced: false,
     persisted: persist,
@@ -399,6 +403,9 @@ Deno.serve(async (req) => {
     },
     state_spec_hash: stateSpecHash,
     candidate_spec_hash: candidateSpecHash,
+    contract_hashes: v3hashes,
+    continuity_report: continuity,
+    holdout_report: holdoutReport,
     definition_hash: definitionHash,
     run_hash: runHash,
     results_digest: resultsDigest,
