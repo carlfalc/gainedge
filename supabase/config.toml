@@ -102,6 +102,3 @@ verify_jwt = false
 # Read-only against falconer_engine_events; no writes, no broker path, no persistence.
 [functions.ron-agent-falconer-signal-source]
 verify_jwt = false
-
-[functions.ron-audit-2d2j]
-verify_jwt = false
