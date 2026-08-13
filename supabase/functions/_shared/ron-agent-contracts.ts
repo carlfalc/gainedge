@@ -308,6 +308,15 @@ const SECRET_VALUE_PATTERNS = [
 
 export interface DenylistHit { path: string; rule: string; }
 
+/**
+ * Token match on a WORD boundary. Substring matching would flag the envelope's own
+ * `uncertainty` field via the "certainty" token, so a preceding letter disqualifies a hit.
+ */
+export function hasDeniedToken(key: string, tokens: readonly string[]): boolean {
+  const norm = key.toLowerCase();
+  return tokens.some((t) => new RegExp(`(^|[^a-z])${t}`).test(norm));
+}
+
 /** Recursive key/value denylist scan over an arbitrary payload. */
 export function scanDenylist(value: unknown, path = "$"): DenylistHit[] {
   const hits: DenylistHit[] = [];
@@ -325,13 +334,13 @@ export function scanDenylist(value: unknown, path = "$"): DenylistHit[] {
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     const norm = k.toLowerCase();
     const p = `${path}.${k}`;
-    if (PROBABILITY_KEY_TOKENS.some((t) => norm.includes(t))) {
+    if (hasDeniedToken(norm, PROBABILITY_KEY_TOKENS)) {
       hits.push({ path: p, rule: "probability_key_forbidden" });
     }
-    if (SECRET_KEY_TOKENS.some((t) => norm.includes(t))) {
+    if (hasDeniedToken(norm, SECRET_KEY_TOKENS)) {
       hits.push({ path: p, rule: "secret_or_private_account_key_forbidden" });
     }
-    if (CAUSAL_KEY_TOKENS.some((t) => norm.includes(t))) {
+    if (hasDeniedToken(norm, CAUSAL_KEY_TOKENS)) {
       hits.push({ path: p, rule: "causal_claim_key_forbidden" });
     }
     hits.push(...scanDenylist(v, p));
@@ -394,13 +403,13 @@ export function validateEvidence(e: unknown): string[] {
       if (typeof ob.key !== "string" || !ob.key.length) r.push(`observation_missing_key: ${i}`);
       else {
         const nk = ob.key.toLowerCase();
-        if (PROBABILITY_KEY_TOKENS.some((t) => nk.includes(t))) {
+        if (hasDeniedToken(nk, PROBABILITY_KEY_TOKENS)) {
           r.push(`probability_key_forbidden at $.observations[${i}].key`);
         }
-        if (SECRET_KEY_TOKENS.some((t) => nk.includes(t))) {
+        if (hasDeniedToken(nk, SECRET_KEY_TOKENS)) {
           r.push(`secret_or_private_account_key_forbidden at $.observations[${i}].key`);
         }
-        if (CAUSAL_KEY_TOKENS.some((t) => nk.includes(t))) {
+        if (hasDeniedToken(nk, CAUSAL_KEY_TOKENS)) {
           r.push(`causal_claim_key_forbidden at $.observations[${i}].key`);
         }
       }
