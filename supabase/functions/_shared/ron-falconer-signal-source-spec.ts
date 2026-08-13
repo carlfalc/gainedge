@@ -442,8 +442,8 @@ export function isReplaySafeTradeRow(r: FalconerTradeStateRow, anchor: number): 
  * applied or needed, because rows with any future timestamp are already excluded.
  */
 export function falconerStateAsOf(r: FalconerTradeStateRow, anchor: number): number {
-  const raw = Math.max(r.opened_at, r.updated_at, r.closed_at ?? Number.NEGATIVE_INFINITY);
-  return Math.min(raw, anchor);
+  void anchor;
+  return Math.max(r.opened_at, r.updated_at, r.closed_at ?? Number.NEGATIVE_INFINITY);
 }
 
 export interface FalconerSignalSourceInputV1 {
