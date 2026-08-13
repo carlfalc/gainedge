@@ -13,7 +13,7 @@ import {
 import { PROMOTED_STATE_VARIABLES } from "../../supabase/functions/_shared/ron-agentic-architecture.ts";
 import {
   buildOpportunityRiskEvidenceV1, opportunityRiskSpecHash, OPPORTUNITY_RISK_SPEC_V1,
-  OPPORTUNITY_REQUIRED_AGENTS, OPPORTUNITY_OPTIONAL_AGENTS,
+  OPPORTUNITY_REQUIRED_AGENTS, OPPORTUNITY_OPTIONAL_AGENTS, OpportunityRiskContractError,
 } from "../../supabase/functions/_shared/ron-opportunity-risk-spec.ts";
 import { SESSION_STRUCTURE_SPEC_V2_HASH_PINNED } from "../../supabase/functions/_shared/ron-cross-asset-spec.ts";
 import { calibrationValidationSpecHash } from "../../supabase/functions/_shared/ron-calibration-validation-spec.ts";
@@ -303,5 +303,64 @@ describe("2D.2i — truthfulness invariants", () => {
     expect(e.provenance_refs[0]).toMatch(/^spec:ron_opportunity_risk_foundation:v1:[0-9a-f]{64}$/);
     for (const r of e.provenance_refs.slice(1)) expect(r).toMatch(/^evidence:[a-z_]+:v1:[0-9a-f]{64}$/);
     expect(e.provenance_refs.join(" ")).not.toContain("falconer");
+  });
+});
+
+describe("2D.2i-a — invalid evaluation anchors fail closed without throwing RangeError", () => {
+  const bad = [
+    ["invalid string", "not-a-timestamp"],
+    ["local / non-Z timestamp", "2026-08-13T10:00:00"],
+    ["offset (non-UTC) timestamp", "2026-08-13T10:00:00+02:00"],
+    ["impossible date", "2026-02-31T99:99:99Z"],
+    ["empty string", ""],
+    ["non-string", 1_760_000_000_000 as unknown as string],
+  ] as const;
+
+  for (const [label, anchor] of bad) {
+    it(`rejects ${label} with a deterministic typed contract error`, async () => {
+      const attempt = () => buildOpportunityRiskEvidenceV1({
+        instrument: "XAUUSD", timeframe: "15m",
+        evaluation_anchor: anchor as string,
+        evidence: [], promoted_state_variables: [],
+        run_id: "run_bad_anchor", trace_id: TRACE,
+      });
+      // Deterministic, typed, identical on replay — never a RangeError, never a fallback.
+      const a = await attempt().catch((e) => e);
+      const b = await attempt().catch((e) => e);
+      expect(a).toBeInstanceOf(OpportunityRiskContractError);
+      expect((a as OpportunityRiskContractError).name).toBe("RangeErrorGuard".replace("RangeErrorGuard", "OpportunityRiskContractError"));
+      expect((a as Error).constructor.name).not.toBe("RangeError");
+      expect((a as OpportunityRiskContractError).reason).toBe("evaluation_anchor_not_utc_iso");
+      expect((b as Error).message).toBe((a as Error).message);
+    });
+  }
+
+  it("never substitutes a wall-clock anchor for an invalid one", async () => {
+    const before = Date.now();
+    const err = await buildOpportunityRiskEvidenceV1({
+      instrument: "XAUUSD", timeframe: "15m", evaluation_anchor: "nope",
+      evidence: [], promoted_state_variables: [],
+      run_id: "r", trace_id: TRACE,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(OpportunityRiskContractError);
+    // No envelope at all => no as_of could have been minted from the clock.
+    expect((err as { as_of?: unknown }).as_of).toBeUndefined();
+    expect(Date.now()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("a valid UTC ISO anchor still builds normally", async () => {
+    const e = await buildOpportunityRiskEvidenceV1({
+      instrument: "XAUUSD", timeframe: "15m", evaluation_anchor: ANCHOR,
+      evidence: [], promoted_state_variables: [],
+      run_id: "r", trace_id: TRACE,
+    });
+    expect(e.as_of).toBe("2026-08-13T10:00:00.000Z");
+    expect(readiness(e)).toBe("blocked_missing_required_evidence");
+  });
+
+  it("registered opportunity_risk 15m TTL is 60 minutes (base 60 x multiplier 1)", () => {
+    expect(agentSpec("opportunity_risk").ttl_multiplier).toBe(1);
+    expect(evidenceTtlMinutes("opportunity_risk", "15m")).toBe(60);
+    expect(evidenceTtlMinutes("opportunity_risk", "15m")).not.toBe(15);
   });
 });
