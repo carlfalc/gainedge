@@ -38,6 +38,19 @@ const ALLOWLIST = new Set([
   "20260812030646_8e61d41e-97b6-4820-9ae2-562571a1196d.sql",
   // Phase 2D.1: CREATE FUNCTION body for public.ron_invoke_worker (worker allowlist only).
   "20260812072740_c3f6ce80-55cd-4304-9c71-5606fef3d117.sql",
+  // Phase 2D.2b-CORR: CREATE FUNCTION body re-declaring public.ron_invoke_worker with the
+  // permanent 'ron-agent-session-structure' allow-list entry. Definition + REVOKE/GRANT
+  // only; it invokes nothing at replay.
+  "20260813090242_525bbba0-acde-406d-8eb7-e5d27af09b0f.sql",
+]);
+
+/**
+ * Migrations that may legitimately mention ron_invoke_worker at all. Anything else that
+ * names the worker is a one-off invocation harness, not infrastructure.
+ */
+const WORKER_DEFINITION_FILES = new Set([
+  "20260812072740_c3f6ce80-55cd-4304-9c71-5606fef3d117.sql",
+  "20260813090242_525bbba0-acde-406d-8eb7-e5d27af09b0f.sql",
 ]);
 
 /** Test-harness / one-off invocation versions — permanently neutralized, never allowlistable. */
@@ -82,6 +95,39 @@ describe("migration hygiene", () => {
       expect(lower).not.toMatch(/\bcron\.schedule\b/);
       expect(lower).not.toMatch(/\binsert\s+into\b/);
     }
+  });
+
+  it("no migration keeps an executable session-structure specialist invocation", () => {
+    // Narrow by design: earlier phases legitimately schedule other RON workers. What must
+    // never persist as executable SQL is a one-off trigger for the agentic specialist
+    // endpoint, which performs live analysis and can persist evidence.
+    const offenders: string[] = [];
+    for (const f of files) {
+      const sql = read(f);
+      // strip SQL line comments so historical markers stay legal
+      const code = sql.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").toLowerCase();
+      if (!code.includes("ron-agent-session-structure")) continue;
+      if (WORKER_DEFINITION_FILES.has(f)) continue; // allow-list entry inside the definition
+      offenders.push(`${f} -> executable reference to the session-structure specialist`);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("the Phase 2D.2b-CORR worker allow-list migration is definition-only and service-role scoped", () => {
+    const sql = read("20260813090242_525bbba0-acde-406d-8eb7-e5d27af09b0f.sql");
+    expect(sql).toContain("CREATE OR REPLACE FUNCTION public.ron_invoke_worker");
+    expect(sql).toContain("'ron-agent-session-structure'");
+    expect(sql).toMatch(/REVOKE EXECUTE ON FUNCTION public\.ron_invoke_worker\(text, jsonb\) FROM PUBLIC, anon, authenticated;/);
+    expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.ron_invoke_worker\(text, jsonb\) TO service_role;/);
+    expect(sql).not.toMatch(/\bdo\s+\$\$/i);
+  });
+
+  it("the Phase 2D.2b-CORR smoke migration is a comment-only historical marker", () => {
+    const sql = read("20260813090313_5a98de55-5877-42b3-ba8b-d3d7f442a441.sql");
+    const executable = sql.split("\n").map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith("--"));
+    expect(executable).toEqual([]);
+    expect(sql.toLowerCase()).not.toContain("ron_invoke_worker(");
   });
 
   it("the legitimate Phase 2B.2 schema migration is unchanged", () => {

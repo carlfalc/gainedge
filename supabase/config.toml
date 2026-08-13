@@ -55,3 +55,9 @@ verify_jwt = true
 
 [functions.ron-orchestrate]
 verify_jwt = false
+
+# Internal service-role-only specialist endpoint. verify_jwt is pinned false because the
+# function performs its OWN fail-closed service-role / capability check in code; the
+# platform gate is not the security boundary and must not be relied on.
+[functions.ron-agent-session-structure]
+verify_jwt = false
