@@ -8,9 +8,9 @@
  * V4 fixes the framework for FUTURE runs. It never mutates or reinterprets V3.
  *
  * V4 changes exactly three methodological things versus V3:
- *   1. CONTINUITY SOURCE is explicit: the ordered `ron_market_snapshots` feature_version=5
- *      grid (quality-v4 eligible by construction), bounded by source_bar_cutoff — never
- *      inferred from label completeness.
+ *   1. CONTINUITY SOURCE is explicit: the ordered `ron_market_snapshots` feature_version=6
+ *      grid (quality-v5 eligible by construction), bounded by source_bar_cutoff — never
+ *      inferred from label completeness. Outcomes come from label_version=7.
  *   2. CONTINUITY BOUNDARY MAPPING is non-exact: a splitting defect partitions the
  *      eligible timeline at the FIRST eligible timestamp at-or-after the defect end.
  *   3. PROMOTION is a two-stage, fully predeclared and hashed gate: every pre-holdout
@@ -43,13 +43,23 @@ export const RESEARCH_VERSION_V4 = 4;
 export const FOLD_DEFINITION_VERSION_V4 = 4;
 export const CONTINUITY_CONTRACT_VERSION_V4 = 2;
 
-/** The ONLY admissible continuity source for V4. Hashed into run identity. */
-export const CONTINUITY_SOURCE_IDENTITY = "quality_v4_eligible_feature_v5_grid";
+/**
+ * The ONLY admissible continuity source for V4. Hashed into run identity.
+ *
+ * Phase 2D.1g INFRASTRUCTURE-ONLY binding revision: V4 has never been executed (zero
+ * persisted runs / results), so its prospective lineage binding is retargeted from the
+ * frozen qv4/fv5/lv6 lineage to the accepted qv5/fv6/lv7 lineage that incorporates the
+ * recovered genuine broker-native 15m history. No candidate family, State Spec V2
+ * semantic, promotion threshold, ECE rule, support floor, holdout stage, boundary
+ * mapping or venue-calendar semantic is changed by this revision.
+ */
+export const CONTINUITY_SOURCE_IDENTITY = "quality_v5_eligible_feature_v6_grid";
 export const CONTINUITY_SOURCE_SPEC = {
   identity: CONTINUITY_SOURCE_IDENTITY,
   table: "ron_market_snapshots",
-  feature_version: 5,
-  quality_version: 4,
+  feature_version: 6,
+  quality_version: 5,
+  label_version: 7,
   quality_eligibility: "quarantined_bar_times_excluded_by_construction",
   ordering: "bar_time_ascending_distinct",
   bounded_by: "source_bar_cutoff_inclusive",
@@ -80,7 +90,7 @@ export function continuityContractPayloadV4() {
 /* ----------------------------------------------------------- V4 continuity */
 
 /**
- * Scan the ordered ACCEPTED FEATURE-GRID timestamps (feature_version=5, quality-v4
+ * Scan the ordered ACCEPTED FEATURE-GRID timestamps (feature_version=6, quality-v5
  * eligible, <= source_bar_cutoff) and report every genuine expected-open coverage defect.
  * Passing label-derived timestamps here is a contract violation, so callers must supply
  * the snapshot grid explicitly.
