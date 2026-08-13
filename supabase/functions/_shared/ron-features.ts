@@ -38,9 +38,15 @@ import { detectPatterns, type DetectedPattern } from "./ron-patterns.ts";
  *       genuine XAUUSD 1m source. A new feature_version is mandatory because the eligible
  *       input series (and therefore recursive indicator state) is now derived from a
  *       different quality lineage. v1..v4 rows are preserved untouched.
+ *  v6 — Phase 2D.1g: identical indicator MATH and identical `last_1500_quality_eligible`
+ *       window contract to v5. The eligibility lineage is now quality_version=5, which
+ *       additionally covers the 552 recovered genuine broker-native 15m bars. Because the
+ *       eligible input series (and therefore recursive indicator state) changes, a new
+ *       feature_version is mandatory. v1..v5 rows are preserved untouched.
  * v1..v3 rows are preserved for audit; readers must pin a version explicitly.
  */
-export const RON_FEATURE_VERSION = 5;
+export const RON_FEATURE_VERSION = 6;
+export const RON_FEATURE_VERSION_V5 = 5;
 export const RON_FEATURE_VERSION_V4 = 4;
 export const RON_FEATURE_VERSION_V3 = 3;
 export const RON_FEATURE_VERSION_V2 = 2;
