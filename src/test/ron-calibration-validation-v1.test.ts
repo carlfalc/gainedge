@@ -235,19 +235,27 @@ describe("2D.2c — source hygiene and non-regression", () => {
   const fnSrc = fs.readFileSync(
     path.resolve(__dirname, "../../supabase/functions/ron-agent-calibration-validation/index.ts"), "utf8");
 
+  /** Executable source only — doc comments legitimately NAME the things they forbid. */
+  const fnCode = fnSrc
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+
   it("the pure producer performs no I/O and never imports Falconer", () => {
-    expect(specSrc).not.toMatch(/falconer/i);
-    expect(specSrc).not.toMatch(/createClient|fetch\(|Deno\.env/);
-    expect(specSrc).not.toMatch(/Date\.now\(\)/);
+    const specCode = specSrc
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    expect(specCode).not.toMatch(/falconer/i);
+    expect(specCode).not.toMatch(/createClient|fetch\(|Deno\.env/);
+    expect(specCode).not.toMatch(/Date\.now\(\)/);
   });
 
   it("the endpoint has no trade, rerun, or orchestrator-decision path", () => {
-    expect(fnSrc).not.toMatch(/falconer/i);
-    expect(fnSrc).not.toMatch(/metaapi/i);
-    expect(fnSrc).not.toMatch(/ron_orchestrator_decisions|ron_decision_evidence/);
-    expect(fnSrc).not.toMatch(/ron-research|ron-calibrate|ron-rebuild|ron-label/);
-    expect(fnSrc).not.toMatch(/\.delete\(|\.update\(/);
-    expect(fnSrc).not.toMatch(/ai\.gateway|openai|anthropic/i);
+    expect(fnCode).not.toMatch(/falconer/i);
+    expect(fnCode).not.toMatch(/metaapi/i);
+    expect(fnCode).not.toMatch(/ron_orchestrator_decisions|ron_decision_evidence/);
+    expect(fnCode).not.toMatch(/ron-research|ron-calibrate|ron-rebuild|ron-label/);
+    expect(fnCode).not.toMatch(/\.delete\(|\.update\(/);
+    expect(fnCode).not.toMatch(/ai\.gateway|openai|anthropic/i);
   });
 
   it("in-code service-role auth remains mandatory and returns 401", () => {
