@@ -234,11 +234,13 @@ describe("2D.2n — promotion readiness foundation", () => {
           artifact_id: `resolved_by_${p0}_artifact`,
           artifact_kind: "prerequisite_resolution" as const,
           resolves_prerequisite: p1,
+          ...procedureBinding(p1),
         },
         {
           artifact_id: `resolved_by_${p1}_artifact`,
           artifact_kind: "prerequisite_resolution" as const,
           resolves_prerequisite: p0,
+          ...procedureBinding(p0),
         },
       ],
     });
