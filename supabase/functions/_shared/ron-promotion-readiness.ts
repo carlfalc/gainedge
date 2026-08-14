@@ -46,6 +46,14 @@ export const PROMOTION_READINESS_SPEC_V1 = {
   confirmation_rule: "confirmatory_window_strictly_after_discovery_window_and_spec_freeze",
   selection_rule: "confirmatory_data_never_used_for_selection_ranking_or_tuning",
   reuse_rule: "already_consumed_holdout_or_identical_cutoff_is_not_fresh_confirmation",
+  /**
+   * Strict literal rule enforced in code: `confirmation_window.start > spec_frozen_at`.
+   * Equality is NOT defensible — a window opening exactly at the freeze instant is not
+   * strictly post-freeze evidence.
+   */
+  freeze_boundary_rule: "confirmation_window_start_must_be_strictly_greater_than_spec_frozen_at",
+  /** Acceptance is never self-asserted by a manifest entry. */
+  acceptance_binding_rule: "acceptance_artifact_and_every_prerequisite_resolution_must_match_explicit_accepted_registry",
 } as const;
 
 /**
@@ -115,6 +123,51 @@ export interface AcceptedPromotionEntry {
  */
 export const ACCEPTED_PROMOTION_MANIFEST: readonly AcceptedPromotionEntry[] = [] as const;
 
+/* ------------------------------------------------- accepted artifact registry */
+
+export type AcceptedArtifactKind =
+  | "research_contract_acceptance"
+  | "prerequisite_resolution";
+
+/**
+ * One EXPLICITLY accepted artifact identity. Existence of a record here is the ONLY
+ * admissible proof of acceptance; a boolean or a nonempty string inside a manifest entry
+ * is a self-assertion and proves nothing.
+ */
+export interface AcceptedArtifactRecord {
+  artifact_id: string;
+  artifact_kind: AcceptedArtifactKind;
+  /** Required for `research_contract_acceptance`: the research contract version accepted. */
+  research_version?: number;
+  /** Required for `prerequisite_resolution`: the prerequisite id this artifact resolves. */
+  resolves_prerequisite?: string;
+}
+
+export interface AcceptanceRegistry {
+  registry_version: number;
+  artifacts: readonly AcceptedArtifactRecord[];
+}
+
+/**
+ * THE production/current accepted-artifact registry. EMPTY: no post-V4 research contract
+ * has been accepted, and neither unresolved prerequisite has an accepted resolution
+ * artifact. Consequently every non-empty promotion entry is denied today.
+ */
+export const CURRENT_ACCEPTED_ARTIFACT_REGISTRY: AcceptanceRegistry = {
+  registry_version: RON_PROMOTION_READINESS_VERSION,
+  artifacts: [] as const,
+} as const;
+
+function findArtifact(
+  registry: AcceptanceRegistry,
+  artifactId: string,
+  kind: AcceptedArtifactKind,
+): AcceptedArtifactRecord | undefined {
+  return (registry?.artifacts ?? []).find(
+    (a) => a.artifact_id === artifactId && a.artifact_kind === kind,
+  );
+}
+
 /* --------------------------------------------------------------- validation */
 
 export interface PromotionValidation {
@@ -143,7 +196,10 @@ function scanForbiddenKeys(value: unknown, path: string, hits: string[]): void {
 }
 
 /** Deny-by-default validation of ONE candidate promotion entry. Reports every reason. */
-export function validatePromotionEntry(entry: AcceptedPromotionEntry): PromotionValidation {
+export function validatePromotionEntry(
+  entry: AcceptedPromotionEntry,
+  registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+): PromotionValidation {
   const reasons: string[] = [];
 
   // 1. Immutable, separately versioned research identity.
@@ -161,6 +217,21 @@ export function validatePromotionEntry(entry: AcceptedPromotionEntry): Promotion
   }
   if (entry.research_contract_accepted !== true) reasons.push("research_contract_not_accepted");
   if (!nonEmpty(entry.acceptance_artifact_id)) reasons.push("missing_acceptance_artifact_id");
+  else {
+    const accepted = findArtifact(
+      registry, entry.acceptance_artifact_id, "research_contract_acceptance",
+    );
+    if (!accepted) {
+      reasons.push(
+        `acceptance_artifact_not_in_accepted_registry: ${entry.acceptance_artifact_id}`,
+      );
+    } else if (accepted.research_version !== entry.research_version) {
+      reasons.push(
+        "acceptance_artifact_research_version_mismatch: "
+        + `${accepted.research_version} != ${entry.research_version}`,
+      );
+    }
+  }
   if (entry.acceptance_manifest_version !== RON_PROMOTION_READINESS_VERSION) {
     reasons.push("acceptance_manifest_version_mismatch");
   }
@@ -204,7 +275,7 @@ export function validatePromotionEntry(entry: AcceptedPromotionEntry): Promotion
   if (dEnd != null && cStart != null && cStart < dEnd) {
     reasons.push("confirmation_window_overlaps_discovery_window");
   }
-  if (frozen != null && cStart != null && cStart < frozen) {
+  if (frozen != null && cStart != null && cStart <= frozen) {
     reasons.push("confirmation_window_starts_before_spec_freeze");
   }
   if (!nonEmpty(entry.confirmation_source_identity)) {
@@ -221,7 +292,16 @@ export function validatePromotionEntry(entry: AcceptedPromotionEntry): Promotion
   // 5. Unresolved prerequisites block promotion instead of being guessed at.
   const res = entry.prerequisite_resolutions ?? {};
   for (const p of UNRESOLVED_PROMOTION_PREREQUISITES) {
-    if (!nonEmpty(res[p])) reasons.push(`unresolved_prerequisite: ${p}`);
+    if (!nonEmpty(res[p])) {
+      reasons.push(`unresolved_prerequisite: ${p}`);
+      continue;
+    }
+    const artifact = findArtifact(registry, res[p], "prerequisite_resolution");
+    if (!artifact) {
+      reasons.push(`unresolved_prerequisite: ${p} (resolution_artifact_not_in_accepted_registry: ${res[p]})`);
+    } else if (artifact.resolves_prerequisite !== p) {
+      reasons.push(`unresolved_prerequisite: ${p} (resolution_artifact_resolves_different_prerequisite: ${artifact.resolves_prerequisite})`);
+    }
   }
 
   // 6. No forbidden field may ride along.
@@ -233,10 +313,11 @@ export function validatePromotionEntry(entry: AcceptedPromotionEntry): Promotion
 /** Validate a whole manifest, including cross-entry contradictions. */
 export function validatePromotionManifest(
   entries: readonly AcceptedPromotionEntry[],
+  registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
 ): PromotionValidation {
   const reasons: string[] = [];
   entries.forEach((e, i) => {
-    for (const r of validatePromotionEntry(e).reasons) reasons.push(`entry[${i}]: ${r}`);
+    for (const r of validatePromotionEntry(e, registry).reasons) reasons.push(`entry[${i}]: ${r}`);
   });
 
   const byVariable = new Map<string, string>();
@@ -260,9 +341,10 @@ export function validatePromotionManifest(
  */
 export function derivePromotedStateVariables(
   entries: readonly AcceptedPromotionEntry[] = ACCEPTED_PROMOTION_MANIFEST,
+  registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
 ): readonly string[] {
   if (entries.length === 0) return [];
-  if (!validatePromotionManifest(entries).admissible) return [];
+  if (!validatePromotionManifest(entries, registry).admissible) return [];
   return [...new Set(entries.flatMap((e) => [...e.state_variables]))].sort();
 }
 
@@ -287,21 +369,32 @@ function entryPayload(e: AcceptedPromotionEntry) {
 /** Canonical, input-order-independent payload of the accepted manifest. */
 export function promotionManifestPayload(
   entries: readonly AcceptedPromotionEntry[] = ACCEPTED_PROMOTION_MANIFEST,
+  registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
 ) {
   return [
     "ron_promotion_readiness_version", RON_PROMOTION_READINESS_VERSION,
     "policy", Object.keys(PROMOTION_READINESS_SPEC_V1).sort()
       .map((k) => [k, (PROMOTION_READINESS_SPEC_V1 as Record<string, unknown>)[k]]),
     "unresolved_prerequisites", [...UNRESOLVED_PROMOTION_PREREQUISITES].sort(),
+    "accepted_artifact_registry", [
+      registry.registry_version,
+      [...(registry.artifacts ?? [])]
+        .sort((a, b) => (a.artifact_id < b.artifact_id ? -1 : a.artifact_id > b.artifact_id ? 1 : 0))
+        .map((a) => [
+          a.artifact_id, a.artifact_kind,
+          a.research_version ?? null, a.resolves_prerequisite ?? null,
+        ]),
+    ],
     "accepted_entries", [...entries]
       .sort((a, b) => (a.candidate_id < b.candidate_id ? -1 : a.candidate_id > b.candidate_id ? 1 : 0))
       .map(entryPayload),
-    "derived_promoted_state_variables", [...derivePromotedStateVariables(entries)],
+    "derived_promoted_state_variables", [...derivePromotedStateVariables(entries, registry)],
   ];
 }
 
 export async function promotionManifestHash(
   entries: readonly AcceptedPromotionEntry[] = ACCEPTED_PROMOTION_MANIFEST,
+  registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
 ) {
-  return await sha256(promotionManifestPayload(entries));
+  return await sha256(promotionManifestPayload(entries, registry));
 }
