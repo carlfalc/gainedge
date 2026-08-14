@@ -158,14 +158,25 @@ export const CURRENT_ACCEPTED_ARTIFACT_REGISTRY: AcceptanceRegistry = {
   artifacts: [] as const,
 } as const;
 
+export const ACCEPTED_ARTIFACT_KINDS: readonly AcceptedArtifactKind[] = [
+  "research_contract_acceptance",
+  "prerequisite_resolution",
+] as const;
+
+/**
+ * Unique lookup. NEVER picks among duplicates: a registry containing more than one record
+ * for an id is rejected by `validateAcceptanceRegistry` before this is reached, and this
+ * function additionally refuses to disambiguate by insertion order.
+ */
 function findArtifact(
   registry: AcceptanceRegistry,
   artifactId: string,
   kind: AcceptedArtifactKind,
 ): AcceptedArtifactRecord | undefined {
-  return (registry?.artifacts ?? []).find(
+  const hits = (registry?.artifacts ?? []).filter(
     (a) => a.artifact_id === artifactId && a.artifact_kind === kind,
   );
+  return hits.length === 1 ? hits[0] : undefined;
 }
 
 /* --------------------------------------------------------------- validation */
@@ -195,12 +206,79 @@ function scanForbiddenKeys(value: unknown, path: string, hits: string[]): void {
   }
 }
 
+/**
+ * Pure, deny-by-default validation of an accepted-artifact registry. A malformed registry
+ * can never be used to prove acceptance; the EMPTY production registry is valid.
+ */
+export function validateAcceptanceRegistry(
+  registry: AcceptanceRegistry | null | undefined,
+): PromotionValidation {
+  const reasons: string[] = [];
+  if (!registry || typeof registry !== "object") {
+    return { admissible: false, reasons: ["missing_registry"] };
+  }
+  if (registry.registry_version !== RON_PROMOTION_READINESS_VERSION) {
+    reasons.push(
+      `registry_version_mismatch: ${registry.registry_version} != ${RON_PROMOTION_READINESS_VERSION}`,
+    );
+  }
+  const artifacts = registry.artifacts;
+  if (!Array.isArray(artifacts)) {
+    return { admissible: false, reasons: [...reasons, "registry_artifacts_not_an_array"] };
+  }
+
+  const seen = new Set<string>();
+  artifacts.forEach((a, i) => {
+    const at = `artifact[${i}]`;
+    if (!a || typeof a !== "object") { reasons.push(`${at}: malformed_record`); return; }
+    if (!nonEmpty(a.artifact_id)) reasons.push(`${at}: missing_artifact_id`);
+    else if (seen.has(a.artifact_id)) {
+      // Covers same-kind duplicates AND cross-kind id collisions: one id, one record.
+      reasons.push(`${at}: duplicate_artifact_id: ${a.artifact_id}`);
+    } else seen.add(a.artifact_id);
+
+    if (!ACCEPTED_ARTIFACT_KINDS.includes(a.artifact_kind)) {
+      reasons.push(`${at}: unknown_artifact_kind: ${String(a.artifact_kind)}`);
+      return;
+    }
+    if (a.artifact_kind === "research_contract_acceptance") {
+      if (!Number.isInteger(a.research_version)
+        || (a.research_version as number)
+          < PROMOTION_READINESS_SPEC_V1.min_research_version_for_promotion) {
+        reasons.push(`${at}: research_contract_acceptance_requires_research_version >= `
+          + `${PROMOTION_READINESS_SPEC_V1.min_research_version_for_promotion}`);
+      }
+      if (a.resolves_prerequisite !== undefined) {
+        reasons.push(`${at}: research_contract_acceptance_must_not_resolve_a_prerequisite`);
+      }
+    } else {
+      if (!nonEmpty(a.resolves_prerequisite)
+        || !UNRESOLVED_PROMOTION_PREREQUISITES.includes(a.resolves_prerequisite as string)) {
+        reasons.push(`${at}: prerequisite_resolution_requires_known_prerequisite_id`);
+      }
+      if (a.research_version !== undefined) {
+        reasons.push(`${at}: prerequisite_resolution_must_not_carry_research_version`);
+      }
+    }
+  });
+
+  // Forbidden fields can never ride along inside a registry record either.
+  scanForbiddenKeys(artifacts, "registry", reasons);
+
+  return { admissible: reasons.length === 0, reasons };
+}
+
 /** Deny-by-default validation of ONE candidate promotion entry. Reports every reason. */
 export function validatePromotionEntry(
   entry: AcceptedPromotionEntry,
   registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
 ): PromotionValidation {
   const reasons: string[] = [];
+
+  // 0. The registry itself must be well formed BEFORE any acceptance lookup happens.
+  const registryCheck = validateAcceptanceRegistry(registry);
+  const registryUsable = registryCheck.admissible;
+  for (const r of registryCheck.reasons) reasons.push(`invalid_acceptance_registry: ${r}`);
 
   // 1. Immutable, separately versioned research identity.
   if (!Number.isInteger(entry.research_version)
@@ -217,7 +295,9 @@ export function validatePromotionEntry(
   }
   if (entry.research_contract_accepted !== true) reasons.push("research_contract_not_accepted");
   if (!nonEmpty(entry.acceptance_artifact_id)) reasons.push("missing_acceptance_artifact_id");
-  else {
+  else if (!registryUsable) {
+    reasons.push("acceptance_artifact_unverifiable_invalid_registry");
+  } else {
     const accepted = findArtifact(
       registry, entry.acceptance_artifact_id, "research_contract_acceptance",
     );
@@ -296,6 +376,10 @@ export function validatePromotionEntry(
       reasons.push(`unresolved_prerequisite: ${p}`);
       continue;
     }
+    if (!registryUsable) {
+      reasons.push(`unresolved_prerequisite: ${p} (unverifiable_invalid_registry)`);
+      continue;
+    }
     const artifact = findArtifact(registry, res[p], "prerequisite_resolution");
     if (!artifact) {
       reasons.push(`unresolved_prerequisite: ${p} (resolution_artifact_not_in_accepted_registry: ${res[p]})`);
@@ -316,8 +400,13 @@ export function validatePromotionManifest(
   registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
 ): PromotionValidation {
   const reasons: string[] = [];
+  const registryCheck = validateAcceptanceRegistry(registry);
+  for (const r of registryCheck.reasons) reasons.push(`invalid_acceptance_registry: ${r}`);
   entries.forEach((e, i) => {
-    for (const r of validatePromotionEntry(e, registry).reasons) reasons.push(`entry[${i}]: ${r}`);
+    for (const r of validatePromotionEntry(e, registry).reasons) {
+      if (r.startsWith("invalid_acceptance_registry: ")) continue; // already reported once
+      reasons.push(`entry[${i}]: ${r}`);
+    }
   });
 
   const byVariable = new Map<string, string>();
@@ -377,13 +466,18 @@ export function promotionManifestPayload(
       .map((k) => [k, (PROMOTION_READINESS_SPEC_V1 as Record<string, unknown>)[k]]),
     "unresolved_prerequisites", [...UNRESOLVED_PROMOTION_PREREQUISITES].sort(),
     "accepted_artifact_registry", [
-      registry.registry_version,
-      [...(registry.artifacts ?? [])]
-        .sort((a, b) => (a.artifact_id < b.artifact_id ? -1 : a.artifact_id > b.artifact_id ? 1 : 0))
+      registry?.registry_version ?? null,
+      validateAcceptanceRegistry(registry).admissible ? "valid" : "invalid",
+      [...(registry?.artifacts ?? [])]
         .map((a) => [
           a.artifact_id, a.artifact_kind,
           a.research_version ?? null, a.resolves_prerequisite ?? null,
-        ]),
+        ] as const)
+        // Unambiguous composite key: duplicates are rejected by validation, and even a
+        // rejected registry hashes order-independently.
+        .map((t) => [t, JSON.stringify(t)] as const)
+        .sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0))
+        .map((t) => [...t[0]]),
     ],
     "accepted_entries", [...entries]
       .sort((a, b) => (a.candidate_id < b.candidate_id ? -1 : a.candidate_id > b.candidate_id ? 1 : 0))

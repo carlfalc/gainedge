@@ -4,6 +4,7 @@ import {
   UNRESOLVED_PROMOTION_PREREQUISITES, derivePromotedStateVariables, promotionManifestHash,
   promotionManifestPayload, validatePromotionEntry, validatePromotionManifest,
   CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+  validateAcceptanceRegistry,
   type AcceptanceRegistry, type AcceptedPromotionEntry,
 } from "../../supabase/functions/_shared/ron-promotion-readiness";
 import {
@@ -76,6 +77,98 @@ describe("2D.2n — promotion readiness foundation", () => {
 
   it("the production accepted-artifact registry is empty", () => {
     expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toEqual([]);
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.registry_version)
+      .toBe(RON_PROMOTION_READINESS_VERSION);
+    expect(validateAcceptanceRegistry(CURRENT_ACCEPTED_ARTIFACT_REGISTRY))
+      .toEqual({ admissible: true, reasons: [] });
+    expect(validateAcceptanceRegistry(syntheticRegistry()).admissible).toBe(true);
+  });
+
+  const badRegistries: Array<[string, AcceptanceRegistry, string]> = [
+    ["wrong registry version",
+      syntheticRegistry({ registry_version: RON_PROMOTION_READINESS_VERSION + 1 }),
+      "registry_version_mismatch"],
+    ["duplicate same id + kind",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [...syntheticRegistry().artifacts, syntheticRegistry().artifacts[0]] },
+      "duplicate_artifact_id"],
+    ["cross-kind id collision",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [...syntheticRegistry().artifacts, {
+          artifact_id: "hypothetical_acceptance_artifact",
+          artifact_kind: "prerequisite_resolution",
+          resolves_prerequisite: UNRESOLVED_PROMOTION_PREREQUISITES[0],
+        }] },
+      "duplicate_artifact_id"],
+    ["unknown kind",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{ artifact_id: "x", artifact_kind: "whatever" as never }] },
+      "unknown_artifact_kind"],
+    ["acceptance record without a valid research_version",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          artifact_id: "hypothetical_acceptance_artifact",
+          artifact_kind: "research_contract_acceptance",
+          research_version: RESEARCH_VERSION_V4,
+        }] },
+      "research_contract_acceptance_requires_research_version"],
+    ["acceptance record masquerading as a prerequisite resolution",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          artifact_id: "hypothetical_acceptance_artifact",
+          artifact_kind: "research_contract_acceptance",
+          research_version: RESEARCH_VERSION_V4 + 1,
+          resolves_prerequisite: UNRESOLVED_PROMOTION_PREREQUISITES[0],
+        }] },
+      "must_not_resolve_a_prerequisite"],
+    ["prerequisite resolution for an unknown prerequisite",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          artifact_id: "p1", artifact_kind: "prerequisite_resolution",
+          resolves_prerequisite: "not_a_known_prerequisite",
+        }] },
+      "prerequisite_resolution_requires_known_prerequisite_id"],
+    ["prerequisite resolution carrying a research_version",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          artifact_id: "p1", artifact_kind: "prerequisite_resolution",
+          resolves_prerequisite: UNRESOLVED_PROMOTION_PREREQUISITES[0],
+          research_version: 5,
+        }] },
+      "prerequisite_resolution_must_not_carry_research_version"],
+  ];
+
+  it.each(badRegistries)("malformed registry fails closed: %s", (_l, reg, expected) => {
+    const rv = validateAcceptanceRegistry(reg);
+    expect(rv.admissible).toBe(false);
+    expect(rv.reasons.join(" | ")).toContain(expected);
+    const e = futureEntry();
+    const r = validatePromotionEntry(e, reg);
+    expect(r.admissible).toBe(false);
+    expect(r.reasons.join(" | ")).toContain("invalid_acceptance_registry");
+    expect(r.reasons.join(" | ")).toContain("acceptance_artifact_unverifiable_invalid_registry");
+    expect(validatePromotionManifest([e], reg).admissible).toBe(false);
+    expect(derivePromotedStateVariables([e], reg)).toEqual([]);
+  });
+
+  it("registry payload hash is independent of artifact input order", async () => {
+    const forward = syntheticRegistry();
+    const reversed: AcceptanceRegistry = {
+      registry_version: forward.registry_version,
+      artifacts: [...forward.artifacts].reverse(),
+    };
+    const e = futureEntry();
+    expect(await promotionManifestHash([e], forward))
+      .toBe(await promotionManifestHash([e], reversed));
+  });
+
+  it("a valid synthetic registry still only admits the explicitly bound fixture", () => {
+    const reg = syntheticRegistry();
+    expect(validatePromotionEntry(futureEntry(), reg).admissible).toBe(true);
+    expect(validatePromotionEntry(
+      futureEntry({ acceptance_artifact_id: "other_artifact" }), reg,
+    ).admissible).toBe(false);
+    expect(derivePromotedStateVariables([futureEntry()])).toEqual([]);
   });
 
   it("self-asserted acceptance fails closed against the default empty registry", () => {
@@ -88,21 +181,30 @@ describe("2D.2n — promotion readiness foundation", () => {
   });
 
   it("unknown or mismatched registry identities fail closed", () => {
-    const wrongVersion = syntheticRegistry({
+    const [p0, p1] = UNRESOLVED_PROMOTION_PREREQUISITES;
+    // Registry is itself VALID; the bindings simply do not match the entry.
+    const mismatched = syntheticRegistry({
       artifacts: [
         {
           artifact_id: "hypothetical_acceptance_artifact",
           artifact_kind: "research_contract_acceptance",
           research_version: RESEARCH_VERSION_V4 + 9,
         },
-        ...UNRESOLVED_PROMOTION_PREREQUISITES.map((p) => ({
-          artifact_id: `resolved_by_${p}_artifact`,
+        // Swapped: each artifact id claims the OTHER prerequisite.
+        {
+          artifact_id: `resolved_by_${p0}_artifact`,
           artifact_kind: "prerequisite_resolution" as const,
-          resolves_prerequisite: "some_other_prerequisite",
-        })),
+          resolves_prerequisite: p1,
+        },
+        {
+          artifact_id: `resolved_by_${p1}_artifact`,
+          artifact_kind: "prerequisite_resolution" as const,
+          resolves_prerequisite: p0,
+        },
       ],
     });
-    const r = validatePromotionEntry(futureEntry(), wrongVersion);
+    expect(validateAcceptanceRegistry(mismatched).admissible).toBe(true);
+    const r = validatePromotionEntry(futureEntry(), mismatched);
     expect(r.admissible).toBe(false);
     expect(r.reasons.join(" | ")).toContain("acceptance_artifact_research_version_mismatch");
     expect(r.reasons.join(" | ")).toContain("resolution_artifact_resolves_different_prerequisite");
