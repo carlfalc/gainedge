@@ -44,8 +44,12 @@ export const DECISION_READ_SPEC_V1 = {
     "status", "direction", "recommendation", "observations", "data_health",
     "uncertainty", "conflicts", "dependencies", "provenance_refs", "source_timestamps",
   ],
-  /** The only key permitted to carry a probability-shaped NAME, and only with a null value. */
-  probability_key_exemption: "numeric_probability",
+  /**
+   * The ONLY keys permitted to carry a probability-shaped NAME. `numeric_probability` is
+   * checked to be null and `probability_status` to be the literal "not_calibrated" BEFORE
+   * they are stripped for the denylist scan.
+   */
+  probability_key_exemptions: ["numeric_probability", "probability_status"],
 } as const;
 
 export async function decisionReadSpecHash(): Promise<string> {
@@ -155,7 +159,7 @@ function stripExemptKey(value: unknown): unknown {
   if (value === null || typeof value !== "object") return value;
   const out: Row = {};
   for (const [k, v] of Object.entries(value as Row)) {
-    if (k === DECISION_READ_SPEC_V1.probability_key_exemption) continue;
+    if ((DECISION_READ_SPEC_V1.probability_key_exemptions as readonly string[]).includes(k)) continue;
     out[k] = stripExemptKey(v);
   }
   return out;

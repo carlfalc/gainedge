@@ -120,6 +120,7 @@ describe("RON persisted-decision read contract V1", () => {
     expect(RON_DECISION_READ_VERSION).toBe(1);
     expect(DECISION_READ_SPEC_V1.mutation_surface).toBe("none");
     expect(DECISION_READ_SPEC_V1.recomputation).toBe("none");
+    expect(DECISION_READ_SPEC_V1.probability_key_exemptions).toEqual(["numeric_probability", "probability_status"]);
     expect(await decisionReadSpecHash()).toMatch(/^[0-9a-f]{64}$/);
   });
 });
