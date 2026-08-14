@@ -228,7 +228,8 @@ export async function confirmatorySampleSufficiencyHash() {
  * PINNED canonical hash of the procedure above. Synchronous so registry validation stays
  * pure/sync; a test asserts equality with `await confirmatorySampleSufficiencyHash()`.
  */
-export const CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH = "__PENDING__";
+export const CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH =
+  "9b832d1c4ea958bb9ea37edbdafc865b727c37218adde8bde942b54735bfe618";
 
 /** Stable identity of the accepted prerequisite-resolution artifact for this procedure. */
 export const CONFIRMATORY_SAMPLE_SUFFICIENCY_ARTIFACT_ID =
