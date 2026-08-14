@@ -158,14 +158,25 @@ export const CURRENT_ACCEPTED_ARTIFACT_REGISTRY: AcceptanceRegistry = {
   artifacts: [] as const,
 } as const;
 
+export const ACCEPTED_ARTIFACT_KINDS: readonly AcceptedArtifactKind[] = [
+  "research_contract_acceptance",
+  "prerequisite_resolution",
+] as const;
+
+/**
+ * Unique lookup. NEVER picks among duplicates: a registry containing more than one record
+ * for an id is rejected by `validateAcceptanceRegistry` before this is reached, and this
+ * function additionally refuses to disambiguate by insertion order.
+ */
 function findArtifact(
   registry: AcceptanceRegistry,
   artifactId: string,
   kind: AcceptedArtifactKind,
 ): AcceptedArtifactRecord | undefined {
-  return (registry?.artifacts ?? []).find(
+  const hits = (registry?.artifacts ?? []).filter(
     (a) => a.artifact_id === artifactId && a.artifact_kind === kind,
   );
+  return hits.length === 1 ? hits[0] : undefined;
 }
 
 /* --------------------------------------------------------------- validation */
