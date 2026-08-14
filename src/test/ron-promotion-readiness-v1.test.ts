@@ -130,7 +130,7 @@ describe("2D.2n — promotion readiness foundation", () => {
   it("contract carries no probability, geometry, execution or private fields", () => {
     const e = futureEntry({ candidate_id: "x" }) as unknown as Record<string, unknown>;
     e.win_probability = 0.7;
-    expect(validatePromotionEntry(e as AcceptedPromotionEntry).reasons.join(" "))
+    expect(validatePromotionEntry(e as unknown as AcceptedPromotionEntry).reasons.join(" "))
       .toContain("forbidden_field");
     const text = JSON.stringify(promotionManifestPayload()).toLowerCase();
     for (const bad of ["probability", "execution_allowed", "user_id", "balance", "stop_loss"]) {
