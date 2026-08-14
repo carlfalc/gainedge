@@ -17,9 +17,39 @@ import {
   RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
   RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
   SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+  REQUIRED_FROZEN_SPEC_SURFACES,
+  ADMISSIBLE_ACCEPTANCE_ORIGIN,
+  buildResearchContractAcceptanceArtifact,
+  type ResearchContractAcceptanceClaim,
 } from "../../supabase/functions/_shared/ron-research-contract-acceptance";
 
 const HASH64 = "a".repeat(64);
+
+/** SYNTHETIC, test-only future acceptance claim. Nothing here is accepted in production. */
+const syntheticClaim: ResearchContractAcceptanceClaim = {
+  procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+  procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+  research_version: RESEARCH_VERSION_V4 + 1,
+  contract_identity: "research_v5_synthetic",
+  contract_frozen_at: "2026-09-01T00:00:00Z",
+  frozen_spec_hashes: Object.fromEntries(
+    REQUIRED_FROZEN_SPEC_SURFACES.map((s, i) => [s, String(i).repeat(64).slice(0, 64)]),
+  ),
+  confirmation_start: "2026-09-02T00:00:00Z",
+  confirmation_used_for_selection: false,
+  confirmation_used_for_tuning: false,
+  acceptance_origin: ADMISSIBLE_ACCEPTANCE_ORIGIN,
+};
+
+const built = await buildResearchContractAcceptanceArtifact(syntheticClaim);
+if (!built.built) throw new Error(`synthetic fixture must build: ${built.reasons.join(",")}`);
+const syntheticAcceptanceArtifact = built.artifact;
+
+const builtOther = await buildResearchContractAcceptanceArtifact({
+  ...syntheticClaim, research_version: RESEARCH_VERSION_V4 + 9,
+});
+if (!builtOther.built) throw new Error("synthetic fixture must build");
+const otherAcceptanceArtifact = builtOther.artifact;
 
 /** Binding fields required for the acceptance-procedure prerequisite resolution only. */
 const procedureBinding = (p: string) =>
@@ -37,7 +67,7 @@ function futureEntry(over: Partial<AcceptedPromotionEntry> = {}): AcceptedPromot
     research_run_id: "future-run-0001",
     research_run_identity_hash: HASH64,
     research_contract_accepted: true,
-    acceptance_artifact_id: "hypothetical_acceptance_artifact",
+    acceptance_artifact_id: syntheticAcceptanceArtifact.artifact_id,
     acceptance_manifest_version: RON_PROMOTION_READINESS_VERSION,
     candidate_id: "cand_future_1",
     candidate_spec_hash: "b".repeat(64),
@@ -69,9 +99,8 @@ function syntheticRegistry(over: Partial<AcceptanceRegistry> = {}): AcceptanceRe
     registry_version: RON_PROMOTION_READINESS_VERSION,
     artifacts: [
       {
-        artifact_id: "hypothetical_acceptance_artifact",
-        artifact_kind: "research_contract_acceptance",
-        research_version: RESEARCH_VERSION_V4 + 1,
+        ...syntheticAcceptanceArtifact,
+        research_version: syntheticAcceptanceArtifact.contract_binding.research_version,
       },
       ...UNRESOLVED_PROMOTION_PREREQUISITES.map((p) => ({
         artifact_id: `resolved_by_${p}_artifact`,
@@ -122,7 +151,7 @@ describe("2D.2n — promotion readiness foundation", () => {
     ["cross-kind id collision",
       { registry_version: RON_PROMOTION_READINESS_VERSION,
         artifacts: [...syntheticRegistry().artifacts, {
-          artifact_id: "hypothetical_acceptance_artifact",
+          artifact_id: syntheticAcceptanceArtifact.artifact_id,
           artifact_kind: "prerequisite_resolution",
           resolves_prerequisite: UNRESOLVED_PROMOTION_PREREQUISITES[0],
         }] },
@@ -142,12 +171,73 @@ describe("2D.2n — promotion readiness foundation", () => {
     ["acceptance record masquerading as a prerequisite resolution",
       { registry_version: RON_PROMOTION_READINESS_VERSION,
         artifacts: [{
-          artifact_id: "hypothetical_acceptance_artifact",
-          artifact_kind: "research_contract_acceptance",
+          ...syntheticAcceptanceArtifact,
           research_version: RESEARCH_VERSION_V4 + 1,
           resolves_prerequisite: UNRESOLVED_PROMOTION_PREREQUISITES[0],
         }] },
       "must_not_resolve_a_prerequisite"],
+    ["acceptance record with no claim binding at all",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          artifact_id: syntheticAcceptanceArtifact.artifact_id,
+          artifact_kind: "research_contract_acceptance",
+          research_version: RESEARCH_VERSION_V4 + 1,
+        }] },
+      "missing_contract_binding"],
+    ["acceptance record with a malformed claim hash",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          ...syntheticAcceptanceArtifact,
+          research_version: RESEARCH_VERSION_V4 + 1,
+          contract_binding: { ...syntheticAcceptanceArtifact.contract_binding, claim_hash: "nope" },
+        }] },
+      "binding_malformed_claim_hash"],
+    ["acceptance record with the wrong procedure hash",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          ...syntheticAcceptanceArtifact,
+          research_version: RESEARCH_VERSION_V4 + 1,
+          contract_binding: {
+            ...syntheticAcceptanceArtifact.contract_binding, procedure_hash: "f".repeat(64),
+          },
+        }] },
+      "binding_procedure_hash_mismatch"],
+    ["acceptance record with the wrong procedure version",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          ...syntheticAcceptanceArtifact,
+          research_version: RESEARCH_VERSION_V4 + 1,
+          contract_binding: {
+            ...syntheticAcceptanceArtifact.contract_binding,
+            procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION + 1,
+          },
+        }] },
+      "binding_procedure_version_mismatch"],
+    ["acceptance record whose id is not derived from its binding",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          ...syntheticAcceptanceArtifact,
+          artifact_id: "hand_rolled_acceptance_artifact",
+          research_version: RESEARCH_VERSION_V4 + 1,
+        }] },
+      "binding_artifact_id_not_derived_from_binding"],
+    ["acceptance record whose research_version contradicts its binding",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          ...syntheticAcceptanceArtifact,
+          research_version: RESEARCH_VERSION_V4 + 7,
+        }] },
+      "contract_binding_research_version_mismatch"],
+    ["prerequisite resolution carrying a stray contract binding",
+      { registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{
+          artifact_id: "p1", artifact_kind: "prerequisite_resolution",
+          resolves_prerequisite: RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
+          bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+          bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+          contract_binding: syntheticAcceptanceArtifact.contract_binding,
+        }] },
+      "prerequisite_resolution_must_not_carry_contract_binding"],
     ["prerequisite resolution for an unknown prerequisite",
       { registry_version: RON_PROMOTION_READINESS_VERSION,
         artifacts: [{
@@ -225,8 +315,7 @@ describe("2D.2n — promotion readiness foundation", () => {
     const mismatched = syntheticRegistry({
       artifacts: [
         {
-          artifact_id: "hypothetical_acceptance_artifact",
-          artifact_kind: "research_contract_acceptance",
+          ...otherAcceptanceArtifact,
           research_version: RESEARCH_VERSION_V4 + 9,
         },
         // Swapped: each artifact id claims the OTHER prerequisite.
@@ -245,7 +334,9 @@ describe("2D.2n — promotion readiness foundation", () => {
       ],
     });
     expect(validateAcceptanceRegistry(mismatched).admissible).toBe(true);
-    const r = validatePromotionEntry(futureEntry(), mismatched);
+    const r = validatePromotionEntry(
+      futureEntry({ acceptance_artifact_id: otherAcceptanceArtifact.artifact_id }), mismatched,
+    );
     expect(r.admissible).toBe(false);
     expect(r.reasons.join(" | ")).toContain("acceptance_artifact_research_version_mismatch");
     expect(r.reasons.join(" | ")).toContain("resolution_artifact_resolves_different_prerequisite");

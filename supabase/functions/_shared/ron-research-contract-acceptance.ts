@@ -191,3 +191,144 @@ export const RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH =
 /** Stable identity of the accepted prerequisite-resolution artifact for this procedure. */
 export const RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID =
   `prerequisite_resolution.${RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID}.v${RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION}`;
+
+/* ------------------------------------------- 2D.2p claim binding (prospective) */
+/**
+ * RON implementation marker 2D.2p — RESEARCH-CONTRACT ACCEPTANCE ARTIFACT BINDING.
+ *
+ * Registry validation alone can never prove that a `research_contract_acceptance` artifact
+ * corresponds to a claim that actually passed `validateResearchContractAcceptance`: the
+ * claim is not present in the registry. So the binding works in two halves:
+ *   - `buildResearchContractAcceptanceArtifact(claim)` is the ONLY admissible way to mint
+ *     such an artifact. It validates the claim first and fails closed otherwise, and it
+ *     computes the canonical claim hash itself.
+ *   - the registry then structurally enforces that the artifact carries the full immutable
+ *     binding, that the procedure version/hash are exactly the accepted 2D.2o ones, and
+ *     that the artifact id is the deterministic function of the binding.
+ * Nothing here creates, accepts or persists an artifact in production.
+ */
+export const RESEARCH_CONTRACT_ACCEPTANCE_CLAIM_PAYLOAD_VERSION = 1;
+
+/** Deterministic, key-order-independent hash of the frozen spec surface map. */
+export function frozenSpecMapPayload(hashes: Readonly<Record<string, string>>) {
+  return Object.keys(hashes ?? {}).sort().map((k) => [k, hashes[k]]);
+}
+
+export async function frozenSpecMapHash(hashes: Readonly<Record<string, string>>) {
+  return await sha256(frozenSpecMapPayload(hashes));
+}
+
+/**
+ * Canonical, input-order-independent payload of a claim. Binds EVERY field that determines
+ * procedure admissibility, and nothing else — no probability, execution, user or private data.
+ */
+export function researchContractAcceptanceClaimPayload(claim: ResearchContractAcceptanceClaim) {
+  return [
+    "ron_research_contract_acceptance_claim", RESEARCH_CONTRACT_ACCEPTANCE_CLAIM_PAYLOAD_VERSION,
+    "procedure_version", claim?.procedure_version ?? null,
+    "procedure_hash", claim?.procedure_hash ?? null,
+    "research_version", claim?.research_version ?? null,
+    "contract_identity", claim?.contract_identity ?? null,
+    "contract_frozen_at", claim?.contract_frozen_at ?? null,
+    "frozen_spec_hashes", frozenSpecMapPayload(claim?.frozen_spec_hashes ?? {}),
+    "confirmation_start", claim?.confirmation_start ?? null,
+    "confirmation_used_for_selection", claim?.confirmation_used_for_selection ?? null,
+    "confirmation_used_for_tuning", claim?.confirmation_used_for_tuning ?? null,
+    "acceptance_origin", claim?.acceptance_origin ?? null,
+  ];
+}
+
+export async function researchContractAcceptanceClaimHash(claim: ResearchContractAcceptanceClaim) {
+  return await sha256(researchContractAcceptanceClaimPayload(claim));
+}
+
+/** Immutable binding a future `research_contract_acceptance` artifact MUST carry. */
+export interface ResearchContractAcceptanceBinding {
+  research_version: number;
+  contract_identity: string;
+  contract_frozen_at: string;
+  claim_hash: string;
+  frozen_spec_map_hash: string;
+  procedure_version: number;
+  procedure_hash: string;
+}
+
+/** Deterministic artifact identity derived from the binding. Structurally checkable. */
+export function researchContractAcceptanceArtifactId(
+  binding: ResearchContractAcceptanceBinding,
+): string {
+  return `research_contract_acceptance.v${binding.research_version}.`
+    + `${binding.contract_identity}.${binding.claim_hash.slice(0, 16)}`;
+}
+
+export interface BuiltResearchContractAcceptanceArtifact {
+  artifact_id: string;
+  artifact_kind: "research_contract_acceptance";
+  contract_binding: ResearchContractAcceptanceBinding;
+}
+
+export type BuildAcceptanceArtifactResult =
+  | { built: true; artifact: BuiltResearchContractAcceptanceArtifact; reasons: [] }
+  | { built: false; artifact: null; reasons: string[] };
+
+/**
+ * The ONLY admissible way to mint a future research-contract acceptance artifact. Pure and
+ * fail-closed: an inadmissible claim yields no artifact. Production never calls this.
+ */
+export async function buildResearchContractAcceptanceArtifact(
+  claim: ResearchContractAcceptanceClaim,
+  procedureHash: string = RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+): Promise<BuildAcceptanceArtifactResult> {
+  const validation = validateResearchContractAcceptance(claim, procedureHash);
+  if (!validation.admissible) return { built: false, artifact: null, reasons: validation.reasons };
+
+  const binding: ResearchContractAcceptanceBinding = {
+    research_version: claim.research_version,
+    contract_identity: claim.contract_identity,
+    contract_frozen_at: claim.contract_frozen_at,
+    claim_hash: await researchContractAcceptanceClaimHash(claim),
+    frozen_spec_map_hash: await frozenSpecMapHash(claim.frozen_spec_hashes),
+    procedure_version: claim.procedure_version,
+    procedure_hash: claim.procedure_hash,
+  };
+  return {
+    built: true,
+    reasons: [],
+    artifact: {
+      artifact_id: researchContractAcceptanceArtifactId(binding),
+      artifact_kind: "research_contract_acceptance",
+      contract_binding: binding,
+    },
+  };
+}
+
+/** Pure, structural, deny-by-default validation of an artifact binding. */
+export function validateResearchContractAcceptanceBinding(
+  binding: ResearchContractAcceptanceBinding | undefined | null,
+  artifactId: string,
+): AcceptanceValidation {
+  const reasons: string[] = [];
+  if (!binding || typeof binding !== "object") {
+    return { admissible: false, reasons: ["missing_contract_binding"] };
+  }
+  if (!Number.isInteger(binding.research_version)
+    || binding.research_version < RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE.min_research_version) {
+    reasons.push("binding_research_version_not_after_frozen_negative");
+  }
+  if (!nonEmpty(binding.contract_identity)) reasons.push("binding_missing_contract_identity");
+  if (instant(binding.contract_frozen_at) == null) {
+    reasons.push("binding_missing_or_malformed_contract_frozen_at");
+  }
+  if (!hex64(binding.claim_hash)) reasons.push("binding_malformed_claim_hash");
+  if (!hex64(binding.frozen_spec_map_hash)) reasons.push("binding_malformed_frozen_spec_map_hash");
+  if (binding.procedure_version !== RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION) {
+    reasons.push("binding_procedure_version_mismatch");
+  }
+  if (binding.procedure_hash !== RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH) {
+    reasons.push("binding_procedure_hash_mismatch");
+  }
+  if (reasons.length === 0 && artifactId !== researchContractAcceptanceArtifactId(binding)) {
+    reasons.push("binding_artifact_id_not_derived_from_binding");
+  }
+  return { admissible: reasons.length === 0, reasons };
+}
