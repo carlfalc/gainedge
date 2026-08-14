@@ -206,6 +206,68 @@ function scanForbiddenKeys(value: unknown, path: string, hits: string[]): void {
   }
 }
 
+/**
+ * Pure, deny-by-default validation of an accepted-artifact registry. A malformed registry
+ * can never be used to prove acceptance; the EMPTY production registry is valid.
+ */
+export function validateAcceptanceRegistry(
+  registry: AcceptanceRegistry | null | undefined,
+): PromotionValidation {
+  const reasons: string[] = [];
+  if (!registry || typeof registry !== "object") {
+    return { admissible: false, reasons: ["missing_registry"] };
+  }
+  if (registry.registry_version !== RON_PROMOTION_READINESS_VERSION) {
+    reasons.push(
+      `registry_version_mismatch: ${registry.registry_version} != ${RON_PROMOTION_READINESS_VERSION}`,
+    );
+  }
+  const artifacts = registry.artifacts;
+  if (!Array.isArray(artifacts)) {
+    return { admissible: false, reasons: [...reasons, "registry_artifacts_not_an_array"] };
+  }
+
+  const seen = new Set<string>();
+  artifacts.forEach((a, i) => {
+    const at = `artifact[${i}]`;
+    if (!a || typeof a !== "object") { reasons.push(`${at}: malformed_record`); return; }
+    if (!nonEmpty(a.artifact_id)) reasons.push(`${at}: missing_artifact_id`);
+    else if (seen.has(a.artifact_id)) {
+      // Covers same-kind duplicates AND cross-kind id collisions: one id, one record.
+      reasons.push(`${at}: duplicate_artifact_id: ${a.artifact_id}`);
+    } else seen.add(a.artifact_id);
+
+    if (!ACCEPTED_ARTIFACT_KINDS.includes(a.artifact_kind)) {
+      reasons.push(`${at}: unknown_artifact_kind: ${String(a.artifact_kind)}`);
+      return;
+    }
+    if (a.artifact_kind === "research_contract_acceptance") {
+      if (!Number.isInteger(a.research_version)
+        || (a.research_version as number)
+          < PROMOTION_READINESS_SPEC_V1.min_research_version_for_promotion) {
+        reasons.push(`${at}: research_contract_acceptance_requires_research_version >= `
+          + `${PROMOTION_READINESS_SPEC_V1.min_research_version_for_promotion}`);
+      }
+      if (a.resolves_prerequisite !== undefined) {
+        reasons.push(`${at}: research_contract_acceptance_must_not_resolve_a_prerequisite`);
+      }
+    } else {
+      if (!nonEmpty(a.resolves_prerequisite)
+        || !UNRESOLVED_PROMOTION_PREREQUISITES.includes(a.resolves_prerequisite as string)) {
+        reasons.push(`${at}: prerequisite_resolution_requires_known_prerequisite_id`);
+      }
+      if (a.research_version !== undefined) {
+        reasons.push(`${at}: prerequisite_resolution_must_not_carry_research_version`);
+      }
+    }
+  });
+
+  // Forbidden fields can never ride along inside a registry record either.
+  scanForbiddenKeys(artifacts, "registry", reasons);
+
+  return { admissible: reasons.length === 0, reasons };
+}
+
 /** Deny-by-default validation of ONE candidate promotion entry. Reports every reason. */
 export function validatePromotionEntry(
   entry: AcceptedPromotionEntry,
