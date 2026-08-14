@@ -533,6 +533,14 @@ export function promotionManifestPayload(
           a.artifact_id, a.artifact_kind,
           a.research_version ?? null, a.resolves_prerequisite ?? null,
           a.bound_procedure_version ?? null, a.bound_procedure_hash ?? null,
+          a.contract_binding
+            ? [
+              a.contract_binding.research_version, a.contract_binding.contract_identity,
+              a.contract_binding.contract_frozen_at, a.contract_binding.claim_hash,
+              a.contract_binding.frozen_spec_map_hash,
+              a.contract_binding.procedure_version, a.contract_binding.procedure_hash,
+            ]
+            : null,
         ] as const)
         // Unambiguous composite key: duplicates are rejected by validation, and even a
         // rejected registry hashes order-independently.
