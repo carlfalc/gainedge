@@ -186,9 +186,16 @@ export function assertCollectionComplete(
 
 /* ------------------------------------------------- sensitive-content guard */
 
-/** Substrings that must never appear anywhere in a persisted payload. */
+/**
+ * Substrings that must never appear anywhere in a persisted payload.
+ *
+ * NOTE: the bare English word `authorization` is NOT listed here — legitimate evidence
+ * prose says things like "readiness is NOT a trade authorization". Actual authorization
+ * material is still caught by the `bearer `/`eyj`/token substrings below and by the
+ * `authorization` FIELD name in FORBIDDEN_KEYS.
+ */
 const FORBIDDEN_SUBSTRINGS: readonly string[] = [
-  "authorization", "bearer ", "access_token", "refresh_token", "service_role",
+  "bearer ", "access_token", "refresh_token", "service_role",
   "apikey", "api_key", "password", "eyj",
 ];
 
@@ -199,6 +206,7 @@ const FORBIDDEN_KEYS: readonly string[] = [
   "swap_usd", "entry_price", "actual_entry_price", "actual_exit_price", "sl_price",
   "tp1_price", "tp2_price", "tp3_price", "be_level", "qty", "qty1", "qty2", "qty3",
   "notes", "tags", "raw_alert_payload", "pineconnector_license", "jwt", "token",
+  "authorization", "auth_header", "bearer",
 ];
 
 function walkKeys(value: unknown, hit: (key: string) => void): void {

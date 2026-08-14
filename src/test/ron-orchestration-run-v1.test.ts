@@ -195,4 +195,45 @@ describe("persistence plan safety and idempotency surface", () => {
     expect(() => assertPersistSafe({ metaapi_account_id: "x" }, "t")).toThrow(/forbidden_key/);
     expect(() => assertPersistSafe({ observations: [{ key: "readiness_state" }] }, "t")).not.toThrow();
   });
+
+  it("allows the legitimate English word 'authorization' in evidence prose", () => {
+    expect(() => assertPersistSafe(
+      { limitation: "not a trade authorization" }, "t",
+    )).not.toThrow();
+    expect(() => assertPersistSafe({
+      uncertainty: {
+        level: "high",
+        limitations: [
+          "readiness is NOT a trade authorization; construction is a future, separately versioned phase",
+        ],
+      },
+    }, "t")).not.toThrow();
+  });
+
+  it("still fails closed on real authorization / secret material", () => {
+    expect(() => assertPersistSafe({ authorization: "Bearer eyJhbGciOi" }, "t"))
+      .toThrow(/forbidden_key:authorization/);
+    expect(() => assertPersistSafe({ Authorization: "x" }, "t"))
+      .toThrow(/forbidden_key:authorization/);
+    expect(() => assertPersistSafe({ headers: { bearer: "x" } }, "t"))
+      .toThrow(/forbidden_key:bearer/);
+    expect(() => assertPersistSafe({ h: "authorization: Bearer abc" }, "t"))
+      .toThrow(/forbidden_content:bearer/);
+    expect(() => assertPersistSafe({ blob: "eyJhbGciOiJIUzI1NiJ9.x.y" }, "t"))
+      .toThrow(/forbidden_content:eyj/);
+    expect(() => assertPersistSafe({ s: "access_token=abc" }, "t"))
+      .toThrow(/forbidden_content:access_token/);
+    expect(() => assertPersistSafe({ s: "refresh_token=abc" }, "t"))
+      .toThrow(/forbidden_content:refresh_token/);
+    expect(() => assertPersistSafe({ s: "service_role key" }, "t"))
+      .toThrow(/forbidden_content:service_role/);
+    expect(() => assertPersistSafe({ s: "api_key: k" }, "t"))
+      .toThrow(/forbidden_content:api_key/);
+    expect(() => assertPersistSafe({ token: "t" }, "t")).toThrow(/forbidden_key:token/);
+    expect(() => assertPersistSafe({ notes: "n" }, "t")).toThrow(/forbidden_key:notes/);
+    expect(() => assertPersistSafe({ tags: [] }, "t")).toThrow(/forbidden_key:tags/);
+    expect(() => assertPersistSafe({ balance: 1 }, "t")).toThrow(/forbidden_key:balance/);
+    expect(() => assertPersistSafe({ raw_alert_payload: {} }, "t"))
+      .toThrow(/forbidden_key:raw_alert_payload/);
+  });
 });
