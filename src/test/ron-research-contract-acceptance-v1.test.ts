@@ -6,6 +6,9 @@ import {
   RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH, RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
   SAMPLE_SUFFICIENCY_PREREQUISITE_ID, researchContractAcceptanceHash,
   researchContractAcceptancePayload, validateResearchContractAcceptance,
+  buildResearchContractAcceptanceArtifact, frozenSpecMapHash,
+  researchContractAcceptanceArtifactId, researchContractAcceptanceClaimHash,
+  validateResearchContractAcceptanceBinding,
   type ResearchContractAcceptanceClaim,
 } from "../../supabase/functions/_shared/ron-research-contract-acceptance";
 import {
