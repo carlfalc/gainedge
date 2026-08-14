@@ -199,6 +199,18 @@ describe("2D.2n — promotion readiness foundation", () => {
   });
 
   it("self-asserted acceptance fails closed against the default empty registry", () => {
+    const productionOnlyProcedure = futureEntry({
+      prerequisite_resolutions: {
+        [RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID]: RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
+      },
+    });
+    const pr = validatePromotionEntry(productionOnlyProcedure);
+    expect(pr.admissible).toBe(false);
+    expect(pr.reasons.join(" | "))
+      .toContain(`unresolved_prerequisite: ${SAMPLE_SUFFICIENCY_PREREQUISITE_ID}`);
+    expect(pr.reasons.join(" | ")).toContain("acceptance_artifact_not_in_accepted_registry");
+    expect(derivePromotedStateVariables([productionOnlyProcedure])).toEqual([]);
+
     const e = futureEntry();
     const r = validatePromotionEntry(e);
     expect(r.admissible).toBe(false);
