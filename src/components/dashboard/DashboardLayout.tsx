@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic, Wine, Brain
+  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic, Wine, Brain,
   ShieldCheck,
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
