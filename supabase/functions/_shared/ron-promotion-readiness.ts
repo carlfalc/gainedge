@@ -213,6 +213,11 @@ export function validatePromotionEntry(
 ): PromotionValidation {
   const reasons: string[] = [];
 
+  // 0. The registry itself must be well formed BEFORE any acceptance lookup happens.
+  const registryCheck = validateAcceptanceRegistry(registry);
+  const registryUsable = registryCheck.admissible;
+  for (const r of registryCheck.reasons) reasons.push(`invalid_acceptance_registry: ${r}`);
+
   // 1. Immutable, separately versioned research identity.
   if (!Number.isInteger(entry.research_version)
     || entry.research_version < PROMOTION_READINESS_SPEC_V1.min_research_version_for_promotion) {
@@ -228,7 +233,9 @@ export function validatePromotionEntry(
   }
   if (entry.research_contract_accepted !== true) reasons.push("research_contract_not_accepted");
   if (!nonEmpty(entry.acceptance_artifact_id)) reasons.push("missing_acceptance_artifact_id");
-  else {
+  else if (!registryUsable) {
+    reasons.push("acceptance_artifact_unverifiable_invalid_registry");
+  } else {
     const accepted = findArtifact(
       registry, entry.acceptance_artifact_id, "research_contract_acceptance",
     );
@@ -305,6 +312,10 @@ export function validatePromotionEntry(
   for (const p of UNRESOLVED_PROMOTION_PREREQUISITES) {
     if (!nonEmpty(res[p])) {
       reasons.push(`unresolved_prerequisite: ${p}`);
+      continue;
+    }
+    if (!registryUsable) {
+      reasons.push(`unresolved_prerequisite: ${p} (unverifiable_invalid_registry)`);
       continue;
     }
     const artifact = findArtifact(registry, res[p], "prerequisite_resolution");
