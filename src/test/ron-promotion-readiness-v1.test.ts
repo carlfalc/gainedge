@@ -22,6 +22,11 @@ import {
   buildResearchContractAcceptanceArtifact,
   type ResearchContractAcceptanceClaim,
 } from "../../supabase/functions/_shared/ron-research-contract-acceptance";
+import {
+  CONFIRMATORY_SAMPLE_SUFFICIENCY_ARTIFACT_ID,
+  CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH,
+  RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION,
+} from "../../supabase/functions/_shared/ron-confirmatory-sample-sufficiency";
 
 const HASH64 = "a".repeat(64);
 
@@ -58,7 +63,12 @@ const procedureBinding = (p: string) =>
       bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
       bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
     }
-    : {};
+    : p === SAMPLE_SUFFICIENCY_PREREQUISITE_ID
+      ? {
+        bound_procedure_version: RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION,
+        bound_procedure_hash: CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH,
+      }
+      : {};
 
 /** A hypothetical FUTURE entry. Nothing here is accepted or persisted. */
 function futureEntry(over: Partial<AcceptedPromotionEntry> = {}): AcceptedPromotionEntry {
@@ -121,23 +131,71 @@ describe("2D.2n — promotion readiness foundation", () => {
     expect(validatePromotionManifest(ACCEPTED_PROMOTION_MANIFEST).admissible).toBe(true);
   });
 
-  it("the production accepted-artifact registry holds only the 2D.2o procedure resolution", () => {
-    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toEqual([{
-      artifact_id: RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
-      artifact_kind: "prerequisite_resolution",
-      resolves_prerequisite: RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
-      bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
-      bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
-    }]);
+  it("the production registry holds exactly the 2D.2o and 2D.2q procedure resolutions", () => {
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toEqual([
+      {
+        artifact_id: RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
+        artifact_kind: "prerequisite_resolution",
+        resolves_prerequisite: RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
+        bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+        bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+      },
+      {
+        artifact_id: CONFIRMATORY_SAMPLE_SUFFICIENCY_ARTIFACT_ID,
+        artifact_kind: "prerequisite_resolution",
+        resolves_prerequisite: SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+        bound_procedure_version: RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION,
+        bound_procedure_hash: CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH,
+      },
+    ]);
     expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
       .filter((a) => a.artifact_kind === "research_contract_acceptance")).toEqual([]);
-    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
-      .filter((a) => a.resolves_prerequisite === SAMPLE_SUFFICIENCY_PREREQUISITE_ID)).toEqual([]);
     expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.registry_version)
       .toBe(RON_PROMOTION_READINESS_VERSION);
     expect(validateAcceptanceRegistry(CURRENT_ACCEPTED_ARTIFACT_REGISTRY))
       .toEqual({ admissible: true, reasons: [] });
     expect(validateAcceptanceRegistry(syntheticRegistry()).admissible).toBe(true);
+  });
+
+  it("2D.2q: wrong or missing sufficiency procedure binding fails closed", () => {
+    const base = {
+      artifact_id: CONFIRMATORY_SAMPLE_SUFFICIENCY_ARTIFACT_ID,
+      artifact_kind: "prerequisite_resolution" as const,
+      resolves_prerequisite: SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+    };
+    for (const bad of [
+      {},
+      { bound_procedure_version: RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION },
+      { bound_procedure_hash: CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH },
+      {
+        bound_procedure_version: RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION + 1,
+        bound_procedure_hash: CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH,
+      },
+      {
+        bound_procedure_version: RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION,
+        bound_procedure_hash: "f".repeat(64),
+      },
+    ]) {
+      const rv = validateAcceptanceRegistry({
+        registry_version: RON_PROMOTION_READINESS_VERSION,
+        artifacts: [{ ...base, ...bad }],
+      });
+      expect(rv.admissible).toBe(false);
+      expect(rv.reasons.join(" | "))
+        .toContain("sample_sufficiency_resolution_not_bound_to_accepted_procedure");
+    }
+    // 2D.2o binding rules are unchanged.
+    expect(validateAcceptanceRegistry({
+      registry_version: RON_PROMOTION_READINESS_VERSION,
+      artifacts: [{
+        artifact_id: RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
+        artifact_kind: "prerequisite_resolution",
+        resolves_prerequisite: RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
+        bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION + 1,
+        bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+      }],
+    }).reasons.join(" | "))
+      .toContain("acceptance_procedure_resolution_not_bound_to_accepted_procedure");
   });
 
   const badRegistries: Array<[string, AcceptanceRegistry, string]> = [
