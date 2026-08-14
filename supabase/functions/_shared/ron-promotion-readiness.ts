@@ -24,6 +24,13 @@
  */
 import { sha256 } from "./ron-calibration.ts";
 import { PROMOTION_GATE_V4, RESEARCH_VERSION_V4 } from "./ron-research-v4.ts";
+import {
+  RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
+  RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
+  RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+  RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+  SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+} from "./ron-research-contract-acceptance.ts";
 
 export const RON_PROMOTION_READINESS_VERSION = 1;
 
@@ -62,9 +69,12 @@ export const PROMOTION_READINESS_SPEC_V1 = {
  */
 export const UNRESOLVED_PROMOTION_PREREQUISITES: readonly string[] = [
   // How much genuinely post-freeze confirmatory data is "enough" has no accepted source.
-  "confirmatory_sample_sufficiency_threshold",
-  // No accepted artifact defines how a newer research contract is itself accepted.
-  "research_contract_acceptance_procedure",
+  SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+  // 2D.2o: the ACCEPTANCE PROCEDURE for a newer research contract is now defined by
+  // `ron-research-contract-acceptance.ts` and resolved by exactly one registry artifact.
+  // The prerequisite id itself stays listed: every promotion entry must still cite the
+  // accepted resolution artifact explicitly. Nothing is auto-resolved.
+  RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
 ] as const;
 
 /** Field names that must never appear anywhere in a manifest entry. */
@@ -141,6 +151,12 @@ export interface AcceptedArtifactRecord {
   research_version?: number;
   /** Required for `prerequisite_resolution`: the prerequisite id this artifact resolves. */
   resolves_prerequisite?: string;
+  /**
+   * Required ONLY for the artifact resolving `research_contract_acceptance_procedure`:
+   * the immutable version/hash of the accepted procedure it is bound to.
+   */
+  bound_procedure_version?: number;
+  bound_procedure_hash?: string;
 }
 
 export interface AcceptanceRegistry {
@@ -149,13 +165,28 @@ export interface AcceptanceRegistry {
 }
 
 /**
- * THE production/current accepted-artifact registry. EMPTY: no post-V4 research contract
- * has been accepted, and neither unresolved prerequisite has an accepted resolution
- * artifact. Consequently every non-empty promotion entry is denied today.
+ * THE production/current accepted-artifact registry.
+ *
+ * 2D.2o: it contains EXACTLY ONE artifact — the prerequisite resolution for
+ * `research_contract_acceptance_procedure`, hash-bound to the accepted, immutable
+ * procedure in `ron-research-contract-acceptance.ts`.
+ *
+ * It deliberately contains NO `research_contract_acceptance` artifact (no post-V4 research
+ * contract has been accepted) and NO resolution for
+ * `confirmatory_sample_sufficiency_threshold` (still unresolved and promotion-blocking).
+ * Consequently every non-empty promotion entry is still denied today.
  */
 export const CURRENT_ACCEPTED_ARTIFACT_REGISTRY: AcceptanceRegistry = {
   registry_version: RON_PROMOTION_READINESS_VERSION,
-  artifacts: [] as const,
+  artifacts: [
+    {
+      artifact_id: RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
+      artifact_kind: "prerequisite_resolution",
+      resolves_prerequisite: RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
+      bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+      bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+    },
+  ] as const,
 } as const;
 
 export const ACCEPTED_ARTIFACT_KINDS: readonly AcceptedArtifactKind[] = [
@@ -258,6 +289,15 @@ export function validateAcceptanceRegistry(
       }
       if (a.research_version !== undefined) {
         reasons.push(`${at}: prerequisite_resolution_must_not_carry_research_version`);
+      }
+      // The acceptance-procedure resolution must be bound to the exact accepted procedure.
+      if (a.resolves_prerequisite === RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID) {
+        if (a.bound_procedure_version !== RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION
+          || a.bound_procedure_hash !== RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH) {
+          reasons.push(`${at}: acceptance_procedure_resolution_not_bound_to_accepted_procedure`);
+        }
+      } else if (a.bound_procedure_version !== undefined || a.bound_procedure_hash !== undefined) {
+        reasons.push(`${at}: procedure_binding_only_allowed_for_acceptance_procedure_resolution`);
       }
     }
   });
@@ -472,6 +512,7 @@ export function promotionManifestPayload(
         .map((a) => [
           a.artifact_id, a.artifact_kind,
           a.research_version ?? null, a.resolves_prerequisite ?? null,
+          a.bound_procedure_version ?? null, a.bound_procedure_hash ?? null,
         ] as const)
         // Unambiguous composite key: duplicates are rejected by validation, and even a
         // rejected registry hashes order-independently.
