@@ -181,21 +181,30 @@ describe("2D.2n — promotion readiness foundation", () => {
   });
 
   it("unknown or mismatched registry identities fail closed", () => {
-    const wrongVersion = syntheticRegistry({
+    const [p0, p1] = UNRESOLVED_PROMOTION_PREREQUISITES;
+    // Registry is itself VALID; the bindings simply do not match the entry.
+    const mismatched = syntheticRegistry({
       artifacts: [
         {
           artifact_id: "hypothetical_acceptance_artifact",
           artifact_kind: "research_contract_acceptance",
           research_version: RESEARCH_VERSION_V4 + 9,
         },
-        ...UNRESOLVED_PROMOTION_PREREQUISITES.map((p) => ({
-          artifact_id: `resolved_by_${p}_artifact`,
+        // Swapped: each artifact id claims the OTHER prerequisite.
+        {
+          artifact_id: `resolved_by_${p0}_artifact`,
           artifact_kind: "prerequisite_resolution" as const,
-          resolves_prerequisite: "some_other_prerequisite",
-        })),
+          resolves_prerequisite: p1,
+        },
+        {
+          artifact_id: `resolved_by_${p1}_artifact`,
+          artifact_kind: "prerequisite_resolution" as const,
+          resolves_prerequisite: p0,
+        },
       ],
     });
-    const r = validatePromotionEntry(futureEntry(), wrongVersion);
+    expect(validateAcceptanceRegistry(mismatched).admissible).toBe(true);
+    const r = validatePromotionEntry(futureEntry(), mismatched);
     expect(r.admissible).toBe(false);
     expect(r.reasons.join(" | ")).toContain("acceptance_artifact_research_version_mismatch");
     expect(r.reasons.join(" | ")).toContain("resolution_artifact_resolves_different_prerequisite");
