@@ -16,6 +16,7 @@
  * class is granted to the emitting role AND every artifact it cites is in the ledger.
  */
 import { sha256 } from "./ron-calibration.ts";
+import { derivePromotedStateVariables } from "./ron-promotion-readiness.ts";
 
 export const RON_AGENTIC_ARCHITECTURE_VERSION = 1;
 
@@ -65,8 +66,13 @@ export const LEDGER_IDS = ACCEPTED_EVIDENCE_LEDGER.map((a) => a.id);
 /**
  * Research V4 promoted nothing. This list is the single source of truth for any
  * conditional-edge claim and stays EMPTY until a run passes the two-stage gate.
+ *
+ * 2D.2n: no longer a naked literal — it is DERIVED from the accepted promotion manifest
+ * (`ron-promotion-readiness.ts`), which is empty and deny-by-default. The derivation is
+ * pure and returns [] unless an audited, separately versioned, disjointly confirmed
+ * promotion entry exists and independently validates. Value today: [].
  */
-export const PROMOTED_STATE_VARIABLES: readonly string[] = [] as const;
+export const PROMOTED_STATE_VARIABLES: readonly string[] = derivePromotedStateVariables();
 
 /* ------------------------------------------------------------- claim classes */
 
