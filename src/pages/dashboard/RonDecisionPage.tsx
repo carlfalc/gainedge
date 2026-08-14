@@ -64,9 +64,12 @@ export default function RonDecisionPage() {
     <div className="p-5 space-y-4">
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: C.text }}>RON Decision Record</h1>
+          <h1 className="text-xl font-semibold" style={{ color: C.text }}>
+            RON Stored Decision Record
+          </h1>
           <p className="text-sm" style={{ color: C.sec }}>
-            Read-only view of the last persisted multi-agent evaluation. Nothing here is executable.
+            Stored audit record of a past multi-agent evaluation — not a live RON decision and not
+            current market state. Nothing here is executable.
           </p>
         </div>
         <button
@@ -99,12 +102,16 @@ export default function RonDecisionPage() {
         <>
           <Panel title="Decision">
             <div className="flex flex-wrap items-center gap-4">
+              <span className="rounded-md px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest"
+                style={{ background: `${C.sec}1A`, color: C.sec, border: `1px solid ${C.border}` }}>
+                STORED / HISTORICAL
+              </span>
               <span className="rounded-md px-2.5 py-1 font-mono text-sm"
                 style={{ background: `${STATE_COLOR[state] ?? C.sec}1A`, color: STATE_COLOR[state] ?? C.sec }}>
                 {state}
               </span>
               <span className="text-sm" style={{ color: C.sec }}>
-                {view.decision.instrument} · {view.decision.timeframe} · as of{" "}
+                {view.decision.instrument} · {view.decision.timeframe} · stored evaluation anchor{" "}
                 <span className="font-mono" style={{ color: C.text }}>{view.decision.as_of}</span>
               </span>
               <span className="text-sm" style={{ color: C.sec }}>
@@ -150,7 +157,8 @@ export default function RonDecisionPage() {
                     <span className="text-xs" style={{ color: C.sec }}>v{e.agent_version} · rank {e.authority_rank}</span>
                     <span className="text-xs font-mono" style={{ color: C.sec }}>{e.status}</span>
                     <span className="text-xs" style={{ color: e.data_health?.status === "healthy" ? C.jade : C.amber }}>
-                      health {e.data_health?.status} · {e.data_health?.freshness_minutes}m old
+                      health {e.data_health?.status} · source freshness at decision:{" "}
+                      {e.data_health?.freshness_minutes}m
                     </span>
                     <span className="text-xs" style={{ color: C.muted }}>uncertainty {e.uncertainty?.level}</span>
                   </div>
