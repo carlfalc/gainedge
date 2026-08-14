@@ -512,6 +512,7 @@ export function promotionManifestPayload(
         .map((a) => [
           a.artifact_id, a.artifact_kind,
           a.research_version ?? null, a.resolves_prerequisite ?? null,
+          a.bound_procedure_version ?? null, a.bound_procedure_hash ?? null,
         ] as const)
         // Unambiguous composite key: duplicates are rejected by validation, and even a
         // rejected registry hashes order-independently.

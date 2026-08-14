@@ -11,8 +11,24 @@ import {
   PROMOTED_STATE_VARIABLES, agenticArchitectureHash, evaluateClaim,
 } from "../../supabase/functions/_shared/ron-agentic-architecture";
 import { PROMOTION_GATE_V4, RESEARCH_VERSION_V4 } from "../../supabase/functions/_shared/ron-research-v4";
+import {
+  RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
+  RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
+  RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+  RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+  SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+} from "../../supabase/functions/_shared/ron-research-contract-acceptance";
 
 const HASH64 = "a".repeat(64);
+
+/** Binding fields required for the acceptance-procedure prerequisite resolution only. */
+const procedureBinding = (p: string) =>
+  p === RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID
+    ? {
+      bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+      bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+    }
+    : {};
 
 /** A hypothetical FUTURE entry. Nothing here is accepted or persisted. */
 function futureEntry(over: Partial<AcceptedPromotionEntry> = {}): AcceptedPromotionEntry {
@@ -61,6 +77,7 @@ function syntheticRegistry(over: Partial<AcceptanceRegistry> = {}): AcceptanceRe
         artifact_id: `resolved_by_${p}_artifact`,
         artifact_kind: "prerequisite_resolution" as const,
         resolves_prerequisite: p,
+        ...procedureBinding(p),
       })),
     ],
     ...over,
@@ -75,8 +92,18 @@ describe("2D.2n — promotion readiness foundation", () => {
     expect(validatePromotionManifest(ACCEPTED_PROMOTION_MANIFEST).admissible).toBe(true);
   });
 
-  it("the production accepted-artifact registry is empty", () => {
-    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toEqual([]);
+  it("the production accepted-artifact registry holds only the 2D.2o procedure resolution", () => {
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toEqual([{
+      artifact_id: RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID,
+      artifact_kind: "prerequisite_resolution",
+      resolves_prerequisite: RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
+      bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+      bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+    }]);
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
+      .filter((a) => a.artifact_kind === "research_contract_acceptance")).toEqual([]);
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
+      .filter((a) => a.resolves_prerequisite === SAMPLE_SUFFICIENCY_PREREQUISITE_ID)).toEqual([]);
     expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.registry_version)
       .toBe(RON_PROMOTION_READINESS_VERSION);
     expect(validateAcceptanceRegistry(CURRENT_ACCEPTED_ARTIFACT_REGISTRY))
