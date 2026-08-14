@@ -62,11 +62,8 @@ export interface RonDecisionReadResult {
 export async function fetchLatestRonDecision(
   params: { instrument?: string; timeframe?: string; decision_id?: string } = {},
 ): Promise<RonDecisionReadResult> {
-  // Proactive refresh, but never fatal: a valid existing session is enough.
-  try { await supabase.auth.refreshSession(); } catch { /* fall back to existing session */ }
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Not authenticated");
-
+  // The Supabase client attaches (and transparently refreshes) the caller's JWT. The
+  // endpoint itself is the authorization boundary and fails closed without one.
   const { data, error } = await supabase.functions.invoke("ron-decision-read", { body: params });
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(String(data.error));
