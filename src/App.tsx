@@ -26,6 +26,7 @@ import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
 import TradingViewChartPage from "./pages/dashboard/TradingViewChartPage.tsx";
 import WhiskyCigarLoungePage from "./pages/dashboard/WhiskyCigarLoungePage.tsx";
 import StrategyPage from "./pages/dashboard/StrategyPage.tsx";
+import RonDecisionPage from "./pages/dashboard/RonDecisionPage";
 import GainEdgeAIPage from "./pages/dashboard/GainEdgeAIPage.tsx";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => (
             <Route path="charts" element={<TradingViewChartPage />} />
             <Route path="strategy" element={<StrategyPage />} />
             <Route path="ai" element={<GainEdgeAIPage />} />
+            <Route path="ron-decision" element={<RonDecisionPage />} />
             <Route path="whisky-cigar-lounge" element={<WhiskyCigarLoungePage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
