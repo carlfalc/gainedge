@@ -132,8 +132,12 @@ describe("2D.2n — promotion readiness foundation", () => {
     e.win_probability = 0.7;
     expect(validatePromotionEntry(e as unknown as AcceptedPromotionEntry).reasons.join(" "))
       .toContain("forbidden_field");
-    const text = JSON.stringify(promotionManifestPayload()).toLowerCase();
-    for (const bad of ["probability", "execution_allowed", "user_id", "balance", "stop_loss"]) {
+    // Only the accepted-entry surface is scanned: the policy block legitimately NAMES
+    // these prohibitions ("probability_policy": "no_probability_in_contract").
+    const payload = promotionManifestPayload([futureEntry()]);
+    const entriesIdx = payload.indexOf("accepted_entries");
+    const text = JSON.stringify(payload[entriesIdx + 1]).toLowerCase();
+    for (const bad of ["probability", "execution", "user_id", "balance", "stop_loss", "token"]) {
       expect(text).not.toContain(bad);
     }
     expect(PROMOTION_READINESS_SPEC_V1.default_decision).toBe("deny");
