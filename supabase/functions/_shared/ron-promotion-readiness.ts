@@ -30,6 +30,8 @@ import {
   RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
   RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
   SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+  validateResearchContractAcceptanceBinding,
+  type ResearchContractAcceptanceBinding,
 } from "./ron-research-contract-acceptance.ts";
 
 export const RON_PROMOTION_READINESS_VERSION = 1;
@@ -149,6 +151,12 @@ export interface AcceptedArtifactRecord {
   artifact_kind: AcceptedArtifactKind;
   /** Required for `research_contract_acceptance`: the research contract version accepted. */
   research_version?: number;
+  /**
+   * 2D.2p — REQUIRED for `research_contract_acceptance`: the immutable binding to a claim
+   * that passed `validateResearchContractAcceptance`. Minted only by
+   * `buildResearchContractAcceptanceArtifact`. Forbidden on prerequisite resolutions.
+   */
+  contract_binding?: ResearchContractAcceptanceBinding;
   /** Required for `prerequisite_resolution`: the prerequisite id this artifact resolves. */
   resolves_prerequisite?: string;
   /**
@@ -282,6 +290,15 @@ export function validateAcceptanceRegistry(
       if (a.resolves_prerequisite !== undefined) {
         reasons.push(`${at}: research_contract_acceptance_must_not_resolve_a_prerequisite`);
       }
+      if (a.bound_procedure_version !== undefined || a.bound_procedure_hash !== undefined) {
+        reasons.push(`${at}: research_contract_acceptance_must_use_contract_binding`);
+      }
+      // 2D.2p: the artifact must be immutably bound to a validated acceptance claim.
+      const b = validateResearchContractAcceptanceBinding(a.contract_binding, a.artifact_id);
+      for (const r of b.reasons) reasons.push(`${at}: ${r}`);
+      if (b.admissible && a.contract_binding!.research_version !== a.research_version) {
+        reasons.push(`${at}: contract_binding_research_version_mismatch`);
+      }
     } else {
       if (!nonEmpty(a.resolves_prerequisite)
         || !UNRESOLVED_PROMOTION_PREREQUISITES.includes(a.resolves_prerequisite as string)) {
@@ -289,6 +306,9 @@ export function validateAcceptanceRegistry(
       }
       if (a.research_version !== undefined) {
         reasons.push(`${at}: prerequisite_resolution_must_not_carry_research_version`);
+      }
+      if (a.contract_binding !== undefined) {
+        reasons.push(`${at}: prerequisite_resolution_must_not_carry_contract_binding`);
       }
       // The acceptance-procedure resolution must be bound to the exact accepted procedure.
       if (a.resolves_prerequisite === RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID) {
