@@ -14,8 +14,9 @@
  *     `holdoutViable = tail_times >= MIN_TEST_OBS_PER_FOLD && every direction has
  *     >= MIN_TEST_OBS_PER_FOLD observations in the tail`; otherwise `holdout.used=false`
  *     with the recorded reason.
- *   - `PURGE_MINUTES` is the embargo width at the train -> confirmatory boundary, and
- *     `HOLDOUT_FRACTION` the reserved tail fraction.
+ *   - `PURGE_MINUTES` (60) is the embargo width at the train -> confirmatory boundary, and
+ *     the V3 `HOLDOUT_FRACTION` (0.15, imported from `ron-research-v3.ts` — NOT the
+ *     unrelated calibration-module constant) is the reserved tail fraction.
  *   - `PROMOTION_GATE_V4` declares the confirmatory block `holdout_required`, its role
  *     `final_confirmation_only_never_selection_or_tuning`, and infeasibility as
  *     `fail_closed`.

@@ -33,6 +33,11 @@ import {
   validateResearchContractAcceptanceBinding,
   type ResearchContractAcceptanceBinding,
 } from "./ron-research-contract-acceptance.ts";
+import {
+  CONFIRMATORY_SAMPLE_SUFFICIENCY_ARTIFACT_ID,
+  CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH,
+  RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION,
+} from "./ron-confirmatory-sample-sufficiency.ts";
 
 export const RON_PROMOTION_READINESS_VERSION = 1;
 
@@ -70,7 +75,11 @@ export const PROMOTION_READINESS_SPEC_V1 = {
  * entry cites an accepted artifact that resolves it. No number is invented here.
  */
 export const UNRESOLVED_PROMOTION_PREREQUISITES: readonly string[] = [
-  // How much genuinely post-freeze confirmatory data is "enough" has no accepted source.
+  // 2D.2q: the MINIMUM CONFIRMATORY-BLOCK VIABILITY rule is now inherited verbatim from the
+  // frozen accepted research contracts and resolved by exactly one registry artifact. The
+  // prerequisite id stays listed: every promotion entry must still cite that accepted
+  // resolution artifact explicitly. Nothing is auto-resolved, and the resolution is scoped
+  // to minimum viability only — it is NOT a statistical-power/MDE/significance guarantee.
   SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
   // 2D.2o: the ACCEPTANCE PROCEDURE for a newer research contract is now defined by
   // `ron-research-contract-acceptance.ts` and resolved by exactly one registry artifact.
@@ -175,14 +184,17 @@ export interface AcceptanceRegistry {
 /**
  * THE production/current accepted-artifact registry.
  *
- * 2D.2o: it contains EXACTLY ONE artifact — the prerequisite resolution for
- * `research_contract_acceptance_procedure`, hash-bound to the accepted, immutable
- * procedure in `ron-research-contract-acceptance.ts`.
+ * It contains EXACTLY TWO prerequisite-resolution artifacts, each hash-bound to its
+ * accepted, immutable procedure:
+ *   - 2D.2o: `research_contract_acceptance_procedure`
+ *     (`ron-research-contract-acceptance.ts`).
+ *   - 2D.2q: `confirmatory_sample_sufficiency_threshold`, inherited verbatim from the
+ *     frozen research contracts (`ron-confirmatory-sample-sufficiency.ts`), scoped to
+ *     minimum confirmatory-block viability only.
  *
  * It deliberately contains NO `research_contract_acceptance` artifact (no post-V4 research
- * contract has been accepted) and NO resolution for
- * `confirmatory_sample_sufficiency_threshold` (still unresolved and promotion-blocking).
- * Consequently every non-empty promotion entry is still denied today.
+ * contract has been accepted). Consequently every non-empty promotion entry is still
+ * denied today, and `ACCEPTED_PROMOTION_MANIFEST` stays empty.
  */
 export const CURRENT_ACCEPTED_ARTIFACT_REGISTRY: AcceptanceRegistry = {
   registry_version: RON_PROMOTION_READINESS_VERSION,
@@ -193,6 +205,13 @@ export const CURRENT_ACCEPTED_ARTIFACT_REGISTRY: AcceptanceRegistry = {
       resolves_prerequisite: RESEARCH_CONTRACT_ACCEPTANCE_PREREQUISITE_ID,
       bound_procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
       bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+    },
+    {
+      artifact_id: CONFIRMATORY_SAMPLE_SUFFICIENCY_ARTIFACT_ID,
+      artifact_kind: "prerequisite_resolution",
+      resolves_prerequisite: SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+      bound_procedure_version: RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION,
+      bound_procedure_hash: CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH,
     },
   ] as const,
 } as const;
@@ -315,6 +334,12 @@ export function validateAcceptanceRegistry(
         if (a.bound_procedure_version !== RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION
           || a.bound_procedure_hash !== RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH) {
           reasons.push(`${at}: acceptance_procedure_resolution_not_bound_to_accepted_procedure`);
+        }
+      } else if (a.resolves_prerequisite === SAMPLE_SUFFICIENCY_PREREQUISITE_ID) {
+        // 2D.2q: the sufficiency resolution must be bound to the exact inherited procedure.
+        if (a.bound_procedure_version !== RON_CONFIRMATORY_SAMPLE_SUFFICIENCY_VERSION
+          || a.bound_procedure_hash !== CONFIRMATORY_SAMPLE_SUFFICIENCY_PROCEDURE_HASH) {
+          reasons.push(`${at}: sample_sufficiency_resolution_not_bound_to_accepted_procedure`);
         }
       } else if (a.bound_procedure_version !== undefined || a.bound_procedure_hash !== undefined) {
         reasons.push(`${at}: procedure_binding_only_allowed_for_acceptance_procedure_resolution`);
