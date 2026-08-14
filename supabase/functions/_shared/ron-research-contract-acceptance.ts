@@ -186,7 +186,7 @@ export async function researchContractAcceptanceHash() {
  * can never drift from the contract it pins.
  */
 export const RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH =
-  "0000000000000000000000000000000000000000000000000000000000000000";
+  "f4a92124555372e2b1e423f0cd6c9370b740be9642bd178ffca09a53e510547e";
 
 /** Stable identity of the accepted prerequisite-resolution artifact for this procedure. */
 export const RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID =
