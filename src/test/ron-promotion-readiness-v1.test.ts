@@ -17,9 +17,33 @@ import {
   RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
   RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
   SAMPLE_SUFFICIENCY_PREREQUISITE_ID,
+  REQUIRED_FROZEN_SPEC_SURFACES,
+  ADMISSIBLE_ACCEPTANCE_ORIGIN,
+  buildResearchContractAcceptanceArtifact,
+  type ResearchContractAcceptanceClaim,
 } from "../../supabase/functions/_shared/ron-research-contract-acceptance";
 
 const HASH64 = "a".repeat(64);
+
+/** SYNTHETIC, test-only future acceptance claim. Nothing here is accepted in production. */
+const syntheticClaim: ResearchContractAcceptanceClaim = {
+  procedure_version: RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION,
+  procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
+  research_version: RESEARCH_VERSION_V4 + 1,
+  contract_identity: "research_v5_synthetic",
+  contract_frozen_at: "2026-09-01T00:00:00Z",
+  frozen_spec_hashes: Object.fromEntries(
+    REQUIRED_FROZEN_SPEC_SURFACES.map((s, i) => [s, String(i).repeat(64).slice(0, 64)]),
+  ),
+  confirmation_start: "2026-09-02T00:00:00Z",
+  confirmation_used_for_selection: false,
+  confirmation_used_for_tuning: false,
+  acceptance_origin: ADMISSIBLE_ACCEPTANCE_ORIGIN,
+};
+
+const built = await buildResearchContractAcceptanceArtifact(syntheticClaim);
+if (!built.built) throw new Error(`synthetic fixture must build: ${built.reasons.join(",")}`);
+const syntheticAcceptanceArtifact = built.artifact;
 
 /** Binding fields required for the acceptance-procedure prerequisite resolution only. */
 const procedureBinding = (p: string) =>
@@ -37,7 +61,7 @@ function futureEntry(over: Partial<AcceptedPromotionEntry> = {}): AcceptedPromot
     research_run_id: "future-run-0001",
     research_run_identity_hash: HASH64,
     research_contract_accepted: true,
-    acceptance_artifact_id: "hypothetical_acceptance_artifact",
+    acceptance_artifact_id: syntheticAcceptanceArtifact.artifact_id,
     acceptance_manifest_version: RON_PROMOTION_READINESS_VERSION,
     candidate_id: "cand_future_1",
     candidate_spec_hash: "b".repeat(64),
@@ -69,9 +93,8 @@ function syntheticRegistry(over: Partial<AcceptanceRegistry> = {}): AcceptanceRe
     registry_version: RON_PROMOTION_READINESS_VERSION,
     artifacts: [
       {
-        artifact_id: "hypothetical_acceptance_artifact",
-        artifact_kind: "research_contract_acceptance",
-        research_version: RESEARCH_VERSION_V4 + 1,
+        ...syntheticAcceptanceArtifact,
+        research_version: syntheticAcceptanceArtifact.contract_binding.research_version,
       },
       ...UNRESOLVED_PROMOTION_PREREQUISITES.map((p) => ({
         artifact_id: `resolved_by_${p}_artifact`,
