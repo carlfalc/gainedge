@@ -400,8 +400,13 @@ export function validatePromotionManifest(
   registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
 ): PromotionValidation {
   const reasons: string[] = [];
+  const registryCheck = validateAcceptanceRegistry(registry);
+  for (const r of registryCheck.reasons) reasons.push(`invalid_acceptance_registry: ${r}`);
   entries.forEach((e, i) => {
-    for (const r of validatePromotionEntry(e, registry).reasons) reasons.push(`entry[${i}]: ${r}`);
+    for (const r of validatePromotionEntry(e, registry).reasons) {
+      if (r.startsWith("invalid_acceptance_registry: ")) continue; // already reported once
+      reasons.push(`entry[${i}]: ${r}`);
+    }
   });
 
   const byVariable = new Map<string, string>();
@@ -461,13 +466,18 @@ export function promotionManifestPayload(
       .map((k) => [k, (PROMOTION_READINESS_SPEC_V1 as Record<string, unknown>)[k]]),
     "unresolved_prerequisites", [...UNRESOLVED_PROMOTION_PREREQUISITES].sort(),
     "accepted_artifact_registry", [
-      registry.registry_version,
-      [...(registry.artifacts ?? [])]
-        .sort((a, b) => (a.artifact_id < b.artifact_id ? -1 : a.artifact_id > b.artifact_id ? 1 : 0))
+      registry?.registry_version ?? null,
+      validateAcceptanceRegistry(registry).admissible ? "valid" : "invalid",
+      [...(registry?.artifacts ?? [])]
         .map((a) => [
           a.artifact_id, a.artifact_kind,
           a.research_version ?? null, a.resolves_prerequisite ?? null,
-        ]),
+        ] as const)
+        // Unambiguous composite key: duplicates are rejected by validation, and even a
+        // rejected registry hashes order-independently.
+        .map((t) => [t, JSON.stringify(t)] as const)
+        .sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0))
+        .map((t) => [...t[0]]),
     ],
     "accepted_entries", [...entries]
       .sort((a, b) => (a.candidate_id < b.candidate_id ? -1 : a.candidate_id > b.candidate_id ? 1 : 0))
