@@ -109,9 +109,10 @@ describe("2D.2o — research contract acceptance procedure", () => {
     expect(UNRESOLVED_PROMOTION_PREREQUISITES).toContain(SAMPLE_SUFFICIENCY_PREREQUISITE_ID);
   });
 
-  it("production registry holds exactly this one hash-bound resolution artifact", () => {
+  it("production registry holds this hash-bound resolution artifact", () => {
     const arts = CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts;
-    expect(arts).toHaveLength(1);
+    // 2D.2q added a second prerequisite resolution; the 2D.2o artifact is unchanged.
+    expect(arts).toHaveLength(2);
     expect(arts[0].artifact_id).toBe(RESEARCH_CONTRACT_ACCEPTANCE_ARTIFACT_ID);
     expect(arts[0].artifact_kind).toBe("prerequisite_resolution");
     expect(arts[0].bound_procedure_hash).toBe(RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH);
@@ -134,7 +135,8 @@ describe("2D.2o — research contract acceptance procedure", () => {
     expect(bad.reasons.join(" | "))
       .toContain("acceptance_procedure_resolution_not_bound_to_accepted_procedure");
 
-    const strayBinding = validateAcceptanceRegistry({
+    // A different prerequisite may never borrow the acceptance-procedure binding.
+    const borrowedBinding = validateAcceptanceRegistry({
       registry_version: CURRENT_ACCEPTED_ARTIFACT_REGISTRY.registry_version,
       artifacts: [{
         artifact_id: "x",
@@ -143,9 +145,9 @@ describe("2D.2o — research contract acceptance procedure", () => {
         bound_procedure_hash: RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH,
       }],
     });
-    expect(strayBinding.admissible).toBe(false);
-    expect(strayBinding.reasons.join(" | "))
-      .toContain("procedure_binding_only_allowed_for_acceptance_procedure_resolution");
+    expect(borrowedBinding.admissible).toBe(false);
+    expect(borrowedBinding.reasons.join(" | "))
+      .toContain("sample_sufficiency_resolution_not_bound_to_accepted_procedure");
   });
 });
 
@@ -237,7 +239,7 @@ describe("2D.2p — research contract acceptance artifact binding", () => {
       .filter((a) => a.artifact_kind === "research_contract_acceptance")).toEqual([]);
     expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
       .filter((a) => a.contract_binding !== undefined)).toEqual([]);
-    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toHaveLength(1);
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toHaveLength(2);
     expect(validateAcceptanceRegistry(CURRENT_ACCEPTED_ARTIFACT_REGISTRY).admissible).toBe(true);
   });
 });
