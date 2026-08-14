@@ -62,7 +62,8 @@ export interface RonDecisionReadResult {
 export async function fetchLatestRonDecision(
   params: { instrument?: string; timeframe?: string; decision_id?: string } = {},
 ): Promise<RonDecisionReadResult> {
-  await supabase.auth.refreshSession();
+  // Proactive refresh, but never fatal: a valid existing session is enough.
+  try { await supabase.auth.refreshSession(); } catch { /* fall back to existing session */ }
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Not authenticated");
 
