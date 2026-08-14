@@ -3,7 +3,8 @@ import {
   ACCEPTED_PROMOTION_MANIFEST, PROMOTION_READINESS_SPEC_V1, RON_PROMOTION_READINESS_VERSION,
   UNRESOLVED_PROMOTION_PREREQUISITES, derivePromotedStateVariables, promotionManifestHash,
   promotionManifestPayload, validatePromotionEntry, validatePromotionManifest,
-  type AcceptedPromotionEntry,
+  CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+  type AcceptanceRegistry, type AcceptedPromotionEntry,
 } from "../../supabase/functions/_shared/ron-promotion-readiness";
 import {
   PROMOTED_STATE_VARIABLES, agenticArchitectureHash, evaluateClaim,
@@ -45,12 +46,78 @@ function futureEntry(over: Partial<AcceptedPromotionEntry> = {}): AcceptedPromot
   };
 }
 
+/** SYNTHETIC test-only registry. Nothing here is accepted in production. */
+function syntheticRegistry(over: Partial<AcceptanceRegistry> = {}): AcceptanceRegistry {
+  return {
+    registry_version: RON_PROMOTION_READINESS_VERSION,
+    artifacts: [
+      {
+        artifact_id: "hypothetical_acceptance_artifact",
+        artifact_kind: "research_contract_acceptance",
+        research_version: RESEARCH_VERSION_V4 + 1,
+      },
+      ...UNRESOLVED_PROMOTION_PREREQUISITES.map((p) => ({
+        artifact_id: `resolved_by_${p}_artifact`,
+        artifact_kind: "prerequisite_resolution" as const,
+        resolves_prerequisite: p,
+      })),
+    ],
+    ...over,
+  };
+}
+
 describe("2D.2n — promotion readiness foundation", () => {
   it("accepted manifest is empty and promotes exactly zero state variables", () => {
     expect(ACCEPTED_PROMOTION_MANIFEST).toEqual([]);
     expect(derivePromotedStateVariables()).toEqual([]);
     expect(PROMOTED_STATE_VARIABLES).toEqual([]);
     expect(validatePromotionManifest(ACCEPTED_PROMOTION_MANIFEST).admissible).toBe(true);
+  });
+
+  it("the production accepted-artifact registry is empty", () => {
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toEqual([]);
+  });
+
+  it("self-asserted acceptance fails closed against the default empty registry", () => {
+    const e = futureEntry();
+    const r = validatePromotionEntry(e);
+    expect(r.admissible).toBe(false);
+    expect(r.reasons.join(" | ")).toContain("acceptance_artifact_not_in_accepted_registry");
+    expect(r.reasons.join(" | ")).toContain("resolution_artifact_not_in_accepted_registry");
+    expect(derivePromotedStateVariables([e])).toEqual([]);
+  });
+
+  it("unknown or mismatched registry identities fail closed", () => {
+    const wrongVersion = syntheticRegistry({
+      artifacts: [
+        {
+          artifact_id: "hypothetical_acceptance_artifact",
+          artifact_kind: "research_contract_acceptance",
+          research_version: RESEARCH_VERSION_V4 + 9,
+        },
+        ...UNRESOLVED_PROMOTION_PREREQUISITES.map((p) => ({
+          artifact_id: `resolved_by_${p}_artifact`,
+          artifact_kind: "prerequisite_resolution" as const,
+          resolves_prerequisite: "some_other_prerequisite",
+        })),
+      ],
+    });
+    const r = validatePromotionEntry(futureEntry(), wrongVersion);
+    expect(r.admissible).toBe(false);
+    expect(r.reasons.join(" | ")).toContain("acceptance_artifact_research_version_mismatch");
+    expect(r.reasons.join(" | ")).toContain("resolution_artifact_resolves_different_prerequisite");
+
+    const unknown = validatePromotionEntry(
+      futureEntry({ acceptance_artifact_id: "not_registered" }), syntheticRegistry(),
+    );
+    expect(unknown.reasons.join(" | ")).toContain("acceptance_artifact_not_in_accepted_registry");
+  });
+
+  it("confirmation window starting exactly at spec freeze fails (strict rule)", () => {
+    const e = futureEntry({ spec_frozen_at: "2026-09-02T00:00:00Z" });
+    const r = validatePromotionEntry(e, syntheticRegistry());
+    expect(r.admissible).toBe(false);
+    expect(r.reasons.join(" | ")).toContain("confirmation_window_starts_before_spec_freeze");
   });
 
   it("architecture derives its empty list without changing its hash", async () => {
@@ -65,17 +132,22 @@ describe("2D.2n — promotion readiness foundation", () => {
 
   it("the frozen Research V4 negative artifact can never produce a promotion", () => {
     const v4 = futureEntry({ research_version: RESEARCH_VERSION_V4, final_promotion_pass: false });
-    const r = validatePromotionEntry(v4);
+    const r = validatePromotionEntry(v4, syntheticRegistry());
     expect(r.admissible).toBe(false);
     expect(r.reasons.join(" ")).toContain("research_version_not_separately_versioned");
     expect(r.reasons.join(" ")).toContain("final_promotion_gate_not_passed");
+    expect(derivePromotedStateVariables([v4], syntheticRegistry())).toEqual([]);
     expect(derivePromotedStateVariables([v4])).toEqual([]);
   });
 
-  it("a fully qualified hypothetical future entry validates and derives its variables", () => {
+  it("a fully qualified future entry validates ONLY with an explicit synthetic registry", () => {
     const e = futureEntry();
-    expect(validatePromotionEntry(e)).toEqual({ admissible: true, reasons: [] });
-    expect(derivePromotedStateVariables([e])).toEqual(["adx_regime"]);
+    expect(validatePromotionEntry(e, syntheticRegistry()))
+      .toEqual({ admissible: true, reasons: [] });
+    expect(derivePromotedStateVariables([e], syntheticRegistry())).toEqual(["adx_regime"]);
+    // Default/current registry: fails closed, derives nothing.
+    expect(validatePromotionEntry(e).admissible).toBe(false);
+    expect(derivePromotedStateVariables([e])).toEqual([]);
   });
 
   const failures: Array<[string, Partial<AcceptedPromotionEntry>, string]> = [
@@ -97,9 +169,10 @@ describe("2D.2n — promotion readiness foundation", () => {
 
   it.each(failures)("fails closed: %s", (_label, over, expected) => {
     const e = futureEntry(over);
-    const r = validatePromotionEntry(e);
+    const r = validatePromotionEntry(e, syntheticRegistry());
     expect(r.admissible).toBe(false);
     expect(r.reasons.join(" | ")).toContain(expected);
+    expect(derivePromotedStateVariables([e], syntheticRegistry())).toEqual([]);
     expect(derivePromotedStateVariables([e])).toEqual([]);
   });
 
@@ -107,6 +180,7 @@ describe("2D.2n — promotion readiness foundation", () => {
     const flagOnly = futureEntry({
       pre_holdout_gate_pass: false, holdout_gate_pass: false, final_promotion_pass: false,
     });
+    expect(validatePromotionEntry(flagOnly, syntheticRegistry()).admissible).toBe(false);
     expect(validatePromotionEntry(flagOnly).admissible).toBe(false);
     expect(derivePromotedStateVariables([flagOnly])).toEqual([]);
   });
@@ -114,16 +188,17 @@ describe("2D.2n — promotion readiness foundation", () => {
   it("rejects contradictory or duplicated variables across entries", () => {
     const a = futureEntry();
     const b = futureEntry({ candidate_id: "cand_future_2", direction: "short" });
-    const m = validatePromotionManifest([a, b]);
+    const m = validatePromotionManifest([a, b], syntheticRegistry());
     expect(m.admissible).toBe(false);
     expect(m.reasons.join(" ")).toContain("contradictory_variable_direction");
-    expect(derivePromotedStateVariables([a, b])).toEqual([]);
+    expect(derivePromotedStateVariables([a, b], syntheticRegistry())).toEqual([]);
   });
 
   it("manifest hash is deterministic and independent of input order", async () => {
     const a = futureEntry();
     const b = futureEntry({ candidate_id: "cand_future_2", state_variables: ["rsi_regime"] });
-    expect(await promotionManifestHash([a, b])).toBe(await promotionManifestHash([b, a]));
+    expect(await promotionManifestHash([a, b], syntheticRegistry()))
+      .toBe(await promotionManifestHash([b, a], syntheticRegistry()));
     expect(await promotionManifestHash()).toBe(await promotionManifestHash());
   });
 
