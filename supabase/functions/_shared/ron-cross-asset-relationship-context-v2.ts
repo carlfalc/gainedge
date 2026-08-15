@@ -322,7 +322,11 @@ export async function buildCrossAssetRelationshipEvidenceV2(
   let excluded: { time: number; reason: CounterpartExclusionReason }[] = [];
   let conflict: string | null = null;
   try {
-    const res = admitCounterpartBars(input.counterpart_bars);
+    // No look-ahead: counterpart admissibility accounting is evaluated strictly at or
+    // before the evaluation anchor, exactly like the inherited V1 window.
+    const res = admitCounterpartBars(
+      input.counterpart_bars.filter((b) => Number.isFinite(b.time) && b.time <= asOf),
+    );
     admitted = res.admitted;
     excluded = res.excluded;
   } catch (err) {
