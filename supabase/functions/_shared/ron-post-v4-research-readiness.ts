@@ -19,7 +19,8 @@
  *      infeasibility, no selection/tuning contamination).
  * This module only adds CROSS-CONSISTENCY: same research_version, same contract_identity,
  * strictly newer than the frozen V4 negative, exact accepted procedure versions/hashes on
- * both sides, and binding<->claim agreement. Nothing is duplicated or weakened.
+ * both sides, the confirmatory window cannot predate the contract's declared confirmation
+ * start, and every binding must match its own claim. Nothing is duplicated or weakened.
  *
  * WHAT A PASS MEANS
  * -----------------
@@ -31,9 +32,9 @@
  * execute V5 or any research run. Not a calibrated probability. Not statistical power, MDE
  * or significance. Not permission for trading or order execution. Not a causal claim.
  *
- * Production is deliberately NOT ready: no post-V4 research-contract acceptance artifact
- * exists in `CURRENT_ACCEPTED_ARTIFACT_REGISTRY`, `ACCEPTED_PROMOTION_MANIFEST` is empty,
- * and `PROMOTED_STATE_VARIABLES` is empty.
+ * Production is deliberately NOT ready because no post-V4 research-contract acceptance
+ * artifact exists in `CURRENT_ACCEPTED_ARTIFACT_REGISTRY`. An empty promotion manifest is
+ * expected before research succeeds and is NOT a prerequisite for beginning research.
  */
 import { sha256 } from "./ron-calibration.ts";
 import { RESEARCH_VERSION_V4 } from "./ron-research-v4.ts";
@@ -59,6 +60,8 @@ import {
 import {
   ACCEPTED_PROMOTION_MANIFEST,
   CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+  validateAcceptanceRegistry,
+  type AcceptanceRegistry,
 } from "./ron-promotion-readiness.ts";
 
 export const RON_POST_V4_RESEARCH_READINESS_VERSION = 1;
@@ -94,6 +97,7 @@ export const POST_V4_RESEARCH_READINESS_PROCEDURE = {
     "same_contract_identity_on_both_sides",
     "research_version_strictly_after_frozen_negative",
     "exact_accepted_procedure_versions_and_hashes_on_both_sides",
+    "confirmation_window_not_before_declared_confirmation_start",
     "each_binding_matches_its_own_validated_claim_hash",
   ],
   frozen_negative_research_version: RESEARCH_VERSION_V4,
@@ -150,22 +154,12 @@ export async function evaluatePostV4ResearchHandoffReadiness(
   if (!sb || typeof sb !== "object") reasons.push("missing_sufficiency_binding");
   if (reasons.length > 0) return deny(reasons);
 
-  // 1/2. Delegated, unmodified acceptance + sufficiency semantics.
-  for (const r of validateResearchContractAcceptance(ac).reasons) {
-    reasons.push(`acceptance_claim: ${r}`);
-  }
-  for (const r of validateConfirmatorySampleSufficiency(sc).reasons) {
-    reasons.push(`sufficiency_claim: ${r}`);
-  }
+  for (const r of validateResearchContractAcceptance(ac).reasons) reasons.push(`acceptance_claim: ${r}`);
+  for (const r of validateConfirmatorySampleSufficiency(sc).reasons) reasons.push(`sufficiency_claim: ${r}`);
   if (!nonEmpty(aid)) reasons.push("missing_acceptance_artifact_id");
-  for (const r of validateResearchContractAcceptanceBinding(ab, aid).reasons) {
-    reasons.push(`acceptance_binding: ${r}`);
-  }
-  for (const r of validateConfirmatorySampleSufficiencyBinding(sb).reasons) {
-    reasons.push(`sufficiency_binding: ${r}`);
-  }
+  for (const r of validateResearchContractAcceptanceBinding(ab, aid).reasons) reasons.push(`acceptance_binding: ${r}`);
+  for (const r of validateConfirmatorySampleSufficiencyBinding(sb).reasons) reasons.push(`sufficiency_binding: ${r}`);
 
-  // 5. Exact accepted procedure identity on both sides (explicit, not inferred).
   if (ac?.procedure_version !== RON_RESEARCH_CONTRACT_ACCEPTANCE_VERSION
     || ac?.procedure_hash !== RESEARCH_CONTRACT_ACCEPTANCE_PROCEDURE_HASH) {
     reasons.push("acceptance_procedure_identity_not_exactly_accepted");
@@ -175,53 +169,37 @@ export async function evaluatePostV4ResearchHandoffReadiness(
     reasons.push("sufficiency_procedure_identity_not_exactly_accepted");
   }
 
-  // 3. Both sides must describe the SAME research contract.
-  if (ac?.research_version !== sc?.research_version) {
-    reasons.push("research_version_mismatch_between_acceptance_and_sufficiency");
-  }
-  if (ac?.contract_identity !== sc?.contract_identity) {
-    reasons.push("contract_identity_mismatch_between_acceptance_and_sufficiency");
+  if (ac?.research_version !== sc?.research_version) reasons.push("research_version_mismatch_between_acceptance_and_sufficiency");
+  if (ac?.contract_identity !== sc?.contract_identity) reasons.push("contract_identity_mismatch_between_acceptance_and_sufficiency");
+
+  const declaredConfirmationStart = Date.parse(ac?.confirmation_start ?? "");
+  const actualConfirmationStart = Date.parse(sc?.confirmation_window?.start ?? "");
+  if (Number.isFinite(declaredConfirmationStart) && Number.isFinite(actualConfirmationStart)
+    && actualConfirmationStart < declaredConfirmationStart) {
+    reasons.push("confirmation_window_starts_before_declared_confirmation_start");
   }
 
-  // 4. Strictly newer than the frozen V4 negative.
-  if (!Number.isInteger(ac?.research_version)
-    || (ac.research_version as number) <= RESEARCH_VERSION_V4) {
+  if (!Number.isInteger(ac?.research_version) || (ac.research_version as number) <= RESEARCH_VERSION_V4) {
     reasons.push("research_version_not_after_frozen_negative_v4");
   }
 
-  // Bindings must belong to the claims presented, not to some other claim.
-  if (ab && ac && ab.claim_hash !== await researchContractAcceptanceClaimHash(ac)) {
-    reasons.push("acceptance_binding_claim_hash_does_not_match_claim");
-  }
-  if (sb && sc && sb.claim_hash !== await confirmatorySampleSufficiencyClaimHash(sc)) {
-    reasons.push("sufficiency_binding_claim_hash_does_not_match_claim");
-  }
+  if (ab && ac && ab.claim_hash !== await researchContractAcceptanceClaimHash(ac)) reasons.push("acceptance_binding_claim_hash_does_not_match_claim");
+  if (sb && sc && sb.claim_hash !== await confirmatorySampleSufficiencyClaimHash(sc)) reasons.push("sufficiency_binding_claim_hash_does_not_match_claim");
   if (ab && ac && (ab.research_version !== ac.research_version
     || ab.contract_identity !== ac.contract_identity
-    || ab.contract_frozen_at !== ac.contract_frozen_at)) {
-    reasons.push("acceptance_binding_identity_does_not_match_claim");
-  }
+    || ab.contract_frozen_at !== ac.contract_frozen_at)) reasons.push("acceptance_binding_identity_does_not_match_claim");
   if (sb && sc && (sb.research_version !== sc.research_version
-    || sb.contract_identity !== sc.contract_identity)) {
-    reasons.push("sufficiency_binding_identity_does_not_match_claim");
-  }
-  if (ab && aid && reasons.length === 0 && aid !== researchContractAcceptanceArtifactId(ab)) {
-    reasons.push("acceptance_artifact_id_not_derived_from_binding");
-  }
+    || sb.contract_identity !== sc.contract_identity)) reasons.push("sufficiency_binding_identity_does_not_match_claim");
+  if (ab && aid && reasons.length === 0 && aid !== researchContractAcceptanceArtifactId(ab)) reasons.push("acceptance_artifact_id_not_derived_from_binding");
 
   return { ready: reasons.length === 0, meaning: POST_V4_READINESS_MEANING, reasons };
 }
 
-/* ----------------------------------------------------------------- payloads */
-
-/** Canonical, key-order-independent payload of the procedure itself. */
 export function postV4ResearchReadinessPayload() {
   const p = POST_V4_RESEARCH_READINESS_PROCEDURE as Record<string, unknown>;
   return [
     "ron_post_v4_research_readiness_version", RON_POST_V4_RESEARCH_READINESS_VERSION,
-    "procedure", Object.keys(p).sort().map((k) => [
-      k, Array.isArray(p[k]) ? [...(p[k] as unknown[])].map(String).sort() : p[k],
-    ]),
+    "procedure", Object.keys(p).sort().map((k) => [k, Array.isArray(p[k]) ? [...(p[k] as unknown[])].map(String).sort() : p[k]]),
   ];
 }
 
@@ -229,26 +207,16 @@ export async function postV4ResearchReadinessHash() {
   return await sha256(postV4ResearchReadinessPayload());
 }
 
-/**
- * Canonical, deterministic, input-order-independent readiness payload for a SUBMISSION.
- * Binds only readiness-relevant identity: the two validated claim hashes, the two accepted
- * procedure identities, the shared contract identity/version and the outcome. No
- * probability, execution, user or private field is included.
- */
-export async function postV4ReadinessSubmissionPayload(
-  submission: PostV4ResearchHandoffSubmission,
-) {
+export async function postV4ReadinessSubmissionPayload(submission: PostV4ResearchHandoffSubmission) {
   const result = await evaluatePostV4ResearchHandoffReadiness(submission);
   return [
     "ron_post_v4_readiness_submission", RON_POST_V4_RESEARCH_READINESS_VERSION,
-    "acceptance_claim_hash",
-    submission?.acceptance_claim
-      ? await researchContractAcceptanceClaimHash(submission.acceptance_claim) : null,
+    "readiness_procedure_version", RON_POST_V4_RESEARCH_READINESS_VERSION,
+    "readiness_procedure_hash", await postV4ResearchReadinessHash(),
+    "acceptance_claim_hash", submission?.acceptance_claim ? await researchContractAcceptanceClaimHash(submission.acceptance_claim) : null,
     "acceptance_procedure_version", submission?.acceptance_claim?.procedure_version ?? null,
     "acceptance_procedure_hash", submission?.acceptance_claim?.procedure_hash ?? null,
-    "sufficiency_claim_hash",
-    submission?.sufficiency_claim
-      ? await confirmatorySampleSufficiencyClaimHash(submission.sufficiency_claim) : null,
+    "sufficiency_claim_hash", submission?.sufficiency_claim ? await confirmatorySampleSufficiencyClaimHash(submission.sufficiency_claim) : null,
     "sufficiency_procedure_version", submission?.sufficiency_claim?.procedure_version ?? null,
     "sufficiency_procedure_hash", submission?.sufficiency_claim?.procedure_hash ?? null,
     "research_version", submission?.acceptance_claim?.research_version ?? null,
@@ -260,13 +228,9 @@ export async function postV4ReadinessSubmissionPayload(
   ];
 }
 
-export async function postV4ReadinessSubmissionHash(
-  submission: PostV4ResearchHandoffSubmission,
-) {
+export async function postV4ReadinessSubmissionHash(submission: PostV4ResearchHandoffSubmission) {
   return await sha256(await postV4ReadinessSubmissionPayload(submission));
 }
-
-/* ------------------------------------------------------ production statement */
 
 export interface ProductionPostV4Readiness {
   ready: boolean;
@@ -275,19 +239,20 @@ export interface ProductionPostV4Readiness {
   accepted_promotion_entries: number;
 }
 
-/**
- * The production answer, derived (never asserted) from the accepted registry/manifest:
- * production is NOT ready for a post-V4 handoff because no accepted post-V4
- * research-contract artifact exists.
- */
-export function productionPostV4Readiness(): ProductionPostV4Readiness {
-  const accepted = CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
-    .filter((a) => a.artifact_kind === "research_contract_acceptance").length;
+export function productionPostV4Readiness(
+  registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+): ProductionPostV4Readiness {
+  const registryCheck = validateAcceptanceRegistry(registry);
   const reasons: string[] = [];
-  if (accepted === 0) reasons.push("no_accepted_post_v4_research_contract_artifact");
-  if (ACCEPTED_PROMOTION_MANIFEST.length === 0) reasons.push("accepted_promotion_manifest_empty");
+  if (!registryCheck.admissible) {
+    for (const r of registryCheck.reasons) reasons.push(`invalid_acceptance_registry: ${r}`);
+  }
+  const accepted = registryCheck.admissible
+    ? registry.artifacts.filter((a) => a.artifact_kind === "research_contract_acceptance").length
+    : 0;
+  if (registryCheck.admissible && accepted === 0) reasons.push("no_accepted_post_v4_research_contract_artifact");
   return {
-    ready: false,
+    ready: registryCheck.admissible && accepted > 0,
     reasons,
     accepted_research_contract_artifacts: accepted,
     accepted_promotion_entries: ACCEPTED_PROMOTION_MANIFEST.length,
