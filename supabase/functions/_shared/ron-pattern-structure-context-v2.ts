@@ -463,7 +463,7 @@ export async function buildPatternStructureContextEvidenceV2(
     state("structure_context_source", "sealed_session_market_structure_v2_evidence", at),
   );
 
-  if (!ctx.ok) {
+  if (ctx.ok === false) {
     observations.push(
       state("structure_context_availability", "unavailable", at),
       state("structure_context_rejection_reason", ctx.reason, at),
