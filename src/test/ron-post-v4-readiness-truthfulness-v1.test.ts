@@ -3,6 +3,7 @@ import { productionPostV4Readiness } from "../../supabase/functions/_shared/ron-
 import {
   ACCEPTED_PROMOTION_MANIFEST,
   CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+  type AcceptanceRegistry,
 } from "../../supabase/functions/_shared/ron-promotion-readiness";
 
 describe("2D.2s — post-V4 production-readiness truthfulness", () => {
@@ -17,5 +18,21 @@ describe("2D.2s — post-V4 production-readiness truthfulness", () => {
     expect(readiness.accepted_research_contract_artifacts).toBe(0);
     expect(readiness.accepted_promotion_entries).toBe(0);
     expect(readiness.reasons).not.toContain("accepted_promotion_manifest_empty");
+  });
+
+  it("fails closed when the accepted-artifact registry is malformed", () => {
+    const malformed: AcceptanceRegistry = {
+      ...CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+      artifacts: [
+        ...CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts,
+        CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts[0],
+      ],
+    };
+
+    const readiness = productionPostV4Readiness(malformed);
+    expect(readiness.ready).toBe(false);
+    expect(readiness.accepted_research_contract_artifacts).toBe(0);
+    expect(readiness.reasons.join(" | ")).toContain("invalid_acceptance_registry");
+    expect(readiness.reasons.join(" | ")).toContain("duplicate_artifact_id");
   });
 });
