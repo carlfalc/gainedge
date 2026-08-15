@@ -257,9 +257,6 @@ export interface RejectedSessionContext {
 }
 export type SessionContextResult = AcceptedSessionContext | RejectedSessionContext;
 
-const obsOf = (e: EvidenceEnvelopeV1, key: string) =>
-  e.observations.find((o) => o.key === key);
-
 /**
  * SINGLETON accessor. Evidence V1 does not enforce unique observation keys, so duplicate
  * or conflicting keys are rejected HERE rather than silently collapsed.
