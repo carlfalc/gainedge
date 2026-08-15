@@ -18,6 +18,10 @@ import {
   buildPatternContextEvidenceV1, patternContextSpecHash,
   PATTERN_CONTEXT_SPEC_V1, PATTERN_DETECTOR_SOURCE_SHA256,
 } from "../_shared/ron-pattern-context-spec.ts";
+import {
+  buildPatternStructureContextEvidenceV2, patternContextSpecHashV2,
+  PATTERN_CONTEXT_SPEC_V2,
+} from "../_shared/ron-pattern-structure-context-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,6 +75,17 @@ Deno.serve(async (req) => {
 
   const db = createClient(supabaseUrl, serviceKey || token, { auth: { persistSession: false } });
 
+  // spec_version 2 (default) attaches consumed Session V2 structure context.
+  // spec_version 1 stays explicitly replayable and DEPENDENCY-ISOLATED: it never reads,
+  // requires or is influenced by the V2 structure-context input.
+  const specVersion = body.spec_version == null ? 2 : Number(body.spec_version);
+  if (specVersion !== 1 && specVersion !== 2) {
+    return json({ error: "unsupported_spec_version", spec_version: body.spec_version }, 400);
+  }
+  if (specVersion === 1 && body.session_evidence != null) {
+    return json({ error: "v1_replay_is_dependency_isolated_session_evidence_not_accepted" }, 400);
+  }
+
   try {
     const contract = await buildEligibilityContract(db, instrument, timeframe, RON_QUALITY_VERSION);
 
@@ -114,12 +129,20 @@ Deno.serve(async (req) => {
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
-    const build = () => buildPatternContextEvidenceV1({
-      instrument, timeframe, as_of: asOf, bars,
-      isQuarantined: (b, m) => contract.isQuarantined(b, m),
-      run_id: runId, trace_id: traceId,
-      newest_source_bar: newestSourceBar,
-    });
+    const build = () => specVersion === 2
+      ? buildPatternStructureContextEvidenceV2({
+        instrument, timeframe, as_of: asOf, bars,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+        session_evidence: body.session_evidence ?? null,
+      })
+      : buildPatternContextEvidenceV1({
+        instrument, timeframe, as_of: asOf, bars,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+      });
 
     const envelope = await build();
     const errs = validateEvidence(envelope);
@@ -133,14 +156,17 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      spec_version: PATTERN_CONTEXT_SPEC_V1.spec_version,
-      spec_hash: await patternContextSpecHash(),
+      spec_version: specVersion,
+      spec_hash: specVersion === 2 ? await patternContextSpecHashV2() : await patternContextSpecHash(),
+      agent_id: PATTERN_CONTEXT_SPEC_V2.agent_id,
+      agent_version: PATTERN_CONTEXT_SPEC_V2.agent_version,
       detector_source_sha256: PATTERN_DETECTOR_SOURCE_SHA256,
       quality_version: RON_QUALITY_VERSION,
       evidence: sealed,
       numeric_probability: null,
       execution_allowed: false,
       execution_path: "signal_only",
+      allow_live_execution: false,
       persisted: false,
     });
   } catch (err) {
