@@ -275,7 +275,13 @@ export async function buildMacroTemporalContextEvidenceV2(
   observations.push(state("macro_price_context_source", "candle_history_native", iso(anchor)));
 
   if (base.status !== "supported") {
-    observations.push(state("macro_temporal_context_state", "unavailable_no_admitted_source_items", iso(anchor)));
+    // Truthful fail-closed: V2 does NOT know WHY V1 was not supported (no in-window
+    // rows, conflicting duplicate source row ids, ...). The base status is copied
+    // verbatim and the temporal-context state stays generic.
+    observations.push(
+      state("macro_base_news_evidence_status", base.status, iso(anchor)),
+      state("macro_temporal_context_state", "unavailable_base_news_evidence_not_supported", iso(anchor)),
+    );
     return out(base.data_health.status, base.data_health.completeness);
   }
 
