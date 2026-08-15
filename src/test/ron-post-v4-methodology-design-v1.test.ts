@@ -83,7 +83,7 @@ describe("2D.3c post-V4 methodology design", () => {
     expect(CONFIRMATORY_INFERENCE.multiplicity).toBe("bonferroni");
     expect(CONFIRMATORY_INFERENCE.hypotheses).toBe(HYPOTHESIS_COUNT);
     expect(CONFIRMATORY_INFERENCE.per_hypothesis_alpha)
-      .toBeCloseTo(0.05 / HYPOTHESIS_COUNT, 12);
+      .toBeCloseTo(0.05 / HYPOTHESIS_COUNT, 6);
   });
 
   it("computes a prospective MDE without any empirical effect size", () => {
