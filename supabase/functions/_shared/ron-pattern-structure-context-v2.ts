@@ -483,6 +483,9 @@ export async function buildPatternStructureContextEvidenceV2(
       `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${ctx.evidence_hash}`,
     );
     source_timestamps.structure_context_as_of = iso(ctx.as_of);
+    // The ACTUAL completed-close instant is carried as a source timestamp, never as an
+    // observation timestamped after the envelope anchor.
+    source_timestamps.structure_context_as_of_bar_completed_close = iso(ctx.as_of + BAR_MS);
     observations.push(
       state("structure_context_availability", "available", at),
       state("current_structure_state", ctx.structure_state, at),
