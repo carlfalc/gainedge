@@ -489,7 +489,8 @@ export async function buildPatternStructureContextEvidenceV2(
       state("current_structure_event", ctx.structure_event, at),
     );
     if (ctx.as_of_close != null) {
-      observations.push(num("structure_context_analytical_close", ctx.as_of_close, iso(ctx.as_of + BAR_MS)));
+      // Mirrors Session V2: the close observation is timestamped at the BAR OPEN anchor.
+      observations.push(num("structure_context_analytical_close", ctx.as_of_close, iso(ctx.as_of)));
     }
   }
 
