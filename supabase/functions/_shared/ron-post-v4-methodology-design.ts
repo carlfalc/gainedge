@@ -407,6 +407,7 @@ export const NEW_METHODOLOGY_CHOICES: readonly string[] = Object.freeze([
   "bonferroni_multiplicity_across_candidates_and_directions",
   "familywise_alpha_0_05_new_constant",
   "target_power_0_80_new_constant",
+  "bootstrap_resamples_10000_new_constant",
   "prospective_mde_rule_from_discovery_dispersion_only",
 ]);
 
@@ -415,7 +416,7 @@ export const UNRESOLVED_ITEMS: readonly string[] = Object.freeze([
   "discovery_window_and_confirmation_start_boundary",
   "confirmation_source_identity",
   "frozen_spec_surface_hashes_of_the_eventual_contract",
-  "explicit_human_acceptance_of_familywise_alpha_and_target_power",
+  "explicit_human_acceptance_of_familywise_alpha_target_power_and_bootstrap_resample_count",
 ]);
 
 export const METHODOLOGY_DESIGN_NON_CLAIMS: readonly string[] = Object.freeze([
@@ -427,6 +428,7 @@ export const METHODOLOGY_DESIGN_NON_CLAIMS: readonly string[] = Object.freeze([
   "not_a_promotion",
   "not_execution_authorization",
   "not_evidence_of_any_effect",
+  "not_an_accepted_bootstrap_resample_count",
 ]);
 
 export const EXECUTION_INVARIANTS = Object.freeze({
