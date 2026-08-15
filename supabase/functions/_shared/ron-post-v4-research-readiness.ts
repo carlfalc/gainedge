@@ -31,9 +31,9 @@
  * execute V5 or any research run. Not a calibrated probability. Not statistical power, MDE
  * or significance. Not permission for trading or order execution. Not a causal claim.
  *
- * Production is deliberately NOT ready: no post-V4 research-contract acceptance artifact
- * exists in `CURRENT_ACCEPTED_ARTIFACT_REGISTRY`, `ACCEPTED_PROMOTION_MANIFEST` is empty,
- * and `PROMOTED_STATE_VARIABLES` is empty.
+ * Production is deliberately NOT ready because no post-V4 research-contract acceptance
+ * artifact exists in `CURRENT_ACCEPTED_ARTIFACT_REGISTRY`. An empty promotion manifest is
+ * expected before research succeeds and is NOT a prerequisite for beginning research.
  */
 import { sha256 } from "./ron-calibration.ts";
 import { RESEARCH_VERSION_V4 } from "./ron-research-v4.ts";
@@ -276,18 +276,18 @@ export interface ProductionPostV4Readiness {
 }
 
 /**
- * The production answer, derived (never asserted) from the accepted registry/manifest:
- * production is NOT ready for a post-V4 handoff because no accepted post-V4
- * research-contract artifact exists.
+ * The production answer, derived (never asserted) from the accepted registry.
+ * Production is NOT ready for a post-V4 research handoff until at least one accepted
+ * post-V4 research-contract artifact exists. Promotion state is reported for observability
+ * only and is deliberately NOT a readiness prerequisite.
  */
 export function productionPostV4Readiness(): ProductionPostV4Readiness {
   const accepted = CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
     .filter((a) => a.artifact_kind === "research_contract_acceptance").length;
   const reasons: string[] = [];
   if (accepted === 0) reasons.push("no_accepted_post_v4_research_contract_artifact");
-  if (ACCEPTED_PROMOTION_MANIFEST.length === 0) reasons.push("accepted_promotion_manifest_empty");
   return {
-    ready: false,
+    ready: accepted > 0,
     reasons,
     accepted_research_contract_artifacts: accepted,
     accepted_promotion_entries: ACCEPTED_PROMOTION_MANIFEST.length,
