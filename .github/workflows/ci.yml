@@ -31,3 +31,11 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Deno check post-V4 data readiness
+        run: deno check supabase/functions/ron-post-v4-data-readiness/index.ts
