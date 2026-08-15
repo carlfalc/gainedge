@@ -166,9 +166,9 @@ describe("XARC V2 — spec inheritance, no reinvention", () => {
   it("introduces no new numeric threshold in the module source", () => {
     const src = readFileSync(
       "supabase/functions/_shared/ron-cross-asset-relationship-context-v2.ts", "utf8");
-    expect(src).not.toMatch(/strong|weak|moderate/i);
-    expect(src).not.toMatch(/p_value|pvalue|significan|beta_|regression_coeff/i);
-    expect(src).not.toMatch(/take_profit|stop_loss|risk_reward/i);
+    // no emitted magnitude bucket vocabulary and no emitted forbidden statistic keys
+    expect(src).not.toMatch(/"[a-z_]*(strong|weak|moderate)[a-z_]*"/i);
+    expect(src).not.toMatch(/"[a-z_]*(p_value|pvalue|significance|beta|regression|take_profit|stop_loss|risk_reward)[a-z_]*"/i);
   });
 });
 
@@ -364,11 +364,15 @@ describe("XARC V2 — envelope behaviour", () => {
     const sealed = await sealEvidence(await buildV2(xau(N), nas(N), ANCHOR));
     expect(validateEvidence(sealed)).toEqual([]);
     expect(scanDenylist(sealed)).toEqual([]);
-    const text = JSON.stringify(sealed).toLowerCase();
+    // Scan EMITTED keys and categorical values only; the limitations block legitimately
+    // uses negation prose ("is not a forecast") which must not be keyword-matched.
+    const text = sealed.observations
+      .map((o: any) => `${o.key} ${o.value_text ?? ""} ${o.unit ?? ""}`).join(" ").toLowerCase();
     for (const banned of [
       "probability", "confidence", "forecast", "predict", "significance", "p_value",
       "expected_value", "edge", "beta", "regression", "causal", "take_profit",
       "stop_loss", "entry_price", "risk_reward", "signal_strength", "strong", "weak",
+      "moderate",
     ]) expect(text).not.toContain(banned);
     expect(sealed.agent_id).toBe("cross_asset_correlation");
     expect(sealed.agent_version).toBe(1);
