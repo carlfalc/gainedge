@@ -19,7 +19,8 @@
  *      infeasibility, no selection/tuning contamination).
  * This module only adds CROSS-CONSISTENCY: same research_version, same contract_identity,
  * strictly newer than the frozen V4 negative, exact accepted procedure versions/hashes on
- * both sides, and binding<->claim agreement. Nothing is duplicated or weakened.
+ * both sides, the confirmatory window cannot predate the contract's declared confirmation
+ * start, and every binding must match its own claim. Nothing is duplicated or weakened.
  *
  * WHAT A PASS MEANS
  * -----------------
@@ -59,6 +60,8 @@ import {
 import {
   ACCEPTED_PROMOTION_MANIFEST,
   CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+  validateAcceptanceRegistry,
+  type AcceptanceRegistry,
 } from "./ron-promotion-readiness.ts";
 
 export const RON_POST_V4_RESEARCH_READINESS_VERSION = 1;
@@ -94,6 +97,7 @@ export const POST_V4_RESEARCH_READINESS_PROCEDURE = {
     "same_contract_identity_on_both_sides",
     "research_version_strictly_after_frozen_negative",
     "exact_accepted_procedure_versions_and_hashes_on_both_sides",
+    "confirmation_window_not_before_declared_confirmation_start",
     "each_binding_matches_its_own_validated_claim_hash",
   ],
   frozen_negative_research_version: RESEARCH_VERSION_V4,
@@ -183,6 +187,16 @@ export async function evaluatePostV4ResearchHandoffReadiness(
     reasons.push("contract_identity_mismatch_between_acceptance_and_sufficiency");
   }
 
+  // The actual confirmatory window may begin at or after the contract's declared
+  // confirmation start, never before it. Both underlying validators already require valid
+  // ISO UTC timestamps, so this only adds cross-consistency between the two accepted claims.
+  const declaredConfirmationStart = Date.parse(ac?.confirmation_start ?? "");
+  const actualConfirmationStart = Date.parse(sc?.confirmation_window?.start ?? "");
+  if (Number.isFinite(declaredConfirmationStart) && Number.isFinite(actualConfirmationStart)
+    && actualConfirmationStart < declaredConfirmationStart) {
+    reasons.push("confirmation_window_starts_before_declared_confirmation_start");
+  }
+
   // 4. Strictly newer than the frozen V4 negative.
   if (!Number.isInteger(ac?.research_version)
     || (ac.research_version as number) <= RESEARCH_VERSION_V4) {
@@ -231,9 +245,9 @@ export async function postV4ResearchReadinessHash() {
 
 /**
  * Canonical, deterministic, input-order-independent readiness payload for a SUBMISSION.
- * Binds only readiness-relevant identity: the two validated claim hashes, the two accepted
- * procedure identities, the shared contract identity/version and the outcome. No
- * probability, execution, user or private field is included.
+ * Binds readiness-relevant identity: the readiness procedure itself, both validated claim
+ * hashes, the two accepted procedure identities, the shared contract identity/version and
+ * the outcome. No probability, execution, user or private field is included.
  */
 export async function postV4ReadinessSubmissionPayload(
   submission: PostV4ResearchHandoffSubmission,
@@ -241,6 +255,8 @@ export async function postV4ReadinessSubmissionPayload(
   const result = await evaluatePostV4ResearchHandoffReadiness(submission);
   return [
     "ron_post_v4_readiness_submission", RON_POST_V4_RESEARCH_READINESS_VERSION,
+    "readiness_procedure_version", RON_POST_V4_RESEARCH_READINESS_VERSION,
+    "readiness_procedure_hash", await postV4ResearchReadinessHash(),
     "acceptance_claim_hash",
     submission?.acceptance_claim
       ? await researchContractAcceptanceClaimHash(submission.acceptance_claim) : null,
@@ -277,17 +293,26 @@ export interface ProductionPostV4Readiness {
 
 /**
  * The production answer, derived (never asserted) from the accepted registry.
- * Production is NOT ready for a post-V4 research handoff until at least one accepted
- * post-V4 research-contract artifact exists. Promotion state is reported for observability
- * only and is deliberately NOT a readiness prerequisite.
+ * Production is NOT ready for a post-V4 research handoff until the registry itself is valid
+ * and at least one accepted post-V4 research-contract artifact exists. Promotion state is
+ * reported for observability only and is deliberately NOT a readiness prerequisite.
  */
-export function productionPostV4Readiness(): ProductionPostV4Readiness {
-  const accepted = CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts
-    .filter((a) => a.artifact_kind === "research_contract_acceptance").length;
+export function productionPostV4Readiness(
+  registry: AcceptanceRegistry = CURRENT_ACCEPTED_ARTIFACT_REGISTRY,
+): ProductionPostV4Readiness {
+  const registryCheck = validateAcceptanceRegistry(registry);
   const reasons: string[] = [];
-  if (accepted === 0) reasons.push("no_accepted_post_v4_research_contract_artifact");
+  if (!registryCheck.admissible) {
+    for (const r of registryCheck.reasons) reasons.push(`invalid_acceptance_registry: ${r}`);
+  }
+  const accepted = registryCheck.admissible
+    ? registry.artifacts.filter((a) => a.artifact_kind === "research_contract_acceptance").length
+    : 0;
+  if (registryCheck.admissible && accepted === 0) {
+    reasons.push("no_accepted_post_v4_research_contract_artifact");
+  }
   return {
-    ready: accepted > 0,
+    ready: registryCheck.admissible && accepted > 0,
     reasons,
     accepted_research_contract_artifacts: accepted,
     accepted_promotion_entries: ACCEPTED_PROMOTION_MANIFEST.length,
