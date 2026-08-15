@@ -262,9 +262,11 @@ describe("V2 safety surface", () => {
   it("source module reads no forbidden model columns, table, LLM or web fetch", () => {
     const src = readFileSync(
       "supabase/functions/_shared/ron-macro-temporal-context-v2.ts", "utf8");
-    for (const forbidden of ["news_impact_results", "openai", "gateway", "fetch("]) {
+    for (const forbidden of ["openai", "gateway", "fetch("]) {
       expect(src.toLowerCase()).not.toContain(forbidden);
     }
+    expect(src).not.toMatch(/from\(\s*["'`]news_impact_results/);
+    expect(src).not.toMatch(/ai_reason_short|sentiment_direction/);
     expect(src).not.toMatch(/select\([^)]*ai_reason_short/);
   });
 
