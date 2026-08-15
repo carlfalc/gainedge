@@ -19,6 +19,10 @@ import {
   buildCrossAssetEvidenceV1, crossAssetSpecHash,
   CROSS_ASSET_SPEC_V1, CROSS_ASSET_COUNTERPART_V1, type CounterpartBar,
 } from "../_shared/ron-cross-asset-spec.ts";
+import {
+  buildCrossAssetRelationshipEvidenceV2, crossAssetRelationshipSpecHashV2,
+  CROSS_ASSET_RELATIONSHIP_SPEC_V2, type CounterpartBarV2,
+} from "../_shared/ron-cross-asset-relationship-context-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -69,6 +73,14 @@ Deno.serve(async (req) => {
   if (!CROSS_ASSET_SPEC_V1.instrument_scope.includes(instrument as "XAUUSD")
     || !CROSS_ASSET_SPEC_V1.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_cross_asset_spec_v1", instrument, timeframe }, 400);
+  }
+
+  // spec_version 2 (default) adds the counterpart completed-bar proof and the descriptive
+  // relationship context. spec_version 1 stays explicitly replayable and DEPENDENCY-
+  // ISOLATED: it never consults the V2 completion proof and never reaches the V2 producer.
+  const specVersion = body.spec_version == null ? 2 : Number(body.spec_version);
+  if (specVersion !== 1 && specVersion !== 2) {
+    return json({ error: "unsupported_spec_version", spec_version: body.spec_version }, 400);
   }
 
   const db = createClient(supabaseUrl, serviceKey || token, { auth: { persistSession: false } });
@@ -130,7 +142,7 @@ Deno.serve(async (req) => {
 
     const { data: cRows, error: cErr } = await db
       .from("candle_history")
-      .select("timestamp, close")
+      .select("timestamp, close, created_at")
       .eq("symbol", counterpart).eq("timeframe", timeframe)
       .gte("timestamp", fromIso).lte("timestamp", toIso)
       .order("timestamp", { ascending: true }).limit(1000);
@@ -141,21 +153,36 @@ Deno.serve(async (req) => {
       open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
       created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
     }));
-    const counterpart_bars: CounterpartBar[] = (cRows ?? []).map((c: Record<string, unknown>) => ({
+    const counterpart_bars_v1: CounterpartBar[] = (cRows ?? []).map((c: Record<string, unknown>) => ({
       time: new Date(String(c.timestamp)).getTime(),
       close: Number(c.close),
+    }));
+    const counterpart_bars_v2: CounterpartBarV2[] = (cRows ?? []).map((c: Record<string, unknown>) => ({
+      time: new Date(String(c.timestamp)).getTime(),
+      close: Number(c.close),
+      created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
     }));
 
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
-    const build = () => buildCrossAssetEvidenceV1({
-      instrument, counterpart, timeframe, as_of: asOf, bars, counterpart_bars,
-      isQuarantined: (b, m) => contract.isQuarantined(b, m),
-      run_id: runId, trace_id: traceId,
-      newest_source_bar: newestSourceBar,
-      newest_counterpart_bar: newestCounterpartBar,
-    });
+    const build = () => (specVersion === 2
+      ? buildCrossAssetRelationshipEvidenceV2({
+        instrument, counterpart, timeframe, as_of: asOf, bars,
+        counterpart_bars: counterpart_bars_v2,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+        newest_counterpart_bar: newestCounterpartBar,
+      })
+      : buildCrossAssetEvidenceV1({
+        instrument, counterpart, timeframe, as_of: asOf, bars,
+        counterpart_bars: counterpart_bars_v1,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+        newest_counterpart_bar: newestCounterpartBar,
+      }));
 
     const envelope = await build();
     const errs = validateEvidence(envelope);
@@ -169,8 +196,12 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      spec_version: CROSS_ASSET_SPEC_V1.spec_version,
-      spec_hash: await crossAssetSpecHash(),
+      spec_version: specVersion,
+      spec_hash: specVersion === 2
+        ? await crossAssetRelationshipSpecHashV2()
+        : await crossAssetSpecHash(),
+      agent_id: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_id,
+      agent_version: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_version,
       quality_version: RON_QUALITY_VERSION,
       counterpart,
       anchor_bar_open: new Date(asOf).toISOString(),
@@ -179,6 +210,7 @@ Deno.serve(async (req) => {
       numeric_probability: null,
       execution_allowed: false,
       execution_path: "signal_only",
+      allow_live_execution: false,
       persisted: false,
     });
   } catch (err) {
