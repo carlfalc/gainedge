@@ -105,3 +105,9 @@ verify_jwt = false
 
 [functions.ron-decision-read]
 verify_jwt = false
+
+# Internal read-only post-V4 data-readiness observer (2D.2y). verify_jwt is pinned false
+# because the function performs its OWN fail-closed service-role / cron-token authorization
+# check in code. The endpoint has no write surface and CI enforces that invariant.
+[functions.ron-post-v4-data-readiness]
+verify_jwt = false
