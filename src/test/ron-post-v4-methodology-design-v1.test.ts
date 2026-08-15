@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  CONFIRMATORY_INFERENCE, EXECUTION_INVARIANTS, HYPOTHESIS_COUNT, LOOKBACK_BARS,
+  CONFIRMATORY_INFERENCE, EXECUTION_INVARIANTS, FAMILYWISE_ALPHA, HYPOTHESIS_COUNT, LOOKBACK_BARS,
   NEW_METHODOLOGY_CHOICES, NOMINAL_STATE_VARIABLES, ORDINAL_LEVEL_ORDER,
-  ORDINAL_STATE_VARIABLES, PROPOSED_CANDIDATES, PROPOSED_PROMOTION_GATE,
+  ORDINAL_STATE_VARIABLES, PROPOSED_CANDIDATES, PROPOSED_PROMOTION_GATE, UNRESOLVED_ITEMS,
   PROPOSED_RESEARCH_VERSION, TRANSITION_VARIABLES, currentPostV4MethodologyDesign,
   deriveTransition, deriveTransitionVector, methodologyDesignHash, normalQuantile,
   prospectiveMde,
@@ -84,6 +84,24 @@ describe("2D.3c post-V4 methodology design", () => {
     expect(CONFIRMATORY_INFERENCE.hypotheses).toBe(HYPOTHESIS_COUNT);
     expect(CONFIRMATORY_INFERENCE.per_hypothesis_alpha)
       .toBeCloseTo(0.05 / HYPOTHESIS_COUNT, 6);
+  });
+
+  it("never rounds the bonferroni alpha upward", () => {
+    const a = CONFIRMATORY_INFERENCE.per_hypothesis_alpha;
+    expect(a).toBe(FAMILYWISE_ALPHA / HYPOTHESIS_COUNT);
+    expect(a * HYPOTHESIS_COUNT).toBeLessThanOrEqual(FAMILYWISE_ALPHA);
+    expect(CONFIRMATORY_INFERENCE.per_hypothesis_alpha_rounding_rule)
+      .toBe("exact_quotient_no_rounding_serialise_round_down_only");
+  });
+
+  it("ledgers the bootstrap resample count as a new unaccepted choice", () => {
+    expect(CONFIRMATORY_INFERENCE.bootstrap_resamples).toBe(10000);
+    expect(CONFIRMATORY_INFERENCE.bootstrap_resamples_provenance)
+      .toBe("new_unaccepted_methodology_choice");
+    expect(NEW_METHODOLOGY_CHOICES).toContain("bootstrap_resamples_10000_new_constant");
+    expect(UNRESOLVED_ITEMS).toContain(
+      "explicit_human_acceptance_of_familywise_alpha_target_power_and_bootstrap_resample_count",
+    );
   });
 
   it("computes a prospective MDE without any empirical effect size", () => {
