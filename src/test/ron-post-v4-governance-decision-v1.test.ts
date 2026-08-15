@@ -31,7 +31,7 @@ describe("2D.3b — current post-V4 governance path decision", () => {
   });
 
   it("carries no replication fields and no post-V4 contract identity or spec hashes", async () => {
-    const input = CURRENT_POST_V4_GOVERNANCE_DECISION_INPUT as Record<string, unknown>;
+    const input = CURRENT_POST_V4_GOVERNANCE_DECISION_INPUT as unknown as Record<string, unknown>;
     for (const k of ["research_version", "contract_identity", "contract_frozen_at", "confirmation_start"]) {
       expect(input[k]).toBeUndefined();
     }
