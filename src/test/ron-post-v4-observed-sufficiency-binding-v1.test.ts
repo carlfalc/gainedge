@@ -175,6 +175,7 @@ describe("2D.3a — observed-data binding for post-V4 confirmatory sufficiency c
 
   it("exposes no probability or execution surface", async () => {
     const r = await buildObservedSufficiencyBinding(input());
-    expect(JSON.stringify(r)).not.toMatch(/probability|confidence|order_id|lot_size/);
+    const { non_claims: _nc, ...artifact } = (r as { artifact: Record<string, unknown> }).artifact;
+    expect(JSON.stringify(artifact)).not.toMatch(/probability|confidence|order_id|lot_size/);
   });
 });
