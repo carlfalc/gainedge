@@ -21,7 +21,7 @@
  * function of two accepted state vectors (anchor t and anchor t-k) on the accepted
  * feature grid. No new indicator, no external data, no news/macro, no fitted threshold.
  */
-import { round6, sha256 } from "./ron-calibration.ts";
+import { ADX_BUCKET_SPEC, round6, sha256 } from "./ron-calibration.ts";
 import {
   RON_STATE_SPEC_VERSION_V2, RON_STATE_VARIABLES, UNAVAILABLE, UNKNOWN,
   stateSpecPayloadV2, type RonStateVector,
@@ -77,7 +77,7 @@ export const NOMINAL_STATE_VARIABLES: readonly string[] = Object.freeze([
  * the already-frozen `RON_STATE_SPEC_V2` bands, reused verbatim.
  */
 export const ORDINAL_LEVEL_ORDER: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  adx_bucket: Object.freeze(["adx_lt15", "adx_15_25", "adx_25_35", "adx_gte35"]),
+  adx_bucket: Object.freeze(ADX_BUCKET_SPEC.bands.map((b) => b.label)),
   nearest_level_atr_bucket: Object.freeze(["lvl_lte0_5atr", "lvl_0_5_1atr", "lvl_1_2atr", "lvl_gt2atr"]),
   position_day_bucket: Object.freeze(["pos_lt25", "pos_25_50", "pos_50_75", "pos_gte75"]),
   relative_volume_bucket: Object.freeze(["rvol_lt0_8", "rvol_0_8_1_2", "rvol_gt1_2"]),
