@@ -84,20 +84,28 @@ Deno.serve(async (req) => {
     // close. Never a wall-clock instant.
     let anchor: number;
     let anchorBarOpen: number | null = null;
-    const contract = await buildEligibilityContract(db, instrument, timeframe, RON_QUALITY_VERSION);
+    // V1 dependency isolation: the qv5 eligibility contract is loaded ONLY when it is
+    // actually required — (a) to choose a default safe anchor, or (b) for V2 price
+    // context quality gating. An explicit `spec_version:1` replay must not newly
+    // depend on the quality contract, exactly as before V2 existed.
+    type Eligibility = Awaited<ReturnType<typeof buildEligibilityContract>>;
+    let contract: Eligibility | null = null;
+    const eligibility = async (): Promise<Eligibility> =>
+      (contract ??= await buildEligibilityContract(db, instrument, timeframe, RON_QUALITY_VERSION));
     const explicit = body.evaluation_anchor ?? body.as_of;
     if (explicit != null) {
       const t = new Date(String(explicit)).getTime();
       if (!Number.isFinite(t)) return json({ error: "invalid_evaluation_anchor" }, 400);
       anchor = t;
     } else {
+      const defaultAnchorContract = await eligibility();
       const { data: bars, error: barErr } = await db
         .from("candle_history").select("timestamp")
         .eq("symbol", instrument).eq("timeframe", timeframe)
         .order("timestamp", { ascending: false }).limit(200);
       if (barErr) throw barErr;
       const times = (bars ?? []).map((r: Record<string, unknown>) => new Date(String(r.timestamp)).getTime());
-      const pick = times.find((t) => !contract.isQuarantined({ time: t }, 15));
+      const pick = times.find((t) => !defaultAnchorContract.isQuarantined({ time: t }, 15));
       if (pick == null) return json({ error: "no_safe_completed_anchor_bar" }, 409);
       anchorBarOpen = pick;
       anchor = pick + BAR_MS;
@@ -129,7 +137,9 @@ Deno.serve(async (req) => {
 
     // ---- V2 only: genuine broker-native completed XAU bars over the inherited window.
     let priceBars: StructureBar[] = [];
+    let qualityGate: Eligibility | null = null;
     if (specVersion === 2) {
+      qualityGate = await eligibility();
       const gridEnd = lastCompletedBarOpen(anchor);
       const gridStart = Math.floor((anchor - MACRO_NEWS_WINDOW_MINUTES * 60_000) / BAR_MS) * BAR_MS;
       const { data: cRows, error: cErr } = await db
@@ -147,11 +157,11 @@ Deno.serve(async (req) => {
       }));
     }
 
-    const build = () => specVersion === 2
+    const build = () => specVersion === 2 && qualityGate
       ? buildMacroTemporalContextEvidenceV2({
         instrument, timeframe, evaluation_anchor: anchor, items,
         run_id: runId, trace_id: traceId,
-        bars: priceBars, isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        bars: priceBars, isQuarantined: (b, m) => qualityGate!.isQuarantined(b, m),
       })
       : buildMacroNewsEvidenceV1({
         instrument, timeframe, evaluation_anchor: anchor, items,

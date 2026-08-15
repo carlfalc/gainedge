@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   MACRO_NEWS_SPEC_V2, macroNewsSpecHashV2, buildMacroTemporalContextEvidenceV2,
-  resolvePriceContext, lastCompletedBarOpen,
+  resolvePriceContext, lastCompletedBarOpen, MACRO_TEMPORAL_BAR_MINUTES,
 } from "../../supabase/functions/_shared/ron-macro-temporal-context-v2.ts";
 import {
   macroNewsSpecHash, buildMacroNewsEvidenceV1, MACRO_NEWS_LATEST_SUMMARY_COUNT,
@@ -15,7 +15,9 @@ import {
 import {
   sealEvidence, validateEvidence, scanDenylist, evidenceTtlMinutes, agentSpec,
 } from "../../supabase/functions/_shared/ron-agent-contracts.ts";
-import { classifySlots } from "../../supabase/functions/_shared/ron-session-structure-spec-v2.ts";
+import {
+  classifySlots, SESSION_STRUCTURE_SPEC_V2,
+} from "../../supabase/functions/_shared/ron-session-structure-spec-v2.ts";
 import type { StructureBar } from "../../supabase/functions/_shared/ron-session-structure-spec.ts";
 
 const MACRO_SPEC_V1_HASH_PINNED =
@@ -211,11 +213,35 @@ describe("V2 determinism and observed context", () => {
     expect(e.data_health.status).not.toBe("degraded");
   });
 
-  it("no source items yields the V1 insufficient state, with no invented context", async () => {
+  it("no source items yields the generic fail-closed state plus the verbatim base status", async () => {
     const e = await buildV2([], series());
     expect(e.status).toBe("insufficient_data");
     expect(obs(e, "macro_temporal_context_state")!.value_text)
-      .toBe("unavailable_no_admitted_source_items");
+      .toBe("unavailable_base_news_evidence_not_supported");
+    expect(obs(e, "macro_base_news_evidence_status")!.value_text).toBe("insufficient_data");
+  });
+
+  it("conflicting duplicate source rows are not mislabelled as 'no admitted source items'", async () => {
+    const conflicting = [
+      row({ id: "dup", headline: "Fed rate decision lands" }),
+      row({ id: "dup", headline: "ECB rate decision lands" }),
+    ];
+    const e = await buildV2(conflicting, series());
+    expect(e.status).toBe("blocked");
+    const st = obs(e, "macro_temporal_context_state")!.value_text;
+    expect(st).toBe("unavailable_base_news_evidence_not_supported");
+    expect(st).not.toContain("no_admitted_source_items");
+    expect(obs(e, "macro_base_news_evidence_status")!.value_text).toBe("blocked");
+    expect(e.data_health.issues).toContain("conflicting_duplicate_source_row_id");
+  });
+
+  it("derives the bar width from the accepted Session V2 spec instead of redeclaring it", () => {
+    expect(MACRO_TEMPORAL_BAR_MINUTES).toBe(SESSION_STRUCTURE_SPEC_V2.bar_minutes);
+    expect(MACRO_NEWS_SPEC_V2.bar_minutes).toBe(SESSION_STRUCTURE_SPEC_V2.bar_minutes);
+    expect(MACRO_NEWS_SPEC_V2.bar_minutes_source).toBe("session_structure_spec_v2.bar_minutes");
+    const src = readFileSync(
+      "supabase/functions/_shared/ron-macro-temporal-context-v2.ts", "utf8");
+    expect(src).toContain("MACRO_TEMPORAL_BAR_MINUTES = SESSION_STRUCTURE_SPEC_V2.bar_minutes");
   });
 
   it("bounds the summarised items to the inherited V1 latest-item count", async () => {
@@ -277,5 +303,25 @@ describe("V2 safety surface", () => {
     expect(src).toContain("persisted: false");
     expect(src).toContain('execution_path: "signal_only"');
     expect(src).toContain("execution_allowed: false");
+  });
+
+  it("explicit spec_version:1 replay does not depend on the V2 quality-gating contract", () => {
+    const src = readFileSync(
+      "supabase/functions/ron-agent-macro-news-geopolitics/index.ts", "utf8");
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    // the contract is never loaded unconditionally at the top of the request path
+    expect(code).not.toMatch(/^\s*const contract = await buildEligibilityContract\(/m);
+    // it is loaded lazily, and only reached from the default-anchor branch or the V2 branch
+    expect(code).toMatch(/contract \?\?= await buildEligibilityContract\(/);
+    const calls = code.match(/await eligibility\(\)/g) ?? [];
+    expect(calls).toHaveLength(2);
+    // default-anchor branch (else) and the `specVersion === 2` branch only
+    const v2Branch = code.slice(code.indexOf("if (specVersion === 2)"));
+    expect(v2Branch).toContain("await eligibility()");
+    const beforeExplicit = code.slice(0, code.indexOf("const explicit ="));
+    expect(beforeExplicit).not.toContain("await eligibility()");
+    // the V1 build branch never references the quality gate
+    const v1Call = code.slice(code.indexOf(": buildMacroNewsEvidenceV1("));
+    expect(v1Call.slice(0, 220)).not.toContain("isQuarantined");
   });
 });

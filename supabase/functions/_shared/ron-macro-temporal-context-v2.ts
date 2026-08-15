@@ -56,7 +56,12 @@ import {
 export const SESSION_STRUCTURE_SPEC_V2_HASH_PINNED =
   "9d104c60d828c5a4c9fe07859bc40c966c00b5bd5ba496f6ff06291a9b5d435b";
 
-export const MACRO_TEMPORAL_BAR_MINUTES = 15;
+/**
+ * Bar width is NOT redeclared here: it is DERIVED from the accepted Session & Market
+ * Structure Spec V2 that performs the slot classification, so V2 can never drift from
+ * its own classification dependency.
+ */
+export const MACRO_TEMPORAL_BAR_MINUTES = SESSION_STRUCTURE_SPEC_V2.bar_minutes;
 const BAR_MS = MACRO_TEMPORAL_BAR_MINUTES * 60_000;
 
 export type MacroPriceContextStatus =
@@ -78,6 +83,7 @@ export const MACRO_NEWS_SPEC_V2 = {
   instrument_scope: ["XAUUSD"],
   timeframe_scope: ["15m"],
   bar_minutes: MACRO_TEMPORAL_BAR_MINUTES,
+  bar_minutes_source: "session_structure_spec_v2.bar_minutes",
 
   inherits: {
     from_spec_version: 1,
@@ -126,6 +132,14 @@ export const MACRO_NEWS_SPEC_V2 = {
       "unavailable_source_defect_between_references",
     ],
     fabricated_zero_change_allowed: false,
+  },
+
+  base_evidence_contract: {
+    /** V2 never re-interprets why V1 failed; it copies V1's own status verbatim. */
+    base_status_preserved_verbatim: true,
+    base_status_observation_key: "macro_base_news_evidence_status",
+    not_supported_state: "unavailable_base_news_evidence_not_supported",
+    infers_no_source_items_from_unsupported_base: false,
   },
 
   semantics_contract: {
@@ -261,7 +275,13 @@ export async function buildMacroTemporalContextEvidenceV2(
   observations.push(state("macro_price_context_source", "candle_history_native", iso(anchor)));
 
   if (base.status !== "supported") {
-    observations.push(state("macro_temporal_context_state", "unavailable_no_admitted_source_items", iso(anchor)));
+    // Truthful fail-closed: V2 does NOT know WHY V1 was not supported (no in-window
+    // rows, conflicting duplicate source row ids, ...). The base status is copied
+    // verbatim and the temporal-context state stays generic.
+    observations.push(
+      state("macro_base_news_evidence_status", base.status, iso(anchor)),
+      state("macro_temporal_context_state", "unavailable_base_news_evidence_not_supported", iso(anchor)),
+    );
     return out(base.data_health.status, base.data_health.completeness);
   }
 
