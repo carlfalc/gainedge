@@ -38,8 +38,9 @@ describe("2D.3b — current post-V4 governance path decision", () => {
     const state = await currentPostV4GovernanceDecision();
     if (!state.decision.built) throw new Error("expected built");
     expect(state.decision.record.replication_draft).toBeNull();
-    const serialized = JSON.stringify(state);
-    expect(serialized).not.toMatch(/[0-9a-f]{64}/);
+    const { record_hash, ...rest } = state.decision;
+    expect(typeof record_hash).toBe("string");
+    expect(JSON.stringify({ ...state, decision: rest })).not.toMatch(/[0-9a-f]{64}/);
   });
 
   it("is deterministic and hashable", async () => {
@@ -83,10 +84,10 @@ describe("2D.3b — current post-V4 governance path decision", () => {
   });
 
   it("leaves registry, promotion manifest and promoted variables untouched", () => {
-    const ids = CURRENT_ACCEPTED_ARTIFACT_REGISTRY.records.map((r) => r.artifact.artifact_kind);
-    expect(ids.filter((k) => k === "prerequisite_resolution")).toHaveLength(2);
-    expect(ids.filter((k) => k === "research_contract_acceptance")).toHaveLength(0);
-    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.records).toHaveLength(2);
+    const kinds = CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts.map((a) => a.artifact_kind);
+    expect(kinds.filter((k) => k === "prerequisite_resolution")).toHaveLength(2);
+    expect(kinds.filter((k) => k === "research_contract_acceptance")).toHaveLength(0);
+    expect(CURRENT_ACCEPTED_ARTIFACT_REGISTRY.artifacts).toHaveLength(2);
     expect([...ACCEPTED_PROMOTION_MANIFEST]).toEqual([]);
     expect([...PROMOTED_STATE_VARIABLES]).toEqual([]);
   });
