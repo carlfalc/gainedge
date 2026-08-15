@@ -23,8 +23,9 @@
  */
 import { ADX_BUCKET_SPEC, round6, sha256 } from "./ron-calibration.ts";
 import {
-  RON_STATE_SPEC_VERSION_V2, RON_STATE_VARIABLES, UNAVAILABLE, UNKNOWN,
-  stateSpecPayloadV2, type RonStateVector,
+  NEAREST_LEVEL_ATR_BANDS_V2, POSITION_DAY_BANDS_V2, RELATIVE_VOLUME_BANDS_V2,
+  RON_STATE_SPEC_VERSION_V2, RON_STATE_VARIABLES, RSI_ZONE_BANDS_V2, STOCH_ZONE_BANDS_V2,
+  UNAVAILABLE, UNKNOWN, stateSpecPayloadV2, type IntervalBand, type RonStateVector,
 } from "./ron-state-spec.ts";
 import {
   BUCKET_EVIDENCE, FLOOR_PAIR, FLOOR_SINGLE, INITIAL_TRAIN_FRACTION, LOGLOSS_CLIP,
@@ -76,13 +77,15 @@ export const NOMINAL_STATE_VARIABLES: readonly string[] = Object.freeze([
  * Ordinal level orders. These are NOT new thresholds: they are the declaration order of
  * the already-frozen `RON_STATE_SPEC_V2` bands, reused verbatim.
  */
+const labelsOf = (bands: readonly IntervalBand[]) => Object.freeze(bands.map((b) => b.label));
+
 export const ORDINAL_LEVEL_ORDER: Readonly<Record<string, readonly string[]>> = Object.freeze({
   adx_bucket: Object.freeze(ADX_BUCKET_SPEC.bands.map((b) => b.label)),
-  nearest_level_atr_bucket: Object.freeze(["lvl_lte0_5atr", "lvl_0_5_1atr", "lvl_1_2atr", "lvl_gt2atr"]),
-  position_day_bucket: Object.freeze(["pos_lt25", "pos_25_50", "pos_50_75", "pos_gte75"]),
-  relative_volume_bucket: Object.freeze(["rvol_lt0_8", "rvol_0_8_1_2", "rvol_gt1_2"]),
-  rsi_zone: Object.freeze(["rsi_lt35", "rsi_35_45", "rsi_45_55", "rsi_55_65", "rsi_gte65"]),
-  stoch_zone: Object.freeze(["stoch_lt20", "stoch_20_40", "stoch_40_60", "stoch_60_80", "stoch_gte80"]),
+  nearest_level_atr_bucket: labelsOf(NEAREST_LEVEL_ATR_BANDS_V2),
+  position_day_bucket: labelsOf(POSITION_DAY_BANDS_V2),
+  relative_volume_bucket: labelsOf(RELATIVE_VOLUME_BANDS_V2),
+  rsi_zone: labelsOf(RSI_ZONE_BANDS_V2),
+  stoch_zone: labelsOf(STOCH_ZONE_BANDS_V2),
 });
 
 export const ORDINAL_TRANSITION_LABELS: readonly string[] =
