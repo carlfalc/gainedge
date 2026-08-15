@@ -69,8 +69,14 @@ export type SessionContextRejection =
   | "session_context_after_pattern_anchor"
   | "session_context_anchor_mismatch"
   | "session_context_not_supported"
+  | "session_context_spec_provenance_mismatch"
+  | "session_context_source_timestamp_mismatch"
+  | "session_context_required_observation_conflict"
   | "session_context_structure_state_absent"
-  | "session_context_structure_state_unrecognised";
+  | "session_context_structure_state_unrecognised"
+  | "session_context_structure_event_absent"
+  | "session_context_structure_event_unrecognised"
+  | "session_context_close_observation_invalid";
 
 export const PATTERN_CONTEXT_SPEC_V2 = {
   spec_id: "ron_pattern_context",
@@ -125,6 +131,15 @@ export const PATTERN_CONTEXT_SPEC_V2 = {
     requires_same_timeframe: true,
     requires_same_evaluation_anchor: true,
     evidence_after_pattern_anchor_rejected: true,
+    requires_exact_accepted_spec_provenance_ref: true,
+    accepted_spec_provenance_ref:
+      `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${SESSION_STRUCTURE_SPEC_V2_HASH_PINNED}`,
+    requires_singleton_required_observations: true,
+    required_singleton_observations: ["structure_state", "structure_event"],
+    optional_singleton_observations: ["as_of_bar_close_price"],
+    structure_event_inferred_when_absent: false,
+    requires_matching_source_timestamps: true,
+    required_source_timestamps: ["as_of_bar_open", "as_of_bar_completed_close"],
     staleness_tolerance_minutes: 0,
     staleness_tolerance_invented: false,
     optional_input: true,
@@ -142,8 +157,14 @@ export const PATTERN_CONTEXT_SPEC_V2 = {
       "session_context_after_pattern_anchor",
       "session_context_anchor_mismatch",
       "session_context_not_supported",
+      "session_context_spec_provenance_mismatch",
+      "session_context_source_timestamp_mismatch",
+      "session_context_required_observation_conflict",
       "session_context_structure_state_absent",
       "session_context_structure_state_unrecognised",
+      "session_context_structure_event_absent",
+      "session_context_structure_event_unrecognised",
+      "session_context_close_observation_invalid",
     ],
   },
 
@@ -184,6 +205,10 @@ export const PATTERN_CONTEXT_SPEC_V2 = {
     structure_context_is: "current_at_the_evaluation_anchor",
     geometry_is: "observed_over_the_current_admissible_segment_up_to_the_anchor",
     explicit_current_vs_historical_observation: true,
+    envelope_anchor_convention: "bar_open_of_the_completed_analytical_bar",
+    consumed_close_observation_timestamped_at: "session_v2_bar_open_as_of",
+    completed_close_instant_carried_in: "source_timestamps.structure_context_as_of_bar_completed_close",
+    observation_at_after_envelope_as_of_emitted: false,
     lookahead: "none",
   },
 
