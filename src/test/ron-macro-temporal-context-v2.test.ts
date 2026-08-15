@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   MACRO_NEWS_SPEC_V2, macroNewsSpecHashV2, buildMacroTemporalContextEvidenceV2,
-  resolvePriceContext, lastCompletedBarOpen,
+  resolvePriceContext, lastCompletedBarOpen, MACRO_TEMPORAL_BAR_MINUTES,
 } from "../../supabase/functions/_shared/ron-macro-temporal-context-v2.ts";
 import {
   macroNewsSpecHash, buildMacroNewsEvidenceV1, MACRO_NEWS_LATEST_SUMMARY_COUNT,
@@ -15,7 +15,9 @@ import {
 import {
   sealEvidence, validateEvidence, scanDenylist, evidenceTtlMinutes, agentSpec,
 } from "../../supabase/functions/_shared/ron-agent-contracts.ts";
-import { classifySlots } from "../../supabase/functions/_shared/ron-session-structure-spec-v2.ts";
+import {
+  classifySlots, SESSION_STRUCTURE_SPEC_V2,
+} from "../../supabase/functions/_shared/ron-session-structure-spec-v2.ts";
 import type { StructureBar } from "../../supabase/functions/_shared/ron-session-structure-spec.ts";
 
 const MACRO_SPEC_V1_HASH_PINNED =
