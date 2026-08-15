@@ -69,8 +69,14 @@ export type SessionContextRejection =
   | "session_context_after_pattern_anchor"
   | "session_context_anchor_mismatch"
   | "session_context_not_supported"
+  | "session_context_spec_provenance_mismatch"
+  | "session_context_source_timestamp_mismatch"
+  | "session_context_required_observation_conflict"
   | "session_context_structure_state_absent"
-  | "session_context_structure_state_unrecognised";
+  | "session_context_structure_state_unrecognised"
+  | "session_context_structure_event_absent"
+  | "session_context_structure_event_unrecognised"
+  | "session_context_close_observation_invalid";
 
 export const PATTERN_CONTEXT_SPEC_V2 = {
   spec_id: "ron_pattern_context",
@@ -125,6 +131,15 @@ export const PATTERN_CONTEXT_SPEC_V2 = {
     requires_same_timeframe: true,
     requires_same_evaluation_anchor: true,
     evidence_after_pattern_anchor_rejected: true,
+    requires_exact_accepted_spec_provenance_ref: true,
+    accepted_spec_provenance_ref:
+      `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${SESSION_STRUCTURE_SPEC_V2_HASH_PINNED}`,
+    requires_singleton_required_observations: true,
+    required_singleton_observations: ["structure_state", "structure_event"],
+    optional_singleton_observations: ["as_of_bar_close_price"],
+    structure_event_inferred_when_absent: false,
+    requires_matching_source_timestamps: true,
+    required_source_timestamps: ["as_of_bar_open", "as_of_bar_completed_close"],
     staleness_tolerance_minutes: 0,
     staleness_tolerance_invented: false,
     optional_input: true,
@@ -142,8 +157,14 @@ export const PATTERN_CONTEXT_SPEC_V2 = {
       "session_context_after_pattern_anchor",
       "session_context_anchor_mismatch",
       "session_context_not_supported",
+      "session_context_spec_provenance_mismatch",
+      "session_context_source_timestamp_mismatch",
+      "session_context_required_observation_conflict",
       "session_context_structure_state_absent",
       "session_context_structure_state_unrecognised",
+      "session_context_structure_event_absent",
+      "session_context_structure_event_unrecognised",
+      "session_context_close_observation_invalid",
     ],
   },
 
@@ -184,6 +205,10 @@ export const PATTERN_CONTEXT_SPEC_V2 = {
     structure_context_is: "current_at_the_evaluation_anchor",
     geometry_is: "observed_over_the_current_admissible_segment_up_to_the_anchor",
     explicit_current_vs_historical_observation: true,
+    envelope_anchor_convention: "bar_open_of_the_completed_analytical_bar",
+    consumed_close_observation_timestamped_at: "session_v2_bar_open_as_of",
+    completed_close_instant_carried_in: "source_timestamps.structure_context_as_of_bar_completed_close",
+    observation_at_after_envelope_as_of_emitted: false,
     lookahead: "none",
   },
 
@@ -232,8 +257,22 @@ export interface RejectedSessionContext {
 }
 export type SessionContextResult = AcceptedSessionContext | RejectedSessionContext;
 
-const obsOf = (e: EvidenceEnvelopeV1, key: string) =>
-  e.observations.find((o) => o.key === key);
+/**
+ * SINGLETON accessor. Evidence V1 does not enforce unique observation keys, so duplicate
+ * or conflicting keys are rejected HERE rather than silently collapsed.
+ */
+function singleObs(e: EvidenceEnvelopeV1, key: string):
+  { kind: "absent" } | { kind: "conflict" } | { kind: "one"; obs: Observation } {
+  const all = e.observations.filter((o) => o.key === key);
+  if (all.length === 0) return { kind: "absent" };
+  if (all.length > 1) return { kind: "conflict" };
+  return { kind: "one", obs: all[0] };
+}
+
+const ACCEPTED_SESSION_SPEC_PROVENANCE_PREFIX =
+  `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v`;
+const ACCEPTED_SESSION_SPEC_PROVENANCE_REF =
+  `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${SESSION_STRUCTURE_SPEC_V2_HASH_PINNED}`;
 
 /**
  * Validate a SEALED Session V2 envelope for use as pattern structure context.
@@ -277,19 +316,51 @@ export async function acceptSessionStructureContext(
 
   if (e.status !== "supported") return { ok: false, reason: "session_context_not_supported" };
 
-  const st = obsOf(e, "structure_state")?.value_text;
+  // EXACT accepted Session V2 spec provenance: never merely "same agent, same version".
+  const specRefs = (Array.isArray(e.provenance_refs) ? e.provenance_refs : [])
+    .filter((p) => typeof p === "string" && p.startsWith(ACCEPTED_SESSION_SPEC_PROVENANCE_PREFIX));
+  if (specRefs.length !== 1 || specRefs[0] !== ACCEPTED_SESSION_SPEC_PROVENANCE_REF) {
+    return { ok: false, reason: "session_context_spec_provenance_mismatch" };
+  }
+
+  // Bar-open / completed-close source instants must match the accepted convention exactly.
+  const ts = e.source_timestamps ?? {};
+  if (ts.as_of_bar_open !== iso(sessionAsOf)
+    || ts.as_of_bar_completed_close !== iso(sessionAsOf + BAR_MS)) {
+    return { ok: false, reason: "session_context_source_timestamp_mismatch" };
+  }
+
+  const stObs = singleObs(e, "structure_state");
+  if (stObs.kind === "conflict") return { ok: false, reason: "session_context_required_observation_conflict" };
+  const st = stObs.kind === "one" ? stObs.obs.value_text : undefined;
   if (typeof st !== "string" || !st) return { ok: false, reason: "session_context_structure_state_absent" };
   if (!STRUCTURE_STATES.includes(st)) {
     return { ok: false, reason: "session_context_structure_state_unrecognised" };
   }
 
-  const evText = obsOf(e, "structure_event")?.value_text;
-  const structure_event: StructureEventText =
-    typeof evText === "string" && STRUCTURE_EVENTS.includes(evText)
-      ? evText as StructureEventText : "none";
+  // A structure event is NEVER inferred: `none` must be an OBSERVED fact, not a fallback.
+  const evObs = singleObs(e, "structure_event");
+  if (evObs.kind === "conflict") return { ok: false, reason: "session_context_required_observation_conflict" };
+  if (evObs.kind === "absent") return { ok: false, reason: "session_context_structure_event_absent" };
+  const evText = evObs.obs.value_text;
+  if (typeof evText !== "string" || !STRUCTURE_EVENTS.includes(evText)) {
+    return { ok: false, reason: "session_context_structure_event_unrecognised" };
+  }
+  const structure_event = evText as StructureEventText;
 
-  const closeObs = obsOf(e, "as_of_bar_close_price")?.value_num;
-  const as_of_close = typeof closeObs === "number" && Number.isFinite(closeObs) ? closeObs : null;
+  // The analytical close is OPTIONAL, but if present it must be exactly one finite number.
+  const closeSingle = singleObs(e, "as_of_bar_close_price");
+  if (closeSingle.kind === "conflict") {
+    return { ok: false, reason: "session_context_required_observation_conflict" };
+  }
+  let as_of_close: number | null = null;
+  if (closeSingle.kind === "one") {
+    const v = closeSingle.obs.value_num;
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return { ok: false, reason: "session_context_close_observation_invalid" };
+    }
+    as_of_close = v;
+  }
 
   return {
     ok: true,
@@ -409,13 +480,17 @@ export async function buildPatternStructureContextEvidenceV2(
       `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${ctx.evidence_hash}`,
     );
     source_timestamps.structure_context_as_of = iso(ctx.as_of);
+    // The ACTUAL completed-close instant is carried as a source timestamp, never as an
+    // observation timestamped after the envelope anchor.
+    source_timestamps.structure_context_as_of_bar_completed_close = iso(ctx.as_of + BAR_MS);
     observations.push(
       state("structure_context_availability", "available", at),
       state("current_structure_state", ctx.structure_state, at),
       state("current_structure_event", ctx.structure_event, at),
     );
     if (ctx.as_of_close != null) {
-      observations.push(num("structure_context_analytical_close", ctx.as_of_close, iso(ctx.as_of + BAR_MS)));
+      // Mirrors Session V2: the close observation is timestamped at the BAR OPEN anchor.
+      observations.push(num("structure_context_analytical_close", ctx.as_of_close, iso(ctx.as_of)));
     }
   }
 

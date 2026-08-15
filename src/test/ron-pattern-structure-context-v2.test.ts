@@ -17,7 +17,9 @@ import {
   sealEvidence, validateEvidence, scanDenylist, agentSpec,
   type EvidenceEnvelopeV1,
 } from "../../supabase/functions/_shared/ron-agent-contracts.ts";
-import { sessionStructureSpecHashV2 } from "../../supabase/functions/_shared/ron-session-structure-spec-v2.ts";
+import {
+  sessionStructureSpecHashV2, SESSION_STRUCTURE_SPEC_V2, buildSessionStructureEvidenceV2,
+} from "../../supabase/functions/_shared/ron-session-structure-spec-v2.ts";
 
 const PATTERN_V1_HASH_PINNED =
   "9983d79b80e691655bfdd9179c2dabab14ec41494fa7e738cc540b1727de663d";
@@ -50,18 +52,23 @@ const AS_OF = BARS.at(-1)!.time;
 
 /** Minimal genuine-shaped SEALED Session V2 envelope for the same scope/anchor. */
 async function sessionEvidence(over: {
-  structure_state?: string; structure_event?: string; close?: number | null;
+  structure_state?: string; structure_event?: string | null; close?: number | null;
   as_of?: number; trace_id?: string; instrument?: string; timeframe?: string;
   status?: EvidenceEnvelopeV1["status"];
+  provenance_refs?: string[];
+  source_timestamps?: Record<string, string>;
+  extra?: EvidenceEnvelopeV1["observations"];
 } = {}): Promise<EvidenceEnvelopeV1> {
   const asOf = over.as_of ?? AS_OF;
   const at = new Date(asOf).toISOString();
   const observations: EvidenceEnvelopeV1["observations"] = [
     { key: "structure_state", kind: "state", value_text: over.structure_state ?? "up_structure", at },
-    { key: "structure_event", kind: "event", value_text: over.structure_event ?? "none", at },
   ];
+  const evText = over.structure_event === undefined ? "none" : over.structure_event;
+  if (evText != null) observations.push({ key: "structure_event", kind: "event", value_text: evText, at });
   const close = over.close === undefined ? 2400 : over.close;
   if (close != null) observations.push({ key: "as_of_bar_close_price", kind: "measurement", value_num: close, at });
+  if (over.extra) observations.push(...over.extra);
   return await sealEvidence({
     schema_version: 1,
     agent_id: "session_market_structure",
@@ -71,9 +78,13 @@ async function sessionEvidence(over: {
     instrument: over.instrument ?? "XAUUSD",
     timeframe: over.timeframe ?? "15m",
     as_of: at,
-    source_timestamps: {},
+    source_timestamps: over.source_timestamps ?? {
+      as_of_bar_open: at,
+      as_of_bar_completed_close: new Date(asOf + BAR).toISOString(),
+    },
     observations,
-    provenance_refs: [`spec:ron_session_market_structure:v2:${SESSION_V2_HASH_PINNED}`],
+    provenance_refs: over.provenance_refs
+      ?? [`spec:ron_session_market_structure:v2:${SESSION_V2_HASH_PINNED}`],
     data_health: { status: "healthy", freshness_minutes: 0, completeness: 1, issues: [] },
     uncertainty: { level: "unquantified", limitations: [] },
     conflicts: [],
@@ -341,8 +352,11 @@ describe("V2 producer behaviour", () => {
     const e = await buildV2(await sessionEvidence());
     expect(obs(e, "structure_context_semantics")!.value_text).toBe("current_at_evaluation_anchor");
     expect(e.source_timestamps.structure_context_as_of).toBe(new Date(AS_OF).toISOString());
+    expect(e.source_timestamps.structure_context_as_of_bar_completed_close)
+      .toBe(new Date(AS_OF + BAR).toISOString());
+    expect(obs(e, "structure_context_analytical_close")!.at).toBe(new Date(AS_OF).toISOString());
     for (const o of e.observations) {
-      if (o.at) expect(Date.parse(o.at)).toBeLessThanOrEqual(AS_OF + BAR);
+      if (o.at) expect(Date.parse(o.at)).toBeLessThanOrEqual(AS_OF);
     }
   });
 
@@ -479,5 +493,126 @@ describe("endpoint contract", () => {
   it("selects the spec hash by version and rejects unknown versions", () => {
     expect(code).toContain("unsupported_spec_version");
     expect(code).toContain("specVersion === 2 ? await patternContextSpecHashV2() : await patternContextSpecHash()");
+  });
+});
+
+describe("audit correction — exact Session V2 provenance, singleton observations, temporal semantics", () => {
+  const reseal = async (e: EvidenceEnvelopeV1, over: Partial<EvidenceEnvelopeV1>) =>
+    await sealEvidence({ ...e, ...over, evidence_hash: undefined });
+
+  it("rejects a hash-valid envelope carrying V1/wrong/missing/duplicate session spec provenance", async () => {
+    const base = await sessionEvidence();
+    const variants: string[][] = [
+      [`spec:ron_session_market_structure:v1:${SESSION_V2_HASH_PINNED}`],
+      ["spec:ron_session_market_structure:v2:" + "0".repeat(64)],
+      [],
+      ["quality_version:5"],
+      [
+        `spec:ron_session_market_structure:v2:${SESSION_V2_HASH_PINNED}`,
+        `spec:ron_session_market_structure:v2:${SESSION_V2_HASH_PINNED}`,
+      ],
+      [
+        `spec:ron_session_market_structure:v2:${SESSION_V2_HASH_PINNED}`,
+        `spec:ron_session_market_structure:v1:${SESSION_V2_HASH_PINNED}`,
+      ],
+    ];
+    for (const provenance_refs of variants) {
+      const e = await reseal(base, { provenance_refs });
+      expect(await acceptSessionStructureContext(e, scope))
+        .toEqual({ ok: false, reason: "session_context_spec_provenance_mismatch" });
+    }
+    expect(PATTERN_CONTEXT_SPEC_V2.structure_context_dependency.accepted_spec_provenance_ref)
+      .toBe(`spec:ron_session_market_structure:v2:${SESSION_V2_HASH_PINNED}`);
+  });
+
+  it("rejects source timestamps that do not match the bar-open/completed-close convention", async () => {
+    const at = new Date(AS_OF).toISOString();
+    const bad: Record<string, string>[] = [
+      {},
+      { as_of_bar_open: at },
+      { as_of_bar_open: at, as_of_bar_completed_close: at },
+      { as_of_bar_open: new Date(AS_OF - BAR).toISOString(), as_of_bar_completed_close: at },
+      { as_of_bar_open: at, as_of_bar_completed_close: new Date(AS_OF + 2 * BAR).toISOString() },
+    ];
+    for (const source_timestamps of bad) {
+      expect(await acceptSessionStructureContext(await sessionEvidence({ source_timestamps }), scope))
+        .toEqual({ ok: false, reason: "session_context_source_timestamp_mismatch" });
+    }
+  });
+
+  it("rejects duplicate or conflicting required observations instead of collapsing them", async () => {
+    const at = new Date(AS_OF).toISOString();
+    const dupState = await sessionEvidence({
+      extra: [{ key: "structure_state", kind: "state", value_text: "up_structure", at }],
+    });
+    expect(await acceptSessionStructureContext(dupState, scope))
+      .toEqual({ ok: false, reason: "session_context_required_observation_conflict" });
+
+    const conflictState = await sessionEvidence({
+      extra: [{ key: "structure_state", kind: "state", value_text: "down_structure", at }],
+    });
+    expect(await acceptSessionStructureContext(conflictState, scope))
+      .toEqual({ ok: false, reason: "session_context_required_observation_conflict" });
+
+    const dupEvent = await sessionEvidence({
+      extra: [{ key: "structure_event", kind: "event", value_text: "break_up", at }],
+    });
+    expect(await acceptSessionStructureContext(dupEvent, scope))
+      .toEqual({ ok: false, reason: "session_context_required_observation_conflict" });
+
+    const dupClose = await sessionEvidence({
+      close: 2400,
+      extra: [{ key: "as_of_bar_close_price", kind: "measurement", value_num: 2401, at }],
+    });
+    expect(await acceptSessionStructureContext(dupClose, scope))
+      .toEqual({ ok: false, reason: "session_context_required_observation_conflict" });
+  });
+
+  it("never fabricates structure_event=none for a missing or unrecognised event", async () => {
+    expect(await acceptSessionStructureContext(await sessionEvidence({ structure_event: null }), scope))
+      .toEqual({ ok: false, reason: "session_context_structure_event_absent" });
+    expect(await acceptSessionStructureContext(await sessionEvidence({ structure_event: "mega_break" }), scope))
+      .toEqual({ ok: false, reason: "session_context_structure_event_unrecognised" });
+    expect(PATTERN_CONTEXT_SPEC_V2.structure_context_dependency.structure_event_inferred_when_absent)
+      .toBe(false);
+
+    const e = await buildV2(await sessionEvidence({ structure_event: null }));
+    expect(obs(e, "structure_context_rejection_reason")!.value_text)
+      .toBe("session_context_structure_event_absent");
+    expect(obs(e, "current_structure_event")).toBeUndefined();
+  });
+
+  it("rejects a non-finite close observation", async () => {
+    const at = new Date(AS_OF).toISOString();
+    const e = await sessionEvidence({
+      close: null,
+      extra: [{ key: "as_of_bar_close_price", kind: "measurement", value_text: "2400", at }],
+    });
+    expect(await acceptSessionStructureContext(e, scope))
+      .toEqual({ ok: false, reason: "session_context_close_observation_invalid" });
+  });
+
+  it("derives the bar width from accepted specs and never redeclares it", () => {
+    expect(PATTERN_CONTEXT_SPEC_V2.bar_minutes).toBe(PATTERN_CONTEXT_SPEC_V1.bar_minutes);
+    expect(PATTERN_CONTEXT_SPEC_V2.bar_minutes).toBe(SESSION_STRUCTURE_SPEC_V2.bar_minutes);
+  });
+
+  it("is anchor/source-timestamp compatible with the REAL Session V2 producer", async () => {
+    const sessionBars = BARS.map((b) => ({ ...b, created_at: b.created_at ?? null }));
+    const real = await sealEvidence(await buildSessionStructureEvidenceV2({
+      instrument: "XAUUSD", timeframe: "15m", as_of: AS_OF, bars: sessionBars,
+      isQuarantined: never, run_id: "session-real-run", trace_id: TRACE,
+    }));
+    const accepted = await acceptSessionStructureContext(real, scope);
+    expect(accepted.ok).toBe(true);
+
+    const e = await buildV2(real);
+    expect(validateEvidence(e)).toEqual([]);
+    expect(obs(e, "structure_context_availability")!.value_text).toBe("available");
+    expect(e.source_timestamps.structure_context_as_of_bar_completed_close)
+      .toBe(real.source_timestamps.as_of_bar_completed_close);
+    for (const o of e.observations) {
+      if (o.at) expect(Date.parse(o.at)).toBeLessThanOrEqual(AS_OF);
+    }
   });
 });
