@@ -141,7 +141,9 @@ function filterSpikeCandles<T extends { high: number }>(candles: T[]) {
   });
 }
 
-Deno.serve(async (req: Request) => {
+const REQUEST_DEADLINE_MS = 110_000; // stay under the platform 150s idle limit
+
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -475,5 +477,26 @@ Deno.serve(async (req: Request) => {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+}
+
+Deno.serve(async (req: Request) => {
+  let timer: number | undefined;
+  const deadline = new Promise<Response>((resolve) => {
+    timer = setTimeout(
+      () =>
+        resolve(
+          new Response(JSON.stringify({ error: "MetaApi request exceeded the time budget" }), {
+            status: 504,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }),
+        ),
+      REQUEST_DEADLINE_MS,
+    );
+  });
+  try {
+    return await Promise.race([handleRequest(req), deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 });

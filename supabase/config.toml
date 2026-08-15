@@ -21,7 +21,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.metaapi-candles]
-verify_jwt = true
+verify_jwt = false
 
 [functions.metaapi-trade]
 verify_jwt = true

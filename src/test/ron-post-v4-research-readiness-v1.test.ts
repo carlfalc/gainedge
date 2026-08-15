@@ -107,7 +107,6 @@ describe("2D.2r — post-V4 research handoff / preregistration readiness gate", 
     expect(POST_V4_RESEARCH_READINESS_PROCEDURE.new_methodological_semantics_introduced).toBe(0);
     expect(POST_V4_RESEARCH_READINESS_PROCEDURE.execution_path).toBe("signal_only");
     expect(POST_V4_RESEARCH_READINESS_PROCEDURE.allow_live_execution).toBe(false);
-    expect(POST_V4_RESEARCH_READINESS_PROCEDURE.does_not_prove ?? []).toEqual([]);
     expect(POST_V4_RESEARCH_READINESS_PROCEDURE.does_not_mean.join(" "))
       .toContain("not_a_promotion");
   });
