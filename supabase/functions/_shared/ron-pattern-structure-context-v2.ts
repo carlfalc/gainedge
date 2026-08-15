@@ -261,6 +261,23 @@ const obsOf = (e: EvidenceEnvelopeV1, key: string) =>
   e.observations.find((o) => o.key === key);
 
 /**
+ * SINGLETON accessor. Evidence V1 does not enforce unique observation keys, so duplicate
+ * or conflicting keys are rejected HERE rather than silently collapsed.
+ */
+function singleObs(e: EvidenceEnvelopeV1, key: string):
+  { kind: "absent" } | { kind: "conflict" } | { kind: "one"; obs: Observation } {
+  const all = e.observations.filter((o) => o.key === key);
+  if (all.length === 0) return { kind: "absent" };
+  if (all.length > 1) return { kind: "conflict" };
+  return { kind: "one", obs: all[0] };
+}
+
+const ACCEPTED_SESSION_SPEC_PROVENANCE_PREFIX =
+  `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v`;
+const ACCEPTED_SESSION_SPEC_PROVENANCE_REF =
+  `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${SESSION_STRUCTURE_SPEC_V2_HASH_PINNED}`;
+
+/**
  * Validate a SEALED Session V2 envelope for use as pattern structure context.
  *
  * Fails closed on: absence, a malformed/invalid envelope, the wrong agent, a missing or
@@ -302,19 +319,51 @@ export async function acceptSessionStructureContext(
 
   if (e.status !== "supported") return { ok: false, reason: "session_context_not_supported" };
 
-  const st = obsOf(e, "structure_state")?.value_text;
+  // EXACT accepted Session V2 spec provenance: never merely "same agent, same version".
+  const specRefs = (Array.isArray(e.provenance_refs) ? e.provenance_refs : [])
+    .filter((p) => typeof p === "string" && p.startsWith(ACCEPTED_SESSION_SPEC_PROVENANCE_PREFIX));
+  if (specRefs.length !== 1 || specRefs[0] !== ACCEPTED_SESSION_SPEC_PROVENANCE_REF) {
+    return { ok: false, reason: "session_context_spec_provenance_mismatch" };
+  }
+
+  // Bar-open / completed-close source instants must match the accepted convention exactly.
+  const ts = e.source_timestamps ?? {};
+  if (ts.as_of_bar_open !== iso(sessionAsOf)
+    || ts.as_of_bar_completed_close !== iso(sessionAsOf + BAR_MS)) {
+    return { ok: false, reason: "session_context_source_timestamp_mismatch" };
+  }
+
+  const stObs = singleObs(e, "structure_state");
+  if (stObs.kind === "conflict") return { ok: false, reason: "session_context_required_observation_conflict" };
+  const st = stObs.kind === "one" ? stObs.obs.value_text : undefined;
   if (typeof st !== "string" || !st) return { ok: false, reason: "session_context_structure_state_absent" };
   if (!STRUCTURE_STATES.includes(st)) {
     return { ok: false, reason: "session_context_structure_state_unrecognised" };
   }
 
-  const evText = obsOf(e, "structure_event")?.value_text;
-  const structure_event: StructureEventText =
-    typeof evText === "string" && STRUCTURE_EVENTS.includes(evText)
-      ? evText as StructureEventText : "none";
+  // A structure event is NEVER inferred: `none` must be an OBSERVED fact, not a fallback.
+  const evObs = singleObs(e, "structure_event");
+  if (evObs.kind === "conflict") return { ok: false, reason: "session_context_required_observation_conflict" };
+  if (evObs.kind === "absent") return { ok: false, reason: "session_context_structure_event_absent" };
+  const evText = evObs.obs.value_text;
+  if (typeof evText !== "string" || !STRUCTURE_EVENTS.includes(evText)) {
+    return { ok: false, reason: "session_context_structure_event_unrecognised" };
+  }
+  const structure_event = evText as StructureEventText;
 
-  const closeObs = obsOf(e, "as_of_bar_close_price")?.value_num;
-  const as_of_close = typeof closeObs === "number" && Number.isFinite(closeObs) ? closeObs : null;
+  // The analytical close is OPTIONAL, but if present it must be exactly one finite number.
+  const closeSingle = singleObs(e, "as_of_bar_close_price");
+  if (closeSingle.kind === "conflict") {
+    return { ok: false, reason: "session_context_required_observation_conflict" };
+  }
+  let as_of_close: number | null = null;
+  if (closeSingle.kind === "one") {
+    const v = closeSingle.obs.value_num;
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      return { ok: false, reason: "session_context_close_observation_invalid" };
+    }
+    as_of_close = v;
+  }
 
   return {
     ok: true,
