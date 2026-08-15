@@ -260,13 +260,25 @@ export const CONFIRMATORY_INFERENCE = Object.freeze({
   /** Overlapping 60m labels on a 15m grid => dependence spans exactly LOOKBACK_BARS bars. */
   bootstrap_block_bars: LOOKBACK_BARS,
   bootstrap_block_justification: "inherited_purge_minutes_over_source_bar_minutes",
+  /**
+   * NEW methodological/computational constant. It is NOT derivable from any accepted
+   * source rule, so it is ledgered in NEW_METHODOLOGY_CHOICES and requires explicit human
+   * acceptance (see UNRESOLVED_ITEMS). It is not inherited.
+   */
   bootstrap_resamples: 10000,
+  bootstrap_resamples_provenance: "new_unaccepted_methodology_choice",
   bootstrap_seed_rule: "deterministic_seed_derived_from_the_frozen_contract_hash",
   test: "two_sided_studentized_paired_block_bootstrap",
   familywise_alpha: FAMILYWISE_ALPHA,
   multiplicity: "bonferroni",
   hypotheses: HYPOTHESIS_COUNT,
-  per_hypothesis_alpha: round6(FAMILYWISE_ALPHA / HYPOTHESIS_COUNT),
+  /**
+   * EXACT unrounded Bonferroni quotient. Rounding to fixed decimals could round UP and
+   * break the family-wise guarantee (48 * 0.001042 = 0.050016 > 0.05), so no rounding is
+   * applied here and any fixed-decimal serialisation MUST round DOWN.
+   */
+  per_hypothesis_alpha: FAMILYWISE_ALPHA / HYPOTHESIS_COUNT,
+  per_hypothesis_alpha_rounding_rule: "exact_quotient_no_rounding_serialise_round_down_only",
   target_power: TARGET_POWER,
   /**
    * Prospective MDE, computed BEFORE the confirmation block is scored and using ONLY the
