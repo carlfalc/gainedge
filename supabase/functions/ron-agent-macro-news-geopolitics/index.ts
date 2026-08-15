@@ -16,6 +16,11 @@ import {
   buildMacroNewsEvidenceV1, macroNewsSpecHash, MACRO_NEWS_SPEC_V1,
   MACRO_NEWS_WINDOW_MINUTES, MACRO_NEWS_MAX_ROWS, type MacroNewsRow,
 } from "../_shared/ron-macro-news-geopolitics-spec.ts";
+import {
+  buildMacroTemporalContextEvidenceV2, macroNewsSpecHashV2, lastCompletedBarOpen,
+  MACRO_NEWS_SPEC_V2,
+} from "../_shared/ron-macro-temporal-context-v2.ts";
+import type { StructureBar } from "../_shared/ron-session-structure-spec.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -65,6 +70,13 @@ Deno.serve(async (req) => {
     return json({ error: "out_of_scope_for_macro_news_spec_v1", instrument, timeframe }, 400);
   }
 
+  // spec_version 2 (default) attaches observed temporal XAU price context.
+  // spec_version 1 stays explicitly replayable, byte-for-byte.
+  const specVersion = body.spec_version == null ? 2 : Number(body.spec_version);
+  if (specVersion !== 1 && specVersion !== 2) {
+    return json({ error: "unsupported_spec_version", spec_version: body.spec_version }, 400);
+  }
+
   const db = createClient(supabaseUrl, serviceKey || token, { auth: { persistSession: false } });
 
   try {
@@ -72,13 +84,13 @@ Deno.serve(async (req) => {
     // close. Never a wall-clock instant.
     let anchor: number;
     let anchorBarOpen: number | null = null;
+    const contract = await buildEligibilityContract(db, instrument, timeframe, RON_QUALITY_VERSION);
     const explicit = body.evaluation_anchor ?? body.as_of;
     if (explicit != null) {
       const t = new Date(String(explicit)).getTime();
       if (!Number.isFinite(t)) return json({ error: "invalid_evaluation_anchor" }, 400);
       anchor = t;
     } else {
-      const contract = await buildEligibilityContract(db, instrument, timeframe, RON_QUALITY_VERSION);
       const { data: bars, error: barErr } = await db
         .from("candle_history").select("timestamp")
         .eq("symbol", instrument).eq("timeframe", timeframe)
@@ -115,10 +127,36 @@ Deno.serve(async (req) => {
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
-    const build = () => buildMacroNewsEvidenceV1({
-      instrument, timeframe, evaluation_anchor: anchor, items,
-      run_id: runId, trace_id: traceId,
-    });
+    // ---- V2 only: genuine broker-native completed XAU bars over the inherited window.
+    let priceBars: StructureBar[] = [];
+    if (specVersion === 2) {
+      const gridEnd = lastCompletedBarOpen(anchor);
+      const gridStart = Math.floor((anchor - MACRO_NEWS_WINDOW_MINUTES * 60_000) / BAR_MS) * BAR_MS;
+      const { data: cRows, error: cErr } = await db
+        .from("candle_history")
+        .select("timestamp, open, high, low, close, created_at")
+        .eq("symbol", instrument).eq("timeframe", timeframe)
+        .gte("timestamp", new Date(gridStart).toISOString())
+        .lte("timestamp", new Date(gridEnd).toISOString())
+        .order("timestamp", { ascending: true }).limit(1000);
+      if (cErr) throw cErr;
+      priceBars = (cRows ?? []).map((c: Record<string, unknown>) => ({
+        time: new Date(String(c.timestamp)).getTime(),
+        open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
+        created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
+      }));
+    }
+
+    const build = () => specVersion === 2
+      ? buildMacroTemporalContextEvidenceV2({
+        instrument, timeframe, evaluation_anchor: anchor, items,
+        run_id: runId, trace_id: traceId,
+        bars: priceBars, isQuarantined: (b, m) => contract.isQuarantined(b, m),
+      })
+      : buildMacroNewsEvidenceV1({
+        instrument, timeframe, evaluation_anchor: anchor, items,
+        run_id: runId, trace_id: traceId,
+      });
 
     const envelope = await build();
     const errs = validateEvidence(envelope);
@@ -131,8 +169,11 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      spec_version: MACRO_NEWS_SPEC_V1.spec_version,
-      spec_hash: await macroNewsSpecHash(),
+      spec_version: specVersion,
+      spec_hash: specVersion === 2 ? await macroNewsSpecHashV2() : await macroNewsSpecHash(),
+      quality_version: specVersion === 2 ? RON_QUALITY_VERSION : null,
+      agent_id: MACRO_NEWS_SPEC_V2.agent_id,
+      agent_version: MACRO_NEWS_SPEC_V2.agent_version,
       evaluation_anchor: new Date(anchor).toISOString(),
       anchor_bar_open: anchorBarOpen == null ? null : new Date(anchorBarOpen).toISOString(),
       source_window_start: fromIso,
