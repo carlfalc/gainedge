@@ -118,6 +118,15 @@ export function presentCalibrationScope(
 ): CalibrationScope {
   const sym = (symbol ?? "").trim().toUpperCase();
   const tf = normaliseTimeframe(timeframe);
+  if (!sym || !tf) {
+    // Scope depends on BOTH instrument and timeframe. With either missing we
+    // cannot classify anything, and must never assume the XAUUSD 15m scope.
+    return {
+      inScope: false,
+      label: "Calibration scope unavailable",
+      secondary: "Instrument or timeframe not specified",
+    };
+  }
   if (sym === CALIBRATED_SYMBOL && tf === CALIBRATED_TIMEFRAME) {
     return {
       inScope: true,
@@ -127,7 +136,7 @@ export function presentCalibrationScope(
   }
   return {
     inScope: false,
-    label: "Calibration: not established for this instrument",
+    label: "Calibration: not established for this instrument/timeframe",
     secondary: "Context only · no probability",
   };
 }

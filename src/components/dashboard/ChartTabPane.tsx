@@ -15,7 +15,6 @@ import TradeLevelOverlay from "./TradeLevelOverlay";
 import LivePnLBar from "./LivePnLBar";
 import type { ChartMode } from "./AddChartTabModal";
 import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
-import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 
 const BROKER_SYMBOL_MAP: Record<string, string[]> = {
   XAUUSD: ["XAUUSD"], US30: ["US30", "DJ30"], NAS100: ["NAS100", "USTEC"],
@@ -45,8 +44,12 @@ export default function ChartTabPane({
   const [positions, setPositions] = useState<Position[]>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [livePrice, setLivePrice] = useState<number | null>(null);
-  /** Instant the displayed live price was actually received (client fetch time). */
-  const [livePriceAt, setLivePriceAt] = useState<number | null>(null);
+  /**
+   * Broker/source quote instant for the displayed price, exactly as returned by
+   * `fetchCurrentPrice` (`p.time`). Never client receipt time, and never a
+   * fabricated fallback — when the source omits it, provenance stays unknown.
+   */
+  const [livePriceTime, setLivePriceTime] = useState<string | null>(null);
   const [orderMode, setOrderMode] = useState<OrderMode>("market");
   const [limitPrices, setLimitPrices] = useState<LimitOrderPrices | null>(null);
   const tradePanelRef = useRef<TradeExecutionPanelRef>(null);
@@ -55,14 +58,14 @@ export default function ChartTabPane({
 
   /* live mid-price polling (used by P&L bar + chart header) */
   useEffect(() => {
-    if (!isLive) { setLivePrice(null); setLivePriceAt(null); return; }
+    if (!isLive) { setLivePrice(null); setLivePriceTime(null); return; }
     let cancelled = false;
     const variants = BROKER_SYMBOL_MAP[symbol] ?? [symbol];
     const poll = async () => {
       for (const sym of variants) {
         try {
           const p = await fetchCurrentPrice(accountId!, sym);
-          if (p && !cancelled) { setLivePrice((p.bid + p.ask) / 2); setLivePriceAt(Date.now()); return; }
+          if (p && !cancelled) { setLivePrice((p.bid + p.ask) / 2); setLivePriceTime(p.time ?? null); return; }
         } catch { /* try next variant */ }
       }
     };
@@ -119,8 +122,9 @@ export default function ChartTabPane({
             {livePrice.toFixed(symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5)}
           </span>
         )}
-        <PriceProvenanceBadge kind="live_quote" timestamp={livePrice != null ? livePriceAt : null} />
-        <CalibrationScopeBadge symbol={symbol} timeframe={null} compact />
+        {livePrice != null && (
+          <PriceProvenanceBadge kind="live_quote" timestamp={livePriceTime} />
+        )}
       </div>
 
       <RonSignalAlert symbol={symbol} userId={userId} />
