@@ -66,13 +66,44 @@ describe("Falconer identity reconciliation V1 — A/B/C: three distinct identiti
 
   it("canonical Falconer v7 semantics are untouched by this audit", () => {
     const pine = readFileSync("strategy/falconer_v7_tp3.pine", "utf8");
+
+    // Identity/intent: TP3 33-33-34, long-only safety mode.
+    expect(pine).toContain('strategy("Falconer v7 TP3 33-33-34"');
+    expect(pine).toContain("Longs Only Safety Mode with 5R runner");
+
+    // Sizing split: 33 / 33 / remainder (=34 under canonical inputs).
+    expect(pine).toContain('pct1    = input.float(33,  "TP1 %"');
+    expect(pine).toContain('pct2    = input.float(33,  "TP2 %"');
+    expect(pine).toContain("qty1 = qty * pct1 / 100.0");
+    expect(pine).toContain("qty2 = qty * pct2 / 100.0");
+    expect(pine).toContain("qty3 = qty - qty1 - qty2");
+    expect(pine).toContain("tp1size=33");
+    expect(pine).toContain("tp2size=33");
+    expect(pine).toContain("tp3size=34");
+
+    // R-multiples, BE, risk and dollar-per-unit.
     expect(pine).toContain('input.float(1.5, "TP1 R"');
     expect(pine).toContain('input.float(3.0, "TP2 R"');
     expect(pine).toContain('input.float(5.0, "TP3 R (runner)"');
     expect(pine).toContain('input.float(1.0, "BE at R"');
     expect(pine).toContain('input.float(200.0, "Risk per Trade $"');
+    expect(pine).toContain("dpu     = input.float(1.0)");
+
+    // Long only.
     expect(pine).toContain("allowL = true");
+    expect(pine).toContain('strategy.entry("L", strategy.long');
     expect(pine).not.toContain("strategy.short");
+    expect(pine).not.toContain("allowS = true");
+
+    // STANDARD OHLC chart + MANUAL Heiken Ashi computation (no HA feed).
+    expect(pine).toContain("haC = (open + high + low + close) / 4.0");
+    expect(pine).toContain(
+      "haO := na(haO[1]) ? (open + close) / 2.0 : (nz(haO[1]) + nz(haC[1])) / 2.0");
+    expect(pine).not.toContain("ticker.heikinashi");
+
+    // Bar-close execution semantics.
+    expect(pine).toContain("process_orders_on_close=true");
+    expect(pine).toContain("calc_on_every_tick=false");
   });
 });
 
@@ -125,14 +156,42 @@ describe("Falconer identity reconciliation V1 — E/F: version selector and pin 
     const entry = ORCHESTRATION_RUN_PLAN_V6
       .find((p) => p.agent_id === "falconer_signal_source")!;
     expect(entry).toBeDefined();
-    expect((entry as Record<string, unknown>).spec_version).toBeUndefined();
+    // The real plan field is `spec_version_pin`; unpinned means explicit null.
+    expect(entry.spec_version_pin).toBeNull();
+    expect(Object.keys(ORCHESTRATION_RUN_SPEC_V6.spec_version_pins))
+      .not.toContain("falconer_signal_source");
+    expect(ORCHESTRATION_RUN_SPEC_V6.unpinned_agents_use_endpoint_defaults)
+      .toContain("falconer_signal_source");
     expect(entry.function_name).toBe("ron-agent-falconer-signal-source");
   });
 
-  it("F. a future pin would be unambiguous: exact spec ref string is stable", async () => {
+  it("F. identity is unambiguous: exact spec ref string is stable", async () => {
     expect(`spec:${FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_id}:v${FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version}:${await falconerSignalSourceSpecHash()}`)
       .toBe(`spec:ron_falconer_signal_source:v1:${SIGNAL_SOURCE_SPEC_V1_HASH}`);
     expect(FALCONER_SIGNAL_SOURCE_SPEC_V1.falconer_authority).toBe("strategy_context_only");
     expect(FALCONER_SIGNAL_SOURCE_SPEC_V1.non_authoritative).toBe(true);
+  });
+
+  it("F (CORRECTED). explicit orchestration pin readiness is BLOCKED", () => {
+    // Under this project's orchestration convention an explicit pin means the
+    // orchestrator sends `spec_version:N` AND the specialist endpoint explicitly
+    // selects/replays that version. The Falconer endpoint ignores any selector,
+    // so no replay-safe explicit pin is possible yet.
+    const endpoint = readFileSync(
+      "supabase/functions/ron-agent-falconer-signal-source/index.ts", "utf8");
+    expect(endpoint).not.toContain("body.spec_version");
+    expect(AUDIT_OUTCOME_V1).toEqual({
+      identity_reconciliation_a_to_e: "PASS",
+      explicit_orchestration_pin_readiness_f: "BLOCKED",
+      result: "RON_FALCONER_SIGNAL_SOURCE_IDENTITY_RECONCILIATION_AUDIT_V1_BLOCKED",
+      blocker:
+        "falconer_signal_source endpoint has no explicit spec_version selector; "
+        + "V6 remains safely unpinned",
+      safest_next_action:
+        "separate forward-only slice adding an endpoint spec_version selector that "
+        + "defaults to V1 and preserves byte/semantic V1 output, followed later by a "
+        + "forward-only Orchestration V7 pin",
+      performed_in_this_correction: "test-only; no runtime, endpoint or plan change",
+    });
   });
 });
