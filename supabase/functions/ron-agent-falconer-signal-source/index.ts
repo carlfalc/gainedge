@@ -91,6 +91,21 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body allowed */ }
 
+  // ---- EXPLICIT REQUEST SPEC-VERSION SELECTOR (V1-only).
+  // Parsed BEFORE any candle_history / falconer_engine_events / falconer_trades read.
+  // Omitted => V1 (exact historical default). Explicit numeric 1 => V1.
+  // Anything else (0, 2, negative, fractional, "1", null, object, array) => 400.
+  if ("spec_version" in body) {
+    const raw = body.spec_version;
+    if (raw !== FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version) {
+      return json({
+        error: "unsupported_spec_version",
+        requested_spec_version: typeof raw === "number" || typeof raw === "string" ? raw : null,
+        supported_spec_versions: [FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version],
+      }, 400);
+    }
+  }
+
   const instrument = typeof body.instrument === "string" ? body.instrument : SYMBOL;
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : TIMEFRAME;
   if (!FALCONER_SIGNAL_SOURCE_SPEC_V1.instrument_scope.includes(instrument as "XAUUSD")
