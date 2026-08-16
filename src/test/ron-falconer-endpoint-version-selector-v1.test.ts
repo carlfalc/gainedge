@@ -58,8 +58,8 @@ describe("Falconer endpoint version selector V1 — resolution", () => {
       if (r.ok === false) {
         expect(r.error).toBe("unsupported_spec_version");
         expect(r.supported_spec_versions).toEqual([1]);
-        expect(typeof raw === "number" || typeof raw === "string"
-          ? r.requested_spec_version : r.requested_spec_version === null).toBeTruthy();
+        const echoed = typeof raw === "number" || typeof raw === "string" ? raw : null;
+        expect(Object.is(r.requested_spec_version, echoed)).toBe(true);
       }
     }
   });
