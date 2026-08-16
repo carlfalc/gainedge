@@ -5,8 +5,10 @@
  * existing V1 contract: it exists solely so a caller can EXPLICITLY replay V1.
  *
  * It is NOT a spec, carries NO spec hash, mutates NO spec object, and creates NO V2.
- * It must be evaluated BEFORE any database read so unsupported versions fail closed
- * without touching candle_history, falconer_engine_events or falconer_trades.
+ * Exact contract: it must be evaluated BEFORE any Falconer MARKET/SIGNAL DATA read
+ * (candle_history, falconer_engine_events, falconer_trades) so unsupported versions
+ * fail closed without touching those sources. It deliberately does NOT constrain the
+ * authorization/capability work the endpoint performs before body parsing.
  */
 export const FALCONER_SUPPORTED_SPEC_VERSIONS = [1] as const;
 
