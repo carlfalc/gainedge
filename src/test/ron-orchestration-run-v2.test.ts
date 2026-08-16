@@ -59,6 +59,7 @@ const sealedSession = () => sealEvidence(envelope("session_market_structure"));
 
 const SESSION_SPEC_REF =
   `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${SESSION_STRUCTURE_SPEC_V2_HASH_PINNED}`;
+const OPEN_ISO = new Date(Date.parse(AS_OF)).toISOString();
 const CLOSE_ISO = new Date(Date.parse(AS_OF) + 15 * 60_000).toISOString();
 
 /** An ACCEPTED Session V2 envelope per the frozen Pattern V2 acceptance contract. */
@@ -67,7 +68,7 @@ const acceptedSessionEnvelope = (over: Partial<EvidenceEnvelopeV1> = {}) =>
     provenance_refs: [SESSION_SPEC_REF],
     source_timestamps: {
       reference_instant: AS_OF,
-      as_of_bar_open: AS_OF,
+      as_of_bar_open: OPEN_ISO,
       as_of_bar_completed_close: CLOSE_ISO,
     },
     observations: [
@@ -201,8 +202,10 @@ describe("sealed session -> pattern dependency gate fails closed", () => {
       .rejects.toThrow(/session_dependency_instrument_mismatch/);
     await expect(assertSessionDependencySealed(s, { ...CTX, timeframe: "1h" }))
       .rejects.toThrow(/session_dependency_timeframe_mismatch/);
-    await expect(assertSessionDependencySealed(s, { ...CTX, as_of: "2026-08-15T11:45:00Z" }))
+    await expect(assertSessionDependencySealed(s, { ...CTX, as_of: "2026-08-15T12:15:00Z" }))
       .rejects.toThrow(/session_dependency_anchor_mismatch/);
+    await expect(assertSessionDependencySealed(s, { ...CTX, as_of: "2026-08-15T11:45:00Z" }))
+      .rejects.toThrow(/session_dependency_after_pattern_anchor/);
   });
 
   it("binds the handed hash to the final collected batch", async () => {
