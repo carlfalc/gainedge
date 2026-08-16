@@ -245,8 +245,6 @@ const STRUCTURE_EVENTS: readonly string[] =
 
 export interface AcceptedSessionContext {
   ok: true;
-  /** Type-only marker: an accepted context never carries a rejection reason. */
-  reason?: undefined;
   structure_state: StructureStateText;
   structure_event: StructureEventText;
   as_of_close: number | null;

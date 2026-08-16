@@ -22,6 +22,10 @@ import {
 import { hashCanonical } from "./ron-agent-contracts.ts";
 import type { OrchestrationContext } from "./ron-orchestrator.ts";
 import {
+  acceptSessionStructureContext, SESSION_STRUCTURE_SPEC_V2_HASH_PINNED,
+} from "./ron-pattern-structure-context-v2.ts";
+import { SESSION_STRUCTURE_SPEC_V2 } from "./ron-session-structure-spec-v2.ts";
+import {
   ORCHESTRATION_RUN_PLAN_V1, ORCHESTRATION_RUN_SPEC_V1, OrchestrationRunError,
   type AgentCallPlanEntry,
 } from "./ron-orchestration-run.ts";
@@ -30,6 +34,17 @@ export const RON_ORCHESTRATION_RUN_VERSION_V2 = 2;
 
 /** The one agent whose sealed evidence Pattern V2 is allowed to consume. */
 export const PATTERN_SESSION_DEPENDENCY_AGENT: RonAgentId = "session_market_structure";
+
+/** The agent whose sealed evidence must PROVE it consumed the Session dependency. */
+export const PATTERN_DEPENDENT_AGENT: RonAgentId = "pattern_context";
+
+/** Exact dependency entry Pattern V2 emits for a consumed sealed Session envelope. */
+export const patternSessionDependencyEntry = (session_hash: string): string =>
+  `session_market_structure_evidence:${session_hash}`;
+
+const PATTERN_SESSION_DEPENDENCY_PREFIX = "session_market_structure_evidence:";
+const PATTERN_STRUCTURE_PROVENANCE_PREFIX =
+  `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:`;
 
 export interface AgentCallPlanEntryV2 extends AgentCallPlanEntry {
   /**
@@ -85,6 +100,18 @@ export const ORCHESTRATION_RUN_SPEC_V2 = {
   execution_path: "signal_only",
   persist_default: false,
   run_id_domain: "ron_orch_run_v2",
+  /**
+   * The pre-Pattern gate requires the ACCEPTED Session V2 contract (the frozen Pattern V2
+   * acceptance function), not merely a sealed envelope carrying the same agent id.
+   */
+  session_dependency_acceptance: {
+    contract: "pattern_v2_accept_session_structure_context",
+    requires_accepted_session_spec_hash: SESSION_STRUCTURE_SPEC_V2_HASH_PINNED,
+    second_structural_truth_invented: false,
+    sealed_session_v1_rejected: true,
+  },
+  /** After Pattern returns, its own evidence must cite exactly the handed Session hash. */
+  pattern_dependency_binding_verified: true,
   /** Declared limitation: only Pattern and its Session dependency are version-pinned. */
   spec_version_pins: { session_market_structure: 2, pattern_context: 2 },
   unpinned_agents_use_endpoint_defaults: ORCHESTRATION_RUN_PLAN_V2
