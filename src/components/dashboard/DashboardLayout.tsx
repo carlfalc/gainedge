@@ -154,7 +154,7 @@ export default function DashboardLayout() {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+        <nav style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
           {NAV_GROUPS.map((group, gi) => (
             <div key={group.labelKey} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {sidebarWidth > 0 && (
