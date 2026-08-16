@@ -1,6 +1,6 @@
 /**
  * GAINEDGE_PRODUCT_RON_DECISION_EXPLORER_V1 — pure selection helpers for the
- * read-only RON decision explorer. No market claim, no ranking, no probability:
+ * read-only RON decision explorer. It makes no market claim and orders nothing:
  * this file only decides WHICH stored record the user is looking at.
  */
 export interface TrackedPair {
