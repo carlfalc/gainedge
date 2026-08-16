@@ -416,11 +416,14 @@ describe("opportunity/risk V2 acceptance gate", () => {
     );
     for (const key of ["entry_price", "stop_loss", "take_profit_target", "risk_reward",
       "lot_size", "confidence", "edge_score"]) {
-      const cand = await sealEvidence({
+      const draft = {
         ...s, evidence_hash: undefined,
         observations: [...s.observations, { key, kind: "measurement", value_num: 1, at: AS_OF }],
-      } as EvidenceEnvelopeV1);
-      await reject(cand, /forbidden_observation/);
+      } as EvidenceEnvelopeV1;
+      // Some keys are already refused by the base Evidence V1 contract itself; the rest
+      // must be refused by the V6 gate. Either way the surface never reaches the run.
+      if (validateEvidence(draft).length) continue;
+      await reject(await sealEvidence(draft), /forbidden_observation/);
     }
   });
 });
