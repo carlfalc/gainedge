@@ -3,11 +3,10 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTranslation } from "react-i18next";
 import {
-  LayoutDashboard, Zap, BookOpen, BarChart3, RefreshCw, Calendar,
-  Settings, LogOut, User, Lightbulb, Clock, DollarSign, Newspaper, Globe, CandlestickChart, ExternalLink, Sun, Moon, Mic, Wine, Brain,
-  ShieldCheck,
+  LayoutDashboard, LogOut, User, DollarSign, Sun, Moon, Mic,
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
+import { NAV_GROUPS } from "@/lib/dashboard-nav";
 import { useSeedData } from "@/hooks/use-seed-data";
 import { useAutoTradeNotifications } from "@/hooks/use-auto-trade-notifications";
 import LanguageSelector, { LanguageProvider } from "./LanguageSelector";
@@ -20,25 +19,6 @@ import BrokerModal from "./BrokerModal";
 import { openRonPopout } from "@/lib/ron-popout";
 import TradeNotificationPopup from "./TradeNotificationPopup";
 
-
-const NAV_ITEMS = [
-  { labelKey: "nav.dashboard", icon: LayoutDashboard, path: "/dashboard" },
-  { labelKey: "nav.settings", icon: Settings, path: "/dashboard/settings" },
-  { labelKey: "nav.charts", icon: CandlestickChart, path: "/dashboard/charts", gold: true },
-  { labelKey: "nav.signals", icon: Zap, path: "/dashboard/signals" },
-  { labelKey: "nav.strategy", icon: Zap, path: "/dashboard/strategy", gold: true },
-  { labelKey: "GainEdge AI", icon: Brain, path: "/dashboard/ai", gold: true },
-  { labelKey: "nav.journal", icon: BookOpen, path: "/dashboard/journal" },
-  { labelKey: "nav.analytics", icon: BarChart3, path: "/dashboard/analytics" },
-  { labelKey: "nav.insights", icon: Lightbulb, path: "/dashboard/insights" },
-  { labelKey: "nav.backtesting", icon: RefreshCw, path: "/dashboard/backtesting" },
-  { labelKey: "nav.calendar", icon: Calendar, path: "/dashboard/calendar" },
-  { labelKey: "nav.clockSettings", icon: Clock, path: "/dashboard/clock-settings" },
-  { labelKey: "nav.newsSettings", icon: Newspaper, path: "/dashboard/news-settings" },
-  { labelKey: "nav.myNews", icon: Globe, path: "/dashboard/my-news" },
-  { labelKey: "RON Decision", icon: ShieldCheck, path: "/dashboard/ron-decision" },
-  { labelKey: "nav.lounge", icon: Wine, path: "/dashboard/whisky-cigar-lounge", gold: true },
-] as const;
 
 export default function DashboardLayout() {
   const { t } = useTranslation();
