@@ -131,6 +131,14 @@ export const ORCHESTRATION_RUN_SPEC_V4 = {
     temporal_contract: {
       as_of_is_completed_bar_open: true,
       as_of_must_not_exceed_orchestration_anchor: true,
+      /**
+       * AUDIT CORRECTION: the completed close of the evidence bar is EVIDENCE TIME, not
+       * metadata. A bar that has not closed at or before the orchestration anchor is
+       * future information, so `as_of_bar_completed_close` must be <= the anchor and is
+       * NOT exempt from the anchor-bound source-timestamp rule.
+       */
+      completed_close_must_not_exceed_orchestration_anchor: true,
+      completed_bar_timestamp_pair_all_or_nothing: true,
       as_of_bar_grid_minutes: CROSS_ASSET_SPEC_V1.bar_minutes,
       bound_source_timestamp_keys: ["as_of_bar_open", "as_of_bar_completed_close"],
       source_timestamps_present_only_when_v1_reached_the_admissible_path: true,
@@ -229,20 +237,25 @@ export async function assertCrossAssetContextV2Sealed(
   const st = (e.source_timestamps ?? {}) as Record<string, unknown>;
   const openRaw = st.as_of_bar_open;
   const closeRaw = st.as_of_bar_completed_close;
+  // Blocked / insufficient paths legitimately carry neither timestamp and are never
+  // fabricated. If EITHER is present the pair must be complete and internally consistent.
   if (openRaw != null || closeRaw != null) {
     if (typeof openRaw !== "string" || Date.parse(openRaw) !== atMs) {
       reasons.push("cross_asset_context_source_timestamp_mismatch:as_of_bar_open");
     }
     if (typeof closeRaw !== "string" || Date.parse(closeRaw) !== atMs + BAR_MS) {
       reasons.push("cross_asset_context_source_timestamp_mismatch:as_of_bar_completed_close");
+    } else if (Number.isFinite(anchorMs) && Date.parse(closeRaw) > anchorMs) {
+      // The bar had not closed yet at the orchestration anchor: lookahead. Fail closed.
+      reasons.push("cross_asset_context_completed_bar_after_orchestration_anchor");
     }
   }
-  // Anchor-bound provenance: no source metadata instant may postdate the anchor.
+  // Anchor-bound provenance: NO source instant may postdate the anchor. There is no
+  // exemption for `as_of_bar_completed_close` — it is evidence time, not metadata.
   for (const [k, v] of Object.entries(st)) {
     if (typeof v !== "string") continue;
     const ms = Date.parse(v);
-    if (Number.isFinite(ms) && Number.isFinite(anchorMs) && ms > anchorMs
-      && k !== "as_of_bar_completed_close") {
+    if (Number.isFinite(ms) && Number.isFinite(anchorMs) && ms > anchorMs) {
       reasons.push(`cross_asset_context_source_timestamp_after_anchor:${k}`);
     }
   }
