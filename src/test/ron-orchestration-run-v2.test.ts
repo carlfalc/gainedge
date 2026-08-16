@@ -234,30 +234,33 @@ describe("sealed session -> pattern dependency gate fails closed", () => {
           ? Promise.resolve(s)
           : sealEvidence(a === "pattern_context" ? pattern : envelope(a)))));
 
-    expect(() => assertPatternDependencyBinding(
-      build_sync(await build(patternEnvelope(s.evidence_hash!, {
-        dependencies: [], provenance_refs: ["fixture:pattern_context"],
-      }))), s.evidence_hash!)).toThrow(/pattern_dependency_binding_count:0/);
+    const missing = await build(patternEnvelope(s.evidence_hash!, {
+      dependencies: [], provenance_refs: ["fixture:pattern_context"],
+    }));
+    expect(() => assertPatternDependencyBinding(missing, s.evidence_hash!))
+      .toThrow(/pattern_dependency_binding_count:0/);
 
-    expect(() => assertPatternDependencyBinding(
-      build_sync(await build(patternEnvelope(s.evidence_hash!, {
-        dependencies: [
-          patternSessionDependencyEntry(s.evidence_hash!),
-          patternSessionDependencyEntry(other),
-        ],
-      }))), s.evidence_hash!)).toThrow(/pattern_dependency_binding_count:2/);
+    const duplicated = await build(patternEnvelope(s.evidence_hash!, {
+      dependencies: [
+        patternSessionDependencyEntry(s.evidence_hash!),
+        patternSessionDependencyEntry(other),
+      ],
+    }));
+    expect(() => assertPatternDependencyBinding(duplicated, s.evidence_hash!))
+      .toThrow(/pattern_dependency_binding_count:2/);
 
-    expect(() => assertPatternDependencyBinding(
-      build_sync(await build(patternEnvelope(other))), s.evidence_hash!))
+    const divergent = await build(patternEnvelope(other));
+    expect(() => assertPatternDependencyBinding(divergent, s.evidence_hash!))
       .toThrow(/pattern_dependency_binding_hash_divergence/);
 
     // Correct dependency, but structure-context provenance cites a different session.
-    expect(() => assertPatternDependencyBinding(
-      build_sync(await build(patternEnvelope(s.evidence_hash!, {
-        provenance_refs: [
-          `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${other}`,
-        ],
-      }))), s.evidence_hash!)).toThrow(/pattern_dependency_provenance_hash_divergence/);
+    const badRef = await build(patternEnvelope(s.evidence_hash!, {
+      provenance_refs: [
+        `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${other}`,
+      ],
+    }));
+    expect(() => assertPatternDependencyBinding(badRef, s.evidence_hash!))
+      .toThrow(/pattern_dependency_provenance_hash_divergence/);
 
     // Batch Session hash matches the handed hash, yet Pattern proves nothing.
     const blind = await build(patternEnvelope(other));
