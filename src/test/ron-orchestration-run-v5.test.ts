@@ -447,7 +447,14 @@ describe("genuine Macro V2 producer output passes the V5 gate", () => {
     expect(["context_only", "no_action"]).toContain(s.recommendation);
     expect(Date.parse(s.as_of)).toBeLessThanOrEqual(ANCHOR_MS);
     expect(Date.parse(s.source_timestamps.evaluation_anchor)).toBe(ANCHOR_MS);
-    expect(JSON.stringify(s)).not.toMatch(/probabilit|execution_allowed|causal|forecast_value/i);
+    // No probability / execution / promotion FIELD is emitted anywhere (the frozen
+    // limitations prose legitimately contains the words "causation"/"causal" as denials).
+    const keys = new Set(s.observations.map((o) => o.key));
+    for (const k of keys) {
+      expect(k).not.toMatch(/probabilit|confidence|significan|edge|execution|score/i);
+    }
+    expect(s).not.toHaveProperty("numeric_probability");
+    expect(s).not.toHaveProperty("execution_allowed");
   });
 });
 
