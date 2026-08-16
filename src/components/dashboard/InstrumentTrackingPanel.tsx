@@ -10,6 +10,8 @@ import { explainPatterns, summariseStructure, fmtLevel } from "@/lib/pattern-int
 import { deriveFalconerSignalState } from "@/lib/falconer-signal-state";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
+import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
+import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 import {
   useRonSnapshots, useRonOutcomeStats, useRonDataQuality, useRonRebuildStatus,
   ronStateFrom, ronStateColor,
@@ -400,12 +402,23 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                           ? `Live broker bid · ask ${quote.ask ?? "—"} · ${formatAge(quoteInstant!)}`
                           : `Market closed / feed idle · last quote ${formatAge(quoteInstant!)}`}
                       </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
+                        <PriceProvenanceBadge kind="live_quote" timestamp={quoteInstant} />
+                      </div>
                     </div>
                   ) : (
-                    <div style={{ fontSize: 10, color: "#F59E0B", marginTop: 2, fontStyle: "italic" }}>
-                      No live price feed
+                    <div style={{ marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: "#F59E0B", fontStyle: "italic" }}>
+                        No live price feed
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
+                        <PriceProvenanceBadge kind="live_quote" timestamp={null} />
+                      </div>
                     </div>
                   )}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                    <CalibrationScopeBadge symbol={inst.symbol} timeframe={tf} />
+                  </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text }}>
                     {hasSignal ? (
                       <>
