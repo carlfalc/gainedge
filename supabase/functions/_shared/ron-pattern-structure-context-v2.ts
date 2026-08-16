@@ -464,18 +464,14 @@ export async function buildPatternStructureContextEvidenceV2(
   );
 
   if (!ctx.ok) {
-    // `strict: false` in tsconfig.app.json disables boolean-literal discriminant
-    // narrowing under tsc, so the rejected branch is named explicitly. Behaviour and the
-    // frozen `if (!ctx.ok)` control flow are unchanged.
-    const rejected = ctx as RejectedSessionContext;
     observations.push(
       state("structure_context_availability", "unavailable", at),
-      state("structure_context_rejection_reason", rejected.reason, at),
+      state("structure_context_rejection_reason", ctx.reason, at),
       state("current_structure_state", "insufficient_structure_context", at),
       state("pattern_structure_compatibility_state", "insufficient_structure_context", at),
     );
     limitations.push(
-      `no admissible sealed Session V2 structure context (${rejected.reason}); ` +
+      `no admissible sealed Session V2 structure context (${ctx.reason}); ` +
       "structure is reported unavailable and is never inferred",
     );
   } else {
