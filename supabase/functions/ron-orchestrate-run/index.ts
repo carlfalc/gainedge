@@ -42,6 +42,11 @@ import {
   CALIBRATION_CONTEXT_AGENT, deriveRunIdsV3, ORCHESTRATION_RUN_PLAN_V3,
   orchestrationRunPlanHashV3, RON_ORCHESTRATION_RUN_VERSION_V3,
 } from "../_shared/ron-orchestration-run-v3.ts";
+import {
+  assertCrossAssetContextBinding, assertCrossAssetContextV2Sealed,
+  CROSS_ASSET_CONTEXT_AGENT, deriveRunIdsV4, ORCHESTRATION_RUN_PLAN_V4,
+  orchestrationRunPlanHashV4, RON_ORCHESTRATION_RUN_VERSION_V4,
+} from "../_shared/ron-orchestration-run-v4.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -112,10 +117,12 @@ Deno.serve(async (req) => {
   const requestedRunVersion = body.orchestration_run_version == null
     ? RON_ORCHESTRATION_RUN_VERSION_V2
     : Number(body.orchestration_run_version);
-  if (![1, 2, 3].includes(requestedRunVersion)) {
+  if (![1, 2, 3, 4].includes(requestedRunVersion)) {
     return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
   }
-  const isV3 = requestedRunVersion === 3;
+  const isV4 = requestedRunVersion === 4;
+  // V4 inherits every V3 semantic (calibration V2 gate + all V2 semantics).
+  const isV3 = requestedRunVersion === 3 || isV4;
   // V3 inherits every V2 semantic (Session -> sealed evidence -> Pattern, version pins).
   const isV2 = requestedRunVersion === 2 || isV3;
 
@@ -124,7 +131,9 @@ Deno.serve(async (req) => {
   };
 
   try {
-    const runIds = isV3
+    const runIds = isV4
+      ? await deriveRunIdsV4(traceId, anchor)
+      : isV3
       ? await deriveRunIdsV3(traceId, anchor)
       : isV2
         ? await deriveRunIdsV2(traceId, anchor)
@@ -133,9 +142,12 @@ Deno.serve(async (req) => {
     const calls: Record<string, unknown>[] = [];
     let sessionDependencyHash: string | null = null;
     let calibrationContextHash: string | null = null;
+    let crossAssetContextHash: string | null = null;
 
     const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
-      isV3 ? ORCHESTRATION_RUN_PLAN_V3 : isV2 ? ORCHESTRATION_RUN_PLAN_V2 : ORCHESTRATION_RUN_PLAN_V1;
+      isV4 ? ORCHESTRATION_RUN_PLAN_V4
+        : isV3 ? ORCHESTRATION_RUN_PLAN_V3
+        : isV2 ? ORCHESTRATION_RUN_PLAN_V2 : ORCHESTRATION_RUN_PLAN_V1;
 
     for (const entry of plan) {
       const v2entry = isV2 ? entry as AgentCallPlanEntryV2 : null;
@@ -198,6 +210,15 @@ Deno.serve(async (req) => {
         const sealedCal = await sealEvidence(envelope);
         calibrationContextHash = await assertCalibrationContextV2Sealed(sealedCal, ctx);
         collected.push(sealedCal);
+      } else if (isV4 && entry.agent_id === CROSS_ASSET_CONTEXT_AGENT) {
+        // V4 ONLY: the returned cross-asset evidence must PROVE it is the accepted
+        // Cross-Asset Relationship Context V2 artifact — sealed, in scope, correctly
+        // anchored on a completed bar and carrying exactly one accepted V2 spec
+        // provenance ref. Anything missing, V1, wrong-hash, duplicated or ambiguous
+        // fails closed here. It adds no authority and no direction weighting.
+        const sealedCross = await sealEvidence(envelope);
+        crossAssetContextHash = await assertCrossAssetContextV2Sealed(sealedCross, ctx);
+        collected.push(sealedCross);
       } else {
         collected.push(envelope);
       }
@@ -223,6 +244,11 @@ Deno.serve(async (req) => {
     if (isV3 && calibrationContextHash) {
       assertCalibrationContextBinding(sealed, calibrationContextHash);
     }
+    // V4 ONLY: the accepted cross-asset context envelope must be the single cross-asset
+    // envelope in the final batch. It stays contextual — no authority, no direction vote.
+    if (isV4 && crossAssetContextHash) {
+      assertCrossAssetContextBinding(sealed, crossAssetContextHash);
+    }
 
     const { decision, explanation } = await synthesizeDecision(sealed, ctx);
     const replay = await reconstructDecision(sealed, ctx);
@@ -232,10 +258,14 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: isV3
+      orchestration_run_version: isV4
+        ? RON_ORCHESTRATION_RUN_VERSION_V4
+        : isV3
         ? RON_ORCHESTRATION_RUN_VERSION_V3
         : isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: isV3
+      orchestration_run_plan_hash: isV4
+        ? await orchestrationRunPlanHashV4()
+        : isV3
         ? await orchestrationRunPlanHashV3()
         : isV2 ? await orchestrationRunPlanHashV2() : await orchestrationRunPlanHash(),
       persistence_atomicity: isV2
@@ -249,6 +279,13 @@ Deno.serve(async (req) => {
           calibration_context_spec_version: 2,
           calibration_context_evidence_hash: calibrationContextHash,
           default_orchestration_run_version: RON_ORCHESTRATION_RUN_VERSION_V2,
+        }
+        : {}),
+      // V4-ONLY fields: explicit V1/V2/V3 replay keeps the exact pre-V4 summary shape.
+      ...(isV4
+        ? {
+          cross_asset_context_spec_version: 2,
+          cross_asset_context_evidence_hash: crossAssetContextHash,
         }
         : {}),
       evaluation_anchor: anchor,
