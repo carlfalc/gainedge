@@ -18,6 +18,9 @@ import {
   buildOpportunityRiskEvidenceV1, opportunityRiskSpecHash, OPPORTUNITY_RISK_SPEC_V1,
   OpportunityRiskContractError,
 } from "../_shared/ron-opportunity-risk-spec.ts";
+import {
+  buildOpportunityRiskEvidenceV2, opportunityRiskSpecHashV2, OPPORTUNITY_RISK_SPEC_V2,
+} from "../_shared/ron-opportunity-risk-spec-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,6 +59,14 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body allowed */ }
 
+  // Explicit selector only. The DEFAULT REMAINS 1 so frozen Orchestration V1-V5
+  // behaviour cannot silently change in this slice.
+  const requested = body.spec_version === undefined ? 1 : body.spec_version;
+  if (requested !== 1 && requested !== 2) {
+    return json({ error: "unsupported_spec_version", supported: [1, 2] }, 400);
+  }
+  const useV2 = requested === 2;
+
   const S = OPPORTUNITY_RISK_SPEC_V1;
   const instrument = typeof body.instrument === "string" ? body.instrument : "XAUUSD";
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : "15m";
@@ -77,7 +88,8 @@ Deno.serve(async (req) => {
     const trace_id = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const run_id = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
-    const build = () => buildOpportunityRiskEvidenceV1({
+    const producer = useV2 ? buildOpportunityRiskEvidenceV2 : buildOpportunityRiskEvidenceV1;
+    const build = () => producer({
       instrument, timeframe,
       evaluation_anchor: anchor as string,
       evidence: evidence as EvidenceEnvelopeV1[],
@@ -99,8 +111,8 @@ Deno.serve(async (req) => {
     const construction = sealed.observations.find((o) => o.key === "construction_allowed")?.value_text ?? null;
 
     return json({
-      spec_version: S.spec_version,
-      spec_hash: await opportunityRiskSpecHash(),
+      spec_version: useV2 ? OPPORTUNITY_RISK_SPEC_V2.spec_version : S.spec_version,
+      spec_hash: useV2 ? await opportunityRiskSpecHashV2() : await opportunityRiskSpecHash(),
       evaluation_anchor: sealed.as_of,
       readiness_state: readiness,
       construction_allowed: construction,
