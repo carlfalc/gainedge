@@ -59,8 +59,8 @@ describe("orchestration run V1 is untouched by V2", () => {
     expect([...ORCHESTRATION_RUN_PLAN_AGENTS]).toEqual([...ORCHESTRATION_RUN_PLAN_AGENTS_V2]);
     expect(await orchestrationRunPlanHash()).toBe(await orchestrationRunPlanHash());
     for (const p of ORCHESTRATION_RUN_PLAN_V1) {
-      expect((p as Record<string, unknown>).session_evidence).toBeUndefined();
-      expect((p as Record<string, unknown>).depends_on_sealed_evidence).toBeUndefined();
+      expect((p as unknown as Record<string, unknown>).session_evidence).toBeUndefined();
+      expect((p as unknown as Record<string, unknown>).depends_on_sealed_evidence).toBeUndefined();
     }
   });
 
