@@ -136,20 +136,43 @@ export interface EvidenceSummary {
   /** Freshness AS RECORDED AT DECISION TIME — never the current age. */
   freshnessAtDecision: string | null;
   health: "healthy" | "degraded" | "unknown";
-  /** Warning lines worth surfacing without opening technical details. */
-  warnings: string[];
+  /** Stored data-health issues, verbatim. Shown only when the row is open. */
+  issues: string[];
+  /** Stored conflicts, verbatim. Shown only when the row is open. */
+  conflicts: string[];
+  /** Stored uncertainty limitations, verbatim. Shown only when the row is open. */
+  limitations: string[];
+  /** True when there is anything at all to disclose under warnings & caveats. */
+  hasWarnings: boolean;
+  /** Compact, truthful collapsed-row summary. Null when nothing needs flagging. */
+  attentionSummary: string | null;
   evidence_hash: string;
+}
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** Compact count line. Zero categories are omitted; nothing is inferred. */
+export function attentionSummaryLine(
+  health: EvidenceSummary["health"],
+  counts: { issues: number; conflicts: number; limitations: number },
+): string | null {
+  const parts: string[] = [];
+  if (health !== "healthy") parts.push("Needs attention");
+  if (counts.issues > 0) parts.push(plural(counts.issues, "issue", "issues"));
+  if (counts.conflicts > 0) parts.push(plural(counts.conflicts, "conflict", "conflicts"));
+  if (counts.limitations > 0) parts.push(plural(counts.limitations, "caveat", "caveats"));
+  return parts.length ? parts.join(" · ") : null;
 }
 
 export function summariseEvidence(e: RonEvidenceView): EvidenceSummary {
   const healthStatus = e.data_health?.status;
   const health: EvidenceSummary["health"] =
     healthStatus === "healthy" ? "healthy" : healthStatus ? "degraded" : "unknown";
-  const warnings: string[] = [];
-  if (health === "degraded") warnings.push(`Data health recorded as ${healthStatus}`);
-  for (const issue of e.data_health?.issues ?? []) warnings.push(issue);
-  for (const conflict of e.conflicts ?? []) warnings.push(conflict);
-  for (const limitation of e.uncertainty?.limitations ?? []) warnings.push(limitation);
+  const issues = [...(e.data_health?.issues ?? [])];
+  const conflicts = [...(e.conflicts ?? [])];
+  const limitations = [...(e.uncertainty?.limitations ?? [])];
   const fresh = e.data_health?.freshness_minutes;
   return {
     agent_id: e.agent_id,
@@ -159,7 +182,13 @@ export function summariseEvidence(e: RonEvidenceView): EvidenceSummary {
     recommendation: e.recommendation ? titleCaseToken(e.recommendation) : null,
     freshnessAtDecision: typeof fresh === "number" ? `${fresh} min at decision time` : null,
     health,
-    warnings,
+    issues,
+    conflicts,
+    limitations,
+    hasWarnings: issues.length + conflicts.length + limitations.length > 0,
+    attentionSummary: attentionSummaryLine(health, {
+      issues: issues.length, conflicts: conflicts.length, limitations: limitations.length,
+    }),
     evidence_hash: e.evidence_hash,
   };
 }
@@ -178,8 +207,22 @@ export function emptyListCopy(kind: "why" | "what_would_change" | "missing_or_co
   }
 }
 
-/** Version fields are shown only when the stored record actually carries them. */
-export function orchestrationRunVersion(view: RonDecisionView): number | null {
-  const raw = (view.decision as Record<string, unknown>)?.orchestration_run_version;
-  return typeof raw === "number" ? raw : null;
+/**
+ * Orchestrator version comes ONLY from the stored `orchestrator_version` field of the
+ * frozen read projection. Historical records carry no orchestration run-version metadata
+ * and must never be labelled with one.
+ */
+export function orchestratorVersion(view: RonDecisionView): string | null {
+  const raw = (view.decision as Record<string, unknown>)?.orchestrator_version;
+  if (typeof raw === "string" && raw.trim().length > 0) return raw.trim();
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+  return null;
+}
+
+/** Non-empty stored string helper for optional integrity fields. */
+export function storedString(view: RonDecisionView, key: string): string | null {
+  const raw = (view.decision as Record<string, unknown>)?.[key];
+  if (typeof raw === "string" && raw.trim().length > 0) return raw.trim();
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw);
+  return null;
 }

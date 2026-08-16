@@ -96,7 +96,7 @@ export default function RonDecisionPage() {
           <RonDecisionCard view={view} />
           <RonExplanationPanels view={view} />
           <RonEvidenceList evidence={view.evidence ?? []} />
-          <RonRecordIntegrity view={view} />
+          <RonRecordIntegrity view={view} viewHash={result?.view_hash} specHash={result?.spec_hash} />
         </>
       )}
     </div>

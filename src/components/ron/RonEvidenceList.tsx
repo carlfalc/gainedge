@@ -39,16 +39,31 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
         )}
       </button>
 
-      {s.warnings.length > 0 && (
-        <ul className="space-y-1 px-3 pb-3" data-testid={`ron-warnings-${s.agent_id}`}>
-          {s.warnings.map((w) => (
-            <li key={w} className="break-words text-xs leading-relaxed" style={{ color: C.amber }}>• {w}</li>
-          ))}
-        </ul>
+      {s.attentionSummary && (
+        <p
+          className="px-3 pb-3 text-xs"
+          style={{ color: s.health === "healthy" ? C.sec : C.amber }}
+          data-testid={`ron-attention-${s.agent_id}`}
+        >
+          {s.attentionSummary}
+        </p>
       )}
 
       {open && (
         <div className="space-y-3 border-t px-3 py-3" style={{ borderColor: C.border }}>
+          {s.hasWarnings && (
+            <div className="space-y-1.5" data-testid={`ron-caveats-${s.agent_id}`}>
+              <p className="text-xs uppercase tracking-widest" style={{ color: C.sec }}>
+                Warnings &amp; caveats
+              </p>
+              <ul className="space-y-1">
+                {[...s.issues, ...s.conflicts, ...s.limitations].map((w, i) => (
+                  <li key={`${s.evidence_hash}-w-${i}`} className="break-words text-xs leading-relaxed"
+                    style={{ color: C.text }}>• {w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setTechnical((v) => !v)}

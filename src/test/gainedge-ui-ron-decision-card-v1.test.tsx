@@ -7,11 +7,12 @@ import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import {
   EXECUTION_LINE, PROBABILITY_LINE, agentLabel, emptyListCopy, formatAge,
-  orchestrationRunVersion, presentState, summariseEvidence, summaryParagraph, titleCaseToken,
+  orchestratorVersion, presentState, storedString, summariseEvidence, summaryParagraph, titleCaseToken,
 } from "@/lib/ron-decision-presentation";
 import RonDecisionCard from "@/components/ron/RonDecisionCard";
 import RonEvidenceList from "@/components/ron/RonEvidenceList";
 import RonExplanationPanels from "@/components/ron/RonExplanationPanels";
+import RonRecordIntegrity from "@/components/ron/RonRecordIntegrity";
 import type { RonDecisionView, RonEvidenceView } from "@/services/ron-decisions";
 
 const NOW = new Date("2026-08-16T12:00:00Z");
@@ -118,7 +119,11 @@ describe("evidence summaries", () => {
   it("summarises a healthy row with stored fields only", () => {
     const s = summariseEvidence(evidence());
     expect(s.health).toBe("healthy");
-    expect(s.warnings).toEqual([]);
+    expect(s.issues).toEqual([]);
+    expect(s.conflicts).toEqual([]);
+    expect(s.limitations).toEqual([]);
+    expect(s.hasWarnings).toBe(false);
+    expect(s.attentionSummary).toBeNull();
     expect(s.freshnessAtDecision).toBe("15 min at decision time");
     expect(s.label).toBe("Session & market structure");
   });
@@ -130,9 +135,17 @@ describe("evidence summaries", () => {
       uncertainty: { level: "unquantified", limitations: ["small sample"] },
     }));
     expect(s.health).toBe("degraded");
-    expect(s.warnings).toEqual([
-      "Data health recorded as degraded", "gap_in_bars", "counterpart_missing", "small sample",
-    ]);
+    expect(s.issues).toEqual(["gap_in_bars"]);
+    expect(s.conflicts).toEqual(["counterpart_missing"]);
+    expect(s.limitations).toEqual(["small sample"]);
+    expect(s.attentionSummary).toBe("Needs attention · 1 issue · 1 conflict · 1 caveat");
+  });
+
+  it("summarises caveats on a healthy row without claiming it needs attention", () => {
+    const s = summariseEvidence(evidence({
+      uncertainty: { level: "unquantified", limitations: ["a", "b", "c"] },
+    }));
+    expect(s.attentionSummary).toBe("3 caveats");
   });
 
   it("omits fields that are not stored", () => {
@@ -147,11 +160,39 @@ describe("evidence summaries", () => {
 });
 
 describe("record integrity metadata", () => {
-  it("never fabricates an orchestration run version", () => {
-    expect(orchestrationRunVersion(decisionView())).toBeNull();
-    const withVersion = decisionView();
-    (withVersion.decision as Record<string, unknown>).orchestration_run_version = 7;
-    expect(orchestrationRunVersion(withVersion)).toBe(7);
+  it("uses only the stored orchestrator_version and never orchestration_run_version", () => {
+    expect(orchestratorVersion(decisionView())).toBeNull();
+    const legacy = decisionView();
+    (legacy.decision as Record<string, unknown>).orchestration_run_version = 7;
+    expect(orchestratorVersion(legacy)).toBeNull();
+    const stored = decisionView();
+    (stored.decision as Record<string, unknown>).orchestrator_version = "ron_orchestrator_v1";
+    expect(orchestratorVersion(stored)).toBe("ron_orchestrator_v1");
+    expect(storedString(decisionView(), "explanation_hash")).toBeNull();
+  });
+
+  it("renders stored hashes, view/spec hashes and the actual orchestrator version", () => {
+    const v = decisionView();
+    (v.decision as Record<string, unknown>).explanation_hash = "e".repeat(64);
+    (v.decision as Record<string, unknown>).orchestrator_version = "ron_orchestrator_v1";
+    const { container } = render(
+      <RonRecordIntegrity view={v} viewHash={"v".repeat(64)} specHash={"s".repeat(64)} />,
+    );
+    expect(container.textContent).toContain("Explanation hash");
+    expect(container.textContent).toContain("v".repeat(64));
+    expect(container.textContent).toContain("s".repeat(64));
+    expect(screen.getByTestId("ron-orchestrator-version").textContent)
+      .toContain("Orchestrator version ron_orchestrator_v1");
+  });
+
+  it("invents no version or hash labels when the fields are absent", () => {
+    const legacy = decisionView();
+    (legacy.decision as Record<string, unknown>).orchestration_run_version = 7;
+    const { container } = render(<RonRecordIntegrity view={legacy} />);
+    expect(screen.queryByTestId("ron-orchestrator-version")).toBeNull();
+    expect(screen.queryByTestId("ron-schema-versions")).toBeNull();
+    expect(container.textContent).not.toMatch(/Explanation hash|View hash|Read spec hash|Registry hash/);
+    expect(container.textContent).not.toMatch(/V7|Orchestration run version/);
   });
 });
 
@@ -202,12 +243,38 @@ describe("specialist evidence disclosure", () => {
       .toContain("session_slot");
   });
 
-  it("surfaces degraded warnings without opening the row", () => {
+  it("keeps healthy caveat prose out of the collapsed row and shows a compact count", () => {
+    const { container } = render(<RonEvidenceList evidence={[evidence({
+      uncertainty: { level: "unquantified", limitations: ["Long governance caveat prose"] },
+    })]} />);
+    expect(container.textContent).not.toContain("Long governance caveat prose");
+    expect(screen.getByTestId("ron-attention-session_market_structure").textContent).toBe("1 caveat");
+    expect(screen.queryByTestId("ron-caveats-session_market_structure")).toBeNull();
+  });
+
+  it("shows counts not raw lines while degraded and collapsed", () => {
+    const { container } = render(<RonEvidenceList evidence={[evidence({
+      data_health: { status: "degraded", freshness_minutes: 90, completeness: 0.5, issues: ["gap_in_bars"] },
+      conflicts: ["counterpart_missing"],
+    })]} />);
+    expect(screen.getByTestId("ron-attention-session_market_structure").textContent)
+      .toBe("Needs attention · 1 issue · 1 conflict");
+    expect(container.textContent).not.toContain("gap_in_bars");
+    expect(container.textContent).not.toContain("counterpart_missing");
+  });
+
+  it("reveals stored issues, conflicts and limitations under Warnings & caveats when opened", () => {
     render(<RonEvidenceList evidence={[evidence({
       data_health: { status: "degraded", freshness_minutes: 90, completeness: 0.5, issues: ["gap_in_bars"] },
+      conflicts: ["counterpart_missing"],
+      uncertainty: { level: "unquantified", limitations: ["small sample"] },
     })]} />);
-    expect(screen.getByTestId("ron-warnings-session_market_structure").textContent)
-      .toContain("gap_in_bars");
+    fireEvent.click(screen.getByRole("button", { name: /Session & market structure/ }));
+    const caveats = screen.getByTestId("ron-caveats-session_market_structure");
+    expect(caveats.textContent).toContain("gap_in_bars");
+    expect(caveats.textContent).toContain("counterpart_missing");
+    expect(caveats.textContent).toContain("small sample");
+    expect(screen.queryByTestId("ron-technical-session_market_structure")).toBeNull();
   });
 });
 

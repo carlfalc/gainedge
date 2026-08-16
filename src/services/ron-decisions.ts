@@ -29,6 +29,13 @@ export interface RonDecisionView {
     decision_id: string; decision_hash: string; trace_id: string; instrument: string;
     timeframe: string; as_of: string; state: string; recommendation: string;
     direction: string; execution_path: string; created_at: string;
+    /* Optional fields already present in the frozen read projection allowlist. */
+    explanation_hash?: string;
+    orchestrator_version?: string | number;
+    registry_hash?: string;
+    decision_schema_version?: string | number;
+    evidence_schema_version?: string | number;
+    ttl_policy_version?: string | number;
   };
   decision_detail: {
     data_health?: { worst_status?: string; stale_agents?: string[]; issues?: string[] };
