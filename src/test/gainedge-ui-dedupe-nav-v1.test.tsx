@@ -165,3 +165,18 @@ describe("SignalsPage governance-safe wording", () => {
     expect(SIGNAL_RECORDS_QUALIFIER).toMatch(/do not represent orders placed with your broker/i);
   });
 });
+
+describe("sidebar nav is scrollable on short viewports", () => {
+  it("gives the nav vertical scrolling with horizontal overflow suppressed", () => {
+    const src = readFileSync("src/components/dashboard/DashboardLayout.tsx", "utf8");
+    const nav = src.match(/<nav style=\{\{[^}]*\}\}/)![0];
+    expect(nav).toContain("minHeight: 0");
+    expect(nav).toContain('overflowY: "auto"');
+    expect(nav).toContain('overflowX: "hidden"');
+    expect(nav).toContain("flex: 1");
+  });
+
+  it("keeps all five group labels rendered rather than hidden", () => {
+    expect(NAV_GROUPS).toHaveLength(5);
+  });
+});
