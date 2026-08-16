@@ -20,7 +20,8 @@ import {
   assertCollectionComplete, deriveRunIds, orchestrationRunPlanHash,
 } from "../../supabase/functions/_shared/ron-orchestration-run.ts";
 import {
-  ORCHESTRATION_RUN_PLAN_V2, deriveRunIdsV2, orchestrationRunPlanHashV2,
+  ORCHESTRATION_RUN_PLAN_V2, ORCHESTRATION_RUN_SPEC_V2, deriveRunIdsV2,
+  orchestrationRunPlanHashV2,
 } from "../../supabase/functions/_shared/ron-orchestration-run-v2.ts";
 import {
   CALIBRATION_CONTEXT_AGENT, CALIBRATION_CONTEXT_SPEC_VERSION_V3,
