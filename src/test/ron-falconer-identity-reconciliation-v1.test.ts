@@ -23,7 +23,9 @@ import {
   buildFalconerSignalSourceEvidenceV1,
 } from "../../supabase/functions/_shared/ron-falconer-signal-source-spec.ts";
 import { agentSpec, sealEvidence } from "../../supabase/functions/_shared/ron-agent-contracts.ts";
-import { ORCHESTRATION_RUN_PLAN_V6 } from "../../supabase/functions/_shared/ron-orchestration-run-v6.ts";
+import {
+  ORCHESTRATION_RUN_PLAN_V6, ORCHESTRATION_RUN_SPEC_V6,
+} from "../../supabase/functions/_shared/ron-orchestration-run-v6.ts";
 
 const STRATEGY_TS_SHA256 =
   "13736f1ed5dabd3f31a15b8db4179ed4e027950ed515034433ae6134a15581fc";
@@ -31,6 +33,21 @@ const STRATEGY_PINE_SHA256 =
   "76b242b4b4b2e1f2aa5bbb11a0a12ef9849ec40beda306fc5c5dd6899a8b9251";
 const SIGNAL_SOURCE_SPEC_V1_HASH =
   "40a4b6f9d465ae0362e1a0ada43e3b699c2674efa30c5dbe9e5a934dcd1005f3";
+
+/** Formal, machine-checkable outcome of this audit (test-only ledger). */
+const AUDIT_OUTCOME_V1 = {
+  identity_reconciliation_a_to_e: "PASS",
+  explicit_orchestration_pin_readiness_f: "BLOCKED",
+  result: "RON_FALCONER_SIGNAL_SOURCE_IDENTITY_RECONCILIATION_AUDIT_V1_BLOCKED",
+  blocker:
+    "falconer_signal_source endpoint has no explicit spec_version selector; "
+    + "V6 remains safely unpinned",
+  safest_next_action:
+    "separate forward-only slice adding an endpoint spec_version selector that "
+    + "defaults to V1 and preserves byte/semantic V1 output, followed later by a "
+    + "forward-only Orchestration V7 pin",
+  performed_in_this_correction: "test-only; no runtime, endpoint or plan change",
+} as const;
 
 const sha = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
 const ANCHOR = Date.parse("2026-08-13T10:00:00Z");
