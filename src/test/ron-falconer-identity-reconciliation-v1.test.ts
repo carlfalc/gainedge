@@ -37,16 +37,15 @@ const SIGNAL_SOURCE_SPEC_V1_HASH =
 /** Formal, machine-checkable outcome of this audit (test-only ledger). */
 const AUDIT_OUTCOME_V1 = {
   identity_reconciliation_a_to_e: "PASS",
-  explicit_orchestration_pin_readiness_f: "BLOCKED",
-  result: "RON_FALCONER_SIGNAL_SOURCE_IDENTITY_RECONCILIATION_AUDIT_V1_BLOCKED",
-  blocker:
-    "falconer_signal_source endpoint has no explicit spec_version selector; "
-    + "V6 remains safely unpinned",
+  explicit_orchestration_pin_readiness_f: "READY_NOT_PERFORMED",
+  result: "RON_FALCONER_SIGNAL_SOURCE_ENDPOINT_VERSION_SELECTOR_V1_PASS",
+  blocker: null,
   safest_next_action:
-    "separate forward-only slice adding an endpoint spec_version selector that "
-    + "defaults to V1 and preserves byte/semantic V1 output, followed later by a "
-    + "forward-only Orchestration V7 pin",
-  performed_in_this_correction: "test-only; no runtime, endpoint or plan change",
+    "a separate forward-only Orchestration V7 slice may now explicitly pin "
+    + "falconer_signal_source to spec_version 1",
+  performed_in_this_correction:
+    "endpoint request spec_version selector only; no spec object, spec hash, "
+    + "evidence, orchestration or plan change",
 } as const;
 
 const sha = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
@@ -161,10 +160,10 @@ describe("Falconer identity reconciliation V1 — D: sealed provenance identity 
 });
 
 describe("Falconer identity reconciliation V1 — E/F: version selector and pin readiness", () => {
-  it("E. the endpoint exposes NO spec_version selector today; version is implicitly 1", () => {
+  it("E. the endpoint exposes an explicit V1-only spec_version selector", () => {
     const endpoint = readFileSync(
       "supabase/functions/ron-agent-falconer-signal-source/index.ts", "utf8");
-    expect(endpoint).not.toContain("body.spec_version");
+    expect(endpoint).toContain("resolveFalconerSpecVersion(body)");
     expect(endpoint).toContain("FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version");
     expect(agentSpec("falconer_signal_source")!.agent_version).toBe(1);
   });
@@ -189,26 +188,17 @@ describe("Falconer identity reconciliation V1 — E/F: version selector and pin 
     expect(FALCONER_SIGNAL_SOURCE_SPEC_V1.non_authoritative).toBe(true);
   });
 
-  it("F (CORRECTED). explicit orchestration pin readiness is BLOCKED", () => {
-    // Under this project's orchestration convention an explicit pin means the
-    // orchestrator sends `spec_version:N` AND the specialist endpoint explicitly
-    // selects/replays that version. The Falconer endpoint ignores any selector,
-    // so no replay-safe explicit pin is possible yet.
+  it("F (UPDATED). explicit orchestration pin readiness is now unblocked, not performed", () => {
+    // A replay-safe explicit pin requires the specialist endpoint to explicitly
+    // select/replay the requested version. That selector now exists (V1-only),
+    // but no orchestration version pins Falconer in this slice.
     const endpoint = readFileSync(
       "supabase/functions/ron-agent-falconer-signal-source/index.ts", "utf8");
-    expect(endpoint).not.toContain("body.spec_version");
-    expect(AUDIT_OUTCOME_V1).toEqual({
-      identity_reconciliation_a_to_e: "PASS",
-      explicit_orchestration_pin_readiness_f: "BLOCKED",
-      result: "RON_FALCONER_SIGNAL_SOURCE_IDENTITY_RECONCILIATION_AUDIT_V1_BLOCKED",
-      blocker:
-        "falconer_signal_source endpoint has no explicit spec_version selector; "
-        + "V6 remains safely unpinned",
-      safest_next_action:
-        "separate forward-only slice adding an endpoint spec_version selector that "
-        + "defaults to V1 and preserves byte/semantic V1 output, followed later by a "
-        + "forward-only Orchestration V7 pin",
-      performed_in_this_correction: "test-only; no runtime, endpoint or plan change",
-    });
+    expect(endpoint).toContain("resolveFalconerSpecVersion(body)");
+    expect(AUDIT_OUTCOME_V1.explicit_orchestration_pin_readiness_f)
+      .toBe("READY_NOT_PERFORMED");
+    expect(AUDIT_OUTCOME_V1.blocker).toBeNull();
+    expect(AUDIT_OUTCOME_V1.result)
+      .toBe("RON_FALCONER_SIGNAL_SOURCE_ENDPOINT_VERSION_SELECTOR_V1_PASS");
   });
 });

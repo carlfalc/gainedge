@@ -19,6 +19,7 @@ import {
   FALCONER_SOURCE_MAX_ROWS, readFalconerAvailabilityFacts, FalconerAvailabilityParityError,
   type FalconerEventRow, type FalconerTradeStateRow,
 } from "../_shared/ron-falconer-signal-source-spec.ts";
+import { resolveFalconerSpecVersion } from "../_shared/ron-falconer-endpoint-version-selector.ts";
 
 /** Safe, explicit signal-state projection. Never `*`, never a private/geometry field. */
 const TRADE_STATE_COLUMNS =
@@ -90,6 +91,19 @@ Deno.serve(async (req) => {
 
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body allowed */ }
+
+  // ---- EXPLICIT REQUEST SPEC-VERSION SELECTOR (V1-only).
+  // Evaluated BEFORE any candle_history / falconer_engine_events / falconer_trades read.
+  // Omitted => V1 (exact historical default). Explicit numeric 1 => V1.
+  // Anything else (0, 2, negative, fractional, "1", null, object, array) => 400.
+  const versionSelection = resolveFalconerSpecVersion(body);
+  if (!versionSelection.ok) {
+    return json({
+      error: versionSelection.error,
+      requested_spec_version: versionSelection.requested_spec_version,
+      supported_spec_versions: versionSelection.supported_spec_versions,
+    }, 400);
+  }
 
   const instrument = typeof body.instrument === "string" ? body.instrument : SYMBOL;
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : TIMEFRAME;
