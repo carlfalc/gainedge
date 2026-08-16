@@ -30,6 +30,12 @@ import {
   ORCHESTRATION_RUN_PLAN_V1, ORCHESTRATION_RUN_SPEC_V1, OrchestrationRunError,
   orchestrationRunPlanHash, RON_ORCHESTRATION_RUN_VERSION,
 } from "../_shared/ron-orchestration-run.ts";
+import {
+  assertSessionDependencyBinding, assertSessionDependencySealed, deriveRunIdsV2,
+  ORCHESTRATION_RUN_PLAN_V2, ORCHESTRATION_RUN_SPEC_V2,
+  orchestrationRunPlanHashV2, RON_ORCHESTRATION_RUN_VERSION_V2,
+  type AgentCallPlanEntryV2,
+} from "../_shared/ron-orchestration-run-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,16 +98,31 @@ Deno.serve(async (req) => {
     : `ron_run_v1_${anchor}_${instrument}_${timeframe}`;
   const persist = body.persist === true;
 
+  // Newly invoked runs default to orchestration run version 2. Version 1 stays explicitly
+  // reachable for byte-identical replay and NEVER passes `session_evidence` to Pattern.
+  const requestedRunVersion = body.orchestration_run_version == null
+    ? RON_ORCHESTRATION_RUN_VERSION_V2
+    : Number(body.orchestration_run_version);
+  if (requestedRunVersion !== 1 && requestedRunVersion !== 2) {
+    return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
+  }
+  const isV2 = requestedRunVersion === 2;
+
   const ctx: OrchestrationContext = {
     trace_id: traceId, instrument, timeframe, as_of: anchor,
   };
 
   try {
-    const runIds = await deriveRunIds(traceId, anchor);
+    const runIds = isV2 ? await deriveRunIdsV2(traceId, anchor) : await deriveRunIds(traceId, anchor);
     const collected: EvidenceEnvelopeV1[] = [];
     const calls: Record<string, unknown>[] = [];
+    let sessionDependencyHash: string | null = null;
 
-    for (const entry of ORCHESTRATION_RUN_PLAN_V1) {
+    const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
+      isV2 ? ORCHESTRATION_RUN_PLAN_V2 : ORCHESTRATION_RUN_PLAN_V1;
+
+    for (const entry of plan) {
+      const v2entry = isV2 ? entry as AgentCallPlanEntryV2 : null;
       const forwardSubject = entry.subject_scope === "caller_subject_bound" && subjectBound;
       const payload: Record<string, unknown> = {
         instrument, timeframe, trace_id: traceId, run_id: runIds[entry.agent_id],
@@ -109,6 +130,19 @@ Deno.serve(async (req) => {
       };
       payload[entry.anchor_param] = anchor;
       if (entry.requires_evidence_batch) payload.evidence = canonicalOrder(collected);
+
+      // V2 ONLY: explicit specialist version pin + the ONE declared sealed dependency.
+      if (v2entry) {
+        if (v2entry.spec_version_pin != null) payload.spec_version = v2entry.spec_version_pin;
+        if (v2entry.dependency_param === "session_evidence") {
+          // Fail closed BEFORE Pattern is called if the sealed Session envelope is
+          // missing, invalid, unsealed, hash-mismatched or out of scope/anchor.
+          const dep = collected.find((e) => e.agent_id === "session_market_structure");
+          sessionDependencyHash = await assertSessionDependencySealed(dep, ctx);
+          // Pattern receives ONLY that single sealed envelope — never the batch.
+          payload.session_evidence = dep;
+        }
+      }
 
       const res = await fetch(`${supabaseUrl}/functions/v1/${entry.function_name}`, {
         method: "POST",
@@ -131,7 +165,18 @@ Deno.serve(async (req) => {
           http_status: res.status, detail: out?.error ?? null, calls, persisted: false,
         }, 502);
       }
-      collected.push(out.evidence as EvidenceEnvelopeV1);
+      const envelope = out.evidence as EvidenceEnvelopeV1;
+      if (v2entry && entry.agent_id === "session_market_structure") {
+        // Validate + seal immediately, and retain THAT immutable envelope as the single
+        // dependency source. Session is called exactly once per run.
+        const errs = validateEvidence(envelope);
+        if (errs.length) {
+          return json({ error: "session_dependency_invalid_envelope", reasons: errs }, 400);
+        }
+        collected.push(await sealEvidence(envelope));
+      } else {
+        collected.push(envelope);
+      }
     }
 
     for (const [i, e] of collected.entries()) {
@@ -143,6 +188,8 @@ Deno.serve(async (req) => {
 
     const sealed = canonicalOrder(await Promise.all(collected.map(sealEvidence)));
     assertCollectionComplete(sealed, ctx);
+    // The exact envelope handed to Pattern must be the one in the final collected batch.
+    if (isV2 && sessionDependencyHash) assertSessionDependencyBinding(sealed, sessionDependencyHash);
 
     const { decision, explanation } = await synthesizeDecision(sealed, ctx);
     const replay = await reconstructDecision(sealed, ctx);
@@ -152,9 +199,12 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: await orchestrationRunPlanHash(),
-      persistence_atomicity: ORCHESTRATION_RUN_SPEC_V1.persistence_atomicity,
+      orchestration_run_version: isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
+      orchestration_run_plan_hash: isV2 ? await orchestrationRunPlanHashV2() : await orchestrationRunPlanHash(),
+      persistence_atomicity: isV2
+        ? ORCHESTRATION_RUN_SPEC_V2.persistence_atomicity
+        : ORCHESTRATION_RUN_SPEC_V1.persistence_atomicity,
+      session_to_pattern_dependency_hash: sessionDependencyHash,
       evaluation_anchor: anchor,
       trace_id: traceId,
       subject_binding: subjectBound ? "caller_jwt_verified_rls_scoped" : "no_verified_subject_fail_closed",
