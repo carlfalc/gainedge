@@ -82,8 +82,10 @@ export type CounterpartExclusionReason = typeof COUNTERPART_EXCLUSION_REASONS[nu
 /* ------------------------------------------------------------------- the spec */
 
 export const CROSS_ASSET_RELATIONSHIP_SPEC_V2 = {
-  spec_id: "ron_cross_asset_relationship_context",
+  /** SAME spec lineage as the frozen V1 specialist; distinguished by spec_version/hash. */
+  spec_id: CROSS_ASSET_SPEC_V1.spec_id,
   spec_version: 2,
+  supersedes_spec_version: CROSS_ASSET_SPEC_V1.spec_version,
   agent_id: CROSS_ASSET_SPEC_V1.agent_id,
   agent_version: CROSS_ASSET_SPEC_V1.agent_version,
   authority_class: CROSS_ASSET_SPEC_V1.authority_class,
@@ -346,8 +348,11 @@ export async function buildCrossAssetRelationshipEvidenceV2(
     isQuarantined: input.isQuarantined,
     run_id: input.run_id,
     trace_id: input.trace_id,
-    newest_source_bar: input.newest_source_bar,
-    newest_counterpart_bar: input.newest_counterpart_bar,
+    // ANCHOR-BOUND PROVENANCE (V2 only): source metadata newer than the evaluation anchor
+    // is deterministically OMITTED, never clamped to a fabricated instant, so an identical
+    // historical replay cannot be perturbed by future ingestion state.
+    newest_source_bar: anchorBound(input.newest_source_bar, asOf),
+    newest_counterpart_bar: anchorBound(input.newest_counterpart_bar, asOf),
   });
 
   const observations: Observation[] = [...base.observations];
