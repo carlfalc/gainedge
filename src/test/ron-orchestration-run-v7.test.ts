@@ -349,8 +349,9 @@ describe("V7 Falconer acceptance gate", () => {
     const base = await realFalconer();
     // agent_version 2 is unregistered, so the envelope cannot be validly sealed at all:
     // hash it directly to prove BOTH the inherited validator and the V7 version rule fire.
+    // The inherited V6 generic gate fails closed FIRST on the unregistered version.
     await reject(await unvalidated(base, { agent_version: 2 }),
-      "falconer_signal_source_wrong_agent_version");
+      "specialist_invalid_envelope:falconer_signal_source");
     await reject(await reseal(base, { agent_id: "pattern_context" }),
       "specialist_wrong_agent");
   });
@@ -370,7 +371,7 @@ describe("V7 Falconer acceptance gate", () => {
     await reject(await unvalidated(base, {
       observations: [...base.observations,
         { key: "falconer_confidence", kind: "measurement", value_num: 0.9, at: minus(10) }],
-    }), "falconer_signal_source_forbidden_observation:falconer_confidence");
+    }), "specialist_invalid_envelope:falconer_signal_source");
     // A geometry key the base validator does NOT block: V7 is the gate that rejects it.
     await reject(await reseal(base, {
       observations: [...base.observations,
