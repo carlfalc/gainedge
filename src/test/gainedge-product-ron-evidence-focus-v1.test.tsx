@@ -48,7 +48,7 @@ const caveated = evidence({
 const ALL = [healthy1, degraded, healthy2, caveated];
 
 function labels() {
-  return screen.getAllByRole("button", { expanded: false })
+  return screen.queryAllByRole("button", { expanded: false })
     .filter((b) => b.getAttribute("aria-pressed") === null)
     .map((b) => b.textContent ?? "");
 }
@@ -120,7 +120,7 @@ describe("evidence focus filter", () => {
   it("keeps row warnings and technical disclosure behaviour intact", () => {
     render(<RonEvidenceList evidence={[degraded]} />);
     expect(screen.queryByTestId("ron-caveats-pattern_context")).toBeNull();
-    fireEvent.click(screen.getAllByRole("button", { expanded: false })
+    fireEvent.click(screen.queryAllByRole("button", { expanded: false })
       .filter((b) => b.getAttribute("aria-pressed") === null)[0]);
     const caveats = screen.getByTestId("ron-caveats-pattern_context");
     expect(within(caveats).getByText(/stale source/)).toBeTruthy();
