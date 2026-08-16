@@ -51,6 +51,53 @@ export const CALIBRATION_DIAGNOSTIC_CONTEXT_SPEC_V2_HASH_PINNED =
 
 const CAL_SPEC_ID = CALIBRATION_DIAGNOSTIC_CONTEXT_SPEC_V2.spec_id;
 
+/* ------------------------------------------- accepted artifact temporal identity */
+
+/**
+ * The accepted Calibration/Research artifact clocks are frozen in
+ * `CALIBRATION_VALIDATION_SPEC_V1`. V3 DERIVES them rather than duplicating literals, and
+ * fails closed if the two accepted `source_as_of` (or `source_bar_cutoff`) instants ever
+ * diverge instead of silently picking one.
+ */
+const R_ACCEPTED = CALIBRATION_VALIDATION_SPEC_V1.accepted_research_v4;
+const C_ACCEPTED = CALIBRATION_VALIDATION_SPEC_V1.accepted_calibration_v8;
+
+const instant = (s: string): string => {
+  const ms = Date.parse(s);
+  if (!Number.isFinite(ms)) {
+    throw new OrchestrationRunError(["calibration_context_accepted_artifact_clock_unparseable"]);
+  }
+  return new Date(ms).toISOString();
+};
+
+const agree = (a: string, b: string, reason: string): string => {
+  const ia = instant(a), ib = instant(b);
+  if (ia !== ib) throw new OrchestrationRunError([reason]);
+  return ia;
+};
+
+/** Exact accepted Research V4 source_as_of === accepted Calibration v8 source_as_of. */
+export const ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3: string = agree(
+  R_ACCEPTED.source_as_of, C_ACCEPTED.source_as_of,
+  "calibration_context_accepted_artifact_as_of_divergent",
+);
+
+/** Exact accepted shared source_bar_cutoff. */
+export const ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3: string = agree(
+  R_ACCEPTED.source_bar_cutoff, C_ACCEPTED.source_bar_cutoff,
+  "calibration_context_accepted_artifact_bar_cutoff_divergent",
+);
+
+const ACCEPTED_AS_OF_MS = Date.parse(ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3);
+
+/** Envelope source_timestamps keys that must bind exactly to the accepted artifact. */
+const REQUIRED_SOURCE_TIMESTAMPS_V3: readonly (readonly [string, string])[] = [
+  ["research_run_source_as_of", ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3],
+  ["calibration_run_source_as_of", ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3],
+  ["research_run_source_bar_cutoff", ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3],
+  ["calibration_run_source_bar_cutoff", ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3],
+];
+
 /** `spec:<spec_id>:v...` refs are the ONLY accepted spec-identity statements. */
 const CAL_SPEC_PREFIX = `spec:${CAL_SPEC_ID}:`;
 const CAL_SPEC_V2_PREFIX = `${CAL_SPEC_PREFIX}v${CALIBRATION_DIAGNOSTIC_CONTEXT_SPEC_V2.spec_version}:`;
@@ -109,6 +156,12 @@ export const ORCHESTRATION_RUN_SPEC_V3 = {
     promotion_conferred: false,
     required_direction: "neutral",
     required_recommendation: "research_only",
+    accepted_artifact_as_of: ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3,
+    accepted_artifact_bar_cutoff: ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3,
+    evidence_as_of_must_equal_accepted_artifact: true,
+    orchestration_anchor_must_be_at_or_after_artifact: true,
+    wall_clock_freshness_required: false,
+    bound_source_timestamp_keys: REQUIRED_SOURCE_TIMESTAMPS_V3.map(([k]) => k),
   },
   spec_version_pins: {
     session_market_structure: 2,
@@ -183,8 +236,33 @@ export async function assertCalibrationContextV2Sealed(
   const anchorMs = Date.parse(ctx.as_of);
   const atMs = Date.parse(e.as_of ?? "");
   if (!Number.isFinite(anchorMs)) reasons.push("calibration_context_anchor_unparseable");
-  else if (!Number.isFinite(atMs)) reasons.push("calibration_context_as_of_unparseable");
-  else if (atMs > anchorMs) reasons.push("calibration_context_after_anchor");
+  else if (anchorMs < ACCEPTED_AS_OF_MS) {
+    // Historical artifact context may never be claimed by an orchestration run that
+    // predates the accepted artifact itself.
+    reasons.push("calibration_context_artifact_after_orchestration_anchor");
+  }
+
+  // The accepted artifact instant is frozen: this specialist is historical
+  // artifact-validation context, so its as_of must equal the accepted artifact clock
+  // exactly — NOT the orchestration anchor, and not any arbitrary earlier instant.
+  if (!Number.isFinite(atMs)) reasons.push("calibration_context_as_of_unparseable");
+  else if (atMs !== ACCEPTED_AS_OF_MS) {
+    reasons.push("calibration_context_artifact_as_of_mismatch");
+  }
+
+  // Bind temporal provenance to the accepted artifact, not just the top-level as_of.
+  const st = (e.source_timestamps ?? {}) as Record<string, unknown>;
+  for (const [key, expected] of REQUIRED_SOURCE_TIMESTAMPS_V3) {
+    const raw = st[key];
+    if (typeof raw !== "string" || !raw) {
+      reasons.push(`calibration_context_source_timestamp_missing:${key}`);
+      continue;
+    }
+    const ms = Date.parse(raw);
+    if (!Number.isFinite(ms) || ms !== Date.parse(expected)) {
+      reasons.push(`calibration_context_source_timestamp_mismatch:${key}`);
+    }
+  }
 
   const refs = (e.provenance_refs ?? []).filter((p): p is string => typeof p === "string");
   const specRefs = refs.filter((p) => p.startsWith(CAL_SPEC_PREFIX));
