@@ -233,12 +233,58 @@ describe("2D — Orchestration Run V3: accepted calibration V2 identity", () => 
     await reject(await calV2({ trace_id: "other_trace" }), "calibration_context_trace_mismatch");
     await reject(await calV2({ instrument: "NAS100" }), "calibration_context_instrument_mismatch");
     await reject(await calV2({ timeframe: "1h" }), "calibration_context_timeframe_mismatch");
-    await reject(await calV2({ as_of: "2026-08-16T05:00:00Z" }), "calibration_context_after_anchor");
+    await reject(await calV2({ as_of: "2026-08-16T05:00:00Z" }),
+      "calibration_context_artifact_as_of_mismatch");
     const unsealed = envelope(CALIBRATION_CONTEXT_AGENT, {
       direction: "neutral", recommendation: "research_only",
       provenance_refs: [calibrationContextSpecRefV2()],
     });
     await reject(unsealed, "calibration_context_unsealed");
+  });
+
+  it("derives the accepted artifact temporal identity from the frozen Calibration V1 spec", () => {
+    const R = CALIBRATION_VALIDATION_SPEC_V1.accepted_research_v4;
+    const C = CALIBRATION_VALIDATION_SPEC_V1.accepted_calibration_v8;
+    expect(Date.parse(R.source_as_of)).toBe(Date.parse(C.source_as_of));
+    expect(Date.parse(R.source_bar_cutoff)).toBe(Date.parse(C.source_bar_cutoff));
+    expect(ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3).toBe("2026-08-13T05:14:00.000Z");
+    expect(ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3).toBe("2026-08-13T03:45:00.000Z");
+    expect(ORCHESTRATION_RUN_SPEC_V3.calibration_context.accepted_artifact_as_of)
+      .toBe(ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3);
+  });
+
+  it("accepts ONLY the exact accepted artifact as_of", async () => {
+    expect(await assertCalibrationContextV2Sealed(await calV2(), CTX)).toBeTruthy();
+    await reject(await calV2({ as_of: "2026-08-13T05:13:00.000Z" }),
+      "calibration_context_artifact_as_of_mismatch");
+    await reject(await calV2({ as_of: "2026-08-13T05:15:00.000Z" }),
+      "calibration_context_artifact_as_of_mismatch");
+    await reject(await calV2({ as_of: "not-a-date" }), "calibration_context_as_of_unparseable");
+  });
+
+  it("requires exact accepted research/calibration source timestamps", async () => {
+    for (const key of Object.keys(ACCEPTED_SOURCE_TIMESTAMPS)) {
+      const missing = { ...ACCEPTED_SOURCE_TIMESTAMPS };
+      delete missing[key];
+      await reject(await calV2({ source_timestamps: missing }),
+        `calibration_context_source_timestamp_missing:${key}`);
+      await reject(
+        await calV2({ source_timestamps: { ...ACCEPTED_SOURCE_TIMESTAMPS, [key]: "2020-01-01T00:00:00.000Z" } }),
+        `calibration_context_source_timestamp_mismatch:${key}`);
+    }
+  });
+
+  it("binds the orchestration anchor at or after the accepted artifact", async () => {
+    const e = await calV2();
+    const at = { ...CTX, as_of: ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3 };
+    expect(await assertCalibrationContextV2Sealed(e, at)).toBe(e.evidence_hash);
+    const after = { ...CTX, as_of: "2026-09-01T00:00:00.000Z" };
+    expect(await assertCalibrationContextV2Sealed(e, after)).toBe(e.evidence_hash);
+    const before = { ...CTX, as_of: "2026-08-13T05:13:59.999Z" };
+    await expect(assertCalibrationContextV2Sealed(e, before))
+      .rejects.toThrow(/calibration_context_artifact_after_orchestration_anchor/);
+    await expect(assertCalibrationContextV2Sealed(e, { ...CTX, as_of: "nope" }))
+      .rejects.toThrow(/calibration_context_anchor_unparseable/);
   });
 
   it("rejects a tampered envelope whose seal no longer matches its content", async () => {
