@@ -521,6 +521,9 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
               {snap && f ? (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text, marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
                   <span>Completed {snap.timeframe} close <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{snap.close}</span></span>
+                  <span style={{ display: "inline-flex", alignItems: "center" }}>
+                    <PriceProvenanceBadge kind="completed_bar" timestamp={snap.bar_time} timeframe={snap.timeframe} />
+                  </span>
                   <span>ATR% <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(f.atr_pct, 3)}</span></span>
                   <span>Regime <span style={{ color: C.text }}>{String(f.regime ?? "—").replace("_", " ")}</span></span>
                   <span>
