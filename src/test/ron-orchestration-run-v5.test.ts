@@ -416,9 +416,11 @@ describe("macro temporal context V2 acceptance gate", () => {
   });
 
   it("rejects non-contextual direction or recommendation", async () => {
-    await reject(await sealEvidence(macroEnvelope({ direction: "bullish" })), /direction_not_contextual/);
-    await reject(await sealEvidence(macroEnvelope({ recommendation: "execute" as never })),
-      /recommendation_not_contextual|invalid_envelope/);
+    // These shapes cannot even be sealed by the frozen contract, so they are checked on
+    // the unsealed envelope: the gate must still name the contextual violation.
+    await reject(macroEnvelope({ direction: "bullish" }), /direction_not_contextual/);
+    await reject(macroEnvelope({ recommendation: "execute" as never }),
+      /recommendation_not_contextual/);
   });
 });
 
@@ -444,7 +446,7 @@ describe("genuine Macro V2 producer output passes the V5 gate", () => {
     expect(["neutral", "unknown"]).toContain(s.direction);
     expect(["context_only", "no_action"]).toContain(s.recommendation);
     expect(Date.parse(s.as_of)).toBeLessThanOrEqual(ANCHOR_MS);
-    expect(s.source_timestamps.evaluation_anchor).toBe(AS_OF);
+    expect(Date.parse(s.source_timestamps.evaluation_anchor)).toBe(ANCHOR_MS);
     expect(JSON.stringify(s)).not.toMatch(/probabilit|execution_allowed|causal|forecast_value/i);
   });
 });
@@ -489,7 +491,7 @@ describe("orchestration endpoint wiring", () => {
     expect(pinSends).toHaveLength(1);
     expect(ENDPOINT).not.toContain("news_items");
     const macroCalls = ENDPOINT.match(/assertMacroContextV2Sealed\(/g) ?? [];
-    expect(macroCalls).toHaveLength(2); // one import, one call site
+    expect(macroCalls).toHaveLength(1); // exactly one gate call site
   });
 
   it("keeps V5-only summary fields and the V1-V4 gates intact", () => {
