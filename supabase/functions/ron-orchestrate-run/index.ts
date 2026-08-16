@@ -54,6 +54,7 @@ import {
 } from "../_shared/ron-orchestration-run-v5.ts";
 import {
   assertOpportunityRiskBinding, assertOpportunityRiskV2Sealed,
+  assertSpecialistReturnedSealedV6,
   OPPORTUNITY_RISK_AGENT, deriveRunIdsV6, ORCHESTRATION_RUN_PLAN_V6,
   orchestrationRunPlanHashV6, RON_ORCHESTRATION_RUN_VERSION_V6,
 } from "../_shared/ron-orchestration-run-v6.ts";
@@ -216,6 +217,12 @@ Deno.serve(async (req) => {
         }, 502);
       }
       const envelope = out.evidence as EvidenceEnvelopeV1;
+      // V6 ONLY: EVERY specialist response must already be a valid sealed Evidence V1
+      // envelope exactly as returned. Orchestration verifies that seal here, BEFORE any
+      // local sealing or collection, and never repairs or mints a missing/incorrect
+      // specialist `evidence_hash`. Confers no authority on any agent (Falconer and
+      // Pattern included) — it is an integrity/scope proof only.
+      if (isV6) await assertSpecialistReturnedSealedV6(envelope, ctx, entry.agent_id);
       if (v2entry && entry.agent_id === "session_market_structure") {
         // Validate + seal immediately, and retain THAT immutable envelope as the single
         // dependency source. Session is called exactly once per run.
@@ -223,13 +230,16 @@ Deno.serve(async (req) => {
         if (errs.length) {
           return json({ error: "session_dependency_invalid_envelope", reasons: errs }, 400);
         }
-        collected.push(await sealEvidence(envelope));
+        // V6: accept the specialist-returned envelope VERBATIM; V1-V5 keep their exact
+        // historical local-seal replay behavior.
+        const sessionEnvelope = isV6 ? envelope : await sealEvidence(envelope);
+        collected.push(sessionEnvelope);
       } else if (isV3 && entry.agent_id === CALIBRATION_CONTEXT_AGENT) {
         // V3 ONLY: the returned calibration evidence must PROVE it is the accepted
         // Calibration Diagnostic Context V2 artifact — sealed, in scope, correctly
         // anchored and carrying exactly one accepted V2 spec provenance ref. Anything
         // missing, V1, wrong-hash, duplicated or ambiguous fails closed here.
-        const sealedCal = await sealEvidence(envelope);
+        const sealedCal = isV6 ? envelope : await sealEvidence(envelope);
         calibrationContextHash = await assertCalibrationContextV2Sealed(sealedCal, ctx);
         collected.push(sealedCal);
       } else if (isV4 && entry.agent_id === CROSS_ASSET_CONTEXT_AGENT) {
@@ -238,7 +248,7 @@ Deno.serve(async (req) => {
         // anchored on a completed bar and carrying exactly one accepted V2 spec
         // provenance ref. Anything missing, V1, wrong-hash, duplicated or ambiguous
         // fails closed here. It adds no authority and no direction weighting.
-        const sealedCross = await sealEvidence(envelope);
+        const sealedCross = isV6 ? envelope : await sealEvidence(envelope);
         crossAssetContextHash = await assertCrossAssetContextV2Sealed(sealedCross, ctx);
         collected.push(sealedCross);
       } else if (isV5 && entry.agent_id === MACRO_CONTEXT_AGENT) {
@@ -247,7 +257,7 @@ Deno.serve(async (req) => {
         // anchor through `source_timestamps.evaluation_anchor`, free of any source or
         // price-context instant after the anchor, and carrying exactly the accepted V2 +
         // inherited V1 spec lineage. It adds no authority, no causation, no direction.
-        const sealedMacro = await sealEvidence(envelope);
+        const sealedMacro = isV6 ? envelope : await sealEvidence(envelope);
         macroContextHash = await assertMacroContextV2Sealed(sealedMacro, ctx);
         collected.push(sealedMacro);
       } else if (isV6 && entry.agent_id === OPPORTUNITY_RISK_AGENT) {
