@@ -19,6 +19,7 @@ import {
   FALCONER_SOURCE_MAX_ROWS, readFalconerAvailabilityFacts, FalconerAvailabilityParityError,
   type FalconerEventRow, type FalconerTradeStateRow,
 } from "../_shared/ron-falconer-signal-source-spec.ts";
+import { resolveFalconerSpecVersion } from "../_shared/ron-falconer-endpoint-version-selector.ts";
 
 /** Safe, explicit signal-state projection. Never `*`, never a private/geometry field. */
 const TRADE_STATE_COLUMNS =
@@ -92,18 +93,16 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { /* empty body allowed */ }
 
   // ---- EXPLICIT REQUEST SPEC-VERSION SELECTOR (V1-only).
-  // Parsed BEFORE any candle_history / falconer_engine_events / falconer_trades read.
+  // Evaluated BEFORE any candle_history / falconer_engine_events / falconer_trades read.
   // Omitted => V1 (exact historical default). Explicit numeric 1 => V1.
   // Anything else (0, 2, negative, fractional, "1", null, object, array) => 400.
-  if ("spec_version" in body) {
-    const raw = body.spec_version;
-    if (raw !== FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version) {
-      return json({
-        error: "unsupported_spec_version",
-        requested_spec_version: typeof raw === "number" || typeof raw === "string" ? raw : null,
-        supported_spec_versions: [FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version],
-      }, 400);
-    }
+  const versionSelection = resolveFalconerSpecVersion(body);
+  if (!versionSelection.ok) {
+    return json({
+      error: versionSelection.error,
+      requested_spec_version: versionSelection.requested_spec_version,
+      supported_spec_versions: versionSelection.supported_spec_versions,
+    }, 400);
   }
 
   const instrument = typeof body.instrument === "string" ? body.instrument : SYMBOL;
