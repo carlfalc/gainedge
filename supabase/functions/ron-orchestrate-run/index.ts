@@ -257,9 +257,13 @@ Deno.serve(async (req) => {
         // one inherited V1 base ref, contextual direction/recommendation only, a known
         // readiness state and NO probability, score or trade-geometry surface. It remains
         // a readiness gate: it adds no authority and constructs nothing.
-        const sealedOpp = await sealEvidence(envelope);
-        opportunityRiskHash = await assertOpportunityRiskV2Sealed(sealedOpp, ctx);
-        collected.push(sealedOpp);
+        //
+        // AUDIT CORRECTION: the envelope is verified EXACTLY AS RETURNED by the
+        // specialist. Orchestration must never re-seal it first — doing so would mint a
+        // locally computed `evidence_hash` and make the "unsealed" and "hash mismatch"
+        // rejections in `assertOpportunityRiskV2Sealed` unreachable.
+        opportunityRiskHash = await assertOpportunityRiskV2Sealed(envelope, ctx);
+        collected.push(envelope);
       } else {
         collected.push(envelope);
       }
