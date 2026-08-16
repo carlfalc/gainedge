@@ -26,11 +26,13 @@ import {
 import {
   CALIBRATION_CONTEXT_AGENT, CALIBRATION_CONTEXT_SPEC_VERSION_V3,
   CALIBRATION_DIAGNOSTIC_CONTEXT_SPEC_V2_HASH_PINNED,
+  ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3, ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3,
   ORCHESTRATION_RUN_PLAN_AGENTS_V3, ORCHESTRATION_RUN_PLAN_V3, ORCHESTRATION_RUN_SPEC_V3,
   RON_ORCHESTRATION_RUN_VERSION_V3, assertCalibrationContextBinding,
   assertCalibrationContextV2Sealed, calibrationContextSpecRefV2, deriveRunIdV3,
   deriveRunIdsV3, orchestrationRunPlanHashV3,
 } from "../../supabase/functions/_shared/ron-orchestration-run-v3.ts";
+import { CALIBRATION_VALIDATION_SPEC_V1 } from "../../supabase/functions/_shared/ron-calibration-validation-spec.ts";
 import {
   CALIBRATION_DIAGNOSTIC_CONTEXT_SPEC_V2, calibrationDiagnosticContextSpecHashV2,
 } from "../../supabase/functions/_shared/ron-calibration-diagnostic-context-v2.ts";
@@ -72,6 +74,8 @@ const calV2 = (over: Partial<EvidenceEnvelopeV1> = {}) =>
   sealEvidence(envelope(CALIBRATION_CONTEXT_AGENT, {
     direction: "neutral",
     recommendation: "research_only",
+    as_of: ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3,
+    source_timestamps: { ...ACCEPTED_SOURCE_TIMESTAMPS },
     provenance_refs: [calibrationContextSpecRefV2(), "calibration_run:fixture"],
     ...over,
   }));
