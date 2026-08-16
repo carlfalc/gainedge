@@ -2,7 +2,7 @@
  * Specialist evidence with progressive disclosure. Rows are collapsed by default;
  * raw observation keys and provenance live behind an explicit technical disclosure.
  */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { summariseEvidence } from "@/lib/ron-decision-presentation";
@@ -104,13 +104,69 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
 }
 
 export default function RonEvidenceList({ evidence }: { evidence: RonEvidenceView[] }) {
+  // Deterministic frontend-only record identity: the ordered evidence hashes.
+  const recordKey = evidence.map((e) => e.evidence_hash).join("|");
+  const [mode, setMode] = useState<"all" | "attention">("all");
+
+  // A different stored record must never inherit a previous filter.
+  useEffect(() => { setMode("all"); }, [recordKey]);
+
+  const attention = useMemo(
+    () => evidence.filter((e) => {
+      const s = summariseEvidence(e);
+      return s.health !== "healthy" || s.hasWarnings;
+    }),
+    [evidence],
+  );
+
+  const rows = mode === "attention" ? attention : evidence;
+  const btn = (active: boolean) => ({
+    background: active ? C.cardH : "transparent",
+    border: `1px solid ${C.border}`,
+    color: active ? C.text : C.sec,
+  });
+
   return (
     <section className="rounded-xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-      <h2 className="mb-3 text-xs uppercase tracking-widest" style={{ color: C.sec }}>
-        Specialist evidence ({evidence.length})
-      </h2>
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 className="text-xs uppercase tracking-widest" style={{ color: C.sec }}>
+          Specialist evidence ({evidence.length} stored)
+        </h2>
+        {mode === "attention" && (
+          <span className="text-xs" style={{ color: C.muted }} data-testid="ron-evidence-showing">
+            Showing {rows.length}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setMode("all")}
+            aria-pressed={mode === "all"}
+            data-testid="ron-evidence-filter-all"
+            className="rounded-lg px-2.5 py-1 text-xs"
+            style={btn(mode === "all")}
+          >
+            All ({evidence.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("attention")}
+            aria-pressed={mode === "attention"}
+            data-testid="ron-evidence-filter-attention"
+            className="rounded-lg px-2.5 py-1 text-xs"
+            style={btn(mode === "attention")}
+          >
+            Needs attention ({attention.length})
+          </button>
+        </div>
+      </div>
+      {mode === "attention" && rows.length === 0 && (
+        <p className="text-xs leading-relaxed" style={{ color: C.muted }} data-testid="ron-evidence-attention-empty">
+          No specialist evidence in this stored record needs attention.
+        </p>
+      )}
       <div className="space-y-2">
-        {evidence.map((e) => <EvidenceRow key={e.evidence_hash} evidence={e} />)}
+        {rows.map((e) => <EvidenceRow key={e.evidence_hash} evidence={e} />)}
       </div>
     </section>
   );
