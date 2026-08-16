@@ -8,6 +8,7 @@ import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, seco
 import { formatPrintedLocal } from "@/lib/signal-time";
 import { explainPatterns, summariseStructure, fmtLevel } from "@/lib/pattern-interpretation";
 import { deriveFalconerSignalState } from "@/lib/falconer-signal-state";
+import { ronDecisionRecordHref, ronDecisionRecordTitle } from "@/lib/ron-decision-explorer";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
 import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
