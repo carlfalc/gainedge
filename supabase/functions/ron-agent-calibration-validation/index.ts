@@ -19,6 +19,9 @@ import {
   type CalibrationRunRow, type CalibrationValidationInput, type CandidateRow,
   type DirectionReportMetrics, type ResearchRunRow,
 } from "../_shared/ron-calibration-validation-spec.ts";
+import {
+  buildCalibrationDiagnosticContextEvidenceV2, calibrationDiagnosticContextSpecHashV2,
+} from "../_shared/ron-calibration-diagnostic-context-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,6 +85,13 @@ Deno.serve(async (req) => {
 
   const instrument = typeof body.instrument === "string" ? body.instrument : "XAUUSD";
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : "15m";
+  // DEFAULT REMAINS 1 in this slice: frozen Orchestration Run V2 deliberately leaves
+  // calibration unpinned, so V2 must only ever be reached by an EXPLICIT selector.
+  const specVersion = body.spec_version == null ? 1 : Number(body.spec_version);
+  if (specVersion !== 1 && specVersion !== 2) {
+    return json({ error: "unsupported_spec_version", spec_version: body.spec_version }, 400);
+  }
+  const isV2 = specVersion === 2;
   if (!S.instrument_scope.includes(instrument as "XAUUSD")
     || !S.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_calibration_validation_spec_v1", instrument, timeframe }, 400);
@@ -168,13 +178,17 @@ Deno.serve(async (req) => {
       promoted_state_variables: PROMOTED_STATE_VARIABLES,
     };
 
-    const envelope = await buildCalibrationValidationEvidence(input);
+    const build = isV2
+      ? buildCalibrationDiagnosticContextEvidenceV2
+      : buildCalibrationValidationEvidence;
+
+    const envelope = await build(input);
     const errs = validateEvidence(envelope);
     if (errs.length) return json({ error: "evidence_contract_violation", reasons: errs }, 500);
     const sealed = await sealEvidence(envelope);
 
     // Determinism proof on every call.
-    const replay = await sealEvidence(await buildCalibrationValidationEvidence(input));
+    const replay = await sealEvidence(await build(input));
     if (replay.evidence_hash !== sealed.evidence_hash) {
       return json({ error: "nondeterministic_specialist" }, 500);
     }
@@ -206,8 +220,18 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      spec_version: S.spec_version,
-      spec_hash: await calibrationValidationSpecHash(),
+      spec_version: specVersion,
+      spec_hash: isV2
+        ? await calibrationDiagnosticContextSpecHashV2()
+        : await calibrationValidationSpecHash(),
+      // V2-ONLY fields. Explicit spec_version 1 keeps the exact pre-V2 response shape.
+      ...(isV2
+        ? {
+          base_spec_version: S.spec_version,
+          base_spec_hash: await calibrationValidationSpecHash(),
+          allow_live_execution: false,
+        }
+        : {}),
       validation_state: result.state,
       checks_total: result.checks.length,
       checks_failed: result.failed.map((f) => f.id),
