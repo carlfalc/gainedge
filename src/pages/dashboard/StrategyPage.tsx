@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchSymbols } from "@/services/metaapi-client";
 import { C } from "@/lib/mock-data";
 import { toast } from "sonner";
+import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 
 interface Settings {
   enabled: boolean;
@@ -277,8 +278,11 @@ export default function StrategyPage() {
                 <span>{ready?.daily ?? 0}/250 daily candles</span>
                 <span style={{ color: ok ? C.green : C.amber, display: "flex", alignItems: "center", gap: 5 }}>
                   {ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
-                  {ok ? "Ready" : "Backfill required"}
+                  {ok ? "Data ready" : "Backfill required"}
                 </span>
+                <div style={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <CalibrationScopeBadge symbol={symbol} timeframe={settings.timeframe} />
+                </div>
                 <button onClick={() => toggleSymbol(symbol)} style={{ ...chip, color: C.red }}>Remove</button>
               </div>
             );
