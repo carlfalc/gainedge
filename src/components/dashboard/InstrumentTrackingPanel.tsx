@@ -390,6 +390,20 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                     >
                       <LineChart size={10} /> Chart ↗
                     </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openRonRecord(inst.symbol, tf); }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      aria-label={ronDecisionRecordTitle(inst.symbol, tf)}
+                      title={ronDecisionRecordTitle(inst.symbol, tf)}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
+                        color: C.jade, background: "transparent", border: `1px solid ${C.jade}30`,
+                        borderRadius: 5, padding: "1px 6px", cursor: "pointer",
+                      }}
+                    >
+                      <Eye size={10} /> RON record ↗
+                    </button>
                     <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                       {tf}
                     </span>
