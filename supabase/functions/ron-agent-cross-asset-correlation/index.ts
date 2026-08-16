@@ -174,15 +174,20 @@ Deno.serve(async (req) => {
       open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
       created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
     }));
-    const counterpart_bars_v1: CounterpartBar[] = (cRows ?? []).map((c: Record<string, unknown>) => ({
-      time: new Date(String(c.timestamp)).getTime(),
-      close: Number(c.close),
-    }));
-    const counterpart_bars_v2: CounterpartBarV2[] = (cRows ?? []).map((c: Record<string, unknown>) => ({
-      time: new Date(String(c.timestamp)).getTime(),
-      close: Number(c.close),
-      created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
-    }));
+    // ORIGINAL V1-shaped mapping: {time, close} only, no completion-proof field.
+    const counterpart_bars_v1: CounterpartBar[] = specVersion === 1
+      ? (cRows ?? []).map((c: Record<string, unknown>) => ({
+        time: new Date(String(c.timestamp)).getTime(),
+        close: Number(c.close),
+      }))
+      : [];
+    const counterpart_bars_v2: CounterpartBarV2[] = specVersion === 2
+      ? (cRows ?? []).map((c: Record<string, unknown>) => ({
+        time: new Date(String(c.timestamp)).getTime(),
+        close: Number(c.close),
+        created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
+      }))
+      : [];
 
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
