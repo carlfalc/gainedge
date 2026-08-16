@@ -140,14 +140,17 @@ const refs = (e: EvidenceEnvelopeV1): string[] =>
 const scoped = (e: EvidenceEnvelopeV1, kind: string, specId: string): string[] =>
   refs(e).filter((r) => r.startsWith(`${kind}:${specId}:`));
 
-/** Exactly one ref of the family, and it is exactly the accepted one. */
+/**
+ * Exactly one RAW ref of the family, and it is exactly the accepted one.
+ * Raw cardinality is enforced BEFORE any dedupe: two identical copies of the
+ * accepted ref are an ambiguous duplicate lineage and fail closed.
+ */
 function exactlyOne(
   list: readonly string[], expected: string, label: string,
 ): string | null {
-  const unique = [...new Set(list)];
-  if (unique.length === 0) return `missing_${label}`;
-  if (unique.length > 1) return `ambiguous_${label}`;
-  return unique[0] === expected ? null : `unexpected_${label}`;
+  if (list.length === 0) return `missing_${label}`;
+  if (list.length !== 1) return `ambiguous_${label}`;
+  return list[0] === expected ? null : `unexpected_${label}`;
 }
 
 export interface LineageCheck {
@@ -211,18 +214,24 @@ export function checkAcceptedLineage(e: EvidenceEnvelopeV1): LineageCheck {
     case "macro_news_geopolitics": {
       // The frozen Macro V2 producer emits BOTH lineage refs under `spec:` (V2 first,
       // then the inherited V1 ref carried through from the V1 base envelope).
-      const specRefs = [...new Set(scoped(e, "spec", ACCEPTED_MACRO_SPEC_ID))];
+      const specRefs = scoped(e, "spec", ACCEPTED_MACRO_SPEC_ID);
       const v2 = `spec:${ACCEPTED_MACRO_SPEC_ID}:v2:${ACCEPTED_MACRO_V2_HASH}`;
       const v1 = `spec:${ACCEPTED_MACRO_SPEC_ID}:v1:${ACCEPTED_MACRO_V1_HASH}`;
-      if (!specRefs.includes(v2)) {
+      const v2Count = specRefs.filter((r) => r === v2).length;
+      const v1Count = specRefs.filter((r) => r === v1).length;
+      if (v2Count === 0) {
         out.push(specRefs.some((r) => r.startsWith(`spec:${ACCEPTED_MACRO_SPEC_ID}:v2:`))
           ? "unexpected_macro_v2_spec_ref" : "missing_macro_v2_spec_ref");
       }
-      if (!specRefs.includes(v1)) {
+      if (v1Count === 0) {
         out.push(specRefs.some((r) => r.startsWith(`spec:${ACCEPTED_MACRO_SPEC_ID}:v1:`))
           ? "unexpected_macro_v1_spec_ref" : "missing_macro_v1_spec_ref");
       }
-      if (specRefs.length !== 2) out.push("ambiguous_macro_spec_lineage");
+      // RAW cardinality: exactly two refs total, exactly one accepted V2 and one
+      // accepted V1. Identical duplicates, extras or wrong same-lineage refs fail.
+      if (specRefs.length !== 2 || v2Count !== 1 || v1Count !== 1) {
+        out.push("ambiguous_macro_spec_lineage");
+      }
       add(exactlyOne(
         scoped(e, "classification", ACCEPTED_SESSION_STRUCTURE_SPEC_ID),
         `classification:${ACCEPTED_SESSION_STRUCTURE_SPEC_ID}:v2:${ACCEPTED_SESSION_STRUCTURE_V2_HASH}`,

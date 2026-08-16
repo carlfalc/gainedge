@@ -358,4 +358,79 @@ describe("Opportunity/Risk V2 — precedence, Falconer and safety", () => {
     expect(bad.reasons).toEqual(["missing_session_structure_v2_spec_ref"]);
     expect(checkAcceptedLineage(await falconer()).ok).toBe(true);
   });
+
+  it("rejects IDENTICAL duplicate accepted refs directly in the pure helper", async () => {
+    const dupSession = checkAcceptedLineage(await session({
+      provenance_refs: [SESSION_V2_REF, SESSION_V2_REF],
+    }));
+    expect(dupSession.ok).toBe(false);
+    expect(dupSession.reasons).toEqual(["ambiguous_session_structure_v2_spec_ref"]);
+
+    const dupCal = checkAcceptedLineage(await calibration({
+      provenance_refs: [CAL_V2_REF, CAL_V2_REF, CAL_BASE_REF],
+    }));
+    expect(dupCal.ok).toBe(false);
+    expect(dupCal.reasons).toEqual(["ambiguous_calibration_context_v2_spec_ref"]);
+
+    const dupMacro = checkAcceptedLineage(await macro({
+      provenance_refs: [MACRO_V2_REF, MACRO_V2_REF, MACRO_V1_REF, MACRO_CLASS_REF],
+    }));
+    expect(dupMacro.ok).toBe(false);
+    expect(dupMacro.reasons).toContain("ambiguous_macro_spec_lineage");
+  });
+});
+
+describe("Opportunity/Risk V2 — identical duplicate accepted lineage fails closed", () => {
+  const dupBlocked = async (evidence: EvidenceEnvelopeV1[], agent: string, reason: string) => {
+    const e = await build(evidence);
+    expect(readiness(e)).toBe("blocked_contract_mismatch");
+    expect(e.status).toBe("blocked");
+    expect(reasons(e)).toContain(`incompatible_specialist_lineage:${agent}:${reason}`);
+  };
+
+  it("rejects a duplicated identical Session accepted ref", async () => {
+    await dupBlocked([
+      await session({ provenance_refs: [SESSION_V2_REF, SESSION_V2_REF] }),
+      await calibration(),
+    ], "session_market_structure", "ambiguous_session_structure_v2_spec_ref");
+  });
+
+  it("rejects duplicated identical Calibration spec and base_spec refs", async () => {
+    await dupBlocked([await session(), await calibration({
+      provenance_refs: [CAL_V2_REF, CAL_V2_REF, CAL_BASE_REF],
+    })], "calibration_model_validation", "ambiguous_calibration_context_v2_spec_ref");
+    await dupBlocked([await session(), await calibration({
+      provenance_refs: [CAL_V2_REF, CAL_BASE_REF, CAL_BASE_REF],
+    })], "calibration_model_validation", "ambiguous_calibration_v1_base_spec_ref");
+  });
+
+  it("rejects duplicated identical Pattern spec and segmentation refs", async () => {
+    await dupBlocked([await session(), await calibration(), await pattern({
+      provenance_refs: [PATTERN_V2_REF, PATTERN_V2_REF, PATTERN_SEG_REF],
+    })], "pattern_context", "ambiguous_pattern_context_v2_spec_ref");
+    await dupBlocked([await session(), await calibration(), await pattern({
+      provenance_refs: [PATTERN_V2_REF, PATTERN_SEG_REF, PATTERN_SEG_REF],
+    })], "pattern_context", "ambiguous_pattern_segmentation_session_v2_ref");
+  });
+
+  it("rejects duplicated identical Cross-Asset spec and base_spec refs", async () => {
+    await dupBlocked([await session(), await calibration(), await crossAsset({
+      provenance_refs: [CROSS_V2_REF, CROSS_V2_REF, CROSS_BASE_REF],
+    })], "cross_asset_correlation", "ambiguous_cross_asset_v2_spec_ref");
+    await dupBlocked([await session(), await calibration(), await crossAsset({
+      provenance_refs: [CROSS_V2_REF, CROSS_BASE_REF, CROSS_BASE_REF],
+    })], "cross_asset_correlation", "ambiguous_cross_asset_v1_base_spec_ref");
+  });
+
+  it("rejects duplicated identical Macro V2, V1 and classification refs", async () => {
+    await dupBlocked([await session(), await calibration(), await macro({
+      provenance_refs: [MACRO_V2_REF, MACRO_V2_REF, MACRO_V1_REF, MACRO_CLASS_REF],
+    })], "macro_news_geopolitics", "ambiguous_macro_spec_lineage");
+    await dupBlocked([await session(), await calibration(), await macro({
+      provenance_refs: [MACRO_V2_REF, MACRO_V1_REF, MACRO_V1_REF, MACRO_CLASS_REF],
+    })], "macro_news_geopolitics", "ambiguous_macro_spec_lineage");
+    await dupBlocked([await session(), await calibration(), await macro({
+      provenance_refs: [MACRO_V2_REF, MACRO_V1_REF, MACRO_CLASS_REF, MACRO_CLASS_REF],
+    })], "macro_news_geopolitics", "ambiguous_macro_classification_session_v2_ref");
+  });
 });
