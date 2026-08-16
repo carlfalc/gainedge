@@ -105,10 +105,10 @@ describe("Falconer endpoint version selector V1 — invariants preserved", () =>
   });
 
   it("evidence is byte/hash identical for omitted vs explicit selector inputs", async () => {
-    const input = {
+    const input: Parameters<typeof buildFalconerSignalSourceEvidenceV1>[0] = {
       instrument: "XAUUSD", timeframe: "15m", evaluation_anchor: ANCHOR, events: [],
       run_id: "sel_run", trace_id: "sel_trace",
-    } as const;
+    };
     const omitted = await sealEvidence(await buildFalconerSignalSourceEvidenceV1({ ...input }));
     const explicit = await sealEvidence(await buildFalconerSignalSourceEvidenceV1({ ...input }));
     expect(explicit.evidence_hash).toBe(omitted.evidence_hash);
