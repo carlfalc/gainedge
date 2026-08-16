@@ -37,6 +37,11 @@ import {
   orchestrationRunPlanHashV2, RON_ORCHESTRATION_RUN_VERSION_V2,
   type AgentCallPlanEntryV2,
 } from "../_shared/ron-orchestration-run-v2.ts";
+import {
+  assertCalibrationContextBinding, assertCalibrationContextV2Sealed,
+  CALIBRATION_CONTEXT_AGENT, deriveRunIdsV3, ORCHESTRATION_RUN_PLAN_V3,
+  orchestrationRunPlanHashV3, RON_ORCHESTRATION_RUN_VERSION_V3,
+} from "../_shared/ron-orchestration-run-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,28 +104,38 @@ Deno.serve(async (req) => {
     : `ron_run_v1_${anchor}_${instrument}_${timeframe}`;
   const persist = body.persist === true;
 
-  // Newly invoked runs default to orchestration run version 2. Version 1 stays explicitly
-  // reachable for byte-identical replay and NEVER passes `session_evidence` to Pattern.
+  // SAFEST DEFAULT: newly invoked runs still default to orchestration run version 2 — the
+  // frozen, audited default. Following the same precedent as the calibration endpoint's
+  // `spec_version` selector, the newer V3 semantics are reachable ONLY by an explicit
+  // selector, so no existing caller is silently moved onto new calibration context.
+  // Versions 1 and 2 stay explicitly reachable for byte-identical replay.
   const requestedRunVersion = body.orchestration_run_version == null
     ? RON_ORCHESTRATION_RUN_VERSION_V2
     : Number(body.orchestration_run_version);
-  if (requestedRunVersion !== 1 && requestedRunVersion !== 2) {
+  if (![1, 2, 3].includes(requestedRunVersion)) {
     return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
   }
-  const isV2 = requestedRunVersion === 2;
+  const isV3 = requestedRunVersion === 3;
+  // V3 inherits every V2 semantic (Session -> sealed evidence -> Pattern, version pins).
+  const isV2 = requestedRunVersion === 2 || isV3;
 
   const ctx: OrchestrationContext = {
     trace_id: traceId, instrument, timeframe, as_of: anchor,
   };
 
   try {
-    const runIds = isV2 ? await deriveRunIdsV2(traceId, anchor) : await deriveRunIds(traceId, anchor);
+    const runIds = isV3
+      ? await deriveRunIdsV3(traceId, anchor)
+      : isV2
+        ? await deriveRunIdsV2(traceId, anchor)
+        : await deriveRunIds(traceId, anchor);
     const collected: EvidenceEnvelopeV1[] = [];
     const calls: Record<string, unknown>[] = [];
     let sessionDependencyHash: string | null = null;
+    let calibrationContextHash: string | null = null;
 
     const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
-      isV2 ? ORCHESTRATION_RUN_PLAN_V2 : ORCHESTRATION_RUN_PLAN_V1;
+      isV3 ? ORCHESTRATION_RUN_PLAN_V3 : isV2 ? ORCHESTRATION_RUN_PLAN_V2 : ORCHESTRATION_RUN_PLAN_V1;
 
     for (const entry of plan) {
       const v2entry = isV2 ? entry as AgentCallPlanEntryV2 : null;
@@ -175,6 +190,14 @@ Deno.serve(async (req) => {
           return json({ error: "session_dependency_invalid_envelope", reasons: errs }, 400);
         }
         collected.push(await sealEvidence(envelope));
+      } else if (isV3 && entry.agent_id === CALIBRATION_CONTEXT_AGENT) {
+        // V3 ONLY: the returned calibration evidence must PROVE it is the accepted
+        // Calibration Diagnostic Context V2 artifact — sealed, in scope, correctly
+        // anchored and carrying exactly one accepted V2 spec provenance ref. Anything
+        // missing, V1, wrong-hash, duplicated or ambiguous fails closed here.
+        const sealedCal = await sealEvidence(envelope);
+        calibrationContextHash = await assertCalibrationContextV2Sealed(sealedCal, ctx);
+        collected.push(sealedCal);
       } else {
         collected.push(envelope);
       }
@@ -195,6 +218,11 @@ Deno.serve(async (req) => {
       // ...and Pattern's OWN sealed evidence must cite exactly that Session hash.
       assertPatternDependencyBinding(sealed, sessionDependencyHash);
     }
+    // V3 ONLY: the accepted calibration context envelope must be the single calibration
+    // envelope in the final batch. It adds NO authority — it stays neutral/research_only.
+    if (isV3 && calibrationContextHash) {
+      assertCalibrationContextBinding(sealed, calibrationContextHash);
+    }
 
     const { decision, explanation } = await synthesizeDecision(sealed, ctx);
     const replay = await reconstructDecision(sealed, ctx);
@@ -204,13 +232,25 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: isV2 ? await orchestrationRunPlanHashV2() : await orchestrationRunPlanHash(),
+      orchestration_run_version: isV3
+        ? RON_ORCHESTRATION_RUN_VERSION_V3
+        : isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
+      orchestration_run_plan_hash: isV3
+        ? await orchestrationRunPlanHashV3()
+        : isV2 ? await orchestrationRunPlanHashV2() : await orchestrationRunPlanHash(),
       persistence_atomicity: isV2
         ? ORCHESTRATION_RUN_SPEC_V2.persistence_atomicity
         : ORCHESTRATION_RUN_SPEC_V1.persistence_atomicity,
       // V2-ONLY field: explicit V1 replay keeps the exact pre-V2 summary shape.
       ...(isV2 ? { session_to_pattern_dependency_hash: sessionDependencyHash } : {}),
+      // V3-ONLY fields: explicit V1/V2 replay keeps the exact pre-V3 summary shape.
+      ...(isV3
+        ? {
+          calibration_context_spec_version: 2,
+          calibration_context_evidence_hash: calibrationContextHash,
+          default_orchestration_run_version: RON_ORCHESTRATION_RUN_VERSION_V2,
+        }
+        : {}),
       evaluation_anchor: anchor,
       trace_id: traceId,
       subject_binding: subjectBound ? "caller_jwt_verified_rls_scoped" : "no_verified_subject_fail_closed",
