@@ -22,6 +22,10 @@ import {
 import { hashCanonical } from "./ron-agent-contracts.ts";
 import type { OrchestrationContext } from "./ron-orchestrator.ts";
 import {
+  acceptSessionStructureContext, SESSION_STRUCTURE_SPEC_V2_HASH_PINNED,
+} from "./ron-pattern-structure-context-v2.ts";
+import { SESSION_STRUCTURE_SPEC_V2 } from "./ron-session-structure-spec-v2.ts";
+import {
   ORCHESTRATION_RUN_PLAN_V1, ORCHESTRATION_RUN_SPEC_V1, OrchestrationRunError,
   type AgentCallPlanEntry,
 } from "./ron-orchestration-run.ts";
@@ -30,6 +34,17 @@ export const RON_ORCHESTRATION_RUN_VERSION_V2 = 2;
 
 /** The one agent whose sealed evidence Pattern V2 is allowed to consume. */
 export const PATTERN_SESSION_DEPENDENCY_AGENT: RonAgentId = "session_market_structure";
+
+/** The agent whose sealed evidence must PROVE it consumed the Session dependency. */
+export const PATTERN_DEPENDENT_AGENT: RonAgentId = "pattern_context";
+
+/** Exact dependency entry Pattern V2 emits for a consumed sealed Session envelope. */
+export const patternSessionDependencyEntry = (session_hash: string): string =>
+  `session_market_structure_evidence:${session_hash}`;
+
+const PATTERN_SESSION_DEPENDENCY_PREFIX = "session_market_structure_evidence:";
+const PATTERN_STRUCTURE_PROVENANCE_PREFIX =
+  `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:`;
 
 export interface AgentCallPlanEntryV2 extends AgentCallPlanEntry {
   /**
@@ -85,6 +100,18 @@ export const ORCHESTRATION_RUN_SPEC_V2 = {
   execution_path: "signal_only",
   persist_default: false,
   run_id_domain: "ron_orch_run_v2",
+  /**
+   * The pre-Pattern gate requires the ACCEPTED Session V2 contract (the frozen Pattern V2
+   * acceptance function), not merely a sealed envelope carrying the same agent id.
+   */
+  session_dependency_acceptance: {
+    contract: "pattern_v2_accept_session_structure_context",
+    requires_accepted_session_spec_hash: SESSION_STRUCTURE_SPEC_V2_HASH_PINNED,
+    second_structural_truth_invented: false,
+    sealed_session_v1_rejected: true,
+  },
+  /** After Pattern returns, its own evidence must cite exactly the handed Session hash. */
+  pattern_dependency_binding_verified: true,
   /** Declared limitation: only Pattern and its Session dependency are version-pinned. */
   spec_version_pins: { session_market_structure: 2, pattern_context: 2 },
   unpinned_agents_use_endpoint_defaults: ORCHESTRATION_RUN_PLAN_V2
@@ -139,24 +166,36 @@ export async function deriveRunIdsV2(
 export async function assertSessionDependencySealed(
   candidate: unknown, ctx: OrchestrationContext,
 ): Promise<string> {
-  const reasons: string[] = [];
   if (candidate == null || typeof candidate !== "object" || Array.isArray(candidate)) {
     throw new OrchestrationRunError(["session_dependency_absent_or_malformed"]);
   }
-  const e = candidate as EvidenceEnvelopeV1;
-  if (e.agent_id !== PATTERN_SESSION_DEPENDENCY_AGENT) reasons.push("session_dependency_wrong_agent");
-  if (validateEvidence(e).length) reasons.push("session_dependency_invalid_envelope");
-  if (typeof e.evidence_hash !== "string" || !e.evidence_hash) {
-    reasons.push("session_dependency_unsealed");
-  } else if (await evidenceHash(e) !== e.evidence_hash) {
-    reasons.push("session_dependency_hash_mismatch");
+  const anchorMs = Date.parse(ctx.as_of);
+  if (!Number.isFinite(anchorMs)) {
+    throw new OrchestrationRunError(["session_dependency_anchor_unparseable"]);
   }
-  if (e.trace_id !== ctx.trace_id) reasons.push("session_dependency_trace_mismatch");
-  if (e.instrument !== ctx.instrument) reasons.push("session_dependency_instrument_mismatch");
-  if (e.timeframe !== ctx.timeframe) reasons.push("session_dependency_timeframe_mismatch");
-  if (e.as_of !== ctx.as_of) reasons.push("session_dependency_anchor_mismatch");
-  if (reasons.length) throw new OrchestrationRunError([...new Set(reasons)].sort());
-  return e.evidence_hash as string;
+  // Reuse the FROZEN Pattern V2 acceptance contract verbatim so the orchestrator gate and
+  // Pattern cannot diverge and no second acceptance truth is invented here.
+  const accepted = await acceptSessionStructureContext(candidate, {
+    trace_id: ctx.trace_id, instrument: ctx.instrument,
+    timeframe: ctx.timeframe, as_of: anchorMs,
+  });
+  if (accepted.ok === false) {
+    throw new OrchestrationRunError([
+      accepted.reason.replace(/^session_context_/, "session_dependency_"),
+    ]);
+  }
+  // Defence in depth: the accepted contract already proves these, restated explicitly.
+  const e = candidate as EvidenceEnvelopeV1;
+  if (e.agent_id !== PATTERN_SESSION_DEPENDENCY_AGENT) {
+    throw new OrchestrationRunError(["session_dependency_wrong_agent"]);
+  }
+  if (validateEvidence(e).length) {
+    throw new OrchestrationRunError(["session_dependency_invalid_envelope"]);
+  }
+  if (await evidenceHash(e) !== accepted.evidence_hash) {
+    throw new OrchestrationRunError(["session_dependency_hash_mismatch"]);
+  }
+  return accepted.evidence_hash;
 }
 
 /**
@@ -172,5 +211,38 @@ export function assertSessionDependencyBinding(
   }
   if (sessions[0].evidence_hash !== handed_hash) {
     throw new OrchestrationRunError(["session_dependency_binding_hash_divergence"]);
+  }
+}
+
+/**
+ * Prove PATTERN ACTUALLY CONSUMED the exact sealed Session envelope handed to it.
+ *
+ * The sealed Pattern evidence must carry EXACTLY ONE `session_market_structure_evidence:`
+ * dependency entry and it must equal the handed Session hash. Any missing, duplicated or
+ * divergent dependency — and any structure-context provenance ref citing a different
+ * Session hash — fails closed BEFORE synthesis.
+ */
+export function assertPatternDependencyBinding(
+  batch: EvidenceEnvelopeV1[], handed_hash: string,
+): void {
+  const patterns = batch.filter((e) => e?.agent_id === PATTERN_DEPENDENT_AGENT);
+  if (patterns.length !== 1) {
+    throw new OrchestrationRunError([`pattern_dependency_binding_agent_count:${patterns.length}`]);
+  }
+  const deps = (patterns[0].dependencies ?? [])
+    .filter((d) => typeof d === "string" && d.startsWith(PATTERN_SESSION_DEPENDENCY_PREFIX));
+  if (deps.length !== 1) {
+    throw new OrchestrationRunError([`pattern_dependency_binding_count:${deps.length}`]);
+  }
+  if (deps[0] !== patternSessionDependencyEntry(handed_hash)) {
+    throw new OrchestrationRunError(["pattern_dependency_binding_hash_divergence"]);
+  }
+  const refs = (patterns[0].provenance_refs ?? [])
+    .filter((p) => typeof p === "string" && p.startsWith(PATTERN_STRUCTURE_PROVENANCE_PREFIX));
+  if (refs.length !== 1) {
+    throw new OrchestrationRunError([`pattern_dependency_provenance_count:${refs.length}`]);
+  }
+  if (refs[0] !== `${PATTERN_STRUCTURE_PROVENANCE_PREFIX}${handed_hash}`) {
+    throw new OrchestrationRunError(["pattern_dependency_provenance_hash_divergence"]);
   }
 }

@@ -19,9 +19,13 @@ import {
 import {
   ORCHESTRATION_RUN_PLAN_AGENTS_V2, ORCHESTRATION_RUN_PLAN_V2, ORCHESTRATION_RUN_SPEC_V2,
   PATTERN_SESSION_DEPENDENCY_AGENT, RON_ORCHESTRATION_RUN_VERSION_V2,
-  assertSessionDependencyBinding, assertSessionDependencySealed, deriveRunIdV2,
-  deriveRunIdsV2, orchestrationRunPlanHashV2,
+  assertPatternDependencyBinding, assertSessionDependencyBinding,
+  assertSessionDependencySealed, deriveRunIdV2, deriveRunIdsV2, orchestrationRunPlanHashV2,
+  patternSessionDependencyEntry,
 } from "../../supabase/functions/_shared/ron-orchestration-run-v2.ts";
+import { SESSION_STRUCTURE_SPEC_V2 } from "../../supabase/functions/_shared/ron-session-structure-spec-v2.ts";
+import { SESSION_STRUCTURE_SPEC_V2_HASH_PINNED } from "../../supabase/functions/_shared/ron-pattern-context-spec.ts";
+import { readFileSync } from "node:fs";
 
 const TRACE = "ron_run_v2_fixture_trace";
 const AS_OF = "2026-08-15T12:00:00Z";
@@ -52,6 +56,43 @@ function envelope(agent_id: RonAgentId, over: Partial<EvidenceEnvelopeV1> = {}):
 }
 
 const sealedSession = () => sealEvidence(envelope("session_market_structure"));
+
+const SESSION_SPEC_REF =
+  `spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${SESSION_STRUCTURE_SPEC_V2_HASH_PINNED}`;
+const OPEN_ISO = new Date(Date.parse(AS_OF)).toISOString();
+const CLOSE_ISO = new Date(Date.parse(AS_OF) + 15 * 60_000).toISOString();
+
+/** An ACCEPTED Session V2 envelope per the frozen Pattern V2 acceptance contract. */
+const acceptedSessionEnvelope = (over: Partial<EvidenceEnvelopeV1> = {}) =>
+  envelope("session_market_structure", {
+    provenance_refs: [SESSION_SPEC_REF],
+    source_timestamps: {
+      reference_instant: AS_OF,
+      as_of_bar_open: OPEN_ISO,
+      as_of_bar_completed_close: CLOSE_ISO,
+    },
+    observations: [
+      { key: "structure_state", kind: "state", value_text: "up_structure", at: AS_OF },
+      { key: "structure_event", kind: "state", value_text: "none", at: AS_OF },
+    ],
+    status: "supported",
+    ...over,
+  });
+const acceptedSession = () => sealEvidence(acceptedSessionEnvelope());
+
+/** A sealed Session V1-shaped envelope: same agent, but NOT accepted Session V2. */
+const sealedSessionV1 = () => sealEvidence(acceptedSessionEnvelope({
+  provenance_refs: [`spec:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v1:${"a".repeat(64)}`],
+}));
+
+const patternEnvelope = (session_hash: string, over: Partial<EvidenceEnvelopeV1> = {}) =>
+  envelope("pattern_context", {
+    dependencies: [patternSessionDependencyEntry(session_hash)],
+    provenance_refs: [
+      `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${session_hash}`,
+    ],
+    ...over,
+  });
 
 describe("orchestration run V1 is untouched by V2", () => {
   it("keeps the V1 plan, agents and hash stable", async () => {
@@ -132,12 +173,22 @@ describe("orchestration run plan V2", () => {
 
 describe("sealed session -> pattern dependency gate fails closed", () => {
   it("accepts exactly the sealed session envelope for this run", async () => {
-    const s = await sealedSession();
+    const s = await acceptedSession();
     expect(await assertSessionDependencySealed(s, CTX)).toBe(s.evidence_hash);
   });
 
+  it("rejects a sealed session-agent envelope that is not accepted Session V2", async () => {
+    await expect(assertSessionDependencySealed(await sealedSession(), CTX))
+      .rejects.toThrow(OrchestrationRunError);
+    await expect(assertSessionDependencySealed(await sealedSessionV1(), CTX))
+      .rejects.toThrow(/session_dependency_spec_provenance_mismatch/);
+    await expect(assertSessionDependencySealed(
+      await sealEvidence(acceptedSessionEnvelope({ status: "insufficient_data" })), CTX))
+      .rejects.toThrow(/session_dependency_not_supported/);
+  });
+
   it("rejects absence, wrong agent, unsealed, tampered, wrong scope and wrong anchor", async () => {
-    const s = await sealedSession();
+    const s = await acceptedSession();
     await expect(assertSessionDependencySealed(null, CTX)).rejects.toThrow(OrchestrationRunError);
     await expect(assertSessionDependencySealed(await sealEvidence(envelope("pattern_context")), CTX))
       .rejects.toThrow(/session_dependency_wrong_agent/);
@@ -151,17 +202,23 @@ describe("sealed session -> pattern dependency gate fails closed", () => {
       .rejects.toThrow(/session_dependency_instrument_mismatch/);
     await expect(assertSessionDependencySealed(s, { ...CTX, timeframe: "1h" }))
       .rejects.toThrow(/session_dependency_timeframe_mismatch/);
-    await expect(assertSessionDependencySealed(s, { ...CTX, as_of: "2026-08-15T11:45:00Z" }))
+    await expect(assertSessionDependencySealed(s, { ...CTX, as_of: "2026-08-15T12:15:00Z" }))
       .rejects.toThrow(/session_dependency_anchor_mismatch/);
+    await expect(assertSessionDependencySealed(s, { ...CTX, as_of: "2026-08-15T11:45:00Z" }))
+      .rejects.toThrow(/session_dependency_after_pattern_anchor/);
   });
 
   it("binds the handed hash to the final collected batch", async () => {
-    const s = await sealedSession();
+    const s = await acceptedSession();
     const batch = canonicalOrder(await Promise.all(
       ORCHESTRATION_RUN_PLAN_AGENTS_V2.map((a) =>
-        a === "session_market_structure" ? Promise.resolve(s) : sealEvidence(envelope(a)))));
+        a === "session_market_structure"
+          ? Promise.resolve(s)
+          : sealEvidence(a === "pattern_context"
+            ? patternEnvelope(s.evidence_hash!) : envelope(a)))));
     expect(() => assertCollectionComplete(batch, CTX)).not.toThrow();
     expect(() => assertSessionDependencyBinding(batch, s.evidence_hash!)).not.toThrow();
+    expect(() => assertPatternDependencyBinding(batch, s.evidence_hash!)).not.toThrow();
     expect(() => assertSessionDependencyBinding(batch, "a".repeat(64)))
       .toThrow(/session_dependency_binding_hash_divergence/);
     expect(() => assertSessionDependencyBinding(
@@ -171,9 +228,52 @@ describe("sealed session -> pattern dependency gate fails closed", () => {
       .toThrow(/session_dependency_binding_count:2/);
   });
 
+  it("fails closed when Pattern omits, duplicates or diverges from the handed hash", async () => {
+    const s = await acceptedSession();
+    const other = "b".repeat(64);
+    const build = async (pattern: EvidenceEnvelopeV1) => canonicalOrder(await Promise.all(
+      ORCHESTRATION_RUN_PLAN_AGENTS_V2.map((a) =>
+        a === "session_market_structure"
+          ? Promise.resolve(s)
+          : sealEvidence(a === "pattern_context" ? pattern : envelope(a)))));
+
+    const missing = await build(patternEnvelope(s.evidence_hash!, {
+      dependencies: [], provenance_refs: ["fixture:pattern_context"],
+    }));
+    expect(() => assertPatternDependencyBinding(missing, s.evidence_hash!))
+      .toThrow(/pattern_dependency_binding_count:0/);
+
+    const duplicated = await build(patternEnvelope(s.evidence_hash!, {
+      dependencies: [
+        patternSessionDependencyEntry(s.evidence_hash!),
+        patternSessionDependencyEntry(other),
+      ],
+    }));
+    expect(() => assertPatternDependencyBinding(duplicated, s.evidence_hash!))
+      .toThrow(/pattern_dependency_binding_count:2/);
+
+    const divergent = await build(patternEnvelope(other));
+    expect(() => assertPatternDependencyBinding(divergent, s.evidence_hash!))
+      .toThrow(/pattern_dependency_binding_hash_divergence/);
+
+    // Correct dependency, but structure-context provenance cites a different session.
+    const badRef = await build(patternEnvelope(s.evidence_hash!, {
+      provenance_refs: [
+        `structure_context:${SESSION_STRUCTURE_SPEC_V2.spec_id}:v${SESSION_STRUCTURE_SPEC_V2.spec_version}:${other}`,
+      ],
+    }));
+    expect(() => assertPatternDependencyBinding(badRef, s.evidence_hash!))
+      .toThrow(/pattern_dependency_provenance_hash_divergence/);
+
+    // Batch Session hash matches the handed hash, yet Pattern proves nothing.
+    const blind = await build(patternEnvelope(other));
+    expect(() => assertSessionDependencyBinding(blind, s.evidence_hash!)).not.toThrow();
+    expect(() => assertPatternDependencyBinding(blind, s.evidence_hash!)).toThrow();
+  });
+
   it("replays deterministically for identical inputs", async () => {
-    const a = await sealedSession();
-    const b = await sealedSession();
+    const a = await acceptedSession();
+    const b = await acceptedSession();
     expect(a.evidence_hash).toBe(b.evidence_hash);
     expect(await assertSessionDependencySealed(a, CTX))
       .toBe(await assertSessionDependencySealed(b, CTX));
@@ -185,5 +285,22 @@ describe("sealed session -> pattern dependency gate fails closed", () => {
       if (t === "probability") expect(s).toContain('"numeric_probability":null');
       else expect(s).not.toContain(t);
     }
+  });
+});
+
+describe("frozen source invariants", () => {
+  it("keeps V1 replay shape free of V2-only fields", () => {
+    const src = readFileSync(
+      "supabase/functions/ron-orchestrate-run/index.ts", "utf8");
+    expect(src).toContain("...(isV2 ? { session_to_pattern_dependency_hash: sessionDependencyHash } : {})");
+    expect(src).not.toMatch(/^\s*session_to_pattern_dependency_hash: sessionDependencyHash,$/m);
+    // `session_evidence` is only ever attached on the V2 dependency branch.
+    expect(src).toMatch(/if \(v2entry\)[\s\S]*payload\.session_evidence = dep;/);
+  });
+
+  it("has no orchestration-induced type marker in frozen Pattern V2 source", () => {
+    const src = readFileSync(
+      "supabase/functions/_shared/ron-pattern-structure-context-v2.ts", "utf8");
+    expect(src).not.toContain("reason?: undefined");
   });
 });
