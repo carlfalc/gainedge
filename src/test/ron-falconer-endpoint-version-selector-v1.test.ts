@@ -26,6 +26,26 @@ const STRATEGY_PINE_SHA256 = "76b242b4b4b2e1f2aa5bbb11a0a12ef9849ec40beda306fc5c
 const sha = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
 const ANCHOR = Date.parse("2026-08-13T10:00:00Z");
 
+/**
+ * CURRENT-STATE LEDGER (forward-only). Named distinctly from the immutable
+ * historical `AUDIT_OUTCOME_V1` in ron-falconer-identity-reconciliation-v1.test.ts.
+ */
+const SELECTOR_AUDIT_OUTCOME_V1 = {
+  result: "RON_FALCONER_SIGNAL_SOURCE_ENDPOINT_VERSION_SELECTOR_V1_PASS",
+  resolves_historical_blocker:
+    "falconer_signal_source endpoint has no explicit spec_version selector; "
+    + "V6 remains safely unpinned",
+  explicit_orchestration_pin_readiness: "READY_NOT_PERFORMED",
+  blocker: null,
+  safest_next_action:
+    "a separate forward-only Orchestration V7 slice may now explicitly pin "
+    + "falconer_signal_source to spec_version 1",
+  performed_in_this_slice:
+    "endpoint request spec_version selector only; no spec object, spec hash, "
+    + "evidence, orchestration or plan change",
+  ledger_semantics: "current_state_forward_only",
+} as const;
+
 describe("Falconer endpoint version selector V1 — resolution", () => {
   it("omitted selector resolves to V1 (exact historical default)", () => {
     expect(resolveFalconerSpecVersion({})).toEqual({
@@ -128,5 +148,38 @@ describe("Falconer endpoint version selector V1 — invariants preserved", () =>
     const entry = ORCHESTRATION_RUN_PLAN_V6
       .find((p) => p.agent_id === "falconer_signal_source")!;
     expect(entry.spec_version_pin).toBeNull();
+  });
+});
+
+describe("Falconer selector V1 — audit chronology (history preserved, not rewritten)", () => {
+  const HISTORICAL = readFileSync(
+    "src/test/ron-falconer-identity-reconciliation-v1.test.ts", "utf8");
+
+  it("the historical identity audit remains BLOCKED as an immutable snapshot", () => {
+    expect(HISTORICAL).toContain(
+      'result: "RON_FALCONER_SIGNAL_SOURCE_IDENTITY_RECONCILIATION_AUDIT_V1_BLOCKED"');
+    expect(HISTORICAL).toContain('explicit_orchestration_pin_readiness_f: "BLOCKED"');
+    expect(HISTORICAL).toContain('ledger_semantics: "historical_snapshot_immutable"');
+    expect(HISTORICAL).toContain("falconer_signal_source endpoint has no explicit spec_version selector; ");
+    // The old audit must NOT be rewritten to claim the later selector outcome.
+    expect(HISTORICAL).not.toContain('explicit_orchestration_pin_readiness_f: "READY_NOT_PERFORMED"');
+  });
+
+  it("the current selector ledger is PASS with pin readiness READY_NOT_PERFORMED", () => {
+    expect(SELECTOR_AUDIT_OUTCOME_V1.result)
+      .toBe("RON_FALCONER_SIGNAL_SOURCE_ENDPOINT_VERSION_SELECTOR_V1_PASS");
+    expect(SELECTOR_AUDIT_OUTCOME_V1.explicit_orchestration_pin_readiness)
+      .toBe("READY_NOT_PERFORMED");
+    expect(SELECTOR_AUDIT_OUTCOME_V1.blocker).toBeNull();
+    expect(SELECTOR_AUDIT_OUTCOME_V1.ledger_semantics).toBe("current_state_forward_only");
+  });
+
+  it("BLOCKED-then-PASS is chronology: the selector resolves the historical blocker", () => {
+    // The exact blocker string recorded in history is the one this slice resolved.
+    expect(HISTORICAL).toContain(SELECTOR_AUDIT_OUTCOME_V1.resolves_historical_blocker.slice(0, 60));
+    // Proof the resolution is real in CURRENT source, while history stays untouched.
+    expect(ENDPOINT).toContain("resolveFalconerSpecVersion(body)");
+    expect(ORCHESTRATION_RUN_PLAN_V6
+      .find((p) => p.agent_id === "falconer_signal_source")!.spec_version_pin).toBeNull();
   });
 });
