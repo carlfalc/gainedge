@@ -40,7 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     labelKey: "RON",
     items: [
-      { labelKey: "GainEdge AI", icon: Brain, path: "/dashboard/ai", gold: true },
+      { labelKey: "Ask RON", icon: Brain, path: "/dashboard/ai", gold: true },
       { labelKey: "RON Decision", icon: ShieldCheck, path: "/dashboard/ron-decision" },
     ],
   },

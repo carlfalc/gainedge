@@ -12,10 +12,10 @@ interface Conversation {
 }
 
 const prompts = [
-  "Which instrument has performed best for Falconer?",
-  "What days and sessions have produced the strongest results?",
-  "Explain my latest Falconer trade and its setup score.",
-  "Where is Falconer losing money, and is the sample large enough?",
+  "Summarise my stored Falconer records by instrument.",
+  "Describe the available sample sizes by session and day.",
+  "Explain my latest stored Falconer record and its evidence.",
+  "What limitations or missing evidence are in my available records?",
 ];
 
 export default function GainEdgeAIPage() {
@@ -68,7 +68,7 @@ export default function GainEdgeAIPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Brain size={27} style={{ color: C.jade }} />
-          <h1 style={{ fontSize: 24, fontWeight: 800 }}>GainEdge AI</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 800 }}>Ask RON</h1>
         </div>
         {history.length > 0 && (
           <button onClick={clearHistory} style={ghostButton}>
@@ -77,7 +77,7 @@ export default function GainEdgeAIPage() {
         )}
       </div>
       <p style={{ color: C.sec, fontSize: 13, marginBottom: 20 }}>
-        Ask about your real Falconer trades, performance, sessions, instruments and recent market context.
+        RON is GainEdge's interactive assistant. Answers are based only on the evidence stored and available in your account.
       </p>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
@@ -98,7 +98,7 @@ export default function GainEdgeAIPage() {
               ask();
             }
           }}
-          placeholder="Ask GainEdge AI…"
+          placeholder="Ask RON…"
           rows={3}
           style={input}
         />
@@ -108,10 +108,10 @@ export default function GainEdgeAIPage() {
         </button>
       </div>
 
-      {asking && <div style={{ ...card, color: C.sec }}>Analysing your Falconer evidence…</div>}
+      {asking && <div style={{ ...card, color: C.sec }}>RON is reviewing the available evidence…</div>}
       {!asking && history.length === 0 && (
         <div style={{ ...card, color: C.sec, textAlign: "center" }}>
-          No questions yet. GainEdge AI will tell you when the available sample is too small.
+          No questions yet. RON answers from stored evidence and will state when the available evidence is insufficient.
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -127,7 +127,7 @@ export default function GainEdgeAIPage() {
       </div>
 
       <p style={{ color: C.muted, fontSize: 11, marginTop: 18 }}>
-        Evidence-based decision support only. Deterministic risk controls remain in charge of execution.
+        Decision support only. Broker order placement is not enabled here.
       </p>
     </div>
   );
