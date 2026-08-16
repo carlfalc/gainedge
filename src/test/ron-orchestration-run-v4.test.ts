@@ -432,7 +432,9 @@ describe("2D — Orchestration Run V4: endpoint wiring", () => {
 
   it("adds no persistence, probability or execution expansion", () => {
     expect(ENDPOINT).toContain("const persist = body.persist === true;");
-    expect(ENDPOINT).not.toMatch(/numeric_probability:\s*(?!null)/);
+    const probs = ENDPOINT.match(/numeric_probability:[^,\n]*/g) ?? [];
+    expect(probs.length).toBeGreaterThan(0);
+    expect(probs.every((m) => m.trim() === "numeric_probability: null")).toBe(true);
     expect(ENDPOINT).not.toContain("allow_live_execution: true");
   });
 });
