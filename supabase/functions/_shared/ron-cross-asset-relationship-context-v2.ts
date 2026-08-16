@@ -47,6 +47,15 @@ const BAR_MINUTES = CROSS_ASSET_SPEC_V1.bar_minutes;
 const BAR_MS = BAR_MINUTES * 60_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
+/**
+ * V2-only provenance guard: source metadata instants strictly AFTER the evaluation anchor
+ * are omitted (never clamped), so future ingestion state cannot alter a historical replay.
+ */
+function anchorBound(v: number | undefined, asOf: number): number | undefined {
+  if (v == null || !Number.isFinite(v)) return undefined;
+  return v > asOf ? undefined : v;
+}
+
 /* ------------------------------------------------------- descriptive vocabularies */
 
 export const OBSERVED_ASSOCIATION_SIGNS = [
