@@ -411,4 +411,76 @@ describe("XARC V2 — endpoint contract", () => {
     expect(src).not.toMatch(/\.insert\(|\.upsert\(|\.update\(|\.delete\(/);
     expect(src).not.toMatch(/openai|anthropic|lovable-api|fetch\(/i);
   });
+
+  it("branches the counterpart projection so V1 never depends on created_at", () => {
+    expect(src).toContain('specVersion === 2 ? "timestamp, close, created_at" : "timestamp, close"');
+    // the V1-shaped mapping is built ONLY on the V1 branch, and carries no proof field
+    expect(src).toMatch(/counterpart_bars_v1[\s\S]{0,200}specVersion === 1/);
+    expect(src).toMatch(/counterpart_bars_v2[\s\S]{0,200}specVersion === 2/);
+    // no unconditional created_at projection remains
+    expect(src).not.toMatch(/\.select\("timestamp, close, created_at"\)/);
+  });
+
+  it("keeps V2-only top-level fields off the V1 replay response", () => {
+    expect(src).toContain("const v2Fields = specVersion === 2");
+    expect(src).toMatch(/v2Fields[\s\S]{0,300}allow_live_execution: false/);
+    expect(src).toContain("...v2Fields");
+  });
+
+  it("requires the V2 default anchor to satisfy the same completed-bar proof", () => {
+    expect(src).toContain("provenTimes");
+    expect(src).toContain("c >= t + BAR_MS");
+    expect(src).toContain("specVersion === 2 ? await provenTimes(counterpart) : await times(counterpart)");
+  });
+});
+
+describe("XARC V2 — audit corrections", () => {
+  it("stays in the SAME spec lineage as the frozen V1 specialist", () => {
+    expect(CROSS_ASSET_RELATIONSHIP_SPEC_V2.spec_id).toBe(CROSS_ASSET_SPEC_V1.spec_id);
+    expect(CROSS_ASSET_RELATIONSHIP_SPEC_V2.spec_id).toBe("ron_cross_asset_correlation");
+    expect(CROSS_ASSET_RELATIONSHIP_SPEC_V2.spec_version).toBe(2);
+    expect(CROSS_ASSET_RELATIONSHIP_SPEC_V2.supersedes_spec_version)
+      .toBe(CROSS_ASSET_SPEC_V1.spec_version);
+  });
+
+  it("omits post-anchor source provenance so historical replay cannot drift", async () => {
+    const bars = xau(N);
+    const cp = nas(N);
+    const plain = await buildCrossAssetRelationshipEvidenceV2({
+      instrument: "XAUUSD", counterpart: CROSS_ASSET_COUNTERPART_V1, timeframe: "15m",
+      as_of: ANCHOR, bars, counterpart_bars: cp, isQuarantined: noQuarantine,
+      run_id: "r", trace_id: TRACE,
+    });
+    const withFuture = await buildCrossAssetRelationshipEvidenceV2({
+      instrument: "XAUUSD", counterpart: CROSS_ASSET_COUNTERPART_V1, timeframe: "15m",
+      as_of: ANCHOR,
+      bars: [...bars, ...xau(6, ANCHOR + BAR)],
+      counterpart_bars: [...cp, ...nas(6, ANCHOR + BAR)],
+      isQuarantined: noQuarantine, run_id: "r", trace_id: TRACE,
+      newest_source_bar: ANCHOR + 40 * BAR,
+      newest_counterpart_bar: ANCHOR + 37 * BAR,
+    });
+    expect((await sealEvidence(withFuture)).evidence_hash)
+      .toBe((await sealEvidence(plain)).evidence_hash);
+    const st = JSON.stringify(withFuture.source_timestamps ?? {});
+    expect(st).not.toContain(new Date(ANCHOR + 40 * BAR).toISOString());
+    expect(st).not.toContain(new Date(ANCHOR + 37 * BAR).toISOString());
+  });
+
+  it("still admits at-or-before-anchor newest_* provenance unchanged", async () => {
+    const e = await buildCrossAssetRelationshipEvidenceV2({
+      instrument: "XAUUSD", counterpart: CROSS_ASSET_COUNTERPART_V1, timeframe: "15m",
+      as_of: ANCHOR, bars: xau(N), counterpart_bars: nas(N), isQuarantined: noQuarantine,
+      run_id: "r", trace_id: TRACE,
+      newest_source_bar: ANCHOR, newest_counterpart_bar: ANCHOR,
+    });
+    expect(e.source_timestamps?.newest_source_bar).toBe(new Date(ANCHOR).toISOString());
+  });
+
+  it("leaves the frozen Pattern V2 source untouched by this slice", () => {
+    const p = readFileSync(
+      "supabase/functions/_shared/ron-pattern-structure-context-v2.ts", "utf8");
+    expect(p).toContain("if (!ctx.ok) {");
+    expect(p).not.toContain("if (ctx.ok === false) {");
+  });
 });

@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
       asOf = Math.floor(t / BAR_MS) * BAR_MS;
     } else {
       const scanFrom = new Date(Math.min(newestSourceBar, newestCounterpartBar) - 400 * BAR_MS).toISOString();
+      // V1 anchor search is BYTE-UNCHANGED: timestamps only, no created_at dependency.
       const times = async (symbol: string): Promise<Set<number>> => {
         const { data, error } = await db
           .from("candle_history").select("timestamp")
@@ -121,8 +122,25 @@ Deno.serve(async (req) => {
         if (error) throw error;
         return new Set((data ?? []).map((r: Record<string, unknown>) => new Date(String(r.timestamp)).getTime()));
       };
+      // V2 counterpart anchor search additionally requires the SAME completed-bar proof
+      // the V2 producer enforces, so the default anchor can never name a row V2 excludes.
+      const provenTimes = async (symbol: string): Promise<Set<number>> => {
+        const { data, error } = await db
+          .from("candle_history").select("timestamp, created_at")
+          .eq("symbol", symbol).eq("timeframe", timeframe)
+          .gte("timestamp", scanFrom)
+          .order("timestamp", { ascending: true }).limit(1000);
+        if (error) throw error;
+        const out = new Set<number>();
+        for (const r of (data ?? []) as Record<string, unknown>[]) {
+          const t = new Date(String(r.timestamp)).getTime();
+          const c = r.created_at ? new Date(String(r.created_at)).getTime() : NaN;
+          if (Number.isFinite(t) && Number.isFinite(c) && c >= t + BAR_MS) out.add(t);
+        }
+        return out;
+      };
       const xs = await times(instrument);
-      const ns = await times(counterpart);
+      const ns = specVersion === 2 ? await provenTimes(counterpart) : await times(counterpart);
       const common = [...xs].filter((t) => ns.has(t)).sort((a, b) => b - a);
       const pick = common.find((t) => !contract.isQuarantined({ time: t }, 15));
       if (pick == null) return json({ error: "no_exact_common_completed_anchor" }, 409);
@@ -140,9 +158,12 @@ Deno.serve(async (req) => {
       .order("timestamp", { ascending: true }).limit(1000);
     if (error) throw error;
 
+    // DEPENDENCY ISOLATION: the V1 branch uses the ORIGINAL counterpart projection and
+    // never reads the V2-only `created_at` completion-proof column.
+    const counterpartSelect = specVersion === 2 ? "timestamp, close, created_at" : "timestamp, close";
     const { data: cRows, error: cErr } = await db
       .from("candle_history")
-      .select("timestamp, close, created_at")
+      .select(counterpartSelect)
       .eq("symbol", counterpart).eq("timeframe", timeframe)
       .gte("timestamp", fromIso).lte("timestamp", toIso)
       .order("timestamp", { ascending: true }).limit(1000);
@@ -153,15 +174,20 @@ Deno.serve(async (req) => {
       open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
       created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
     }));
-    const counterpart_bars_v1: CounterpartBar[] = (cRows ?? []).map((c: Record<string, unknown>) => ({
-      time: new Date(String(c.timestamp)).getTime(),
-      close: Number(c.close),
-    }));
-    const counterpart_bars_v2: CounterpartBarV2[] = (cRows ?? []).map((c: Record<string, unknown>) => ({
-      time: new Date(String(c.timestamp)).getTime(),
-      close: Number(c.close),
-      created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
-    }));
+    // ORIGINAL V1-shaped mapping: {time, close} only, no completion-proof field.
+    const counterpart_bars_v1: CounterpartBar[] = specVersion === 1
+      ? (cRows ?? []).map((c: Record<string, unknown>) => ({
+        time: new Date(String(c.timestamp)).getTime(),
+        close: Number(c.close),
+      }))
+      : [];
+    const counterpart_bars_v2: CounterpartBarV2[] = specVersion === 2
+      ? (cRows ?? []).map((c: Record<string, unknown>) => ({
+        time: new Date(String(c.timestamp)).getTime(),
+        close: Number(c.close),
+        created_at: c.created_at ? new Date(String(c.created_at)).getTime() : null,
+      }))
+      : [];
 
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
@@ -195,13 +221,21 @@ Deno.serve(async (req) => {
       return json({ error: "nondeterministic_specialist" }, 500);
     }
 
+    // V1 keeps its ORIGINAL top-level replay shape; V2-only fields are added for V2 only.
+    const v2Fields = specVersion === 2
+      ? {
+        agent_id: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_id,
+        agent_version: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_version,
+        allow_live_execution: false,
+      }
+      : {};
+
     return json({
       spec_version: specVersion,
       spec_hash: specVersion === 2
         ? await crossAssetRelationshipSpecHashV2()
         : await crossAssetSpecHash(),
-      agent_id: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_id,
-      agent_version: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_version,
+      ...v2Fields,
       quality_version: RON_QUALITY_VERSION,
       counterpart,
       anchor_bar_open: new Date(asOf).toISOString(),
@@ -210,7 +244,6 @@ Deno.serve(async (req) => {
       numeric_probability: null,
       execution_allowed: false,
       execution_path: "signal_only",
-      allow_live_execution: false,
       persisted: false,
     });
   } catch (err) {
