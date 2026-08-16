@@ -369,7 +369,7 @@ describe("opportunity/risk V2 acceptance gate", () => {
 
   it("rejects non-contextual direction or recommendation", async () => {
     const s = await genuineOpportunityV2();
-    await reject({ ...s, direction: "bullish" }, /direction_not_contextual/);
+    await reject({ ...s, direction: "bullish" as never }, /direction_not_contextual/);
     await reject({ ...s, recommendation: "execute" as never }, /recommendation_not_contextual/);
   });
 
