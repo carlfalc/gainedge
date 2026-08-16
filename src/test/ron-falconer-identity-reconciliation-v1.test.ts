@@ -167,12 +167,15 @@ describe("Falconer identity reconciliation V1 — D: sealed provenance identity 
   });
 });
 
-describe("Falconer identity reconciliation V1 — E/F: version selector and pin readiness", () => {
-  it("E. the endpoint exposes an explicit V1-only spec_version selector", () => {
-    const endpoint = readFileSync(
-      "supabase/functions/ron-agent-falconer-signal-source/index.ts", "utf8");
-    expect(endpoint).toContain("resolveFalconerSpecVersion(body)");
-    expect(endpoint).toContain("FALCONER_SIGNAL_SOURCE_SPEC_V1.spec_version");
+describe("Falconer identity reconciliation V1 — E/F: historical pin-readiness snapshot", () => {
+  it("E (HISTORICAL DECLARATION). at audit time the endpoint had NO spec_version selector", () => {
+    // Declaration, not a live source grep: the current endpoint has since gained a
+    // selector (see ron-falconer-endpoint-version-selector-v1.test.ts). Asserting the
+    // historical endpoint state against live source would rewrite audit history.
+    expect(AUDIT_OUTCOME_V1.blocker).toBe(
+      "falconer_signal_source endpoint has no explicit spec_version selector; "
+      + "V6 remains safely unpinned");
+    // Timeless identity check that held then and still holds now.
     expect(agentSpec("falconer_signal_source")!.agent_version).toBe(1);
   });
 
@@ -196,17 +199,15 @@ describe("Falconer identity reconciliation V1 — E/F: version selector and pin 
     expect(FALCONER_SIGNAL_SOURCE_SPEC_V1.non_authoritative).toBe(true);
   });
 
-  it("F (UPDATED). explicit orchestration pin readiness is now unblocked, not performed", () => {
+  it("F (HISTORICAL). explicit orchestration pin readiness was BLOCKED at this snapshot", () => {
     // A replay-safe explicit pin requires the specialist endpoint to explicitly
-    // select/replay the requested version. That selector now exists (V1-only),
-    // but no orchestration version pins Falconer in this slice.
-    const endpoint = readFileSync(
-      "supabase/functions/ron-agent-falconer-signal-source/index.ts", "utf8");
-    expect(endpoint).toContain("resolveFalconerSpecVersion(body)");
-    expect(AUDIT_OUTCOME_V1.explicit_orchestration_pin_readiness_f)
-      .toBe("READY_NOT_PERFORMED");
-    expect(AUDIT_OUTCOME_V1.blocker).toBeNull();
+    // select/replay the requested version. No such selector existed at audit time.
+    expect(AUDIT_OUTCOME_V1.identity_reconciliation_a_to_e).toBe("PASS");
+    expect(AUDIT_OUTCOME_V1.explicit_orchestration_pin_readiness_f).toBe("BLOCKED");
     expect(AUDIT_OUTCOME_V1.result)
-      .toBe("RON_FALCONER_SIGNAL_SOURCE_ENDPOINT_VERSION_SELECTOR_V1_PASS");
+      .toBe("RON_FALCONER_SIGNAL_SOURCE_IDENTITY_RECONCILIATION_AUDIT_V1_BLOCKED");
+    expect(AUDIT_OUTCOME_V1.ledger_semantics).toBe("historical_snapshot_immutable");
+    expect(AUDIT_OUTCOME_V1.safest_next_action).toContain("selector slice");
+    expect(AUDIT_OUTCOME_V1.safest_next_action).toContain("Orchestration V7");
   });
 });
