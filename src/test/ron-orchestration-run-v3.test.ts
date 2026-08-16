@@ -70,6 +70,13 @@ function envelope(agent_id: RonAgentId, over: Partial<EvidenceEnvelopeV1> = {}):
   };
 }
 
+const ACCEPTED_SOURCE_TIMESTAMPS: Record<string, string> = {
+  research_run_source_as_of: ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3,
+  calibration_run_source_as_of: ACCEPTED_CALIBRATION_ARTIFACT_AS_OF_V3,
+  research_run_source_bar_cutoff: ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3,
+  calibration_run_source_bar_cutoff: ACCEPTED_CALIBRATION_ARTIFACT_BAR_CUTOFF_V3,
+};
+
 const calV2 = (over: Partial<EvidenceEnvelopeV1> = {}) =>
   sealEvidence(envelope(CALIBRATION_CONTEXT_AGENT, {
     direction: "neutral",
