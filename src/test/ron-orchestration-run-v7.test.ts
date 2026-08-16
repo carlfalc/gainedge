@@ -377,7 +377,8 @@ describe("V7 Falconer acceptance gate", () => {
       observations: [...base.observations,
         { key: "falconer_target_price", kind: "measurement", value_num: 2400, at: minus(10) }],
     }), "falconer_signal_source_forbidden_observation:falconer_target_price");
-    await reject({ ...base, allow_live_execution: false } as unknown,
+    await reject(
+      await unvalidated(base, { allow_live_execution: false } as Partial<EvidenceEnvelopeV1>),
       "falconer_signal_source_unexpected_field:allow_live_execution");
   });
 });
