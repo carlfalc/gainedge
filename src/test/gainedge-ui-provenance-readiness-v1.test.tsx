@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import {
   formatAgeShort, normaliseTimeframe,
   presentCalibrationScope, presentPriceProvenance,
@@ -74,11 +75,22 @@ describe("calibration scope presentation", () => {
   });
 
   it("does NOT transfer XAU scope to another timeframe", () => {
-    for (const tf of ["1h", "5m", "1d", null]) {
+    for (const tf of ["1h", "5m", "1d"]) {
       const s = presentCalibrationScope("XAUUSD", tf);
       expect(s.inScope).toBe(false);
-      expect(s.label).toBe("Calibration: not established for this instrument");
+      expect(s.label).toBe("Calibration: not established for this instrument/timeframe");
+      expect(s.label).toMatch(/instrument\/timeframe/);
       expect(s.secondary).toBe("Context only · no probability");
+    }
+  });
+
+  it("reports an unavailable scope (never XAUUSD 15m) when symbol or timeframe is missing", () => {
+    for (const [sym, tf] of [["XAUUSD", null], [null, "15m"], [null, null], ["", ""]] as const) {
+      const s = presentCalibrationScope(sym, tf);
+      expect(s.inScope).toBe(false);
+      expect(s.label).toBe("Calibration scope unavailable");
+      expect(s.secondary).toBe("Instrument or timeframe not specified");
+      expect(s.label).not.toMatch(/XAUUSD/);
     }
   });
 
@@ -126,7 +138,7 @@ describe("badge components", () => {
   it("renders non-scope wording for another instrument and keeps the qualifier on the tooltip in compact mode", () => {
     render(<CalibrationScopeBadge symbol="NAS100" timeframe="15m" compact />);
     const el = screen.getByTestId("calibration-scope-badge");
-    expect(el.textContent).toBe("Calibration: not established for this instrument");
+    expect(el.textContent).toBe("Calibration: not established for this instrument/timeframe");
     expect(el.getAttribute("title")).toContain("Context only · no probability");
     expect(screen.queryByTestId("calibration-scope-secondary")).toBeNull();
   });
@@ -154,5 +166,48 @@ describe("badge components", () => {
       </>,
     );
     expect(document.body.textContent ?? "").not.toMatch(BANNED);
+  });
+});
+
+describe("chart + instrument surface wiring (audit correction)", () => {
+  const chart = readFileSync("src/components/dashboard/ChartTabPane.tsx", "utf8");
+  const panel = readFileSync("src/components/dashboard/InstrumentTrackingPanel.tsx", "utf8");
+
+  it("uses the broker/source quote instant, never client receipt time", () => {
+    expect(chart).toContain("setLivePriceTime(p.time ?? null)");
+    expect(chart).not.toContain("setLivePriceAt(Date.now())");
+    expect(chart).not.toMatch(/livePriceAt/);
+  });
+
+  it("passes the source instant straight to the badge with no fabricated fallback", () => {
+    expect(chart).toContain('<PriceProvenanceBadge kind="live_quote" timestamp={livePriceTime} />');
+    expect(chart).not.toMatch(/timestamp=\{[^}]*Date\.now\(\)/);
+  });
+
+  it("renders the chart provenance badge only when a price is displayed", () => {
+    expect(chart).toMatch(/\{livePrice != null && \(\s*<PriceProvenanceBadge/);
+  });
+
+  it("treats a missing/invalid source instant as unknown rather than fresh", () => {
+    for (const ts of [null, undefined, "", "not-a-date"]) {
+      const p = presentPriceProvenance({ kind: "live_quote", timestamp: ts as any, now: NOW });
+      expect(p.state).toBe("unknown");
+      expect(p.label).toBe("Price source unavailable");
+    }
+  });
+
+  it("removes the calibration badge from the chart header (timeframe unavailable there)", () => {
+    expect(chart).not.toMatch(/CalibrationScopeBadge/);
+  });
+
+  it("keeps the calibration badge where the exact timeframe IS known", () => {
+    expect(panel).toMatch(/<CalibrationScopeBadge symbol=\{inst\.symbol\} timeframe=\{tf\}/);
+  });
+
+  it("pairs the completed-close row with a completed_bar provenance badge from snap fields", () => {
+    expect(panel).toContain(
+      '<PriceProvenanceBadge kind="completed_bar" timestamp={snap.bar_time} timeframe={snap.timeframe} />',
+    );
+    expect(panel).toContain("Completed {snap.timeframe} close");
   });
 });
