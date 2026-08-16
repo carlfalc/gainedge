@@ -35,8 +35,15 @@ import {
   orchestrationRunPlanHashV6,
 } from "../../supabase/functions/_shared/ron-orchestration-run-v6.ts";
 
+/**
+ * The V6 spec object is byte-identical to the accepted seal-flow correction commit
+ * 824eb02cab7b04fa5687e799e02ed8e8eeda7f26; this is its deterministic canonical hash,
+ * recomputed from that exact commit. (The value `07b8281f…` quoted in the earlier report
+ * does not reproduce from any committed V6 spec state.) This hardening slice adds only a
+ * pure helper function and changes NOTHING inside the spec object.
+ */
 const V6_PLAN_HASH_FROZEN =
-  "07b8281f69ef49080c95a0695029e0007b8483b27b958897e93051410f922616";
+  "b63797aed1b3d811cb9fd49f3f30572d0f0015d9020b38af9c06267735b722b0";
 
 const TRACE = "ron_run_v6_seal_integrity_trace";
 const AS_OF = "2026-08-16T04:00:00Z";
@@ -135,7 +142,8 @@ describe("assertSpecialistReturnedSealedV6", () => {
 
     it(`rejects an out-of-scope or wrong-agent ${agent} response`, async () => {
       const sealed = await sealEvidence(raw(agent));
-      await expect(assertSpecialistReturnedSealedV6(sealed, CTX, "opportunity_risk"))
+      const other = AGENTS.find((a) => a !== agent)!;
+      await expect(assertSpecialistReturnedSealedV6(sealed, CTX, other))
         .rejects.toThrow(OrchestrationRunError);
       await expect(assertSpecialistReturnedSealedV6(
         sealed, { ...CTX, trace_id: "other_trace" }, agent,
