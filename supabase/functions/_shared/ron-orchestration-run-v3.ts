@@ -236,8 +236,33 @@ export async function assertCalibrationContextV2Sealed(
   const anchorMs = Date.parse(ctx.as_of);
   const atMs = Date.parse(e.as_of ?? "");
   if (!Number.isFinite(anchorMs)) reasons.push("calibration_context_anchor_unparseable");
-  else if (!Number.isFinite(atMs)) reasons.push("calibration_context_as_of_unparseable");
-  else if (atMs > anchorMs) reasons.push("calibration_context_after_anchor");
+  else if (anchorMs < ACCEPTED_AS_OF_MS) {
+    // Historical artifact context may never be claimed by an orchestration run that
+    // predates the accepted artifact itself.
+    reasons.push("calibration_context_artifact_after_orchestration_anchor");
+  }
+
+  // The accepted artifact instant is frozen: this specialist is historical
+  // artifact-validation context, so its as_of must equal the accepted artifact clock
+  // exactly — NOT the orchestration anchor, and not any arbitrary earlier instant.
+  if (!Number.isFinite(atMs)) reasons.push("calibration_context_as_of_unparseable");
+  else if (atMs !== ACCEPTED_AS_OF_MS) {
+    reasons.push("calibration_context_artifact_as_of_mismatch");
+  }
+
+  // Bind temporal provenance to the accepted artifact, not just the top-level as_of.
+  const st = (e.source_timestamps ?? {}) as Record<string, unknown>;
+  for (const [key, expected] of REQUIRED_SOURCE_TIMESTAMPS_V3) {
+    const raw = st[key];
+    if (typeof raw !== "string" || !raw) {
+      reasons.push(`calibration_context_source_timestamp_missing:${key}`);
+      continue;
+    }
+    const ms = Date.parse(raw);
+    if (!Number.isFinite(ms) || ms !== Date.parse(expected)) {
+      reasons.push(`calibration_context_source_timestamp_mismatch:${key}`);
+    }
+  }
 
   const refs = (e.provenance_refs ?? []).filter((p): p is string => typeof p === "string");
   const specRefs = refs.filter((p) => p.startsWith(CAL_SPEC_PREFIX));
