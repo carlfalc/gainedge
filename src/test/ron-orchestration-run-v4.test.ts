@@ -385,7 +385,7 @@ describe("2D — Orchestration Run V4: cross-asset acceptance gate", () => {
     const dir = await crossV2({ direction: "long" });
     expect(await reasons(assertCrossAssetContextV2Sealed(dir, CTX)))
       .toContain("cross_asset_context_direction_not_contextual");
-    const rec = await crossV2({ recommendation: "actionable" as never });
+    const rec = await crossV2({ recommendation: "observe" });
     expect(await reasons(assertCrossAssetContextV2Sealed(rec, CTX)))
       .toContain("cross_asset_context_recommendation_not_contextual");
   });
@@ -432,7 +432,7 @@ describe("2D — Orchestration Run V4: endpoint wiring", () => {
 
   it("adds no persistence, probability or execution expansion", () => {
     expect(ENDPOINT).toContain("const persist = body.persist === true;");
-    expect(ENDPOINT).not.toMatch(/numeric_probability:\s*[^n]/);
+    expect(ENDPOINT).not.toMatch(/numeric_probability:\s*(?!null)/);
     expect(ENDPOINT).not.toContain("allow_live_execution: true");
   });
 });
