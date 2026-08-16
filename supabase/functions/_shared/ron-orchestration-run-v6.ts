@@ -346,3 +346,60 @@ export function assertOpportunityRiskBinding(
     throw new OrchestrationRunError(["opportunity_risk_binding_hash_mismatch"]);
   }
 }
+
+/* ------------------------------- V6 generic as-returned seal integrity gate */
+
+/**
+ * V6-ONLY generic integrity gate, applied to EVERY specialist response before any local
+ * sealing or collection.
+ *
+ * It proves the envelope is ALREADY a valid sealed Evidence V1 envelope exactly as the
+ * specialist returned it. Orchestration may verify a specialist seal; it must never repair
+ * or mint a missing/incorrect `evidence_hash` before acceptance.
+ *
+ * Minimal, deliberately weaker than the specialised per-agent gates (which stay in force
+ * and may impose stricter temporal/lineage semantics):
+ *  - envelope exists and is a plain object
+ *  - `validateEvidence` clean
+ *  - non-empty `evidence_hash`
+ *  - recomputed `evidenceHash(candidate) === candidate.evidence_hash`
+ *  - exact agent_id / trace_id / instrument / timeframe
+ *  - `as_of` parses and is not after the orchestration anchor
+ *
+ * Confers NO authority, reads NO observation, weights NO signal and mutates nothing.
+ * Returns the ORIGINAL specialist-provided evidence hash.
+ */
+export async function assertSpecialistReturnedSealedV6(
+  candidate: unknown, ctx: OrchestrationContext, expected_agent_id: RonAgentId,
+): Promise<string> {
+  if (candidate == null || typeof candidate !== "object" || Array.isArray(candidate)) {
+    throw new OrchestrationRunError([`specialist_absent_or_malformed:${expected_agent_id}`]);
+  }
+  const e = candidate as EvidenceEnvelopeV1;
+  const reasons: string[] = [];
+  const tag = expected_agent_id;
+
+  if (e.agent_id !== expected_agent_id) reasons.push(`specialist_wrong_agent:${tag}`);
+  if (validateEvidence(e).length) reasons.push(`specialist_invalid_envelope:${tag}`);
+  if (typeof e.evidence_hash !== "string" || e.evidence_hash.length === 0) {
+    reasons.push(`specialist_unsealed:${tag}`);
+  }
+  if (e.trace_id !== ctx.trace_id) reasons.push(`specialist_trace_mismatch:${tag}`);
+  if (e.instrument !== ctx.instrument) reasons.push(`specialist_instrument_mismatch:${tag}`);
+  if (e.timeframe !== ctx.timeframe) reasons.push(`specialist_timeframe_mismatch:${tag}`);
+
+  const anchorMs = Date.parse(ctx.as_of);
+  const atMs = Date.parse(e.as_of ?? "");
+  if (!Number.isFinite(anchorMs)) reasons.push(`specialist_anchor_unparseable:${tag}`);
+  if (!Number.isFinite(atMs)) reasons.push(`specialist_as_of_unparseable:${tag}`);
+  else if (Number.isFinite(anchorMs) && atMs > anchorMs) {
+    reasons.push(`specialist_as_of_after_evaluation_anchor:${tag}`);
+  }
+
+  if (reasons.length) throw new OrchestrationRunError([...new Set(reasons)].sort());
+
+  if (await evidenceHash(e) !== e.evidence_hash) {
+    throw new OrchestrationRunError([`specialist_hash_mismatch:${tag}`]);
+  }
+  return e.evidence_hash as string;
+}
