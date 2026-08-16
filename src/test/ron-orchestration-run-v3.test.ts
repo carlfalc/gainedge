@@ -357,7 +357,7 @@ describe("2D — Orchestration Run V3: collection + safety invariants", () => {
 describe("2D — Orchestration Run V3: endpoint wiring", () => {
   it("keeps V2 as the safest documented default and makes V3 explicit-only", () => {
     expect(ENDPOINT).toContain("? RON_ORCHESTRATION_RUN_VERSION_V2");
-    expect(ENDPOINT).toContain("[1, 2, 3, 4].includes(requestedRunVersion)");
+    expect(ENDPOINT).toContain("[1, 2, 3, 4, 5].includes(requestedRunVersion)");
     expect(ENDPOINT).toContain("default_orchestration_run_version: RON_ORCHESTRATION_RUN_VERSION_V2");
   });
 
