@@ -155,9 +155,25 @@ export default function DashboardLayout() {
 
         {/* Nav */}
         <nav style={{ flex: 1, padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV_ITEMS.map(item => {
-            const gold = 'gold' in item && item.gold;
-            const white = 'white' in item && item.white;
+          {NAV_GROUPS.map((group, gi) => (
+            <div key={group.labelKey} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {sidebarWidth > 0 && (
+                <div
+                  style={{
+                    padding: gi === 0 ? "2px 12px 4px" : "12px 12px 4px",
+                    fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                    textTransform: "uppercase", color: C.muted,
+                    fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
+                    borderTop: gi === 0 ? "none" : `1px solid ${C.border}`,
+                    marginTop: gi === 0 ? 0 : 6,
+                  }}
+                >
+                  {group.labelKey.includes(".") ? t(group.labelKey) : group.labelKey}
+                </div>
+              )}
+              {group.items.map(item => {
+            const gold = !!item.gold;
+            const white = !!item.white;
             const activeColor = gold ? "#F59E0B" : white ? "#FFFFFF" : C.jade;
             const defaultColor = gold ? "#F59E0B" : white ? "#E2E8F0" : C.sec;
             const hoverColor = gold ? "#F59E0B" : white ? "#FFFFFF" : C.text;
@@ -186,7 +202,9 @@ export default function DashboardLayout() {
                 <span>{item.labelKey.includes(".") ? t(item.labelKey) : item.labelKey}</span>
               </button>
             );
-          })}
+              })}
+            </div>
+          ))}
 
           {/* Spacer */}
           <div style={{ flex: 1 }} />
