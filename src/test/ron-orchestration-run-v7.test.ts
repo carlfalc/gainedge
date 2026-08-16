@@ -85,6 +85,12 @@ const reseal = async (e: EvidenceEnvelopeV1, over: Partial<EvidenceEnvelopeV1>) 
   return await sealEvidence(rest as EvidenceEnvelopeV1);
 };
 
+/** Hash WITHOUT validating, for defects the Evidence V1 validator itself already blocks. */
+const unvalidated = async (e: EvidenceEnvelopeV1, over: Partial<EvidenceEnvelopeV1>) => {
+  const { evidence_hash: _drop, ...rest } = { ...e, ...over } as EvidenceEnvelopeV1 & { evidence_hash?: string };
+  return { ...rest, evidence_hash: await evidenceHash(rest as EvidenceEnvelopeV1) } as EvidenceEnvelopeV1;
+};
+
 function raw(agent_id: RonAgentId, ageMinutes: number, over: Partial<EvidenceEnvelopeV1> = {}): EvidenceEnvelopeV1 {
   const at = minus(ageMinutes);
   return {
@@ -341,7 +347,9 @@ describe("V7 Falconer acceptance gate", () => {
 
   it("rejects a wrong agent_version and a wrong agent", async () => {
     const base = await realFalconer();
-    await reject(await reseal(base, { agent_version: 2 }),
+    // agent_version 2 is unregistered, so the envelope cannot be validly sealed at all:
+    // hash it directly to prove BOTH the inherited validator and the V7 version rule fire.
+    await reject(await unvalidated(base, { agent_version: 2 }),
       "falconer_signal_source_wrong_agent_version");
     await reject(await reseal(base, { agent_id: "pattern_context" }),
       "specialist_wrong_agent");
@@ -357,14 +365,17 @@ describe("V7 Falconer acceptance gate", () => {
 
   it("rejects probability / geometry / execution observation keys and extra fields", async () => {
     const base = await realFalconer();
-    await reject(await reseal(base, {
+    // `falconer_confidence` is already blocked one layer down by the Evidence V1 validator
+    // itself, so it can only be constructed unvalidated; V7 rejects it independently too.
+    await reject(await unvalidated(base, {
       observations: [...base.observations,
         { key: "falconer_confidence", kind: "measurement", value_num: 0.9, at: minus(10) }],
     }), "falconer_signal_source_forbidden_observation:falconer_confidence");
+    // A geometry key the base validator does NOT block: V7 is the gate that rejects it.
     await reject(await reseal(base, {
       observations: [...base.observations,
-        { key: "stop_loss", kind: "measurement", value_num: 2400, at: minus(10) }],
-    }), "falconer_signal_source_forbidden_observation:stop_loss");
+        { key: "falconer_target_price", kind: "measurement", value_num: 2400, at: minus(10) }],
+    }), "falconer_signal_source_forbidden_observation:falconer_target_price");
     await reject({ ...base, allow_live_execution: false } as unknown,
       "falconer_signal_source_unexpected_field:allow_live_execution");
   });
