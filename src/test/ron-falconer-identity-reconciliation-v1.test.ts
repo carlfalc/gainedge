@@ -34,18 +34,26 @@ const STRATEGY_PINE_SHA256 =
 const SIGNAL_SOURCE_SPEC_V1_HASH =
   "40a4b6f9d465ae0362e1a0ada43e3b699c2674efa30c5dbe9e5a934dcd1005f3";
 
-/** Formal, machine-checkable outcome of this audit (test-only ledger). */
+/**
+ * IMMUTABLE HISTORICAL AUDIT LEDGER (test-only, snapshot semantics).
+ *
+ * This is the conclusion the identity-reconciliation audit genuinely reached AT ITS
+ * OWN SNAPSHOT, when the Falconer signal-source endpoint had NO explicit spec_version
+ * selector. It must NEVER be rewritten to reflect later slices: the selector slice is
+ * recorded separately in `ron-falconer-endpoint-version-selector-v1.test.ts`.
+ * A later PASS there is intentional chronology, not a contradiction of this BLOCKED.
+ */
 const AUDIT_OUTCOME_V1 = {
   identity_reconciliation_a_to_e: "PASS",
-  explicit_orchestration_pin_readiness_f: "READY_NOT_PERFORMED",
-  result: "RON_FALCONER_SIGNAL_SOURCE_ENDPOINT_VERSION_SELECTOR_V1_PASS",
-  blocker: null,
+  explicit_orchestration_pin_readiness_f: "BLOCKED",
+  result: "RON_FALCONER_SIGNAL_SOURCE_IDENTITY_RECONCILIATION_AUDIT_V1_BLOCKED",
+  blocker:
+    "falconer_signal_source endpoint has no explicit spec_version selector; "
+    + "V6 remains safely unpinned",
   safest_next_action:
-    "a separate forward-only Orchestration V7 slice may now explicitly pin "
-    + "falconer_signal_source to spec_version 1",
-  performed_in_this_correction:
-    "endpoint request spec_version selector only; no spec object, spec hash, "
-    + "evidence, orchestration or plan change",
+    "a separate forward-only endpoint spec_version selector slice, and only then a "
+    + "later Orchestration V7 slice pinning falconer_signal_source to spec_version 1",
+  ledger_semantics: "historical_snapshot_immutable",
 } as const;
 
 const sha = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
