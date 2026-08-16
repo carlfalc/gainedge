@@ -166,24 +166,36 @@ export async function deriveRunIdsV2(
 export async function assertSessionDependencySealed(
   candidate: unknown, ctx: OrchestrationContext,
 ): Promise<string> {
-  const reasons: string[] = [];
   if (candidate == null || typeof candidate !== "object" || Array.isArray(candidate)) {
     throw new OrchestrationRunError(["session_dependency_absent_or_malformed"]);
   }
-  const e = candidate as EvidenceEnvelopeV1;
-  if (e.agent_id !== PATTERN_SESSION_DEPENDENCY_AGENT) reasons.push("session_dependency_wrong_agent");
-  if (validateEvidence(e).length) reasons.push("session_dependency_invalid_envelope");
-  if (typeof e.evidence_hash !== "string" || !e.evidence_hash) {
-    reasons.push("session_dependency_unsealed");
-  } else if (await evidenceHash(e) !== e.evidence_hash) {
-    reasons.push("session_dependency_hash_mismatch");
+  const anchorMs = Date.parse(ctx.as_of);
+  if (!Number.isFinite(anchorMs)) {
+    throw new OrchestrationRunError(["session_dependency_anchor_unparseable"]);
   }
-  if (e.trace_id !== ctx.trace_id) reasons.push("session_dependency_trace_mismatch");
-  if (e.instrument !== ctx.instrument) reasons.push("session_dependency_instrument_mismatch");
-  if (e.timeframe !== ctx.timeframe) reasons.push("session_dependency_timeframe_mismatch");
-  if (e.as_of !== ctx.as_of) reasons.push("session_dependency_anchor_mismatch");
-  if (reasons.length) throw new OrchestrationRunError([...new Set(reasons)].sort());
-  return e.evidence_hash as string;
+  // Reuse the FROZEN Pattern V2 acceptance contract verbatim so the orchestrator gate and
+  // Pattern cannot diverge and no second acceptance truth is invented here.
+  const accepted = await acceptSessionStructureContext(candidate, {
+    trace_id: ctx.trace_id, instrument: ctx.instrument,
+    timeframe: ctx.timeframe, as_of: anchorMs,
+  });
+  if (accepted.ok === false) {
+    throw new OrchestrationRunError([
+      accepted.reason.replace(/^session_context_/, "session_dependency_"),
+    ]);
+  }
+  // Defence in depth: the accepted contract already proves these, restated explicitly.
+  const e = candidate as EvidenceEnvelopeV1;
+  if (e.agent_id !== PATTERN_SESSION_DEPENDENCY_AGENT) {
+    throw new OrchestrationRunError(["session_dependency_wrong_agent"]);
+  }
+  if (validateEvidence(e).length) {
+    throw new OrchestrationRunError(["session_dependency_invalid_envelope"]);
+  }
+  if (await evidenceHash(e) !== accepted.evidence_hash) {
+    throw new OrchestrationRunError(["session_dependency_hash_mismatch"]);
+  }
+  return accepted.evidence_hash;
 }
 
 /**
@@ -199,5 +211,38 @@ export function assertSessionDependencyBinding(
   }
   if (sessions[0].evidence_hash !== handed_hash) {
     throw new OrchestrationRunError(["session_dependency_binding_hash_divergence"]);
+  }
+}
+
+/**
+ * Prove PATTERN ACTUALLY CONSUMED the exact sealed Session envelope handed to it.
+ *
+ * The sealed Pattern evidence must carry EXACTLY ONE `session_market_structure_evidence:`
+ * dependency entry and it must equal the handed Session hash. Any missing, duplicated or
+ * divergent dependency — and any structure-context provenance ref citing a different
+ * Session hash — fails closed BEFORE synthesis.
+ */
+export function assertPatternDependencyBinding(
+  batch: EvidenceEnvelopeV1[], handed_hash: string,
+): void {
+  const patterns = batch.filter((e) => e?.agent_id === PATTERN_DEPENDENT_AGENT);
+  if (patterns.length !== 1) {
+    throw new OrchestrationRunError([`pattern_dependency_binding_agent_count:${patterns.length}`]);
+  }
+  const deps = (patterns[0].dependencies ?? [])
+    .filter((d) => typeof d === "string" && d.startsWith(PATTERN_SESSION_DEPENDENCY_PREFIX));
+  if (deps.length !== 1) {
+    throw new OrchestrationRunError([`pattern_dependency_binding_count:${deps.length}`]);
+  }
+  if (deps[0] !== patternSessionDependencyEntry(handed_hash)) {
+    throw new OrchestrationRunError(["pattern_dependency_binding_hash_divergence"]);
+  }
+  const refs = (patterns[0].provenance_refs ?? [])
+    .filter((p) => typeof p === "string" && p.startsWith(PATTERN_STRUCTURE_PROVENANCE_PREFIX));
+  if (refs.length !== 1) {
+    throw new OrchestrationRunError([`pattern_dependency_provenance_count:${refs.length}`]);
+  }
+  if (refs[0] !== `${PATTERN_STRUCTURE_PROVENANCE_PREFIX}${handed_hash}`) {
+    throw new OrchestrationRunError(["pattern_dependency_provenance_hash_divergence"]);
   }
 }

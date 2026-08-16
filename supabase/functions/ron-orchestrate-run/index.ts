@@ -31,7 +31,8 @@ import {
   orchestrationRunPlanHash, RON_ORCHESTRATION_RUN_VERSION,
 } from "../_shared/ron-orchestration-run.ts";
 import {
-  assertSessionDependencyBinding, assertSessionDependencySealed, deriveRunIdsV2,
+  assertPatternDependencyBinding, assertSessionDependencyBinding,
+  assertSessionDependencySealed, deriveRunIdsV2,
   ORCHESTRATION_RUN_PLAN_V2, ORCHESTRATION_RUN_SPEC_V2,
   orchestrationRunPlanHashV2, RON_ORCHESTRATION_RUN_VERSION_V2,
   type AgentCallPlanEntryV2,
@@ -189,7 +190,11 @@ Deno.serve(async (req) => {
     const sealed = canonicalOrder(await Promise.all(collected.map(sealEvidence)));
     assertCollectionComplete(sealed, ctx);
     // The exact envelope handed to Pattern must be the one in the final collected batch.
-    if (isV2 && sessionDependencyHash) assertSessionDependencyBinding(sealed, sessionDependencyHash);
+    if (isV2 && sessionDependencyHash) {
+      assertSessionDependencyBinding(sealed, sessionDependencyHash);
+      // ...and Pattern's OWN sealed evidence must cite exactly that Session hash.
+      assertPatternDependencyBinding(sealed, sessionDependencyHash);
+    }
 
     const { decision, explanation } = await synthesizeDecision(sealed, ctx);
     const replay = await reconstructDecision(sealed, ctx);
@@ -204,7 +209,8 @@ Deno.serve(async (req) => {
       persistence_atomicity: isV2
         ? ORCHESTRATION_RUN_SPEC_V2.persistence_atomicity
         : ORCHESTRATION_RUN_SPEC_V1.persistence_atomicity,
-      session_to_pattern_dependency_hash: sessionDependencyHash,
+      // V2-ONLY field: explicit V1 replay keeps the exact pre-V2 summary shape.
+      ...(isV2 ? { session_to_pattern_dependency_hash: sessionDependencyHash } : {}),
       evaluation_anchor: anchor,
       trace_id: traceId,
       subject_binding: subjectBound ? "caller_jwt_verified_rls_scoped" : "no_verified_subject_fail_closed",
