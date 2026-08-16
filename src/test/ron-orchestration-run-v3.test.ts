@@ -130,7 +130,7 @@ describe("2D — Orchestration Run V3: plan identity", () => {
       expect(p.requires_evidence_batch).toBe(v2.requires_evidence_batch);
     }
     expect(ORCHESTRATION_RUN_SPEC_V3.session_dependency_acceptance)
-      .toEqual(ORCHESTRATION_RUN_PLAN_V3 && ORCHESTRATION_RUN_SPEC_V3.session_dependency_acceptance);
+      .toEqual(ORCHESTRATION_RUN_SPEC_V2.session_dependency_acceptance);
     const opp = ORCHESTRATION_RUN_PLAN_V3.find((p) => p.agent_id === "opportunity_risk")!;
     expect(opp.phase).toBe(2);
     expect(opp.requires_evidence_batch).toBe(true);
