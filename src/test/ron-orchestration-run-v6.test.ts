@@ -536,4 +536,17 @@ describe("orchestration endpoint wiring", () => {
     expect(ENDPOINT).toContain("numeric_probability: null");
     expect(ENDPOINT).toContain("execution_allowed: false");
   });
+
+  it("gates the Opportunity envelope EXACTLY as returned, never re-sealing it first", () => {
+    // The V6 branch must hand the specialist-returned envelope straight to the gate.
+    expect(ENDPOINT).toContain("assertOpportunityRiskV2Sealed(envelope, ctx)");
+    // No locally minted seal may exist in the V6 branch — that would make the
+    // "unsealed" and "hash mismatch" rejections unreachable.
+    expect(ENDPOINT).not.toContain("sealEvidence(envelope);\n        opportunityRiskHash");
+    expect(ENDPOINT).not.toContain("sealedOpp");
+    // And the accepted hash must be the specialist's own seal, pushed verbatim.
+    expect(ENDPOINT).toMatch(
+      /assertOpportunityRiskV2Sealed\(envelope, ctx\);\s*\n\s*collected\.push\(envelope\);/,
+    );
+  });
 });
