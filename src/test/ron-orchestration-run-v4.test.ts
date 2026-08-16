@@ -475,7 +475,7 @@ describe("2D — Orchestration Run V4: batch binding and collection", () => {
 
 describe("2D — Orchestration Run V4: endpoint wiring", () => {
   it("keeps V2 as the default and exposes V4 explicitly only", () => {
-    expect(ENDPOINT).toContain("[1, 2, 3, 4].includes(requestedRunVersion)");
+    expect(ENDPOINT).toContain("[1, 2, 3, 4, 5].includes(requestedRunVersion)");
     expect(ENDPOINT).toContain("requestedRunVersion === 4");
     expect(ENDPOINT).toContain("RON_ORCHESTRATION_RUN_VERSION_V2\n    : Number(body.orchestration_run_version)");
     expect(ENDPOINT).toContain("assertCrossAssetContextV2Sealed");
