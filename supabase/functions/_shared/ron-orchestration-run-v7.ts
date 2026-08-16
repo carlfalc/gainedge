@@ -266,7 +266,7 @@ export async function assertFalconerSignalSourceV1Sealed(
   }
 
   // NO construction surface on the envelope or any observation key.
-  for (const k of Object.keys(e as Record<string, unknown>)) {
+  for (const k of Object.keys(e as unknown as Record<string, unknown>)) {
     if (!ALLOWED_ENVELOPE_KEYS.has(k)) {
       reasons.push(`falconer_signal_source_unexpected_field:${k}`);
     }
