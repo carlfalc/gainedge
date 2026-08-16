@@ -26,6 +26,26 @@ const STRATEGY_PINE_SHA256 = "76b242b4b4b2e1f2aa5bbb11a0a12ef9849ec40beda306fc5c
 const sha = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
 const ANCHOR = Date.parse("2026-08-13T10:00:00Z");
 
+/**
+ * CURRENT-STATE LEDGER (forward-only). Named distinctly from the immutable
+ * historical `AUDIT_OUTCOME_V1` in ron-falconer-identity-reconciliation-v1.test.ts.
+ */
+const SELECTOR_AUDIT_OUTCOME_V1 = {
+  result: "RON_FALCONER_SIGNAL_SOURCE_ENDPOINT_VERSION_SELECTOR_V1_PASS",
+  resolves_historical_blocker:
+    "falconer_signal_source endpoint has no explicit spec_version selector; "
+    + "V6 remains safely unpinned",
+  explicit_orchestration_pin_readiness: "READY_NOT_PERFORMED",
+  blocker: null,
+  safest_next_action:
+    "a separate forward-only Orchestration V7 slice may now explicitly pin "
+    + "falconer_signal_source to spec_version 1",
+  performed_in_this_slice:
+    "endpoint request spec_version selector only; no spec object, spec hash, "
+    + "evidence, orchestration or plan change",
+  ledger_semantics: "current_state_forward_only",
+} as const;
+
 describe("Falconer endpoint version selector V1 — resolution", () => {
   it("omitted selector resolves to V1 (exact historical default)", () => {
     expect(resolveFalconerSpecVersion({})).toEqual({
