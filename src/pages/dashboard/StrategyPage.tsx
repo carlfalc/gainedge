@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchSymbols } from "@/services/metaapi-client";
 import { C } from "@/lib/mock-data";
 import { toast } from "sonner";
+import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 
 interface Settings {
   enabled: boolean;
