@@ -58,6 +58,12 @@ import {
   OPPORTUNITY_RISK_AGENT, deriveRunIdsV6, ORCHESTRATION_RUN_PLAN_V6,
   orchestrationRunPlanHashV6, RON_ORCHESTRATION_RUN_VERSION_V6,
 } from "../_shared/ron-orchestration-run-v6.ts";
+import {
+  assertFalconerSignalSourceBinding, assertFalconerSignalSourceV1Sealed,
+  FALCONER_SIGNAL_SOURCE_AGENT, FALCONER_SIGNAL_SOURCE_SPEC_VERSION_V7,
+  deriveRunIdsV7, ORCHESTRATION_RUN_PLAN_V7,
+  orchestrationRunPlanHashV7, RON_ORCHESTRATION_RUN_VERSION_V7,
+} from "../_shared/ron-orchestration-run-v7.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -128,10 +134,12 @@ Deno.serve(async (req) => {
   const requestedRunVersion = body.orchestration_run_version == null
     ? RON_ORCHESTRATION_RUN_VERSION_V2
     : Number(body.orchestration_run_version);
-  if (![1, 2, 3, 4, 5, 6].includes(requestedRunVersion)) {
+  if (![1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)) {
     return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
   }
-  const isV6 = requestedRunVersion === 6;
+  const isV7 = requestedRunVersion === 7;
+  // V7 inherits every V6 semantic (all seven as-returned seal proofs + every earlier gate).
+  const isV6 = requestedRunVersion === 6 || isV7;
   // V6 inherits every V5 semantic (macro V2 gate + all V4/V3/V2 semantics).
   const isV5 = requestedRunVersion === 5 || isV6;
   // V5 inherits every V4 semantic (cross-asset V2 gate + all V3/V2 semantics).
@@ -146,7 +154,9 @@ Deno.serve(async (req) => {
   };
 
   try {
-    const runIds = isV6
+    const runIds = isV7
+      ? await deriveRunIdsV7(traceId, anchor)
+      : isV6
       ? await deriveRunIdsV6(traceId, anchor)
       : isV5
       ? await deriveRunIdsV5(traceId, anchor)
@@ -164,9 +174,11 @@ Deno.serve(async (req) => {
     let crossAssetContextHash: string | null = null;
     let macroContextHash: string | null = null;
     let opportunityRiskHash: string | null = null;
+    let falconerSignalSourceHash: string | null = null;
 
     const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
-      isV6 ? ORCHESTRATION_RUN_PLAN_V6
+      isV7 ? ORCHESTRATION_RUN_PLAN_V7
+        : isV6 ? ORCHESTRATION_RUN_PLAN_V6
         : isV5 ? ORCHESTRATION_RUN_PLAN_V5
         : isV4 ? ORCHESTRATION_RUN_PLAN_V4
         : isV3 ? ORCHESTRATION_RUN_PLAN_V3
@@ -260,6 +272,15 @@ Deno.serve(async (req) => {
         const sealedMacro = isV6 ? envelope : await sealEvidence(envelope);
         macroContextHash = await assertMacroContextV2Sealed(sealedMacro, ctx);
         collected.push(sealedMacro);
+      } else if (isV7 && entry.agent_id === FALCONER_SIGNAL_SOURCE_AGENT) {
+        // V7 ONLY: the returned Falconer evidence must PROVE it is the accepted Falconer
+        // Signal Source V1 artifact — verified EXACTLY AS RETURNED (never re-sealed
+        // first), carrying exactly one accepted V1 spec ref, no canonical strategy SHA,
+        // contextual direction/recommendation only and no probability, score, geometry or
+        // execution surface. Falconer stays strategy context only and non-authoritative:
+        // this pin confers no authority and no directional weighting.
+        falconerSignalSourceHash = await assertFalconerSignalSourceV1Sealed(envelope, ctx);
+        collected.push(envelope);
       } else if (isV6 && entry.agent_id === OPPORTUNITY_RISK_AGENT) {
         // V6 ONLY: the returned readiness evidence must PROVE it is the accepted
         // Opportunity/Risk Evidence Compatibility V2 artifact — sealed, in scope, anchored
@@ -314,6 +335,11 @@ Deno.serve(async (req) => {
     if (isV6 && opportunityRiskHash) {
       assertOpportunityRiskBinding(sealed, opportunityRiskHash);
     }
+    // V7 ONLY: the accepted Falconer envelope must be the single Falconer envelope in the
+    // final batch. It stays strategy context only — no authority, no direction vote.
+    if (isV7 && falconerSignalSourceHash) {
+      assertFalconerSignalSourceBinding(sealed, falconerSignalSourceHash);
+    }
 
     const { decision, explanation } = await synthesizeDecision(sealed, ctx);
     const replay = await reconstructDecision(sealed, ctx);
@@ -323,7 +349,9 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: isV6
+      orchestration_run_version: isV7
+        ? RON_ORCHESTRATION_RUN_VERSION_V7
+        : isV6
         ? RON_ORCHESTRATION_RUN_VERSION_V6
         : isV5
         ? RON_ORCHESTRATION_RUN_VERSION_V5
@@ -332,7 +360,9 @@ Deno.serve(async (req) => {
         : isV3
         ? RON_ORCHESTRATION_RUN_VERSION_V3
         : isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: isV6
+      orchestration_run_plan_hash: isV7
+        ? await orchestrationRunPlanHashV7()
+        : isV6
         ? await orchestrationRunPlanHashV6()
         : isV5
         ? await orchestrationRunPlanHashV5()
@@ -373,6 +403,14 @@ Deno.serve(async (req) => {
         ? {
           opportunity_risk_spec_version: 2,
           opportunity_risk_evidence_hash: opportunityRiskHash,
+        }
+        : {}),
+      // V7-ONLY fields: explicit V1..V6 replay keeps the exact pre-V7 summary shape.
+      ...(isV7
+        ? {
+          falconer_signal_source_spec_version: FALCONER_SIGNAL_SOURCE_SPEC_VERSION_V7,
+          falconer_signal_source_evidence_hash: falconerSignalSourceHash,
+          falconer_authority: "strategy_context_only",
         }
         : {}),
       evaluation_anchor: anchor,

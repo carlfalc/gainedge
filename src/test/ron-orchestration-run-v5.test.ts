@@ -487,7 +487,7 @@ const ENDPOINT = readFileSync("supabase/functions/ron-orchestrate-run/index.ts",
 
 describe("orchestration endpoint wiring", () => {
   it("accepts explicit version 5 while the DEFAULT stays version 2", () => {
-    expect(ENDPOINT).toMatch(/\[1, 2, 3, 4, 5, 6\]\.includes\(requestedRunVersion\)/);
+    expect(ENDPOINT).toMatch(/\[1, 2, 3, 4, 5, 6, 7\]\.includes\(requestedRunVersion\)/);
     expect(ENDPOINT).toMatch(/body\.orchestration_run_version == null\s*\n?\s*\?\s*RON_ORCHESTRATION_RUN_VERSION_V2/);
     // V6 (a later forward-only slice) inherits every V5 semantic, so V5 is reachable
     // explicitly AND implied by V6. V5 request/response behaviour itself is unchanged.

@@ -513,9 +513,9 @@ const ENDPOINT = readFileSync("supabase/functions/ron-orchestrate-run/index.ts",
 
 describe("orchestration endpoint wiring", () => {
   it("accepts explicit version 6 while the DEFAULT stays version 2", () => {
-    expect(ENDPOINT).toMatch(/\[1, 2, 3, 4, 5, 6\]\.includes\(requestedRunVersion\)/);
+    expect(ENDPOINT).toMatch(/\[1, 2, 3, 4, 5, 6, 7\]\.includes\(requestedRunVersion\)/);
     expect(ENDPOINT).toMatch(/body\.orchestration_run_version == null\s*\n?\s*\?\s*RON_ORCHESTRATION_RUN_VERSION_V2/);
-    expect(ENDPOINT).toContain("const isV6 = requestedRunVersion === 6;");
+    expect(ENDPOINT).toContain("const isV6 = requestedRunVersion === 6 || isV7;");
     expect(ENDPOINT).toContain("const isV5 = requestedRunVersion === 5 || isV6;");
   });
 
