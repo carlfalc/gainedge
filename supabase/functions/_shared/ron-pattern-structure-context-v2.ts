@@ -464,14 +464,17 @@ export async function buildPatternStructureContextEvidenceV2(
   );
 
   if (!ctx.ok) {
+    // Narrow at the use site only: the frozen `if (!ctx.ok) {` guard and the
+    // `SessionContextResult` union are both preserved byte-for-byte.
+    const rejectionReason = (ctx as { reason: string }).reason;
     observations.push(
       state("structure_context_availability", "unavailable", at),
-      state("structure_context_rejection_reason", ctx.reason, at),
+      state("structure_context_rejection_reason", rejectionReason, at),
       state("current_structure_state", "insufficient_structure_context", at),
       state("pattern_structure_compatibility_state", "insufficient_structure_context", at),
     );
     limitations.push(
-      `no admissible sealed Session V2 structure context (${ctx.reason}); ` +
+      `no admissible sealed Session V2 structure context (${rejectionReason}); ` +
       "structure is reported unavailable and is never inferred",
     );
   } else {

@@ -418,7 +418,7 @@ describe("macro temporal context V2 acceptance gate", () => {
   it("rejects non-contextual direction or recommendation", async () => {
     // These shapes cannot even be sealed by the frozen contract, so they are checked on
     // the unsealed envelope: the gate must still name the contextual violation.
-    await reject(macroEnvelope({ direction: "bullish" }), /direction_not_contextual/);
+    await reject(macroEnvelope({ direction: "bullish" as never }), /direction_not_contextual/);
     await reject(macroEnvelope({ recommendation: "execute" as never }),
       /recommendation_not_contextual/);
   });
