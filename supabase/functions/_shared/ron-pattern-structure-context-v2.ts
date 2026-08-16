@@ -463,7 +463,9 @@ export async function buildPatternStructureContextEvidenceV2(
     state("structure_context_source", "sealed_session_market_structure_v2_evidence", at),
   );
 
-  if (!ctx.ok) {
+  // `ctx.ok !== true` is the same runtime condition as `!ctx.ok`, written as an explicit
+  // literal comparison so the discriminated union narrows under the project typechecker.
+  if (ctx.ok !== true) {
     observations.push(
       state("structure_context_availability", "unavailable", at),
       state("structure_context_rejection_reason", ctx.reason, at),
