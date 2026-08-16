@@ -234,6 +234,10 @@ describe("2D — Cross V2 frozen identity", () => {
     expect(ORCHESTRATION_RUN_SPEC_V4.cross_asset_context.temporal_contract
       .counterpart_completion_proof)
       .toBe(CROSS_ASSET_RELATIONSHIP_SPEC_V2.counterpart_completion_contract.proof_rule);
+    expect(ORCHESTRATION_RUN_SPEC_V4.cross_asset_context.temporal_contract
+      .completed_close_must_not_exceed_orchestration_anchor).toBe(true);
+    expect(ORCHESTRATION_RUN_SPEC_V4.cross_asset_context.temporal_contract
+      .completed_bar_timestamp_pair_all_or_nothing).toBe(true);
   });
 });
 
@@ -379,6 +383,54 @@ describe("2D — Orchestration Run V4: cross-asset acceptance gate", () => {
     });
     expect(await reasons(assertCrossAssetContextV2Sealed(leaky, CTX)))
       .toContain("cross_asset_context_source_timestamp_after_anchor:newest_counterpart_source_bar");
+  });
+
+  it("accepts a bar that has already closed at the orchestration anchor", async () => {
+    const e = await crossV2();
+    expect(e.as_of).toBe("2026-08-16T03:45:00Z");
+    expect(await assertCrossAssetContextV2Sealed(e, CTX)).toBe(e.evidence_hash);
+  });
+
+  it("rejects an unclosed bar whose completed close postdates the anchor (lookahead)", async () => {
+    const e = await crossV2({
+      as_of: AS_OF,
+      source_timestamps: {
+        as_of_bar_open: AS_OF, as_of_bar_completed_close: "2026-08-16T04:15:00Z",
+      },
+    });
+    const r = await reasons(assertCrossAssetContextV2Sealed(e, CTX));
+    expect(r).toContain("cross_asset_context_completed_bar_after_orchestration_anchor");
+    expect(r).toContain("cross_asset_context_source_timestamp_after_anchor:as_of_bar_completed_close");
+  });
+
+  it("accepts that same bar once the anchor is at or after its completed close", async () => {
+    const later: OrchestrationContext = { ...CTX, as_of: "2026-08-16T04:15:00Z" };
+    const e = await crossV2({
+      as_of: AS_OF,
+      source_timestamps: {
+        as_of_bar_open: AS_OF, as_of_bar_completed_close: "2026-08-16T04:15:00Z",
+      },
+    });
+    expect(await assertCrossAssetContextV2Sealed(e, later)).toBe(e.evidence_hash);
+  });
+
+  it("requires the completed-bar timestamp pair to be all-or-nothing", async () => {
+    const onlyOpen = await crossV2({ source_timestamps: { as_of_bar_open: BAR_OPEN } });
+    expect(await reasons(assertCrossAssetContextV2Sealed(onlyOpen, CTX)))
+      .toContain("cross_asset_context_source_timestamp_mismatch:as_of_bar_completed_close");
+    const onlyClose = await crossV2({
+      source_timestamps: { as_of_bar_completed_close: BAR_CLOSE },
+    });
+    expect(await reasons(assertCrossAssetContextV2Sealed(onlyClose, CTX)))
+      .toContain("cross_asset_context_source_timestamp_mismatch:as_of_bar_open");
+  });
+
+  it("still accepts a legitimately timestamp-free blocked path", async () => {
+    const e = await crossV2({
+      status: "blocked", direction: "unknown", recommendation: "no_action",
+      source_timestamps: {},
+    });
+    expect(await assertCrossAssetContextV2Sealed(e, CTX)).toBe(e.evidence_hash);
   });
 
   it("rejects direction / recommendation outside the frozen contextual contract", async () => {
