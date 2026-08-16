@@ -25,7 +25,7 @@ import {
 } from "./ron-agent-contracts.ts";
 import {
   buildCalibrationValidationEvidence, calibrationValidationSpecHash,
-  CALIBRATION_VALIDATION_SPEC_V1, validateAcceptedArtifacts,
+  CALIBRATION_VALIDATION_SPEC_V1,
   type CalibrationValidationInput,
 } from "./ron-calibration-validation-spec.ts";
 
@@ -208,8 +208,10 @@ export async function buildCalibrationDiagnosticContextEvidenceV2(
 
   // The frozen V1 producer is the SOLE artifact-integrity truth. V2 never re-validates.
   const base = await buildCalibrationValidationEvidence(input);
-  const v1State = validateAcceptedArtifacts(input).state;
   const at = base.as_of;
+  // The V1 state is READ from the sealed V1 envelope's own singleton observation — the
+  // validator is never invoked a second time, so no second validation truth can exist.
+  const v1State = singleText(base, "validation_state");
 
   const observations: Observation[] = [...base.observations];
   const limitations = [...base.uncertainty.limitations];
