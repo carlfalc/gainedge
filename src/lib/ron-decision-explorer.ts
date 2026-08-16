@@ -57,3 +57,16 @@ export function resolveSelection(
   if (gold) return gold;
   return tracked[0] ?? FALLBACK_PAIR;
 }
+/**
+ * GAINEDGE_PRODUCT_RON_CONTEXT_LINKS_V1 — builds the read-only deep link to the
+ * stored RON decision record for an exact tracked symbol+timeframe. It performs
+ * no computation, no network call and no market claim: it is a URL only.
+ */
+export function ronDecisionRecordHref(symbol: string, timeframe: string): string {
+  return `/dashboard/ron-decision?instrument=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`;
+}
+
+/** Truthful, non-predictive label for the deep-link control. */
+export function ronDecisionRecordTitle(symbol: string, timeframe: string): string {
+  return `Open stored RON decision record for ${symbol} ${timeframe}`;
+}

@@ -8,6 +8,7 @@ import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, seco
 import { formatPrintedLocal } from "@/lib/signal-time";
 import { explainPatterns, summariseStructure, fmtLevel } from "@/lib/pattern-interpretation";
 import { deriveFalconerSignalState } from "@/lib/falconer-signal-state";
+import { ronDecisionRecordHref, ronDecisionRecordTitle } from "@/lib/ron-decision-explorer";
 import { useLiveMarketData } from "@/services/broker-data";
 import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
 import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
@@ -221,6 +222,19 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
     navigate(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`);
   };
 
+  /**
+   * Deep-link to the read-only RON decision explorer for this exact tracked
+   * symbol+timeframe. Navigation only: no computation, no fetch, no write.
+   */
+  const openRonRecord = (symbol: string, timeframe: string) => {
+    const href = ronDecisionRecordHref(symbol, timeframe);
+    if (window.opener || window.location.pathname === "/instruments-popout") {
+      window.open(href, "_blank", "noopener");
+      return;
+    }
+    navigate(href);
+  };
+
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
     e.dataTransfer.effectAllowed = "move";
@@ -375,6 +389,20 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
                       }}
                     >
                       <LineChart size={10} /> Chart ↗
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openRonRecord(inst.symbol, tf); }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                      aria-label={ronDecisionRecordTitle(inst.symbol, tf)}
+                      title={ronDecisionRecordTitle(inst.symbol, tf)}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
+                        color: C.jade, background: "transparent", border: `1px solid ${C.jade}30`,
+                        borderRadius: 5, padding: "1px 6px", cursor: "pointer",
+                      }}
+                    >
+                      <Eye size={10} /> RON record ↗
                     </button>
                     <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                       {tf}
