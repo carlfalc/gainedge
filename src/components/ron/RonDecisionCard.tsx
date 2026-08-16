@@ -10,6 +10,7 @@ import {
   formatAge, presentState, summaryParagraph, titleCaseToken,
 } from "@/lib/ron-decision-presentation";
 import type { RonDecisionView } from "@/services/ron-decisions";
+import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 
 const TONE_COLOR: Record<string, string> = {
   blocked: C.red, caution: C.amber, supported: C.jade, neutral: C.sec,
@@ -41,6 +42,11 @@ export default function RonDecisionCard({ view, now }: { view: RonDecisionView; 
         <span className="text-xs uppercase tracking-widest" style={{ color: C.muted }}>
           stored record
         </span>
+        <CalibrationScopeBadge
+          symbol={view.decision.instrument}
+          timeframe={view.decision.timeframe}
+          compact
+        />
       </div>
 
       <h2 className="mt-4 text-xs uppercase tracking-widest" style={{ color: C.sec }}>
