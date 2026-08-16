@@ -221,6 +221,19 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
     navigate(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`);
   };
 
+  /**
+   * Deep-link to the read-only RON decision explorer for this exact tracked
+   * symbol+timeframe. Navigation only: no computation, no fetch, no write.
+   */
+  const openRonRecord = (symbol: string, timeframe: string) => {
+    const href = ronDecisionRecordHref(symbol, timeframe);
+    if (window.opener || window.location.pathname === "/instruments-popout") {
+      window.open(href, "_blank", "noopener");
+      return;
+    }
+    navigate(href);
+  };
+
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
     e.dataTransfer.effectAllowed = "move";
