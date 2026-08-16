@@ -259,7 +259,8 @@ describe("2D — Orchestration Run V3: accepted calibration V2 identity", () => 
       "calibration_context_artifact_as_of_mismatch");
     await reject(await calV2({ as_of: "2026-08-13T05:15:00.000Z" }),
       "calibration_context_artifact_as_of_mismatch");
-    await reject(await calV2({ as_of: "not-a-date" }), "calibration_context_as_of_unparseable");
+    await reject({ ...(await calV2()), as_of: "not-a-date" },
+      "calibration_context_as_of_unparseable");
   });
 
   it("requires exact accepted research/calibration source timestamps", async () => {
