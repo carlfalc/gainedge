@@ -313,7 +313,7 @@ export async function assertOpportunityRiskV2Sealed(
 
   // NO construction surface: neither the envelope nor any observation key may carry a
   // probability, confidence, score, edge, geometry or execution field.
-  for (const k of Object.keys(e as unknown as Record<string, unknown>)) {
+  for (const k of Object.keys(e as Record<string, unknown>)) {
     if (!ALLOWED_ENVELOPE_KEYS.has(k)) reasons.push(`opportunity_risk_unexpected_field:${k}`);
   }
   for (const o of observations) {
