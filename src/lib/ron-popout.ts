@@ -10,7 +10,7 @@ export const ASK_RON_ROUTE = "/dashboard/ai";
 /** Only route the V1 bridge is allowed to carry a stored pair from. */
 const CONTEXT_ROUTE = "/dashboard/ron-decision";
 
-/** Privacy-safe route data only — no identity, session, or account fields. */
+/** Privacy-safe route data only. */
 export interface RonPopoutContext {
   page?: string;
   search?: string;
