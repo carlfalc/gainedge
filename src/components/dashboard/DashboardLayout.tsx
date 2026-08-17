@@ -249,9 +249,7 @@ export default function DashboardLayout() {
             <button
               onClick={() => openRonPopout({
                 page: location.pathname,
-                sessionLabel,
-                userName: userName || undefined,
-                userId: userId || undefined,
+                search: location.search,
               })}
               style={{
                 display: "flex", alignItems: "center", gap: 6,

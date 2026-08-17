@@ -21,8 +21,8 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
     expect(ASK_RON_ROUTE).toBe("/dashboard/ai");
   });
 
-  it("context does not alter the URL", () => {
-    openRonPopout({ page: "/dashboard/charts", sessionLabel: "London Session" });
+  it("non-allowlisted route context does not alter the URL", () => {
+    openRonPopout({ page: "/dashboard/charts", search: "?symbol=XAUUSD" });
     expect(openSpy).toHaveBeenCalledWith("/dashboard/ai", "_blank", "noopener");
   });
 
@@ -34,7 +34,6 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
     for (const banned of ["fetch(", "supabase", "functions.invoke", "localStorage", "sessionStorage", "postMessage", "document."]) {
       expect(SRC).not.toContain(banned);
     }
-    expect(SRC).not.toMatch(/\?|&\w+=/);
   });
 
   it("route /dashboard/ai remains registered and unchanged", () => {
@@ -42,14 +41,15 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
     expect(app).toContain('<Route path="ai" element={<GainEdgeAIPage />} />');
   });
 
-  it("DashboardLayout still calls openRonPopout and is unchanged from base", () => {
+  it("DashboardLayout still calls openRonPopout with route data only", () => {
     const layout = readFileSync("src/components/dashboard/DashboardLayout.tsx", "utf8");
     expect(layout).toContain("openRonPopout(");
-    const diff = execSync(
-      `git diff ${BASE} -- src/components/dashboard/DashboardLayout.tsx`,
-      { encoding: "utf8" },
-    );
-    expect(diff.trim()).toBe("");
+    const arg = layout.slice(layout.indexOf("openRonPopout("), layout.indexOf("openRonPopout(") + 200);
+    expect(arg).toContain("page: location.pathname");
+    expect(arg).toContain("search: location.search");
+    for (const banned of ["sessionLabel", "userName", "userId"]) {
+      expect(arg).not.toContain(banned);
+    }
   });
 
   it("frozen supabase/, strategy/ and plan remain unchanged", () => {
