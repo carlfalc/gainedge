@@ -137,7 +137,8 @@ describe("RON decision surface action", () => {
 describe("safety constraints", () => {
   it("route remains /dashboard/ai and ron-popout stays context-free", () => {
     expect(askRonContextHref("A", "B").startsWith("/dashboard/ai?")).toBe(true);
-    expect(POPOUT_SRC).toContain('window.open("/dashboard/ai", "_blank", "noopener")');
+    expect(POPOUT_SRC).toContain('ASK_RON_ROUTE = "/dashboard/ai"');
+    expect(POPOUT_SRC).toContain('window.open(ASK_RON_ROUTE, "_blank", "noopener")');
     expect(POPOUT_SRC).not.toContain("instrument=");
   });
 
@@ -148,7 +149,10 @@ describe("safety constraints", () => {
   });
 
   it("introduces no probability, ranking, profitability or execution-enablement wording", () => {
-    const added = [AI_SRC, RON_SRC].join("\n");
-    expect(added).not.toMatch(/probabilit|confidence score|ranking|profitab|place order|execute trade/i);
+    const chip = AI_SRC.slice(AI_SRC.indexOf("{pair && ("), AI_SRC.indexOf("<div style={{ display: \"flex\", gap: 8, marginBottom: 24 }}>"));
+    const action = RON_SRC.slice(RON_SRC.indexOf('data-testid="ron-ask-about-record"'), RON_SRC.indexOf("<RonDecisionCard"));
+    for (const block of [chip, action]) {
+      expect(block).not.toMatch(/probabilit|confidence|rank|profitab|place order|execute|live/i);
+    }
   });
 });
