@@ -15,6 +15,11 @@ import {
 const BASE = "f1e63ad1ea01d86190b51517e0a985278e164ed8";
 const FN = readFileSync("supabase/functions/ingest-macro-headlines/index.ts", "utf8");
 const PURE = readFileSync("supabase/functions/ingest-macro-headlines/gdelt-doc2.ts", "utf8");
+/** Strip comments so prose about what we do NOT do can't satisfy code assertions. */
+const code = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const FN_CODE = code(FN);
+const PURE_CODE = code(PURE);
 const MIGRATION = readFileSync(
   "supabase/migrations/20260817104500_macro_source_events.sql", "utf8");
 
@@ -90,8 +95,8 @@ describe("point-in-time source timestamps", () => {
   });
 
   it("never substitutes wall-clock time for a source timestamp", async () => {
-    expect(PURE).not.toContain("new Date()");
-    expect(PURE).not.toContain("Date.now()");
+    expect(PURE_CODE).not.toContain("new Date()");
+    expect(PURE_CODE).not.toContain("Date.now()");
     const r = await normalizeArticle(article({ seendate: "garbage" }), "commodities_energy");
     expect(r).toMatchObject({ ok: false, reason: "invalid_source_timestamp" });
   });
@@ -153,7 +158,7 @@ describe("normalized row is source-descriptive only", () => {
   });
 
   it("carries no derived-claim vocabulary in either source file", () => {
-    const src = (FN + PURE).toLowerCase();
+    const src = (FN_CODE + PURE_CODE).toLowerCase();
     for (const banned of [
       "sentiment", "instruments_affected", "ai_reason_short", "numeric_probability",
       "recommendation", "execution_allowed", "openai", "lovable.dev/api", "embedding",
@@ -164,11 +169,11 @@ describe("normalized row is source-descriptive only", () => {
 
 describe("write surface and idempotency", () => {
   it("writes only to macro_source_events", () => {
-    const tables = [...FN.matchAll(/\.from\("([^"]+)"\)/g)].map((m) => m[1]);
+    const tables = [...FN_CODE.matchAll(/\.from\("([^"]+)"\)/g)].map((m) => m[1]);
     expect(tables).toEqual(["macro_source_events"]);
     for (const banned of [
       "news_items", "ron_", "falconer", "gainedge_ai_conversations", "profiles",
-    ]) expect(FN).not.toContain(banned);
+    ]) expect(FN_CODE).not.toContain(banned);
   });
 
   it("upserts with DO NOTHING semantics on the unique provider key", () => {
