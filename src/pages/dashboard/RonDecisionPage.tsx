@@ -4,13 +4,14 @@
  * the surface states "not calibrated" until a qualified methodology promotes one.
  */
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import {
   FALLBACK_PAIR, normaliseTracked, pairKey, pairLabel, resolveSelection, type TrackedPair,
 } from "@/lib/ron-decision-explorer";
+import { askRonContextHref, askRonContextTitle } from "@/lib/ask-ron-context";
 import RonDecisionCard from "@/components/ron/RonDecisionCard";
 import RonEvidenceList from "@/components/ron/RonEvidenceList";
 import RonExplanationPanels from "@/components/ron/RonExplanationPanels";
@@ -22,6 +23,7 @@ export default function RonDecisionPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [tracked, setTracked] = useState<TrackedPair[]>([]);
   const [trackedReady, setTrackedReady] = useState(false);
   const [trackedWarning, setTrackedWarning] = useState<string | null>(null);
@@ -177,6 +179,18 @@ export default function RonDecisionPage() {
 
       {view && !loading && (
         <>
+          <div className="flex justify-end">
+            <button
+              data-testid="ron-ask-about-record"
+              onClick={() => navigate(askRonContextHref(selected.symbol, selected.timeframe))}
+              aria-label={askRonContextTitle(selected.symbol, selected.timeframe)}
+              title={askRonContextTitle(selected.symbol, selected.timeframe)}
+              className="rounded-lg px-3 py-2 text-xs"
+              style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
+            >
+              Ask RON about this record ↗
+            </button>
+          </div>
           <RonDecisionCard view={view} />
           <RonExplanationPanels view={view} />
           <RonEvidenceList evidence={view.evidence ?? []} />

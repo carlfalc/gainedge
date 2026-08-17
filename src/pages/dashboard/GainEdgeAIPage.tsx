@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Brain, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { askRonContextLabel, parseAskRonContext } from "@/lib/ask-ron-context";
 
 interface Conversation {
   id: string;
@@ -22,6 +24,15 @@ export default function GainEdgeAIPage() {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<Conversation[]>([]);
   const [asking, setAsking] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pair = parseAskRonContext(searchParams);
+
+  const clearContext = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("instrument");
+    next.delete("timeframe");
+    setSearchParams(next, { replace: true });
+  };
 
   const load = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -43,7 +54,9 @@ export default function GainEdgeAIPage() {
     setQuestion("");
     setAsking(true);
     const { data, error } = await supabase.functions.invoke("gainedge-ai", {
-      body: { question: clean },
+      body: pair
+        ? { question: clean, instrument: pair.instrument, timeframe: pair.timeframe }
+        : { question: clean },
     });
     setAsking(false);
     if (error || !data?.answer) {
@@ -79,6 +92,13 @@ export default function GainEdgeAIPage() {
       <p style={{ color: C.sec, fontSize: 13, marginBottom: 20 }}>
         RON is GainEdge's interactive assistant. Answers are based only on the evidence stored and available in your account.
       </p>
+
+      {pair && (
+        <div data-testid="ask-ron-context-chip" style={contextChip}>
+          <span>{askRonContextLabel(pair)}</span>
+          <button onClick={clearContext} style={ghostButton}>Clear context</button>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {prompts.map(prompt => (
@@ -152,4 +172,9 @@ const promptButton: React.CSSProperties = {
 const ghostButton: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8,
   border: `1px solid ${C.border}`, background: "transparent", color: C.sec, cursor: "pointer",
+};
+const contextChip: React.CSSProperties = {
+  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+  padding: "8px 12px", borderRadius: 10, marginBottom: 16,
+  background: C.bg2, border: `1px solid ${C.border}`, color: C.sec, fontSize: 12,
 };
