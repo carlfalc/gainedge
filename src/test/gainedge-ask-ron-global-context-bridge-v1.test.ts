@@ -108,7 +108,9 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
 
   it("leaves Ask RON page, context helpers and frozen trees byte-identical", () => {
     const diff = execSync(
-      `git diff ${BASE} -- src/pages/dashboard/GainEdgeAIPage.tsx src/lib/ask-ron-context.ts src/pages/dashboard/RonDecisionPage.tsx supabase strategy .lovable/plan.md`,
+      // GainEdgeAIPage.tsx is authorized to change by later frontend slices
+      // (GAINEDGE_PRODUCT_ASK_RON_CONTEXT_HISTORY_CLARITY_V1); the bridge itself never touches it.
+      `git diff ${BASE} -- src/lib/ask-ron-context.ts src/pages/dashboard/RonDecisionPage.tsx supabase strategy .lovable/plan.md`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");

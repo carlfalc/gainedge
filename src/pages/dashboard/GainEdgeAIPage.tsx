@@ -27,6 +27,10 @@ const contextPrompts = [
   "Summarise warnings or caveats in the stored RON evidence, if available.",
 ];
 
+/** Truthful scope note: the pair applies to new questions only. */
+const CONTEXT_HISTORY_NOTE =
+  "Context applies to new questions. Conversation history may include earlier questions from other contexts.";
+
 export default function GainEdgeAIPage() {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<Conversation[]>([]);
@@ -116,6 +120,12 @@ export default function GainEdgeAIPage() {
             </button>
             <button onClick={clearContext} style={ghostButton}>Clear context</button>
           </div>
+        </div>
+      )}
+
+      {pair && history.length > 0 && (
+        <div data-testid="ask-ron-context-history-note" style={contextHistoryNote}>
+          {CONTEXT_HISTORY_NOTE}
         </div>
       )}
 
@@ -215,4 +225,7 @@ const contextChip: React.CSSProperties = {
   display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
   padding: "8px 12px", borderRadius: 10, marginBottom: 16,
   background: C.bg2, border: `1px solid ${C.border}`, color: C.sec, fontSize: 12,
+};
+const contextHistoryNote: React.CSSProperties = {
+  color: C.muted, fontSize: 11, marginTop: -8, marginBottom: 16, lineHeight: 1.5,
 };
