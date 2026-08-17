@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Brain, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { askRonContextLabel, parseAskRonContext } from "@/lib/ask-ron-context";
+import { ronDecisionRecordHref, ronDecisionRecordTitle } from "@/lib/ron-decision-explorer";
 
 interface Conversation {
   id: string;
@@ -25,6 +26,7 @@ export default function GainEdgeAIPage() {
   const [history, setHistory] = useState<Conversation[]>([]);
   const [asking, setAsking] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const pair = parseAskRonContext(searchParams);
 
   const clearContext = () => {
@@ -96,7 +98,18 @@ export default function GainEdgeAIPage() {
       {pair && (
         <div data-testid="ask-ron-context-chip" style={contextChip}>
           <span>{askRonContextLabel(pair)}</span>
-          <button onClick={clearContext} style={ghostButton}>Clear context</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              data-testid="ask-ron-view-stored-record"
+              onClick={() => navigate(ronDecisionRecordHref(pair.instrument, pair.timeframe))}
+              aria-label={ronDecisionRecordTitle(pair.instrument, pair.timeframe)}
+              title={ronDecisionRecordTitle(pair.instrument, pair.timeframe)}
+              style={ghostButton}
+            >
+              View stored record
+            </button>
+            <button onClick={clearContext} style={ghostButton}>Clear context</button>
+          </div>
         </div>
       )}
 
