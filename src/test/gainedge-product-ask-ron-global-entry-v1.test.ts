@@ -56,7 +56,11 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
     // supabase/functions/gainedge-ai/index.ts is intentionally changed by the later
     // accepted slice GAINEDGE_ASK_RON_RON_EVIDENCE_V1; everything else stays frozen.
     const diff = execSync(
-      `git diff ${BASE} -- supabase strategy .lovable/plan.md ':(exclude)supabase/functions/gainedge-ai/index.ts'`,
+      // The additive GAINEDGE_GDELT_RAW_HEADLINES_V1 raw-ingestion seam is newly
+      // authorized and touches no file this guard protects.
+      `git diff ${BASE} -- supabase strategy .lovable/plan.md ':(exclude)supabase/functions/gainedge-ai/index.ts'`
+      + ` ':(exclude)supabase/functions/ingest-macro-headlines'`
+      + ` ':(exclude)supabase/migrations/20260817104500_macro_source_events.sql'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");
