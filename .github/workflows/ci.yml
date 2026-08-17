@@ -34,7 +34,7 @@ jobs:
         run: npm test
 
       - name: Typecheck
-        run: npx -y @typescript/native-preview --noEmit
+        run: npx -y -p @typescript/native-preview tsgo --noEmit
 
       - name: Setup Deno
         uses: denoland/setup-deno@v2
