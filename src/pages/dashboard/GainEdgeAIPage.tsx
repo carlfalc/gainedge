@@ -173,3 +173,8 @@ const ghostButton: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8,
   border: `1px solid ${C.border}`, background: "transparent", color: C.sec, cursor: "pointer",
 };
+const contextChip: React.CSSProperties = {
+  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+  padding: "8px 12px", borderRadius: 10, marginBottom: 16,
+  background: C.bg2, border: `1px solid ${C.border}`, color: C.sec, fontSize: 12,
+};
