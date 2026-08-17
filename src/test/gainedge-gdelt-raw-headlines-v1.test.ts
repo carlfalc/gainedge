@@ -229,9 +229,9 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/functions/ingest-macro-headlines'`
       + ` ':(exclude)supabase/migrations/20260817104500_macro_source_events.sql'`
       + ` ':(exclude)src/test/gainedge-gdelt-raw-headlines-v1.test.ts'`
-      + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`,
+      + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`
       // Older freeze guards were narrowed to exclude this slice's new, additive paths.
-      + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`
+      + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");
