@@ -53,7 +53,12 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
   });
 
   it("frozen supabase/, strategy/ and plan remain unchanged", () => {
-    const diff = execSync(`git diff ${BASE} -- supabase strategy .lovable/plan.md`, { encoding: "utf8" });
+    // supabase/functions/gainedge-ai/index.ts is intentionally changed by the later
+    // accepted slice GAINEDGE_ASK_RON_RON_EVIDENCE_V1; everything else stays frozen.
+    const diff = execSync(
+      `git diff ${BASE} -- supabase strategy .lovable/plan.md ':(exclude)supabase/functions/gainedge-ai/index.ts'`,
+      { encoding: "utf8" },
+    );
     expect(diff.trim()).toBe("");
   });
 });
