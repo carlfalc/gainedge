@@ -68,7 +68,7 @@ export default function GainEdgeAIPage() {
     });
     setAsking(false);
     if (error || !data?.answer) {
-      toast.error(data?.error || error?.message || "GainEdge AI is unavailable");
+      toast.error(data?.error || error?.message || "RON is unavailable");
       return;
     }
     await load();
