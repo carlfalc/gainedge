@@ -27,6 +27,10 @@ const contextPrompts = [
   "Summarise warnings or caveats in the stored RON evidence, if available.",
 ];
 
+/** Truthful scope note: the pair applies to new questions only. */
+const CONTEXT_HISTORY_NOTE =
+  "Context applies to new questions. Conversation history may include earlier questions from other contexts.";
+
 export default function GainEdgeAIPage() {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<Conversation[]>([]);
