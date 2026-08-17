@@ -228,10 +228,14 @@ describe("frozen surfaces untouched", () => {
       `git diff ${BASE} -- src supabase strategy .lovable .github`
       + ` ':(exclude)supabase/functions/ingest-macro-headlines'`
       + ` ':(exclude)supabase/migrations/20260817104500_macro_source_events.sql'`
+      // GAINEDGE_GDELT_SERVER_SCHEDULE_V1: additive, newly authorized cron migration.
+      + ` ':(exclude)supabase/migrations/20260817110900_ingest_macro_headlines_cron.sql'`
       + ` ':(exclude)src/test/gainedge-gdelt-raw-headlines-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`
       // Older freeze guards were narrowed to exclude this slice's new, additive paths.
-      + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`,
+      + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`
+      + ` ':(exclude)src/test/gainedge-gdelt-server-schedule-v1.test.ts'`
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");

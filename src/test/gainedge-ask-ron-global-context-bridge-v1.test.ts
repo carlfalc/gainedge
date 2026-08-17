@@ -114,7 +114,9 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
       // additive; it touches no file this guard protects.
       `git diff ${BASE} -- src/lib/ask-ron-context.ts src/pages/dashboard/RonDecisionPage.tsx supabase strategy .lovable/plan.md`
       + ` ':(exclude)supabase/functions/ingest-macro-headlines'`
-      + ` ':(exclude)supabase/migrations/20260817104500_macro_source_events.sql'`,
+      + ` ':(exclude)supabase/migrations/20260817104500_macro_source_events.sql'`
+      // GAINEDGE_GDELT_SERVER_SCHEDULE_V1: additive, newly authorized cron migration.
+      + ` ':(exclude)supabase/migrations/20260817110900_ingest_macro_headlines_cron.sql'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");

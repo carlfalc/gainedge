@@ -42,6 +42,10 @@ const ALLOWLIST = new Set([
   // permanent 'ron-agent-session-structure' allow-list entry. Definition + REVOKE/GRANT
   // only; it invokes nothing at replay.
   "20260813090242_525bbba0-acde-406d-8eb7-e5d27af09b0f.sql",
+  // GAINEDGE_GDELT_SERVER_SCHEDULE_V1: cron.schedule definition for the internal raw
+  // GDELT headline ingestion function. Schedule definition only; no side effect at replay
+  // beyond (re)registering the named job.
+  "20260817110900_ingest_macro_headlines_cron.sql",
 ]);
 
 /**
@@ -51,6 +55,10 @@ const ALLOWLIST = new Set([
 const WORKER_DEFINITION_FILES = new Set([
   "20260812072740_c3f6ce80-55cd-4304-9c71-5606fef3d117.sql",
   "20260813090242_525bbba0-acde-406d-8eb7-e5d27af09b0f.sql",
+  // GAINEDGE_GDELT_SERVER_SCHEDULE_V1: cron.schedule definition for the internal raw
+  // GDELT headline ingestion function. Schedule definition only; no side effect at replay
+  // beyond (re)registering the named job.
+  "20260817110900_ingest_macro_headlines_cron.sql",
 ]);
 
 /** Test-harness / one-off invocation versions — permanently neutralized, never allowlistable. */
