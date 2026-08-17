@@ -123,6 +123,12 @@ export default function GainEdgeAIPage() {
         </div>
       )}
 
+      {pair && history.length > 0 && (
+        <div data-testid="ask-ron-context-history-note" style={contextHistoryNote}>
+          {CONTEXT_HISTORY_NOTE}
+        </div>
+      )}
+
       {pair && (
         <div data-testid="ask-ron-context-prompts" style={{ marginBottom: 16 }}>
           <div style={{ color: C.sec, fontSize: 11, marginBottom: 8 }}>Ask about this stored context</div>
