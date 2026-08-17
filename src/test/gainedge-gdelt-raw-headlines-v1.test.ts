@@ -93,8 +93,7 @@ describe("point-in-time source timestamps", () => {
     expect(PURE).not.toContain("new Date()");
     expect(PURE).not.toContain("Date.now()");
     const r = await normalizeArticle(article({ seendate: "garbage" }), "commodities_energy");
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toBe("invalid_source_timestamp");
+    expect(r).toMatchObject({ ok: false, reason: "invalid_source_timestamp" });
   });
 
   it("rejects rows with no url or no headline", async () => {
