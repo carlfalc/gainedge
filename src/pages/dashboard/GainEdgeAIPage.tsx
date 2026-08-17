@@ -119,10 +119,6 @@ export default function GainEdgeAIPage() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-        {null}
-      </div>
-
       {pair && (
         <div data-testid="ask-ron-context-prompts" style={{ marginBottom: 16 }}>
           <div style={{ color: C.sec, fontSize: 11, marginBottom: 8 }}>Ask about this stored context</div>
