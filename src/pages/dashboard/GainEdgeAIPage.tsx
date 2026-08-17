@@ -21,6 +21,12 @@ const prompts = [
   "What limitations or missing evidence are in my available records?",
 ];
 
+/** Descriptive, availability-safe questions about an exact stored RON record. */
+const contextPrompts = [
+  "Explain the stored RON decision for this context, if available.",
+  "Summarise warnings or caveats in the stored RON evidence, if available.",
+];
+
 export default function GainEdgeAIPage() {
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<Conversation[]>([]);
@@ -109,6 +115,29 @@ export default function GainEdgeAIPage() {
               View stored record
             </button>
             <button onClick={clearContext} style={ghostButton}>Clear context</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {null}
+      </div>
+
+      {pair && (
+        <div data-testid="ask-ron-context-prompts" style={{ marginBottom: 16 }}>
+          <div style={{ color: C.sec, fontSize: 11, marginBottom: 8 }}>Ask about this stored context</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {contextPrompts.map(prompt => (
+              <button
+                key={prompt}
+                data-testid="ask-ron-context-prompt"
+                onClick={() => ask(prompt)}
+                disabled={asking}
+                style={promptButton}
+              >
+                {prompt}
+              </button>
+            ))}
           </div>
         </div>
       )}
