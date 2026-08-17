@@ -16,6 +16,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Tests reference historical accepted commits (e.g. git show <sha>:<path>),
+          # so the full history must be available.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -30,7 +34,7 @@ jobs:
         run: npm test
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npx -y -p @typescript/native-preview tsgo --noEmit
 
       - name: Setup Deno
         uses: denoland/setup-deno@v2
