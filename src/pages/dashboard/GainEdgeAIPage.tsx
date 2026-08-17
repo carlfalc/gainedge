@@ -226,3 +226,6 @@ const contextChip: React.CSSProperties = {
   padding: "8px 12px", borderRadius: 10, marginBottom: 16,
   background: C.bg2, border: `1px solid ${C.border}`, color: C.sec, fontSize: 12,
 };
+const contextHistoryNote: React.CSSProperties = {
+  color: C.muted, fontSize: 11, marginTop: -8, marginBottom: 16, lineHeight: 1.5,
+};
