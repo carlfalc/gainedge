@@ -17,12 +17,16 @@ const CODE = SQL.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n"
   .toLowerCase().replaceAll("falconer_service_role_key", "<vault_secret>");
 
 describe("schedule contract", () => {
-  it("adds exactly one new migration file", () => {
+  it("adds exactly one new migration file for this slice", () => {
     const added = execSync(
       `git diff --name-status ${BASE} -- supabase/migrations`, { encoding: "utf8" },
     ).trim().split("\n").filter(Boolean);
-    expect(added).toEqual([`A\t${FILE}`]);
+    // Later authorized slices may add their own migrations; this slice adds exactly one
+    // and modifies or deletes none.
+    expect(added.filter((l) => !l.startsWith("A\t"))).toEqual([]);
+    expect(added.filter((l) => l.includes("ingest_macro_headlines_cron"))).toEqual([`A\t${FILE}`]);
   });
+
 
   it("uses the exact schedule name and cadence", () => {
     expect(SQL).toContain(`cron.schedule(\n  '${JOB}',\n  '*/2 * * * *',`);
