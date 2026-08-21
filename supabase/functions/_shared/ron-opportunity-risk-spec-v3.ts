@@ -45,7 +45,7 @@ export { OpportunityRiskContractError };
 
 /** FULL accepted Opportunity/Risk Compatibility Spec V2 hash (never re-derived here). */
 export const OPPORTUNITY_RISK_SPEC_V2_HASH_PINNED =
-  "66065e53__PLACEHOLDER__";
+  "66065e535c2b3580f346858684ba0f2fa2e4729d2b37f8c96235b9d37cc55656";
 
 /* --------------------------------- accepted single-anchor specialist lineages */
 
