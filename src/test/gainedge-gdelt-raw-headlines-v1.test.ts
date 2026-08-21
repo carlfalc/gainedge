@@ -243,6 +243,8 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/migrations/20260821061910_bfc73e53-1fc1-4b70-bffb-8e1b54cdf36b.sql'`
       + ` ':(exclude)supabase/migrations/20260821061932_53b5b8ea-752a-4845-9ac2-8f2b272589b8.sql'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      // Auto-generated backend types regenerate when a migration is applied.
+      + ` ':(exclude)src/integrations/supabase/types.ts'`
       + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
     );
