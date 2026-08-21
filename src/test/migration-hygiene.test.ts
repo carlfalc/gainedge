@@ -46,7 +46,12 @@ const ALLOWLIST = new Set([
   // GDELT headline ingestion function. Schedule definition only; no side effect at replay
   // beyond (re)registering the named job.
   "20260817110900_ingest_macro_headlines_cron.sql",
+  // GAINEDGE_24X7_CANDLE_RON_RUNTIME_V1: cron.schedule + tick-function definition for the
+  // internal RON scheduler (XAUUSD 15m stored decision records only). Definition only; no
+  // side effect at replay beyond (re)registering the named job.
+  "20260821061910_bfc73e53-1fc1-4b70-bffb-8e1b54cdf36b.sql",
 ]);
+
 
 /**
  * Migrations that may legitimately mention ron_invoke_worker at all. Anything else that
