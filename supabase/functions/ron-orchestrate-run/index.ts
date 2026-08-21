@@ -64,13 +64,6 @@ import {
   deriveRunIdsV7, ORCHESTRATION_RUN_PLAN_V7,
   orchestrationRunPlanHashV7, RON_ORCHESTRATION_RUN_VERSION_V7,
 } from "../_shared/ron-orchestration-run-v7.ts";
-import {
-  agentAnchorIsoV8, analyticalBarOpenIso, assertSessionDependencySealedV8,
-  deriveRunIdsV8, isBarCloseAligned, ORCHESTRATION_RUN_PLAN_V8,
-  orchestrationRunPlanHashV8, RON_ORCHESTRATION_RUN_VERSION_V8,
-  type AgentCallPlanEntryV8,
-} from "../_shared/ron-orchestration-run-v8.ts";
-
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -141,23 +134,10 @@ Deno.serve(async (req) => {
   const requestedRunVersion = body.orchestration_run_version == null
     ? RON_ORCHESTRATION_RUN_VERSION_V2
     : Number(body.orchestration_run_version);
-  // V8 is additive and explicit-only. It is accepted alongside — never inside — the
-  // frozen V1..V7 acceptance list, which stays byte-identical for replay auditing.
-  const isV8 = requestedRunVersion === RON_ORCHESTRATION_RUN_VERSION_V8;
-  if (!isV8 && ![1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)) {
+  if (![1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)) {
     return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
   }
-  // V8 ONLY: the evaluation anchor is the COMPLETED BAR CLOSE, so it must lie exactly on
-  // the bar grid. Nothing is rounded, floored or invented — a misaligned anchor is a
-  // caller error and fails closed here, before any specialist is called.
-  if (isV8 && !isBarCloseAligned(anchor)) {
-    return json({
-      error: "OrchestrationRunError",
-      reasons: ["evaluation_anchor_not_bar_close_aligned"],
-    }, 400);
-  }
-  // V8 inherits every V7 semantic; only the per-agent anchor convention differs.
-  const isV7 = requestedRunVersion === 7 || isV8;
+  const isV7 = requestedRunVersion === 7;
   // V7 inherits every V6 semantic (all seven as-returned seal proofs + every earlier gate).
   const isV6 = requestedRunVersion === 6 || isV7;
   // V6 inherits every V5 semantic (macro V2 gate + all V4/V3/V2 semantics).
@@ -174,9 +154,7 @@ Deno.serve(async (req) => {
   };
 
   try {
-    const runIds = isV8
-      ? await deriveRunIdsV8(traceId, anchor)
-      : isV7
+    const runIds = isV7
       ? await deriveRunIdsV7(traceId, anchor)
       : isV6
       ? await deriveRunIdsV6(traceId, anchor)
@@ -199,8 +177,7 @@ Deno.serve(async (req) => {
     let falconerSignalSourceHash: string | null = null;
 
     const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
-      isV8 ? ORCHESTRATION_RUN_PLAN_V8
-        : isV7 ? ORCHESTRATION_RUN_PLAN_V7
+      isV7 ? ORCHESTRATION_RUN_PLAN_V7
         : isV6 ? ORCHESTRATION_RUN_PLAN_V6
         : isV5 ? ORCHESTRATION_RUN_PLAN_V5
         : isV4 ? ORCHESTRATION_RUN_PLAN_V4
@@ -214,13 +191,7 @@ Deno.serve(async (req) => {
         instrument, timeframe, trace_id: traceId, run_id: runIds[entry.agent_id],
         persist: false,
       };
-      // V8 ONLY: the plan declares, per agent, whether the specialist is called at the
-      // evaluation anchor (completed bar close) or at the analytical bar open exactly one
-      // bar earlier. V1-V7 keep passing the anchor verbatim to every agent.
-      const entryAnchor = isV8
-        ? agentAnchorIsoV8(entry as AgentCallPlanEntryV8, anchor)
-        : anchor;
-      payload[entry.anchor_param] = entryAnchor;
+      payload[entry.anchor_param] = anchor;
       if (entry.requires_evidence_batch) payload.evidence = canonicalOrder(collected);
 
       // V2 ONLY: explicit specialist version pin + the ONE declared sealed dependency.
@@ -230,16 +201,11 @@ Deno.serve(async (req) => {
           // Fail closed BEFORE Pattern is called if the sealed Session envelope is
           // missing, invalid, unsealed, hash-mismatched or out of scope/anchor.
           const dep = collected.find((e) => e.agent_id === "session_market_structure");
-          // V8 requires the Session envelope at the ANALYTICAL BAR OPEN; V1-V7 keep the
-          // frozen "session.as_of === orchestration anchor" rule byte-for-byte.
-          sessionDependencyHash = isV8
-            ? await assertSessionDependencySealedV8(dep, ctx)
-            : await assertSessionDependencySealed(dep, ctx);
+          sessionDependencyHash = await assertSessionDependencySealed(dep, ctx);
           // Pattern receives ONLY that single sealed envelope — never the batch.
           payload.session_evidence = dep;
         }
       }
-
 
       const res = await fetch(`${supabaseUrl}/functions/v1/${entry.function_name}`, {
         method: "POST",
@@ -383,9 +349,7 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: isV8
-        ? RON_ORCHESTRATION_RUN_VERSION_V8
-        : isV7
+      orchestration_run_version: isV7
         ? RON_ORCHESTRATION_RUN_VERSION_V7
         : isV6
         ? RON_ORCHESTRATION_RUN_VERSION_V6
@@ -396,9 +360,7 @@ Deno.serve(async (req) => {
         : isV3
         ? RON_ORCHESTRATION_RUN_VERSION_V3
         : isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: isV8
-        ? await orchestrationRunPlanHashV8()
-        : isV7
+      orchestration_run_plan_hash: isV7
         ? await orchestrationRunPlanHashV7()
         : isV6
         ? await orchestrationRunPlanHashV6()
@@ -449,16 +411,6 @@ Deno.serve(async (req) => {
           falconer_signal_source_spec_version: FALCONER_SIGNAL_SOURCE_SPEC_VERSION_V7,
           falconer_signal_source_evidence_hash: falconerSignalSourceHash,
           falconer_authority: "strategy_context_only",
-        }
-        : {}),
-      // V8-ONLY fields: explicit V1..V7 replay keeps the exact pre-V8 summary shape.
-      ...(isV8
-        ? {
-          evaluation_anchor_convention: "completed_bar_close",
-          analytical_bar_open: analyticalBarOpenIso(anchor),
-          analytical_bar_open_agents: ORCHESTRATION_RUN_PLAN_V8
-            .filter((p) => p.anchor_convention === "analytical_bar_open")
-            .map((p) => p.agent_id),
         }
         : {}),
       evaluation_anchor: anchor,
