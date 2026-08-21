@@ -49,7 +49,7 @@ export const PATTERN_CONTEXT_SPEC_V2_HASH_PINNED =
 
 /** FULL Session Structure Spec V3 hash. Pinned by the V3 acceptance gate below. */
 export const SESSION_STRUCTURE_SPEC_V3_HASH_PINNED =
-  "__SESSION_V3_HASH__";
+  "0ea4ecd19d22d4a013f63f4fd44b4a6e89b47fe13be4cf6deed785c99252bc80";
 
 /** Every way the sealed Session V3 dependency can fail. All fail CLOSED. */
 export type SessionContextRejectionV3 =
