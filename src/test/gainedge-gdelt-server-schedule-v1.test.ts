@@ -74,6 +74,14 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/gainedge-gdelt-raw-headlines-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`,
+      // GAINEDGE_24X7_CANDLE_RON_RUNTIME_V1: additive, newly authorized scheduler,
+      // its schedule migrations and the ron-orchestrate-run boot fix it depends on.
+      + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
+      + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260821061910_bfc73e53-1fc1-4b70-bffb-8e1b54cdf36b.sql'`
+      + ` ':(exclude)supabase/migrations/20260821061932_53b5b8ea-752a-4845-9ac2-8f2b272589b8.sql'`
+      + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");
