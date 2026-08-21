@@ -47,22 +47,22 @@ Deno.serve(async (req) => {
 
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const nowMs = Date.now();
-  const windowStart = new Date(nowMs - MAX_ANCHOR_AGE_MS).toISOString();
+  const sourceFloorIso = new Date(nowMs - MAX_ANCHOR_AGE_MS).toISOString();
 
   try {
     const [snaps, candles, decisions, flags] = await Promise.all([
       db.from("ron_market_snapshots").select("bar_time")
         .eq("symbol", RUNTIME_INSTRUMENT).eq("timeframe", RUNTIME_TIMEFRAME)
-        .gte("bar_time", windowStart).order("bar_time", { ascending: false }).limit(64),
+        .gte("bar_time", sourceFloorIso).order("bar_time", { ascending: false }).limit(64),
       db.from("candle_history").select("timestamp")
         .eq("symbol", RUNTIME_INSTRUMENT).eq("timeframe", RUNTIME_TIMEFRAME)
-        .gte("timestamp", windowStart).order("timestamp", { ascending: false }).limit(64),
+        .gte("timestamp", sourceFloorIso).order("timestamp", { ascending: false }).limit(64),
       db.from("ron_orchestrator_decisions").select("as_of")
         .eq("instrument", RUNTIME_INSTRUMENT).eq("timeframe", RUNTIME_TIMEFRAME)
-        .gte("as_of", windowStart).order("as_of", { ascending: false }).limit(64),
+        .gte("as_of", sourceFloorIso).order("as_of", { ascending: false }).limit(64),
       db.from("ron_data_quality_flags").select("bar_time,severity")
         .eq("symbol", RUNTIME_INSTRUMENT).eq("timeframe", RUNTIME_TIMEFRAME)
-        .gte("bar_time", windowStart).limit(256),
+        .gte("bar_time", sourceFloorIso).limit(256),
     ]);
 
     const readErr = snaps.error ?? candles.error ?? decisions.error ?? flags.error;
