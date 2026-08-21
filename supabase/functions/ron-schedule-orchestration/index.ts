@@ -20,15 +20,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/**
- * Frozen seven-agent orchestration run version. Pinned; never inferred from a request.
- *
- * V8 is the completed-bar-close run version: identical to V7 in every specialist,
- * acceptance gate and safety property, differing only in that the plan declares per agent
- * whether it is called at the evaluation anchor or at the analytical bar open one bar
- * earlier. That is what makes the scheduler's completed-close anchor admissible.
- */
-const ORCHESTRATION_RUN_VERSION = 8;
+/** Frozen seven-agent orchestration run version. Pinned; never inferred from a request. */
+const ORCHESTRATION_RUN_VERSION = 7;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {

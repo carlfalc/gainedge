@@ -116,7 +116,7 @@ describe("scheduler endpoint safety", () => {
   });
 
   it("pins the frozen seven-agent orchestration run version", () => {
-    expect(indexSrc).toContain("const ORCHESTRATION_RUN_VERSION = 8");
+    expect(indexSrc).toContain("const ORCHESTRATION_RUN_VERSION = 7");
     expect(indexSrc).toContain("ron-orchestrate-run");
   });
 
