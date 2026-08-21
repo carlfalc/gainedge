@@ -54,10 +54,11 @@ describe("anchor gate — scope and completed-bar semantics", () => {
   });
 
   it("never selects a bar whose interval has not fully closed", () => {
-    const r = base({ now_ms: anchorMs + BAR - 1 });
+    const r = base({ now_ms: anchorMs + BAR - 1, snapshot_bar_times: [iso(anchorMs)] });
     expect(r.run).toBe(false);
     expect(r.reason).toBe("no_completed_bar");
   });
+
 
   it("rejects bar times not aligned to the 15m grid", () => {
     const r = base({ snapshot_bar_times: [iso(anchorMs + 60_000)] });
