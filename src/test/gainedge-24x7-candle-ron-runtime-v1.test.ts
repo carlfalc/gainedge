@@ -50,7 +50,8 @@ describe("anchor gate — scope and completed-bar semantics", () => {
   it("selects the latest completed bar", () => {
     const r = base();
     expect(r.run).toBe(true);
-    expect(r.anchor).toBe(iso(anchorMs));
+    expect(r.anchor).toBe(iso(anchorMs + BAR));
+    expect(r.bar_time).toBe(iso(anchorMs));
   });
 
   it("never selects a bar whose interval has not fully closed", () => {
@@ -94,16 +95,16 @@ describe("anchor gate — fail-closed source rules", () => {
 
 describe("anchor gate — exact-anchor idempotency", () => {
   it("no-ops when a decision already exists for that exact anchor", () => {
-    expect(base({ decision_anchors: [iso(anchorMs)] }))
+    expect(base({ decision_anchors: [iso(anchorMs + BAR)] }))
       .toMatchObject({ run: false, reason: "already_decided" });
   });
 
   it("a decision on a different anchor does not block a new one", () => {
-    expect(base({ decision_anchors: [iso(anchorMs - BAR)] })).toMatchObject({ run: true });
+    expect(base({ decision_anchors: [iso(anchorMs)] })).toMatchObject({ run: true });
   });
 
   it("treats equivalent ISO spellings of the same instant as decided", () => {
-    expect(base({ decision_anchors: ["2026-08-21 05:45:00+00"] }))
+    expect(base({ decision_anchors: ["2026-08-21 06:00:00+00"] }))
       .toMatchObject({ run: false, reason: "already_decided" });
   });
 });

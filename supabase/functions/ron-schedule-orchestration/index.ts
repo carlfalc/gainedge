@@ -41,11 +41,18 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (!token || !serviceKey || !timingSafeEq(token, serviceKey)) {
+  const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  // Internal-only: the caller must present the service-role key itself, or an internal
+  // cron token already registered in Vault (the canonical existing RON cron pattern).
+  let authorized = !!token && !!serviceKey && timingSafeEq(token, serviceKey);
+  if (!authorized && token) {
+    const { data: ok } = await db.rpc("ron_verify_cron_token", { _token: token });
+    authorized = ok === true;
+  }
+  if (!authorized) {
     return json({ error: "unauthorized: internal service-role endpoint" }, 401);
   }
-
-  const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const nowMs = Date.now();
   const sourceFloorIso = new Date(nowMs - MAX_ANCHOR_AGE_MS).toISOString();
 
@@ -105,6 +112,7 @@ Deno.serve(async (req) => {
       instrument: RUNTIME_INSTRUMENT,
       timeframe: RUNTIME_TIMEFRAME,
       evaluation_anchor: gate.anchor,
+      bar_time: gate.bar_time,
       orchestration_run_version: ORCHESTRATION_RUN_VERSION,
       orchestration_http_status: res.status,
       persisted: out?.persisted === true,
@@ -112,6 +120,9 @@ Deno.serve(async (req) => {
       decision_hash: out?.decision?.decision_hash ?? null,
       state: out?.decision?.state ?? null,
       error: res.ok ? null : (out?.error ?? "orchestration_failed"),
+      // Deterministic, non-sensitive contract reasons from the frozen runner. Operational
+      // visibility only; no evidence content, no subject material, no keys.
+      reasons: res.ok ? null : (Array.isArray(out?.reasons) ? out.reasons : null),
       numeric_probability: null,
       execution_allowed: false,
       execution_path: "signal_only",
