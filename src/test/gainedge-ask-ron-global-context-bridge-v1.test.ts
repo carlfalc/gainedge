@@ -116,7 +116,15 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
       + ` ':(exclude)supabase/functions/ingest-macro-headlines'`
       + ` ':(exclude)supabase/migrations/20260817104500_macro_source_events.sql'`
       // GAINEDGE_GDELT_SERVER_SCHEDULE_V1: additive, newly authorized cron migration.
-      + ` ':(exclude)supabase/migrations/20260817110900_ingest_macro_headlines_cron.sql'`,
+      + ` ':(exclude)supabase/migrations/20260817110900_ingest_macro_headlines_cron.sql'`
+      // GAINEDGE_24X7_CANDLE_RON_RUNTIME_V1: additive, newly authorized scheduler,
+      // its schedule migrations and the ron-orchestrate-run boot fix it depends on.
+      + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
+      + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260821061910_bfc73e53-1fc1-4b70-bffb-8e1b54cdf36b.sql'`
+      + ` ':(exclude)supabase/migrations/20260821061932_53b5b8ea-752a-4845-9ac2-8f2b272589b8.sql'`
+      + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");

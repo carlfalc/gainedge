@@ -2548,6 +2548,7 @@ export type Database = {
         Args: { _fn: string; _payload?: Json }
         Returns: number
       }
+      ron_orchestration_cron_tick: { Args: never; Returns: undefined }
       ron_rebuild_cron_tick: { Args: never; Returns: undefined }
       ron_rebuild_finish: { Args: never; Returns: boolean }
       ron_snapshot_cron_tick: { Args: never; Returns: undefined }

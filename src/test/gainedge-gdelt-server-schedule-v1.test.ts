@@ -17,12 +17,16 @@ const CODE = SQL.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n"
   .toLowerCase().replaceAll("falconer_service_role_key", "<vault_secret>");
 
 describe("schedule contract", () => {
-  it("adds exactly one new migration file", () => {
+  it("adds exactly one new migration file for this slice", () => {
     const added = execSync(
       `git diff --name-status ${BASE} -- supabase/migrations`, { encoding: "utf8" },
     ).trim().split("\n").filter(Boolean);
-    expect(added).toEqual([`A\t${FILE}`]);
+    // Later authorized slices may add their own migrations; this slice adds exactly one
+    // and modifies or deletes none.
+    expect(added.filter((l) => !l.startsWith("A\t"))).toEqual([]);
+    expect(added.filter((l) => l.includes("ingest_macro_headlines_cron"))).toEqual([`A\t${FILE}`]);
   });
+
 
   it("uses the exact schedule name and cadence", () => {
     expect(SQL).toContain(`cron.schedule(\n  '${JOB}',\n  '*/2 * * * *',`);
@@ -73,7 +77,17 @@ describe("frozen surfaces untouched", () => {
       // Older freeze guards narrowed to exclude this slice's new, additive migration.
       + ` ':(exclude)src/test/gainedge-gdelt-raw-headlines-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`
-      + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`,
+      + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`
+      // GAINEDGE_24X7_CANDLE_RON_RUNTIME_V1: additive, newly authorized scheduler,
+      // its schedule migrations and the ron-orchestrate-run boot fix it depends on.
+      + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
+      + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260821061910_bfc73e53-1fc1-4b70-bffb-8e1b54cdf36b.sql'`
+      + ` ':(exclude)supabase/migrations/20260821061932_53b5b8ea-752a-4845-9ac2-8f2b272589b8.sql'`
+      + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      // Auto-generated backend types regenerate when a migration is applied.
+      + ` ':(exclude)src/integrations/supabase/types.ts'`
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");

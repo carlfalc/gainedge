@@ -428,8 +428,8 @@ Deno.serve(async (req) => {
 
     if (!persist) return json({ ...summary, persisted: false, persistence_writes: 0 });
 
-    const plan = buildPersistencePlan(sealed, decision, explanation);
-    assertPersistSafe(plan, "pre_write");
+    const persistencePlan = buildPersistencePlan(sealed, decision, explanation);
+    assertPersistSafe(persistencePlan, "pre_write");
 
     const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
     const rhash = await registryHash();
@@ -444,13 +444,13 @@ Deno.serve(async (req) => {
       registryRows().map((r) => ({ ...r, registry_hash: rhash })),
       { onConflict: "agent_id,agent_version,registry_version", ignoreDuplicates: true }));
     await step("ron_agent_runs", () => db.from("ron_agent_runs")
-      .upsert(plan.runs, { onConflict: "run_id", ignoreDuplicates: true }));
+      .upsert(persistencePlan.runs, { onConflict: "run_id", ignoreDuplicates: true }));
     await step("ron_agent_evidence", () => db.from("ron_agent_evidence")
-      .upsert(plan.evidence, { onConflict: "evidence_hash", ignoreDuplicates: true }));
+      .upsert(persistencePlan.evidence, { onConflict: "evidence_hash", ignoreDuplicates: true }));
     await step("ron_orchestrator_decisions", () => db.from("ron_orchestrator_decisions")
-      .upsert(plan.decision, { onConflict: "decision_id", ignoreDuplicates: true }));
+      .upsert(persistencePlan.decision, { onConflict: "decision_id", ignoreDuplicates: true }));
     await step("ron_decision_evidence", () => db.from("ron_decision_evidence")
-      .upsert(plan.links, { onConflict: "decision_id,evidence_hash", ignoreDuplicates: true }));
+      .upsert(persistencePlan.links, { onConflict: "decision_id,evidence_hash", ignoreDuplicates: true }));
 
     return json({ ...summary, persisted: true, persistence_writes: writes.length, writes });
   } catch (err) {
