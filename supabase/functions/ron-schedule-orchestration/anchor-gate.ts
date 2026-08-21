@@ -27,8 +27,8 @@ export interface AnchorInputs {
 }
 
 export type AnchorDecision =
-  | { run: false; reason: string; anchor: null }
-  | { run: true; reason: "new_completed_anchor"; anchor: string };
+  | { run: false; reason: string; anchor: null; bar_time?: string }
+  | { run: true; reason: "new_completed_anchor"; anchor: string; bar_time: string };
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -59,6 +59,10 @@ export function selectAnchor(input: AnchorInputs): AnchorDecision {
   if (closed.length === 0) return { run: false, reason: "no_completed_bar", anchor: null };
 
   const candidate = closed[0];
+  // The evaluation anchor is the bar's COMPLETED CLOSE instant (bar open + one interval).
+  // Downstream orchestration contracts require every consumed completed-bar close to be
+  // at or before the anchor, so a bar-open anchor would always be rejected as lookahead.
+  const anchorMs = candidate + RUNTIME_BAR_MS;
   if (now - candidate > MAX_ANCHOR_AGE_MS) {
     return { run: false, reason: "stale_source", anchor: null };
   }
@@ -68,8 +72,10 @@ export function selectAnchor(input: AnchorInputs): AnchorDecision {
   if (quarantined.has(candidate)) {
     return { run: false, reason: "quarantined_bar", anchor: null };
   }
-  if (decided.has(candidate)) {
+  if (decided.has(anchorMs)) {
     return { run: false, reason: "already_decided", anchor: null };
   }
-  return { run: true, reason: "new_completed_anchor", anchor: iso(candidate) };
+  return {
+    run: true, reason: "new_completed_anchor", anchor: iso(anchorMs), bar_time: iso(candidate),
+  };
 }
