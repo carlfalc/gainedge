@@ -70,7 +70,11 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
       + ` ':(exclude)supabase/migrations/20260821061910_bfc73e53-1fc1-4b70-bffb-8e1b54cdf36b.sql'`
       + ` ':(exclude)supabase/migrations/20260821061932_53b5b8ea-752a-4845-9ac2-8f2b272589b8.sql'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
-      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`
+      // GAINEDGE_RON_LIVE_ANCHOR_COMPAT_V2: additive, newly authorized forward-only
+      // Orchestration Run V8 close-anchor plan and its test.
+      + ` ':(exclude)supabase/functions/_shared/ron-orchestration-run-v8.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v2.test.ts'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");
