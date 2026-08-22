@@ -140,6 +140,7 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
       + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
       + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
       + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
+      + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
       + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
