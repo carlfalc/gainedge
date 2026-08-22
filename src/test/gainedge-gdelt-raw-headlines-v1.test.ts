@@ -262,6 +262,8 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
       + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
       + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-ha-pattern-context-spec-v1.ts'`
+      + ` ':(exclude)src/test/ron-ha-pattern-context-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
       + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
