@@ -87,7 +87,6 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
       // Auto-generated backend types regenerate when a migration is applied.
       + ` ':(exclude)src/integrations/supabase/types.ts'`
-      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       // GAINEDGE_RON_LIVE_ANCHOR_COMPAT_V3: authorized, additive single-anchor stack
       // (Session/Pattern/Cross-Asset/Opportunity V3 specs, Orchestration V8, the four
       // specialist endpoints' additive V3 branches, the coordinator, the scheduler pin
@@ -105,6 +104,7 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
       + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");
