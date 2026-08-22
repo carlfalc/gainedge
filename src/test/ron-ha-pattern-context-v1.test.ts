@@ -72,6 +72,18 @@ function zigzag(n = 8): HaSourceBar[] {
   return out;
 }
 
+/** Swinging series with genuine pivots — the shape Session V3 needs for structure. */
+function swinging(n = 160): HaSourceBar[] {
+  const out: HaSourceBar[] = [];
+  for (let i = 0; i < n; i++) {
+    const base = 2400 + Math.sin(i / 3) * 12 + (i % 7) * 0.4;
+    out.push({
+      time: START + i * BAR, open: base, high: base + 2.5, low: base - 2.5, close: base + 0.5,
+    });
+  }
+  return out;
+}
+
 /** Persistent downtrend, used to obtain structure that OPPOSES a bullish HA direction. */
 function downtrend(n = 40): HaSourceBar[] {
   const out: HaSourceBar[] = [];
@@ -349,7 +361,7 @@ describe("contextual families REUSE accepted features and degrade honestly", () 
 /* ------------------------------------------------------ structure relevance */
 
 describe("structural relevance CONSUMES sealed Session V3 and never infers it", () => {
-  const bars = accelerating(160);
+  const bars = swinging(160);
 
   it("is unavailable with no sealed session context", async () => {
     const r = await run(bars, { features: FULL_FEATURES });
@@ -358,7 +370,7 @@ describe("structural relevance CONSUMES sealed Session V3 and never infers it", 
   });
 
   it("is unavailable when the sealed context is bound to a different anchor", async () => {
-    const other = accelerating(161);
+    const other = swinging(161);
     const sealed = await sealedSession(other, anchorOf(other));
     const r = await run(bars, { features: FULL_FEATURES, session_evidence: sealed });
     expect(r.states.structure_relevance).toBe("unavailable");
