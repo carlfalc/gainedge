@@ -23,6 +23,10 @@ import {
   buildCrossAssetRelationshipEvidenceV2, crossAssetRelationshipSpecHashV2,
   CROSS_ASSET_RELATIONSHIP_SPEC_V2, type CounterpartBarV2,
 } from "../_shared/ron-cross-asset-relationship-context-v2.ts";
+import {
+  buildCrossAssetRelationshipEvidenceV3, crossAssetRelationshipSpecHashV3,
+  CrossAssetV3AnchorError,
+} from "../_shared/ron-cross-asset-relationship-context-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,7 +83,9 @@ Deno.serve(async (req) => {
   // relationship context. spec_version 1 stays explicitly replayable and DEPENDENCY-
   // ISOLATED: it never consults the V2 completion proof and never reaches the V2 producer.
   const specVersion = body.spec_version == null ? 2 : Number(body.spec_version);
-  if (specVersion !== 1 && specVersion !== 2) {
+  // Additive: the DEFAULT stays 2. `3` is the forward-only single-anchor spec, which
+  // reuses the V2 source shape verbatim and only restates the anchor convention.
+  if (specVersion !== 1 && specVersion !== 2 && specVersion !== 3) {
     return json({ error: "unsupported_spec_version", spec_version: body.spec_version }, 400);
   }
 
@@ -140,11 +146,15 @@ Deno.serve(async (req) => {
         return out;
       };
       const xs = await times(instrument);
-      const ns = specVersion === 2 ? await provenTimes(counterpart) : await times(counterpart);
+      // V2 and V3 share the SAME completed-bar proof; only V1 keeps the original read.
+      const ns = specVersion === 3
+        ? await provenTimes(counterpart)
+        : specVersion === 2 ? await provenTimes(counterpart) : await times(counterpart);
       const common = [...xs].filter((t) => ns.has(t)).sort((a, b) => b - a);
       const pick = common.find((t) => !contract.isQuarantined({ time: t }, 15));
       if (pick == null) return json({ error: "no_exact_common_completed_anchor" }, 409);
-      asOf = pick;
+      // V3 anchors are COMPLETED BAR CLOSES, so the default anchor is that bar's close.
+      asOf = specVersion === 3 ? pick + BAR_MS : pick;
     }
 
     const fromIso = new Date(asOf - (CROSS_ASSET_SPEC_V1.lookback_bars_max + 50) * BAR_MS).toISOString();
@@ -160,7 +170,9 @@ Deno.serve(async (req) => {
 
     // DEPENDENCY ISOLATION: the V1 branch uses the ORIGINAL counterpart projection and
     // never reads the V2-only `created_at` completion-proof column.
-    const counterpartSelect = specVersion === 2 ? "timestamp, close, created_at" : "timestamp, close";
+    const counterpartSelect = specVersion === 1
+      ? "timestamp, close"
+      : specVersion === 2 ? "timestamp, close, created_at" : "timestamp, close, created_at";
     const { data: cRows, error: cErr } = await db
       .from("candle_history")
       .select(counterpartSelect)
@@ -181,7 +193,7 @@ Deno.serve(async (req) => {
         close: Number(c.close),
       }))
       : [];
-    const counterpart_bars_v2: CounterpartBarV2[] = specVersion === 2
+    const counterpart_bars_v2: CounterpartBarV2[] = specVersion === 2 || specVersion === 3
       ? (cRows ?? []).map((c: Record<string, unknown>) => ({
         time: new Date(String(c.timestamp)).getTime(),
         close: Number(c.close),
@@ -192,7 +204,16 @@ Deno.serve(async (req) => {
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
-    const build = () => (specVersion === 2
+    const build = () => (specVersion === 3
+      ? buildCrossAssetRelationshipEvidenceV3({
+        instrument, counterpart, timeframe, evaluation_anchor: asOf, bars,
+        counterpart_bars: counterpart_bars_v2,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+        newest_counterpart_bar: newestCounterpartBar,
+      })
+      : specVersion === 2
       ? buildCrossAssetRelationshipEvidenceV2({
         instrument, counterpart, timeframe, as_of: asOf, bars,
         counterpart_bars: counterpart_bars_v2,
@@ -222,24 +243,24 @@ Deno.serve(async (req) => {
     }
 
     // V1 keeps its ORIGINAL top-level replay shape; V2-only fields are added for V2 only.
-    const v2Fields = specVersion === 2
-      ? {
-        agent_id: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_id,
-        agent_version: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_version,
-        allow_live_execution: false,
-      }
-      : {};
+    const v2Fields = specVersion === 2 || specVersion === 3 ? {
+      agent_id: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_id,
+      agent_version: CROSS_ASSET_RELATIONSHIP_SPEC_V2.agent_version,
+      allow_live_execution: false,
+    } : {};
 
     return json({
       spec_version: specVersion,
-      spec_hash: specVersion === 2
+      spec_hash: specVersion === 3
+        ? await crossAssetRelationshipSpecHashV3()
+        : specVersion === 2
         ? await crossAssetRelationshipSpecHashV2()
         : await crossAssetSpecHash(),
       ...v2Fields,
       quality_version: RON_QUALITY_VERSION,
       counterpart,
-      anchor_bar_open: new Date(asOf).toISOString(),
-      anchor_bar_completed_close: new Date(asOf + BAR_MS).toISOString(),
+      anchor_bar_open: new Date(specVersion === 3 ? asOf - BAR_MS : asOf).toISOString(),
+      anchor_bar_completed_close: new Date(specVersion === 3 ? asOf : asOf + BAR_MS).toISOString(),
       evidence: sealed,
       numeric_probability: null,
       execution_allowed: false,
@@ -247,6 +268,9 @@ Deno.serve(async (req) => {
       persisted: false,
     });
   } catch (err) {
+    if (err instanceof CrossAssetV3AnchorError) {
+      return json({ error: err.name, reason: err.reason }, 400);
+    }
     return json({ error: String((err as Error)?.message ?? err) }, 500);
   }
 });

@@ -20,8 +20,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/** Frozen seven-agent orchestration run version. Pinned; never inferred from a request. */
-const ORCHESTRATION_RUN_VERSION = 7;
+/**
+ * Pinned seven-agent orchestration run version. Never inferred from a request.
+ *
+ * V8 = the single-evaluation-anchor run: identical seven-agent plan and identical
+ * persistence path, with Session/Pattern/Cross-Asset pinned to their V3 specs and
+ * Opportunity/Risk to V3, so ONE completed-bar-close anchor is admissible to every
+ * specialist. Frozen run versions 1-7 remain explicitly reachable and unmodified.
+ */
+const ORCHESTRATION_RUN_VERSION = 8;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -101,7 +108,7 @@ Deno.serve(async (req) => {
         timeframe: RUNTIME_TIMEFRAME,
         evaluation_anchor: gate.anchor,
         orchestration_run_version: ORCHESTRATION_RUN_VERSION,
-        trace_id: `ron_sched_v1_${gate.anchor}_${RUNTIME_INSTRUMENT}_${RUNTIME_TIMEFRAME}`,
+        trace_id: `ron_sched_v8_${gate.anchor}_${RUNTIME_INSTRUMENT}_${RUNTIME_TIMEFRAME}`,
         persist: true,
       }),
     });
