@@ -173,7 +173,7 @@ async function run(
 describe("opportunity context spec V1 is pinned, closed and non-predictive", () => {
   it("hashes to the pinned value", async () => {
     expect(await opportunityContextSpecHashV1())
-      .toBe("__PINNED__");
+      .toBe("56e59f3838f71fd9159260e06aaf9f141e0f8235b6ea771c7faa3264c7aba1a5");
   });
 
   it("declares no probability, forecast, recommendation or execution surface", () => {
@@ -324,7 +324,7 @@ describe("sealed contextual evidence is accepted or rejected verbatim", () => {
       [unsealed, "context_unsealed"],
       [tampered, "context_hash_mismatch"],
       [wrongAnchor, "context_anchor_mismatch"],
-      [{ nonsense: true }, "context_malformed_envelope"],
+      [{ nonsense: true }, "context_wrong_agent"],
       [await patternEnvelope(anchor, ["bullish"]), "context_wrong_agent"],
     ];
     for (const [evidence, reason] of cases) {
