@@ -170,9 +170,9 @@ Deno.serve(async (req) => {
 
     // DEPENDENCY ISOLATION: the V1 branch uses the ORIGINAL counterpart projection and
     // never reads the V2-only `created_at` completion-proof column.
-    const counterpartSelect = specVersion === 1
-      ? "timestamp, close"
-      : specVersion === 2 ? "timestamp, close, created_at" : "timestamp, close, created_at";
+    const counterpartSelect = specVersion === 3
+      ? "timestamp, close, created_at"
+      : specVersion === 2 ? "timestamp, close, created_at" : "timestamp, close";
     const { data: cRows, error: cErr } = await db
       .from("candle_history")
       .select(counterpartSelect)
