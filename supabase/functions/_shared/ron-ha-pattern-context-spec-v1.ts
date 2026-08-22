@@ -191,11 +191,12 @@ export const HA_PATTERN_CONTEXT_SPEC_V1 = {
       "wick_character == 'no_opposite_wick' AND momentum_confirmation == 'agreement' AND " +
       "ema_relationship is the matching directional alignment AND " +
       "structure_relevance != 'against_structure'",
-      "R4 strengthening: trend_sequence directional AND run_length >= 2 AND " +
+      "R4 weakening: body_dynamics == 'contracting' OR opposing_wick_emergence in " +
+      "('emerging','persisting') OR momentum_confirmation == 'weakening'. Deteriorating " +
+      "evidence always dominates strengthening evidence",
+      "R5 strengthening: trend_sequence directional AND run_length >= 2 AND " +
       "body_dynamics == 'expanding' AND opposing_wick_emergence != 'emerging' AND " +
       "(momentum_confirmation == 'agreement' OR ema_relationship is the matching alignment)",
-      "R5 weakening: body_dynamics == 'contracting' OR opposing_wick_emergence in " +
-      "('emerging','persisting') OR momentum_confirmation == 'weakening'",
       "R6 forming: otherwise (conservative default)",
       "no hidden numeric score is used at any point; every decision emits reason tokens",
     ],
@@ -669,14 +670,14 @@ export async function buildHaPatternContextV1(
     && ema_relationship === matchingAlignment
     && structure_relevance !== "against_structure") {
     lifecycle = "confirmed"; reason.push("lifecycle:R3_confirmed_multi_family_alignment");
-  } else if (direction != null && runLength >= 2 && body_dynamics === "expanding"
-    && opposing_wick_emergence !== "emerging"
-    && (momentum_confirmation === "agreement" || ema_relationship === matchingAlignment)) {
-    lifecycle = "strengthening"; reason.push("lifecycle:R4_strengthening");
   } else if (body_dynamics === "contracting"
     || opposing_wick_emergence === "emerging" || opposing_wick_emergence === "persisting"
     || momentum_confirmation === "weakening") {
-    lifecycle = "weakening"; reason.push("lifecycle:R5_weakening");
+    lifecycle = "weakening"; reason.push("lifecycle:R4_weakening");
+  } else if (direction != null && runLength >= 2 && body_dynamics === "expanding"
+    && opposing_wick_emergence !== "emerging"
+    && (momentum_confirmation === "agreement" || ema_relationship === matchingAlignment)) {
+    lifecycle = "strengthening"; reason.push("lifecycle:R5_strengthening");
   } else {
     lifecycle = "forming"; reason.push("lifecycle:R6_forming_conservative_default");
   }
