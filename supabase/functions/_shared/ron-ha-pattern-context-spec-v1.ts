@@ -627,13 +627,14 @@ export async function buildHaPatternContextV1(
       timeframe: input.timeframe, evaluation_anchor: anchor,
     },
   );
+  const ctxRejection: string | null = ctx.ok ? null : ctx.reason;
   let structure_relevance: StructureRelevanceState;
   if (!ctx.ok || direction == null) {
     structure_relevance = "unavailable";
-    reason.push(`structure_relevance:R1_unavailable_${ctx.ok ? "no_ha_direction" : ctx.reason}`);
+    reason.push(`structure_relevance:R1_unavailable_${ctxRejection ?? "no_ha_direction"}`);
     if (!ctx.ok) {
       limitations.push(
-        `no admissible sealed Session Structure V3 context (${ctx.reason}); structural ` +
+        `no admissible sealed Session Structure V3 context (${ctxRejection}); structural ` +
         "relevance is reported unavailable and is never inferred",
       );
     }
@@ -735,7 +736,7 @@ export async function buildHaPatternContextV1(
     limitations,
     structure_context: {
       available: ctx.ok,
-      rejection_reason: ctx.ok ? null : ctx.reason,
+      rejection_reason: ctxRejection,
     },
     execution_allowed: false,
     execution_path: "signal_only",

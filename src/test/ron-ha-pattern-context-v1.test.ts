@@ -281,7 +281,7 @@ describe("HA geometry families are exact and vocabulary-closed", () => {
     for (const bars of [accelerating(8), fading(8), zigzag(8), downtrend(20)]) {
       const r = await run(bars, { features: FULL_FEATURES });
       for (const [key, vocab] of Object.entries(fam)) {
-        expect(vocab).toContain((r.states as Record<string, unknown>)[key] as string);
+        expect(vocab).toContain((r.states as unknown as Record<string, unknown>)[key] as string);
       }
       expect(Number.isInteger(r.states.run_length)).toBe(true);
     }
