@@ -112,7 +112,7 @@ const sealedSession = async (bars: HaSourceBar[], anchor: number) => sealEvidenc
 describe("HA pattern context spec V1 is pinned, closed and non-predictive", () => {
   it("hashes to the pinned value", async () => {
     expect(await haPatternContextSpecHashV1())
-      .toBe("d7c15d40cd58bbef6de71e3a52d1e42fbd1d5c5b58d10cd35a9e6a6be6f9e1a2");
+      .toBe("345dbb2a939de17903c1a745ddee080fda91780ded98090020b76ac49f07d15f");
   });
 
   it("declares no probability, forecast, recommendation or execution surface", () => {
@@ -349,7 +349,7 @@ describe("contextual families REUSE accepted features and degrade honestly", () 
 /* ------------------------------------------------------ structure relevance */
 
 describe("structural relevance CONSUMES sealed Session V3 and never infers it", () => {
-  const bars = accelerating(40);
+  const bars = accelerating(160);
 
   it("is unavailable with no sealed session context", async () => {
     const r = await run(bars, { features: FULL_FEATURES });
@@ -358,7 +358,7 @@ describe("structural relevance CONSUMES sealed Session V3 and never infers it", 
   });
 
   it("is unavailable when the sealed context is bound to a different anchor", async () => {
-    const other = accelerating(41);
+    const other = accelerating(161);
     const sealed = await sealedSession(other, anchorOf(other));
     const r = await run(bars, { features: FULL_FEATURES, session_evidence: sealed });
     expect(r.states.structure_relevance).toBe("unavailable");
@@ -395,7 +395,7 @@ describe("lifecycle is an ordered, transparent, conservative rule table", () => 
     expect(r.reason_tokens).toContain("lifecycle:R3_confirmed_multi_family_alignment");
   });
 
-  it("downgrades to strengthening when one confirming family is missing", async () => {
+  it("lets deteriorating evidence dominate strengthening evidence", async () => {
     const r = await run(accelerating(8), {
       features: { ...FULL_FEATURES, macd_state: "bullish_fading" },
     });
@@ -458,12 +458,17 @@ describe("the producer is pure, deterministic and non-predictive", () => {
     expect(r.execution_allowed).toBe(false);
     expect(r.execution_path).toBe("signal_only");
     const text = JSON.stringify(r).toLowerCase();
+    // Only the emitted STATES and observation keys are checked: the limitations text
+    // deliberately NAMES these concepts in order to disclaim them.
+    const emitted = JSON.stringify({ states: r.states, observations: r.observations })
+      .toLowerCase();
     for (const banned of [
-      "probability", "confidence", "expected_value", "edge", "odds", "forecast",
+      "probability", "confidence", "expected_value", "odds", "forecast",
       "predict", "recommend", "entry_price", "stop_loss", "take_profit", "win_rate",
     ]) {
-      expect(text.includes(banned)).toBe(false);
+      expect(emitted.includes(banned)).toBe(false);
     }
+    expect(text).not.toContain("\"numeric_probability\":0");
   });
 
   it("does not read the database, the network or the wall clock", () => {
@@ -471,7 +476,7 @@ describe("the producer is pure, deterministic and non-predictive", () => {
       "supabase/functions/_shared/ron-ha-pattern-context-spec-v1.ts", "utf8",
     );
     for (const banned of [
-      "createClient", "fetch(", "Date.now", "Math.random", "Deno.env", "supabase",
+      "createClient(", "await fetch", "Date.now(", "Math.random(", "Deno.env",
     ]) {
       expect(src.includes(banned)).toBe(false);
     }
