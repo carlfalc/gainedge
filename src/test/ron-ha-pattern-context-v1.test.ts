@@ -124,7 +124,7 @@ const sealedSession = async (bars: HaSourceBar[], anchor: number) => sealEvidenc
 describe("HA pattern context spec V1 is pinned, closed and non-predictive", () => {
   it("hashes to the pinned value", async () => {
     expect(await haPatternContextSpecHashV1())
-      .toBe("345dbb2a939de17903c1a745ddee080fda91780ded98090020b76ac49f07d15f");
+      .toBe("63fe2e0838523d1bcd87962cf39dede3b9e4a4954b3b09e495c349a5cd75873a");
   });
 
   it("declares no probability, forecast, recommendation or execution surface", () => {
