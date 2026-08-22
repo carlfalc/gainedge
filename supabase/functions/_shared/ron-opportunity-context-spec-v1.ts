@@ -442,6 +442,14 @@ async function acceptEnvelope(
   return { ok: true, envelope: e };
 }
 
+/**
+ * Explicit rejection accessor. The rejection reason is a plain string token on the
+ * rejected branch only; it is read through this accessor so no discriminated-union
+ * narrowing is assumed at the call sites.
+ */
+const rejectionOf = (r: { ok: boolean }): string | null =>
+  r.ok ? null : ((r as { reason?: string }).reason ?? "context_absent");
+
 const obsText = (e: EvidenceEnvelopeV1, key: string): string | null => {
   const all = e.observations.filter((o) => o.key === key);
   if (all.length !== 1) return null;
@@ -537,19 +545,19 @@ export async function buildOpportunityContextV1(
   const context_admissibility: OpportunityContextResultV1["context_admissibility"] = {
     session_structure_v3: {
       available: session.ok,
-      rejection_reason: session.ok ? null : session.reason,
+      rejection_reason: rejectionOf(session),
     },
     pattern_context_v3: {
       available: patternRes.ok,
-      rejection_reason: patternRes.ok ? null : patternRes.reason,
+      rejection_reason: rejectionOf(patternRes),
     },
     cross_asset_v3: {
       available: crossRes.ok,
-      rejection_reason: crossRes.ok ? null : crossRes.reason,
+      rejection_reason: rejectionOf(crossRes),
     },
     macro_v2: {
       available: macroRes.ok,
-      rejection_reason: macroRes.ok ? null : macroRes.reason,
+      rejection_reason: rejectionOf(macroRes),
     },
   };
 
@@ -638,7 +646,7 @@ export async function buildOpportunityContextV1(
   let pattern_context_state: PatternContextState;
   if (!patternRes.ok) {
     pattern_context_state = "unavailable";
-    reason.push(`pattern_context_state:unavailable_${patternRes.reason}`);
+    reason.push(`pattern_context_state:unavailable_${rejectionOf(patternRes)}`);
   } else if (direction == null) {
     pattern_context_state = "neutral";
     reason.push("pattern_context_state:neutral_no_direction");
@@ -660,7 +668,7 @@ export async function buildOpportunityContextV1(
   let cross_asset_context_state: CrossAssetContextState;
   if (!crossRes.ok) {
     cross_asset_context_state = "unavailable";
-    reason.push(`cross_asset_context_state:unavailable_${crossRes.reason}`);
+    reason.push(`cross_asset_context_state:unavailable_${rejectionOf(crossRes)}`);
   } else {
     const relState = obsText(crossRes.envelope, "cross_asset_relationship_state");
     if (relState === "evaluated") {
@@ -679,7 +687,7 @@ export async function buildOpportunityContextV1(
   let macro_context_state: MacroContextState;
   if (!macroRes.ok) {
     macro_context_state = "unavailable";
-    reason.push(`macro_context_state:unavailable_${macroRes.reason}`);
+    reason.push(`macro_context_state:unavailable_${rejectionOf(macroRes)}`);
   } else {
     const macroState = obsText(macroRes.envelope, "macro_temporal_context_state");
     if (macroState === "observed_price_context_present") {
@@ -771,8 +779,8 @@ export async function buildOpportunityContextV1(
     && setup_family !== "mixed_or_none"
     && s.lifecycle === "confirmed" && momentumAgrees && emaAligned
     && s.structure_relevance !== "against_structure"
-    && pattern_context_state !== "disagreeing"
-    && cross_asset_context_state !== "disagreeing"
+    && (pattern_context_state as PatternContextState) !== "disagreeing"
+    && (cross_asset_context_state as CrossAssetContextState) !== "disagreeing"
     && data_state === "healthy") {
     lifecycle = "confirmed"; reason.push("lifecycle:R1_confirmed_authoritative_alignment");
   } else if (direction != null && (setup_family !== "mixed_or_none" || priorOpportunity)

@@ -134,7 +134,7 @@ async function sealedContext(
     instrument: "XAUUSD", timeframe: "15m", as_of: at,
     source_timestamps: { evaluation_anchor: at },
     observations: observations.map((o) => ({ ...o, kind: "state" as const, at })),
-    provenance_refs: [], data_health: { status: "healthy", issues: [] },
+    provenance_refs: [], data_health: { status: "healthy", issues: [], freshness_minutes: 0, completeness: 1 },
     uncertainty: { level: "unquantified", limitations: [] },
     conflicts: [], dependencies: [], status: "supported",
     recommendation: "context_only",
@@ -352,7 +352,7 @@ describe("sealed contextual evidence is accepted or rejected verbatim", () => {
     const degraded = await sealedContext(
       CROSS_ASSET_RELATIONSHIP_SPEC_V3, anchor,
       [{ key: "cross_asset_relationship_state", value_text: "evaluated" }],
-      { data_health: { status: "degraded", issues: ["fixture"] } },
+      { data_health: { status: "degraded", issues: ["fixture"], freshness_minutes: 0, completeness: 1 } },
     );
     const r = await run(bars, { cross_asset_evidence: degraded });
     expect(r.context_admissibility.cross_asset_v3.available).toBe(true);
