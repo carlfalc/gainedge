@@ -23,6 +23,10 @@ import {
   buildSessionStructureEvidenceV2, sessionStructureSpecHashV2,
   SESSION_STRUCTURE_SPEC_V2,
 } from "../_shared/ron-session-structure-spec-v2.ts";
+import {
+  buildSessionStructureEvidenceV3, sessionStructureSpecHashV3,
+  SESSION_STRUCTURE_SPEC_V3, SessionStructureV3AnchorError,
+} from "../_shared/ron-session-structure-spec-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,8 +75,12 @@ Deno.serve(async (req) => {
 
   const instrument = typeof body.instrument === "string" ? body.instrument : SYMBOL;
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : TIMEFRAME;
-  const specVersion = body.spec_version === 1 ? 1 : 2;
-  const spec = specVersion === 1 ? SESSION_STRUCTURE_SPEC_V1 : SESSION_STRUCTURE_SPEC_V2;
+  // Additive selector only: the DEFAULT stays 2 so the frozen V1-V7 orchestration
+  // behaviour cannot change. `3` is the forward-only single-evaluation-anchor spec.
+  const specVersion = body.spec_version === 3 ? 3 : body.spec_version === 1 ? 1 : 2;
+  const spec = specVersion === 1
+    ? SESSION_STRUCTURE_SPEC_V1
+    : specVersion === 3 ? SESSION_STRUCTURE_SPEC_V3 : SESSION_STRUCTURE_SPEC_V2;
   if (!spec.instrument_scope.includes(instrument as "XAUUSD")
     || !spec.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_spec_v1", instrument, timeframe }, 400);
@@ -103,6 +111,8 @@ Deno.serve(async (req) => {
       asOf = newestSourceBar;
       // walk back over quarantined anchors so the anchor is admissible
       for (let i = 0; i < 96 && contract.isQuarantined({ time: asOf }, 15); i++) asOf -= BAR_MS;
+      // V3 anchors are COMPLETED BAR CLOSES, so the default anchor is that bar's close.
+      if (specVersion === 3) asOf += BAR_MS;
     }
 
     // Bounded lookback only — never an unbounded history scan.
@@ -138,6 +148,13 @@ Deno.serve(async (req) => {
         // wrong (decorative) which is exactly why V2 exists, but they must stay on the
         // V1 replay path or the accepted evidence_hash becomes unreproducible.
         lineage_refs: [`feature_version:6`, `label_version:7`],
+        newest_source_bar: newestSourceBar,
+      })
+      : specVersion === 3
+      ? buildSessionStructureEvidenceV3({
+        instrument, timeframe, evaluation_anchor: asOf, bars,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
         newest_source_bar: newestSourceBar,
       })
       : buildSessionStructureEvidenceV2({
@@ -183,7 +200,11 @@ Deno.serve(async (req) => {
 
     return json({
       spec_version: spec.spec_version,
-      spec_hash: specVersion === 1 ? await sessionStructureSpecHash() : await sessionStructureSpecHashV2(),
+      spec_hash: specVersion === 1
+        ? await sessionStructureSpecHash()
+        : specVersion === 3
+        ? await sessionStructureSpecHashV3()
+        : await sessionStructureSpecHashV2(),
       quality_version: RON_QUALITY_VERSION,
       evidence: sealed,
       numeric_probability: null,
@@ -192,6 +213,9 @@ Deno.serve(async (req) => {
       persisted,
     });
   } catch (err) {
+    if (err instanceof SessionStructureV3AnchorError) {
+      return json({ error: err.name, reason: err.reason }, 400);
+    }
     return json({ error: String((err as Error)?.message ?? err) }, 500);
   }
 });

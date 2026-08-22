@@ -245,6 +245,23 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
       // Auto-generated backend types regenerate when a migration is applied.
       + ` ':(exclude)src/integrations/supabase/types.ts'`
+      // GAINEDGE_RON_LIVE_ANCHOR_COMPAT_V3: authorized, additive single-anchor stack
+      // (Session/Pattern/Cross-Asset/Opportunity V3 specs, Orchestration V8, the four
+      // specialist endpoints' additive V3 branches, the coordinator, the scheduler pin
+      // and this slice's own tests). No frozen V1-V7 artifact is modified.
+      + ` ':(exclude)supabase/functions/_shared/ron-session-structure-spec-v3.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-pattern-structure-context-v3.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-cross-asset-relationship-context-v3.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-risk-spec-v3.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-orchestration-run-v8.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-session-structure/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-pattern-context/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-cross-asset-correlation/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-opportunity-risk/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
+      + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
+      + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
       + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
     );

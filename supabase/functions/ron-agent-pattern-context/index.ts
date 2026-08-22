@@ -22,6 +22,10 @@ import {
   buildPatternStructureContextEvidenceV2, patternContextSpecHashV2,
   PATTERN_CONTEXT_SPEC_V2,
 } from "../_shared/ron-pattern-structure-context-v2.ts";
+import {
+  buildPatternStructureContextEvidenceV3, patternContextSpecHashV3,
+  PATTERN_CONTEXT_SPEC_V3, PatternStructureV3AnchorError,
+} from "../_shared/ron-pattern-structure-context-v3.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,7 +83,8 @@ Deno.serve(async (req) => {
   // spec_version 1 stays explicitly replayable and DEPENDENCY-ISOLATED: it never reads,
   // requires or is influenced by the V2 structure-context input.
   const specVersion = body.spec_version == null ? 2 : Number(body.spec_version);
-  if (specVersion !== 1 && specVersion !== 2) {
+  // Additive: the DEFAULT stays 2. `3` is the forward-only single-anchor spec.
+  if (specVersion !== 1 && specVersion !== 2 && specVersion !== 3) {
     return json({ error: "unsupported_spec_version", spec_version: body.spec_version }, 400);
   }
   if (specVersion === 1 && body.session_evidence != null) {
@@ -107,6 +112,8 @@ Deno.serve(async (req) => {
     } else {
       asOf = newestSourceBar;
       for (let i = 0; i < 96 && contract.isQuarantined({ time: asOf }, 15); i++) asOf -= BAR_MS;
+      // V3 anchors are COMPLETED BAR CLOSES, so the default anchor is that bar's close.
+      if (specVersion === 3) asOf += BAR_MS;
     }
 
     const fromIso = new Date(asOf - (PATTERN_CONTEXT_SPEC_V1.lookback_bars_max + 50) * BAR_MS).toISOString();
@@ -129,7 +136,15 @@ Deno.serve(async (req) => {
     const traceId = typeof body.trace_id === "string" ? body.trace_id : crypto.randomUUID();
     const runId = typeof body.run_id === "string" ? body.run_id : crypto.randomUUID();
 
-    const build = () => specVersion === 2
+    const build = () => specVersion === 3
+      ? buildPatternStructureContextEvidenceV3({
+        instrument, timeframe, evaluation_anchor: asOf, bars,
+        isQuarantined: (b, m) => contract.isQuarantined(b, m),
+        run_id: runId, trace_id: traceId,
+        newest_source_bar: newestSourceBar,
+        session_evidence: body.session_evidence ?? null,
+      })
+      : specVersion === 2
       ? buildPatternStructureContextEvidenceV2({
         instrument, timeframe, as_of: asOf, bars,
         isQuarantined: (b, m) => contract.isQuarantined(b, m),
@@ -157,9 +172,13 @@ Deno.serve(async (req) => {
 
     return json({
       spec_version: specVersion,
-      spec_hash: specVersion === 2 ? await patternContextSpecHashV2() : await patternContextSpecHash(),
-      agent_id: PATTERN_CONTEXT_SPEC_V2.agent_id,
-      agent_version: PATTERN_CONTEXT_SPEC_V2.agent_version,
+      spec_hash: specVersion === 3
+        ? await patternContextSpecHashV3()
+        : specVersion === 2 ? await patternContextSpecHashV2() : await patternContextSpecHash(),
+      agent_id: specVersion === 3 ? PATTERN_CONTEXT_SPEC_V3.agent_id : PATTERN_CONTEXT_SPEC_V2.agent_id,
+      agent_version: specVersion === 3
+        ? PATTERN_CONTEXT_SPEC_V3.agent_version
+        : PATTERN_CONTEXT_SPEC_V2.agent_version,
       detector_source_sha256: PATTERN_DETECTOR_SOURCE_SHA256,
       quality_version: RON_QUALITY_VERSION,
       evidence: sealed,
@@ -170,6 +189,9 @@ Deno.serve(async (req) => {
       persisted: false,
     });
   } catch (err) {
+    if (err instanceof PatternStructureV3AnchorError) {
+      return json({ error: err.name, reason: err.reason }, 400);
+    }
     return json({ error: String((err as Error)?.message ?? err) }, 500);
   }
 });

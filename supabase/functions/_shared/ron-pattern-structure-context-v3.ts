@@ -423,14 +423,17 @@ export async function buildPatternStructureContextEvidenceV3(
   );
 
   if (!ctx.ok) {
+    // Read through an explicit accessor: the rejection reason is a plain string token and
+    // is emitted verbatim, with no dependency on control-flow narrowing.
+    const rejection = (ctx as RejectedSessionContextV3).reason;
     observations.push(
       state("structure_context_availability", "unavailable", at),
-      state("structure_context_rejection_reason", ctx.reason, at),
+      state("structure_context_rejection_reason", rejection, at),
       state("current_structure_state", "insufficient_structure_context", at),
       state("pattern_structure_compatibility_state", "insufficient_structure_context", at),
     );
     limitations.push(
-      `no admissible sealed Session V3 structure context (${ctx.reason}); ` +
+      `no admissible sealed Session V3 structure context (${rejection}); ` +
       "structure is reported unavailable and is never inferred",
     );
   } else {

@@ -64,6 +64,15 @@ import {
   deriveRunIdsV7, ORCHESTRATION_RUN_PLAN_V7,
   orchestrationRunPlanHashV7, RON_ORCHESTRATION_RUN_VERSION_V7,
 } from "../_shared/ron-orchestration-run-v7.ts";
+import {
+  assertAgentBindingV8, assertCrossAssetContextV3Sealed, assertOpportunityRiskV3Sealed,
+  assertPatternContextV3Sealed, assertPatternDependencyBindingV8,
+  assertSessionStructureV3Sealed, CROSS_ASSET_AGENT, CROSS_ASSET_SPEC_VERSION_V8,
+  deriveRunIdsV8, OPPORTUNITY_RISK_SPEC_VERSION_V8, ORCHESTRATION_RUN_PLAN_V8,
+  orchestrationRunPlanHashV8, PATTERN_CONTEXT_AGENT, PATTERN_CONTEXT_SPEC_VERSION_V8,
+  RON_ORCHESTRATION_RUN_VERSION_V8, SESSION_STRUCTURE_AGENT,
+  SESSION_STRUCTURE_SPEC_VERSION_V8,
+} from "../_shared/ron-orchestration-run-v8.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -134,10 +143,17 @@ Deno.serve(async (req) => {
   const requestedRunVersion = body.orchestration_run_version == null
     ? RON_ORCHESTRATION_RUN_VERSION_V2
     : Number(body.orchestration_run_version);
-  if (![1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)) {
+  // The frozen V1-V7 acceptance list is reused VERBATIM; V8 is a separate, additive term.
+  const runVersionSupported =
+    [1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion) || requestedRunVersion === 8;
+  if (!runVersionSupported) {
     return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
   }
-  const isV7 = requestedRunVersion === 7;
+  // V8 is the forward-only SINGLE-EVALUATION-ANCHOR run: identical seven-agent plan, but
+  // Session/Pattern/Cross-Asset are pinned to their V3 specs and Opportunity/Risk to V3.
+  // Every specialist still receives the SAME anchor string; nothing is offset here.
+  const isV8 = requestedRunVersion === 8;
+  const isV7 = requestedRunVersion === 7 || isV8;
   // V7 inherits every V6 semantic (all seven as-returned seal proofs + every earlier gate).
   const isV6 = requestedRunVersion === 6 || isV7;
   // V6 inherits every V5 semantic (macro V2 gate + all V4/V3/V2 semantics).
@@ -154,7 +170,9 @@ Deno.serve(async (req) => {
   };
 
   try {
-    const runIds = isV7
+    const runIds = isV8
+      ? await deriveRunIdsV8(traceId, anchor)
+      : isV7
       ? await deriveRunIdsV7(traceId, anchor)
       : isV6
       ? await deriveRunIdsV6(traceId, anchor)
@@ -177,7 +195,8 @@ Deno.serve(async (req) => {
     let falconerSignalSourceHash: string | null = null;
 
     const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
-      isV7 ? ORCHESTRATION_RUN_PLAN_V7
+      isV8 ? ORCHESTRATION_RUN_PLAN_V8
+        : isV7 ? ORCHESTRATION_RUN_PLAN_V7
         : isV6 ? ORCHESTRATION_RUN_PLAN_V6
         : isV5 ? ORCHESTRATION_RUN_PLAN_V5
         : isV4 ? ORCHESTRATION_RUN_PLAN_V4
@@ -201,7 +220,11 @@ Deno.serve(async (req) => {
           // Fail closed BEFORE Pattern is called if the sealed Session envelope is
           // missing, invalid, unsealed, hash-mismatched or out of scope/anchor.
           const dep = collected.find((e) => e.agent_id === "session_market_structure");
-          sessionDependencyHash = await assertSessionDependencySealed(dep, ctx);
+          // V8 accepts ONLY the Session V3 lineage at the shared completed-close anchor;
+          // V1-V7 keep the frozen Session V2 acceptance contract byte-for-byte.
+          sessionDependencyHash = isV8
+            ? await assertSessionStructureV3Sealed(dep, ctx)
+            : await assertSessionDependencySealed(dep, ctx);
           // Pattern receives ONLY that single sealed envelope — never the batch.
           payload.session_evidence = dep;
         }
@@ -235,7 +258,25 @@ Deno.serve(async (req) => {
       // specialist `evidence_hash`. Confers no authority on any agent (Falconer and
       // Pattern included) — it is an integrity/scope proof only.
       if (isV6) await assertSpecialistReturnedSealedV6(envelope, ctx, entry.agent_id);
-      if (v2entry && entry.agent_id === "session_market_structure") {
+      if (isV8 && entry.agent_id === SESSION_STRUCTURE_AGENT) {
+        // V8 ONLY: accept the specialist-returned envelope VERBATIM and prove it is the
+        // accepted Session Structure V3 artifact at EXACTLY the shared evaluation anchor.
+        sessionDependencyHash = await assertSessionStructureV3Sealed(envelope, ctx);
+        collected.push(envelope);
+      } else if (isV8 && entry.agent_id === PATTERN_CONTEXT_AGENT) {
+        // V8 ONLY: Pattern V3 must prove it consumed exactly the sealed Session V3
+        // envelope this run handed it, at the same anchor. Structure is never recomputed.
+        await assertPatternContextV3Sealed(envelope, ctx, sessionDependencyHash ?? "");
+        collected.push(envelope);
+      } else if (isV8 && entry.agent_id === CROSS_ASSET_AGENT) {
+        // V8 ONLY: Cross-Asset V3 at the shared anchor. No lookahead exemption exists.
+        crossAssetContextHash = await assertCrossAssetContextV3Sealed(envelope, ctx);
+        collected.push(envelope);
+      } else if (isV8 && entry.agent_id === OPPORTUNITY_RISK_AGENT) {
+        // V8 ONLY: Opportunity/Risk V3 readiness gate over the V3 specialist lineages.
+        opportunityRiskHash = await assertOpportunityRiskV3Sealed(envelope, ctx);
+        collected.push(envelope);
+      } else if (v2entry && entry.agent_id === "session_market_structure") {
         // Validate + seal immediately, and retain THAT immutable envelope as the single
         // dependency source. Session is called exactly once per run.
         const errs = validateEvidence(envelope);
@@ -310,7 +351,10 @@ Deno.serve(async (req) => {
     const sealed = canonicalOrder(await Promise.all(collected.map(sealEvidence)));
     assertCollectionComplete(sealed, ctx);
     // The exact envelope handed to Pattern must be the one in the final collected batch.
-    if (isV2 && sessionDependencyHash) {
+    if (isV8 && sessionDependencyHash) {
+      // V8 binding: same proof under the V3 dependency + structure-provenance vocabulary.
+      assertPatternDependencyBindingV8(sealed, sessionDependencyHash);
+    } else if (isV2 && sessionDependencyHash) {
       assertSessionDependencyBinding(sealed, sessionDependencyHash);
       // ...and Pattern's OWN sealed evidence must cite exactly that Session hash.
       assertPatternDependencyBinding(sealed, sessionDependencyHash);
@@ -322,7 +366,9 @@ Deno.serve(async (req) => {
     }
     // V4 ONLY: the accepted cross-asset context envelope must be the single cross-asset
     // envelope in the final batch. It stays contextual — no authority, no direction vote.
-    if (isV4 && crossAssetContextHash) {
+    if (isV8 && crossAssetContextHash) {
+      assertAgentBindingV8(sealed, CROSS_ASSET_AGENT, crossAssetContextHash);
+    } else if (isV4 && crossAssetContextHash) {
       assertCrossAssetContextBinding(sealed, crossAssetContextHash);
     }
     // V5 ONLY: the accepted macro temporal context envelope must be the single macro
@@ -332,7 +378,9 @@ Deno.serve(async (req) => {
     }
     // V6 ONLY: the accepted opportunity/risk readiness envelope must be the single
     // opportunity envelope in the final batch. It stays a readiness gate.
-    if (isV6 && opportunityRiskHash) {
+    if (isV8 && opportunityRiskHash) {
+      assertAgentBindingV8(sealed, OPPORTUNITY_RISK_AGENT, opportunityRiskHash);
+    } else if (isV6 && opportunityRiskHash) {
       assertOpportunityRiskBinding(sealed, opportunityRiskHash);
     }
     // V7 ONLY: the accepted Falconer envelope must be the single Falconer envelope in the
@@ -349,7 +397,9 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: isV7
+      orchestration_run_version: isV8
+        ? RON_ORCHESTRATION_RUN_VERSION_V8
+        : isV7
         ? RON_ORCHESTRATION_RUN_VERSION_V7
         : isV6
         ? RON_ORCHESTRATION_RUN_VERSION_V6
@@ -360,7 +410,9 @@ Deno.serve(async (req) => {
         : isV3
         ? RON_ORCHESTRATION_RUN_VERSION_V3
         : isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: isV7
+      orchestration_run_plan_hash: isV8
+        ? await orchestrationRunPlanHashV8()
+        : isV7
         ? await orchestrationRunPlanHashV7()
         : isV6
         ? await orchestrationRunPlanHashV6()
@@ -411,6 +463,18 @@ Deno.serve(async (req) => {
           falconer_signal_source_spec_version: FALCONER_SIGNAL_SOURCE_SPEC_VERSION_V7,
           falconer_signal_source_evidence_hash: falconerSignalSourceHash,
           falconer_authority: "strategy_context_only",
+        }
+        : {}),
+      // V8-ONLY fields: explicit V1..V7 replay keeps the exact pre-V8 summary shape.
+      // These deliberately OVERRIDE the inherited V3/V4/V6 spec-version fields above.
+      ...(isV8
+        ? {
+          session_structure_spec_version: SESSION_STRUCTURE_SPEC_VERSION_V8,
+          pattern_context_spec_version: PATTERN_CONTEXT_SPEC_VERSION_V8,
+          cross_asset_context_spec_version: CROSS_ASSET_SPEC_VERSION_V8,
+          opportunity_risk_spec_version: OPPORTUNITY_RISK_SPEC_VERSION_V8,
+          uniform_evaluation_anchor: anchor,
+          per_agent_anchor_convention: false,
         }
         : {}),
       evaluation_anchor: anchor,
