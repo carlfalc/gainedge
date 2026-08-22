@@ -194,8 +194,9 @@ export const HA_PATTERN_CONTEXT_SPEC_V1 = {
       "R4 weakening: body_dynamics == 'contracting' OR opposing_wick_emergence in " +
       "('emerging','persisting') OR momentum_confirmation == 'weakening'. Deteriorating " +
       "evidence always dominates strengthening evidence",
-      "R5 strengthening: trend_sequence directional AND run_length >= 2 AND " +
-      "body_dynamics == 'expanding' AND opposing_wick_emergence != 'emerging' AND " +
+      "R5 strengthening (reached only when R4 did not match, so no deteriorating " +
+      "opposite-wick state is possible here): trend_sequence directional AND " +
+      "run_length >= 2 AND body_dynamics == 'expanding' AND " +
       "(momentum_confirmation == 'agreement' OR ema_relationship is the matching alignment)",
       "R6 forming: otherwise (conservative default)",
       "no hidden numeric score is used at any point; every decision emits reason tokens",
@@ -628,7 +629,7 @@ export async function buildHaPatternContextV1(
       timeframe: input.timeframe, evaluation_anchor: anchor,
     },
   );
-  const ctxRejection: string | null = ctx.ok ? null : ctx.reason;
+  const ctxRejection: string | null = ctx.ok === true ? null : ctx.reason;
   let structure_relevance: StructureRelevanceState;
   if (!ctx.ok || direction == null) {
     structure_relevance = "unavailable";
@@ -675,7 +676,7 @@ export async function buildHaPatternContextV1(
     || momentum_confirmation === "weakening") {
     lifecycle = "weakening"; reason.push("lifecycle:R4_weakening");
   } else if (direction != null && runLength >= 2 && body_dynamics === "expanding"
-    && opposing_wick_emergence !== "emerging"
+    // R4 already excluded every deteriorating opposite-wick state.
     && (momentum_confirmation === "agreement" || ema_relationship === matchingAlignment)) {
     lifecycle = "strengthening"; reason.push("lifecycle:R5_strengthening");
   } else {
