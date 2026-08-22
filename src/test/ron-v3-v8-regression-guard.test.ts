@@ -249,6 +249,8 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       "supabase/functions/_shared/ron-orchestration-run-v8.ts",
       // GAINEDGE_RON_HA_PATTERN_CONTEXT_V1: new, additive, not wired into any run plan.
       "supabase/functions/_shared/ron-ha-pattern-context-spec-v1.ts",
+      // GAINEDGE_RON_OPPORTUNITY_CONTEXT_V1: new, additive, pure, unregistered, unpersisted.
+      "supabase/functions/_shared/ron-opportunity-context-spec-v1.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

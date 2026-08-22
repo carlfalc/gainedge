@@ -89,6 +89,8 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
       + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-ha-pattern-context-spec-v1.ts'`
       + ` ':(exclude)src/test/ron-ha-pattern-context-v1.test.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-spec-v1.ts'`
+      + ` ':(exclude)src/test/ron-opportunity-context-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
       + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
