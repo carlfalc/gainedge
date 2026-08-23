@@ -99,6 +99,8 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  /** Duplicate position/history disclosure — collapsed by default (right rail is primary). */
+  const [showActivity, setShowActivity] = useState(false);
 
   // Intelligent Trader state — PER-SYMBOL settings persisted to user_auto_trade_settings
   // Each symbol has its own enabled flag, lot_size, and signal_direction.
@@ -850,6 +852,23 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
             )}
           </div>
 
+          {/* ─── 3. ACCOUNT ACTIVITY (collapsed by default) ─────────────────
+              The right rail is now the primary position-monitoring surface, so this
+              duplicate list is de-emphasised. The underlying polling/state flow stays
+              mounted because the rail depends on it. ───────────────────────────── */}
+          <div className="border-t border-white/[0.06] pt-2">
+            <button
+              onClick={() => setShowActivity(!showActivity)}
+              className="flex items-center gap-1 text-[10px] text-white/40 hover:text-white/60 uppercase tracking-wider transition-colors"
+              data-testid="account-activity-toggle"
+            >
+              {showActivity ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              Account activity
+              {positions.length > 0 && <span className="text-white/30">({positions.length} open)</span>}
+            </button>
+          </div>
+          {showActivity && (
+          <>
           {/* ─── 3. OPEN POSITIONS (always visible) ─── */}
           <div className="border-t border-white/[0.06] pt-2">
             <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Open Positions</div>
@@ -971,6 +990,8 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
       </div>
 
