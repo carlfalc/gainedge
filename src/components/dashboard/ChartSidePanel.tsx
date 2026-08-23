@@ -19,6 +19,7 @@ import {
   PATTERN_CONTEXT_NOTE,
   RON_CONTEXT_TIMEFRAME,
   ronPlainStatus,
+  type NamedPatternDetection,
 
 } from "@/lib/charts-context";
 
@@ -59,6 +60,7 @@ export default function ChartSidePanel({
   const ronCtx = buildRonChartContext(symbol, snapshot);
   const ron = ronCtx.available ? ronCtx : null;
   const ronUnavailableMessage = ronCtx.available === false ? ronCtx.message : null;
+  const canPreview = Boolean(onShowPattern && snapshot?.bar_time && snapshot?.timeframe);
   const patternCtx = buildPatternContext(
     snapshot?.patterns,
     snapshot?.features,
