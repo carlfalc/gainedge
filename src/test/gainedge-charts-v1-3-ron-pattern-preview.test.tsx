@@ -263,6 +263,19 @@ describe("scope containment", () => {
   });
 });
 
+// jsdom has no canvas; the chart canvas itself is not the subject of these tests.
+vi.mock("lightweight-charts", () => ({
+  createChart: () => ({
+    addSeries: () => ({ setData: () => {}, createPriceLine: () => {} }),
+    timeScale: () => ({ fitContent: () => {} }),
+    applyOptions: () => {},
+    remove: () => {},
+  }),
+  createSeriesMarkers: () => ({}),
+  CandlestickSeries: {},
+  LineSeries: {},
+}));
+
 vi.mock("@/services/pattern-preview-candles", async (orig) => {
   const actual = await orig<typeof import("@/services/pattern-preview-candles")>();
   return {
