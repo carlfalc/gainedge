@@ -147,7 +147,14 @@ describe("slice diff is limited to the frontend read alignment", () => {
   it.skipIf(!haveBase)("touches no backend/runtime/orchestration file", () => {
     const changed = execSync(`git diff --name-only ${BASE} -- supabase strategy .lovable`, { encoding: "utf8" })
       .split("\n").map((s) => s.trim()).filter(Boolean);
-    expect(changed).toEqual([]);
+    // GAINEDGE_RON_PATTERN_EXPANSION_V1 is an authorized additive detector slice: it adds
+    // a new module and composes it in the snapshot feature pipeline only. No runtime,
+    // orchestration, scheduler, migration or execution surface is touched.
+    const allowedBackend = new Set([
+      "supabase/functions/_shared/ron-patterns-expansion-v1.ts",
+      "supabase/functions/_shared/ron-features.ts",
+    ]);
+    expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
   });
 
   it.skipIf(!haveBase)("changes only the snapshot service, this slice's tests, and the later dashboard-UI slice", () => {
@@ -188,6 +195,13 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/lib/pattern-preview.ts",
       "src/services/pattern-preview-candles.ts",
       "src/test/gainedge-charts-v1-3-ron-pattern-preview.test.tsx",
+      // GAINEDGE_RON_PATTERN_EXPANSION_V1 — additive named-pattern detectors.
+      "supabase/functions/_shared/ron-patterns-expansion-v1.ts",
+      "supabase/functions/_shared/ron-features.ts",
+      "src/test/gainedge-ron-pattern-expansion-v1.test.ts",
+      "src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts",
+      "src/test/gainedge-product-ask-ron-global-entry-v1.test.ts",
+      "src/test/ron-v3-v8-regression-guard.test.ts",
       // Typecheck scoping only: ES2021 lib + app-source scope. No frozen artifact touched.
       "tsconfig.app.json",
     ]);

@@ -146,7 +146,12 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
       + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-spec-v1.ts'`
       + ` ':(exclude)src/test/ron-opportunity-context-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
-      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`
+      // GAINEDGE_RON_PATTERN_EXPANSION_V1: additive named-pattern detectors composed
+      // only into the snapshot feature pipeline. The hash-pinned ron-patterns.ts and every
+      // frozen V1-V8 spec stay byte-identical.
+      + ` ':(exclude)supabase/functions/_shared/ron-patterns-expansion-v1.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-features.ts'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");

@@ -317,7 +317,28 @@ export const PATTERN_GLOSSARY: Record<string, PatternGlossaryEntry> = {
     reading: "A shallow bounce after a strong decline is read as consolidation rather than reversal. Traders watch the flag boundaries.",
     measured: "The detector stored the flag's upper and lower boundaries with real time and price coordinates, plus a measured move equal to the pole length subtracted from the end of the flag.",
   },
+  "inverse head & shoulders": {
+    what: "Three swing lows where the middle low (the head) is below the two outer lows (the shoulders), with a neckline drawn above the pattern.",
+    reading: "The second shoulder failing to reach the head's depth is read as fading downside pressure. The neckline is the level traders watch.",
+    measured: "The detector stored the three trough prices, the neckline price, and a measured move equal to the head-to-neckline distance projected above the neckline.",
+  },
+  "symmetrical triangle": {
+    what: "A falling upper boundary and a rising lower boundary squeezing price into a narrowing range.",
+    reading: "Compression from both sides is read as indecision rather than direction. Neither side is implied until price leaves the triangle, so this structure is recorded as neutral.",
+    measured: "The detector stored both converging boundary lines with real time and price coordinates. No measured move is stored, because no breakout has been observed.",
+  },
+  "rising wedge": {
+    what: "Both boundaries rising while narrowing, with the lower boundary rising faster than the upper one.",
+    reading: "Higher highs made with shrinking room above are conventionally read as bearish-leaning structural context. It is context, not a guaranteed reversal.",
+    measured: "The detector stored both rising boundary lines with real time and price coordinates. No measured move is stored, because no breakout has been observed.",
+  },
+  "falling wedge": {
+    what: "Both boundaries falling while narrowing, with the upper boundary falling faster than the lower one.",
+    reading: "Lower lows made with shrinking room below are conventionally read as bullish-leaning structural context. It is context, not a guaranteed reversal.",
+    measured: "The detector stored both falling boundary lines with real time and price coordinates. No measured move is stored, because no breakout has been observed.",
+  },
 };
+
 
 /** Case/spacing-insensitive glossary lookup. Returns null for unknown names. */
 export function patternGlossary(name: string | null | undefined): PatternGlossaryEntry | null {

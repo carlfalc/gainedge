@@ -251,6 +251,10 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       "supabase/functions/_shared/ron-ha-pattern-context-spec-v1.ts",
       // GAINEDGE_RON_OPPORTUNITY_CONTEXT_V1: new, additive, pure, unregistered, unpersisted.
       "supabase/functions/_shared/ron-opportunity-context-spec-v1.ts",
+      // GAINEDGE_RON_PATTERN_EXPANSION_V1: new additive detector module + the snapshot
+      // feature pipeline that composes it. The hash-pinned ron-patterns.ts is untouched.
+      "supabase/functions/_shared/ron-patterns-expansion-v1.ts",
+      "supabase/functions/_shared/ron-features.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

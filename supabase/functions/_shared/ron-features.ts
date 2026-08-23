@@ -17,6 +17,9 @@ import {
   sessionIndexOf,
 } from "./falconer-strategy.ts";
 import { detectPatterns, type DetectedPattern } from "./ron-patterns.ts";
+import {
+  detectExpansionPatterns, type ExpandedPattern,
+} from "./ron-patterns-expansion-v1.ts";
 
 /**
  * Feature-store version.
@@ -68,7 +71,7 @@ export interface RonSnapshot {
   volume: number | null;
   spread: number | null;
   features: RonFeatures;
-  patterns: DetectedPattern[];
+  patterns: (DetectedPattern | ExpandedPattern)[];
   model_signals: Record<string, unknown>;
   feature_version: number;
   data_health: "healthy" | "stale" | "insufficient" | "error";
@@ -300,11 +303,18 @@ export function computeRonSnapshot(
   const nearestRes = Math.max(...srWin.slice(0, -1).map(c => c.high).filter(h => h > bar.close), Number.NEGATIVE_INFINITY);
   const nearestSup = Math.min(...srWin.slice(0, -1).map(c => c.low).filter(l => l < bar.close), Number.POSITIVE_INFINITY);
 
-  const patterns = detectPatterns(
-    candles.slice(Math.max(0, i - 149)).map(c => ({
-      time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
-    })),
-  ).slice(0, 6);
+  // GAINEDGE_RON_PATTERN_EXPANSION_V1 — the pinned base detector output is produced and
+  // truncated EXACTLY as before (unchanged rows, unchanged order, unchanged cap of 6);
+  // the 4 additive expansion patterns are appended afterwards so they can never displace
+  // or reorder an existing detection.
+  const patternInput = candles.slice(Math.max(0, i - 149)).map(c => ({
+    time: Math.floor(c.time / 1000), open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume,
+  }));
+  const basePatterns = detectPatterns(patternInput);
+  const patterns: (DetectedPattern | ExpandedPattern)[] = [
+    ...basePatterns.slice(0, 6),
+    ...detectExpansionPatterns(patternInput, basePatterns).slice(0, 3),
+  ];
 
   const rsiNow = rsi[i];
   const rsiPrev = rsi[Math.max(0, i - 3)];
