@@ -219,7 +219,7 @@ export function MostVolumeBar() {
         </div>
 
         {!collapsed && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {rows.map((row) => {
             const color = row.session.color;
             const hasData = row.topSymbol != null;
@@ -231,73 +231,74 @@ export function MostVolumeBar() {
                   key={row.session.key}
                   style={{
                     display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
-                    padding: "6px 10px", borderRadius: 8,
+                    padding: "9px 12px", borderRadius: 8,
                     background: row.status === "active" ? color + "10" : "transparent",
                     borderLeft: `3px solid ${color}${hasData || row.status === "active" ? "" : "40"}`,
-                    opacity: row.status === "upcoming" ? 0.4 : 1,
+                    opacity: row.status === "upcoming" ? 0.62 : 1,
                   }}
                 >
-                  <span className="text-sm font-medium" style={{ fontSize: 11, fontWeight: 700, color, minWidth: 70, whiteSpace: "nowrap" }}>
+                  <span className="text-sm font-medium" style={{ fontSize: 13, fontWeight: 700, color, minWidth: 84, whiteSpace: "nowrap" }}>
                     {row.session.label}
                   </span>
 
                   {row.status === "active" && !hasData ? (
-                    <span style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>In progress...</span>
+                    <span style={{ fontSize: 12, color: C.muted, fontStyle: "italic" }}>In progress...</span>
                   ) : row.status === "completed" && !hasData ? (
-                    <span style={{ fontSize: 11, color: "#F59E0B", fontStyle: "italic" }}>No data recorded</span>
+                    <span style={{ fontSize: 12, color: "#F59E0B", fontStyle: "italic" }}>No data recorded</span>
                   ) : row.status === "active" && hasData ? (
                     <>
-                      <span style={{ padding: "2px 10px", borderRadius: 14, border: `1.5px solid ${color}`, color: C.text, fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
+                      <span style={{ padding: "3px 12px", borderRadius: 14, border: `1.5px solid ${color}`, color: C.text, fontSize: 13, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
                         {row.topSymbol}
                       </span>
                       {row.peakHourLabel && (
-                        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
-                          <Clock size={9} />{row.peakHourLabel}
+                        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
+                          <Clock size={11} />{row.peakHourLabel}
                         </span>
                       )}
                       {row.volume > 0 && (
-                        <span style={{ fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
+                        <span style={{ fontSize: 11.5, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                           {row.volume.toLocaleString()} vol
                         </span>
                       )}
-                      <span style={{ fontSize: 8, fontWeight: 700, color, background: color + "20", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase", letterSpacing: 1 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color, background: color + "20", padding: "2px 8px", borderRadius: 4, textTransform: "uppercase", letterSpacing: 1 }}>
                         LIVE
                       </span>
                     </>
                   ) : hasData ? (
                     <>
-                      <span style={{ padding: "2px 10px", borderRadius: 14, border: `1.5px solid ${color}50`, color: C.sec, fontSize: 11, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
+                      <span style={{ padding: "3px 12px", borderRadius: 14, border: `1.5px solid ${color}50`, color: C.sec, fontSize: 12.5, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", letterSpacing: 0.5 }}>
                         {row.topSymbol}
                       </span>
                       {row.peakHourLabel && (
-                        <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
-                          <Clock size={9} />{row.peakHourLabel}
+                        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
+                          <Clock size={11} />{row.peakHourLabel}
                         </span>
                       )}
                       {row.volume > 0 && (
-                        <span style={{ fontSize: 10, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
+                        <span style={{ fontSize: 11.5, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                           {row.volume.toLocaleString()} vol
                         </span>
                       )}
                     </>
                   ) : (
-                    <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>Upcoming</span>
+                    <span style={{ fontSize: 11.5, color: C.muted, fontStyle: "italic" }}>Upcoming</span>
                   )}
 
                   {showInsight && ins.bestBuySymbol && ins.bestBuyPct > 50 && (
-                    <span style={{ fontSize: 10, color: "#22C55E", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 11.5, color: "#22C55E", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
                       ▲ BUY: {ins.bestBuySymbol}
                       {ins.bestBuyTime && <> @ {ins.bestBuyTime}</>}
                       {" "}({ins.bestBuyPct}%)
                     </span>
                   )}
                   {showInsight && ins.bestSellSymbol && ins.bestSellPct > 50 && (
-                    <span style={{ fontSize: 10, color: "#EF4444", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 11.5, color: "#EF4444", fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
                       ▼ SHORT: {ins.bestSellSymbol}
                       {ins.bestSellTime && <> @ {ins.bestSellTime}</>}
                       {" "}({ins.bestSellPct}%)
                     </span>
                   )}
+
                 </div>
             );
           })}
