@@ -37,6 +37,8 @@ interface Props {
   tradingConnected?: boolean;
   /** Locally-entered limit/stop draft in the trade panel — never a live broker order. */
   orderDraftLabel?: string | null;
+  /** Opens the GainEdge-owned educational pattern preview for a real detection. */
+  onShowPattern?: (detection: NamedPatternDetection) => void;
 }
 
 const TABS: { id: RailTab; label: string }[] = [
@@ -47,7 +49,9 @@ const TABS: { id: RailTab; label: string }[] = [
 export default function ChartSidePanel({
   symbol, positions, onClosePosition, closingId,
   snapshot = null, tradingConnected = false, orderDraftLabel = null,
+  onShowPattern,
 }: Props) {
+
   const [tab, setTab] = useState<RailTab>("ron");
   const [showEarlier, setShowEarlier] = useState(false);
   const priceDec = symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5;
