@@ -119,27 +119,85 @@ export default function ChartSidePanel({
                 )}
 
                 <div data-testid="ron-patterns">
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Current patterns</div>
-                  {ron.patternItems.length === 0 ? (
-                    <div className="text-[12.5px] text-muted-foreground">No pattern on the current bar</div>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Pattern context</div>
+                    <Info size={12} className="text-muted-foreground/70 shrink-0" aria-hidden />
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground/80 mb-2" data-testid="pattern-context-note">
+                    {PATTERN_CONTEXT_NOTE}
+                  </p>
+                  {!patternCtx.latest ? (
+                    <div className="text-[12.5px] text-muted-foreground">No named chart pattern in the recent window</div>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {ron.patternItems.map(p => (
-                        <span
-                          key={p}
-                          className="px-2 py-1 rounded bg-background/60 border border-border text-[12px] text-foreground"
-                        >
-                          {p}
-                        </span>
-                      ))}
-                      {ron.patternsMore > 0 && (
-                        <span className="px-2 py-1 rounded text-[12px] text-muted-foreground" data-testid="patterns-more">
-                          +{ron.patternsMore} more
-                        </span>
+                    <div className="space-y-2">
+                      <div data-testid="pattern-latest">
+                        <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 mb-1">
+                          Latest detection
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2 px-2 py-1.5 rounded bg-background/60 border border-border">
+                          <span className="text-[12.5px] text-foreground">{patternCtx.latest.label}</span>
+                          {patternCtx.latest.barsAgoLabel && (
+                            <span
+                              className="font-mono text-[11px] text-muted-foreground whitespace-nowrap"
+                              title={patternCtx.latest.approxSpanLabel ?? undefined}
+                            >
+                              {patternCtx.latest.barsAgoLabel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {patternCtx.earlier.length > 0 && (
+                        <div data-testid="pattern-earlier">
+                          <button
+                            onClick={() => setShowEarlier((v) => !v)}
+                            className="text-[10.5px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                            data-testid="pattern-earlier-toggle"
+                          >
+                            {showEarlier ? "Hide" : "Show"} earlier detections ({patternCtx.earlier.length})
+                          </button>
+                          {showEarlier && (
+                            <div className="mt-1.5 space-y-1">
+                              {patternCtx.earlier.map(p => (
+                                <div key={p.key} className="flex items-baseline justify-between gap-2 px-2 py-1 rounded bg-background/40 border border-border">
+                                  <span className="text-[12px] text-muted-foreground">{p.label}</span>
+                                  {p.barsAgoLabel && (
+                                    <span
+                                      className="font-mono text-[11px] text-muted-foreground/80 whitespace-nowrap"
+                                      title={p.approxSpanLabel ?? undefined}
+                                    >
+                                      {p.barsAgoLabel}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
+
+                {patternCtx.levels.length > 0 && (
+                  <div data-testid="ron-levels">
+                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Current level context
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {patternCtx.levels.map((l, i) => (
+                        <span
+                          key={`${l.kind}-${l.price}-${i}`}
+                          className="px-2 py-1 rounded bg-background/60 border border-border text-[12px]"
+                        >
+                          <span className="text-muted-foreground">{l.kind} </span>
+                          <span className="font-mono text-foreground">{l.price}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
 
                 <div>
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">What would change this</div>
