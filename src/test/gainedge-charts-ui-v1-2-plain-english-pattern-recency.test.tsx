@@ -69,12 +69,22 @@ describe("A. plain-English RON status", () => {
 
   it("puts the plain status and secondary freshness on the strip", () => {
     const s = buildInstrumentStrip("XAUUSD", snapshot());
-    expect(s.statusLabel).toBe("RON: WATCHING");
+    // transition regime + ADX 24.2 + mixed stack scores 0 → WAIT, rendered plainly.
+    expect(s.statusLabel).toBe("RON: WAITING");
     expect(s.contextLabel).toBeNull();
     expect(s.freshnessLabel).toMatch(/^15m context · .+ ago$/);
     expect(s.chips.map((c) => c.id)).not.toContain("ron-age");
     expect(JSON.stringify(s)).not.toMatch(/\b(BUY|SELL)\b/);
   });
+
+  it("renders WATCHING plainly when the evidence scores a watch state", () => {
+    const s = buildInstrumentStrip("XAUUSD", snapshot({
+      features: { ...FEATURES, regime: "ranging", adx14: 27, ema_stack: "up" },
+    }));
+    expect(s.statusLabel).toBe("RON: WATCHING");
+    expect(s.contextLabel).toBeNull();
+  });
+
 
   it("shows a bullish context label when the regime is genuinely trending up", () => {
     const s = buildInstrumentStrip("XAUUSD", snapshot({
