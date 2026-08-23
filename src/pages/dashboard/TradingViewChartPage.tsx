@@ -320,17 +320,19 @@ export default function TradingViewChartPage() {
         </div>
       </div>
 
-      {/* Instrument context / freshness strip — genuine source values only. */}
+      {/* Slim context / freshness line — complementary to the intelligence strip above.
+          Genuine source values only, with duplicate state segments removed. */}
       <div
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 border-b border-border bg-[#0a0e16] shrink-0 text-[12px] text-muted-foreground"
+        className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1 border-b border-border bg-[#0a0e16] shrink-0 text-[11px] text-muted-foreground"
         data-testid="chart-context-strip"
       >
         {contextSegments.map((seg, i) => (
-          <span key={seg} className="flex items-center gap-2">
-            {i > 0 && <span className="opacity-40">•</span>}
+          <span key={seg} className={`flex items-center gap-2 ${i === 0 ? "md:hidden" : ""}`}>
+            {i > 1 && <span className="opacity-40">•</span>}
             <span className={i === 0 ? "font-bold text-foreground" : ""}>{seg}</span>
           </span>
         ))}
+
         <span className="ml-auto text-[11px] opacity-70">
           Technical indicators are available in the TradingView Indicators menu.
         </span>
