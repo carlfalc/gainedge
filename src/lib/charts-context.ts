@@ -178,6 +178,202 @@ export function describeSnapshotPatterns(
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * GAINEDGE_CHARTS_UI_V1_2 — plain-English RON status + pattern recency
+ * ------------------------------------------------------------------ */
+
+/**
+ * Plain-English rendering of the deterministic `ronStateFrom()` label.
+ *
+ * These are STANCE words only. They are never translated into BUY / SELL / LONG /
+ * SHORT: the persisted Opportunity engine is not live in the UI, so a directional
+ * recommendation would overstate what the current evidence supports.
+ */
+export const RON_STATE_PLAIN: Record<RonState, string> = {
+  WAIT: "RON: WAITING",
+  WATCH: "RON: WATCHING",
+  "SETUP FORMING": "RON: SETUP FORMING",
+};
+
+export function ronPlainStatus(state: RonState): string {
+  return RON_STATE_PLAIN[state];
+}
+
+/**
+ * Secondary CONTEXT label — only for unambiguous directional regimes. Ranging and
+ * transition regimes deliberately produce no direction: inventing one would be a
+ * fabricated bias. This is context, never a BUY/SELL instruction.
+ */
+export function regimeContextLabel(regime: unknown): string | null {
+  const r = String(regime ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (r === "trending_up") return "Bullish context";
+  if (r === "trending_down") return "Bearish context";
+  return null;
+}
+
+/** Hard cap of the pattern detector's input window (`computeRonSnapshot` slices 150). */
+export const PATTERN_INPUT_MAX_BARS = 150;
+
+/** Structural level detections that must never be counted as named chart patterns. */
+const LEVEL_PATTERN_NAMES = new Set(["support", "resistance"]);
+
+export interface NamedPatternDetection {
+  /** Stable render key. */
+  key: string;
+  name: string;
+  direction: string | null;
+  /** "Double Bottom · bullish" */
+  label: string;
+  endIndex: number | null;
+  /** Completed bars between the detection end and the pattern-window end. */
+  barsAgo: number | null;
+  /** "33 bars ago" — the authoritative text. Null when provenance is unavailable. */
+  barsAgoLabel: string | null;
+  /** Optional non-authoritative "~8h 15m of 15m bars". Null when unparseable. */
+  approxSpanLabel: string | null;
+}
+
+export interface LevelContextItem {
+  kind: "Support" | "Resistance";
+  price: string;
+}
+
+export interface PatternContext {
+  /** Most recent named detection by end_index, or null when there are none. */
+  latest: NamedPatternDetection | null;
+  /** Older named detections, most recent first. */
+  earlier: NamedPatternDetection[];
+  /** Named chart-pattern count — excludes Support/Resistance entries. */
+  namedCount: number;
+  /** Structural support/resistance levels, max 3. */
+  levels: LevelContextItem[];
+}
+
+/** Max structural levels surfaced in the level-context block. */
+export const MAX_LEVEL_ITEMS = 3;
+
+/**
+ * Deterministic pattern-window size, derived ONLY from real provenance.
+ * Returns null when `features.provenance.window_size` is missing or invalid — in that
+ * case no age is displayed rather than guessed.
+ */
+export function patternInputBars(features: unknown): number | null {
+  const f = (features ?? {}) as Record<string, unknown>;
+  const prov = (f.provenance ?? {}) as Record<string, unknown>;
+  const ws = prov.window_size;
+  if (typeof ws !== "number" || !Number.isFinite(ws) || ws <= 0) return null;
+  return Math.min(PATTERN_INPUT_MAX_BARS, Math.floor(ws));
+}
+
+/** Minutes per bar from a timeframe string, or null when it cannot be parsed safely. */
+function timeframeMinutes(tf: unknown): number | null {
+  const m = String(tf ?? "").trim().toLowerCase().match(/^(\d+)\s*(m|h|d)$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return m[2] === "m" ? n : m[2] === "h" ? n * 60 : n * 1440;
+}
+
+function approxSpan(barsAgo: number, tf: unknown): string | null {
+  const mins = timeframeMinutes(tf);
+  if (mins == null || barsAgo <= 0) return null;
+  const total = barsAgo * mins;
+  const h = Math.floor(total / 60);
+  const mm = total % 60;
+  const span = h > 0 ? (mm > 0 ? `${h}h ${mm}m` : `${h}h`) : `${mm}m`;
+  return `~${span} of ${String(tf)} bars`;
+}
+
+function titleise(raw: string): string {
+  return raw.replace(/_/g, " ").trim();
+}
+
+function priceText(v: unknown): string | null {
+  if (typeof v === "number" && Number.isFinite(v)) {
+    return v.toFixed(Math.abs(v) >= 100 ? 2 : 4);
+  }
+  return null;
+}
+
+/**
+ * Builds the Charts rail's PATTERN CONTEXT model from the real v6 patterns array.
+ *
+ * Truthfulness rules:
+ *  - The detector scans a rolling recent window, so entries are NOT simultaneously
+ *    active. No entry is ever labelled current/active/confirmed/valid/invalidated:
+ *    the source carries no pattern lifecycle.
+ *  - Ordering is by `end_index` recency, never by numeric `confidence`, and the
+ *    numeric confidence value is never surfaced.
+ *  - Support/Resistance are structural levels, surfaced separately and excluded from
+ *    the named-pattern count.
+ */
+export function buildPatternContext(
+  patterns: unknown,
+  features: unknown,
+  timeframe?: string,
+): PatternContext {
+  const list = Array.isArray(patterns) ? patterns : [];
+  const bars = patternInputBars(features);
+  const latestIndex = bars == null ? null : bars - 1;
+
+  const named: NamedPatternDetection[] = [];
+  const levels: LevelContextItem[] = [];
+
+  list.forEach((raw, i) => {
+    if (!raw || typeof raw !== "object") return;
+    const p = raw as Record<string, unknown>;
+    const nameSource = p.pattern_name ?? p.name ?? p.type;
+    if (typeof nameSource !== "string" || nameSource.trim() === "") return;
+    const name = titleise(nameSource);
+
+    if (LEVEL_PATTERN_NAMES.has(name.toLowerCase())) {
+      const kp = (p.key_prices ?? {}) as Record<string, unknown>;
+      const isSupport = name.toLowerCase() === "support";
+      const price = priceText(isSupport ? kp.support : kp.resistance) ?? priceText(kp.level ?? kp.price);
+      if (price) levels.push({ kind: isSupport ? "Support" : "Resistance", price });
+      return;
+    }
+
+    const direction = typeof p.direction === "string" && p.direction.trim() !== ""
+      ? titleise(p.direction)
+      : null;
+    const endRaw = p.end_index;
+    const endIndex = typeof endRaw === "number" && Number.isFinite(endRaw) && endRaw >= 0
+      ? Math.floor(endRaw)
+      : null;
+    const barsAgo = latestIndex != null && endIndex != null
+      ? Math.max(0, latestIndex - endIndex)
+      : null;
+
+    named.push({
+      key: `${name}-${endIndex ?? "x"}-${i}`,
+      name,
+      direction,
+      label: direction ? `${name} · ${direction}` : name,
+      endIndex,
+      barsAgo,
+      barsAgoLabel: barsAgo == null ? null : `${barsAgo} ${barsAgo === 1 ? "bar" : "bars"} ago`,
+      approxSpanLabel: barsAgo == null ? null : approxSpan(barsAgo, timeframe),
+    });
+  });
+
+  // Recency ordering by end_index descending; unknown end_index sinks to the bottom.
+  named.sort((a, b) => (b.endIndex ?? -1) - (a.endIndex ?? -1));
+
+  return {
+    latest: named[0] ?? null,
+    earlier: named.slice(1),
+    namedCount: named.length,
+    levels: levels.slice(0, MAX_LEVEL_ITEMS),
+  };
+}
+
+/** Compact microcopy explaining the rolling-window nature of the detector. */
+export const PATTERN_CONTEXT_NOTE =
+  "Pattern scanner reviews a rolling window of recent 15m candles. Older detections are shown as context, not as current signals.";
+
+
+
 
 /**
  * Builds the rail's RON context strictly from a current snapshot row.
