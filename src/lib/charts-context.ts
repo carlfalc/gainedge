@@ -352,21 +352,40 @@ export function buildPatternContext(
     const endIndex = typeof endRaw === "number" && Number.isFinite(endRaw) && endRaw >= 0
       ? Math.floor(endRaw)
       : null;
+    const startRaw = p.start_index;
+    const startIndex = typeof startRaw === "number" && Number.isFinite(startRaw) && startRaw >= 0
+      ? Math.floor(startRaw)
+      : null;
     const barsAgo = latestIndex != null && endIndex != null
       ? Math.max(0, latestIndex - endIndex)
       : null;
+
+    // Previewable ONLY when the stored span can be mapped onto real detector bars.
+    let notPreviewableReason: string | null = null;
+    if (bars == null || latestIndex == null) {
+      notPreviewableReason = "Detector window provenance not stored for this snapshot";
+    } else if (startIndex == null || endIndex == null) {
+      notPreviewableReason = "Detector did not store a candle span for this detection";
+    } else if (startIndex > endIndex || endIndex > latestIndex) {
+      notPreviewableReason = "Stored span falls outside the detector window";
+    }
 
     named.push({
       key: `${name}-${endIndex ?? "x"}-${i}`,
       name,
       direction,
       label: direction ? `${name} · ${direction}` : name,
+      startIndex,
       endIndex,
       barsAgo,
       barsAgoLabel: barsAgo == null ? null : `${barsAgo} ${barsAgo === 1 ? "bar" : "bars"} ago`,
       approxSpanLabel: barsAgo == null ? null : approxSpan(barsAgo, timeframe),
+      previewable: notPreviewableReason == null,
+      notPreviewableReason,
+      source: raw,
     });
   });
+
 
   // Recency ordering by end_index descending; unknown end_index sinks to the bottom.
   named.sort((a, b) => (b.endIndex ?? -1) - (a.endIndex ?? -1));
