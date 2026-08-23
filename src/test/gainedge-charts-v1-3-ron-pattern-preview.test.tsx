@@ -262,3 +262,60 @@ describe("scope containment", () => {
     }
   });
 });
+
+vi.mock("@/services/pattern-preview-candles", async (orig) => {
+  const actual = await orig<typeof import("@/services/pattern-preview-candles")>();
+  return {
+    ...actual,
+    loadPatternPreviewWindow: vi.fn(async () => ({
+      candles: series(150, ANCHOR), excluded: 2, aligned: true, reason: "aligned" as const,
+      quarantinedApplied: 2, qualityVersion: 5, error: null,
+    })),
+  };
+});
+
+describe("pattern preview modal", () => {
+  const detection = buildPatternContext([DOUBLE_BOTTOM], { provenance: PROVENANCE }, "15m").latest!;
+  const renderModal = async (onClose = vi.fn()) => {
+    const { default: PatternPreviewModal } = await import("@/components/dashboard/PatternPreviewModal");
+    const utils = render(
+      <PatternPreviewModal
+        symbol="XAUUSD" timeframe="15m" barTime="2026-08-20T12:00:00.000Z"
+        detection={detection} onClose={onClose}
+      />,
+    );
+    return { ...utils, onClose };
+  };
+
+  it("labels itself educational, cites real recency and never shows probability or a side", async () => {
+    const { container } = await renderModal();
+    expect(await screen.findByTestId("pattern-preview-title")).toHaveTextContent("XAUUSD · Double Bottom · bullish");
+    expect(screen.getByTestId("pattern-preview-recency").textContent).toBe("Detected 33 completed 15m bars ago");
+    expect(container.textContent).toContain("Educational pattern preview");
+    expect(container.textContent).not.toMatch(/probability|confidence|\bBUY\b|\bSELL\b|confirmed|validated/i);
+  });
+
+  it("states that price-only pivots have no stored candle position", async () => {
+    await renderModal();
+    expect(screen.getByTestId("pattern-preview-geometry-note").textContent).toMatch(/not their exact candle positions/);
+  });
+
+  it("closes on the close button, Return to chart, Escape and backdrop click", async () => {
+    for (const act of [
+      () => fireEvent.click(screen.getByTestId("pattern-preview-close")),
+      () => fireEvent.click(screen.getByTestId("pattern-preview-return")),
+      () => fireEvent.keyDown(window, { key: "Escape" }),
+      () => fireEvent.click(screen.getByTestId("pattern-preview-backdrop")),
+    ]) {
+      const { onClose, unmount } = await renderModal();
+      act();
+      expect(onClose).toHaveBeenCalled();
+      unmount();
+    }
+  });
+
+  it("renders no TradingView iframe and injects nothing into one", async () => {
+    const { container } = await renderModal();
+    expect(container.querySelector("iframe")).toBeNull();
+  });
+});
