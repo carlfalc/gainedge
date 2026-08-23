@@ -307,14 +307,30 @@ export interface ChartContextLineInput {
   now?: number;
 }
 
-/** Returns ONLY the segments backed by real source values. Never fabricates. */
+/** Loose comparison key so "Market closed" and "market closed." collapse together. */
+function segKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Returns ONLY the segments backed by real source values. Never fabricates.
+ *
+ * There is exactly ONE open/closed state segment: when the market is closed we never
+ * also render a session label (a closed market has no active session), and identical or
+ * semantically duplicate segments are collapsed.
+ */
 export function buildChartContextSegments(input: ChartContextLineInput): string[] {
   const now = input.now ?? Date.now();
   const out: string[] = [input.symbol];
-  out.push(`Chart feed ${input.chartFeed}`);
+  out.push(`Chart ${input.chartFeed}`);
   if (input.tradingLabel) out.push(input.tradingLabel);
-  if (input.sessionLabel) out.push(input.sessionLabel);
+
+  const closed = input.marketOpen === false;
+  if (!closed && input.sessionLabel && segKey(input.sessionLabel) !== "marketclosed") {
+    out.push(input.sessionLabel);
+  }
   if (input.marketOpen !== null) out.push(input.marketOpen ? "Market open" : "Market closed");
+
   if (input.quoteTimestamp) {
     const ms = new Date(input.quoteTimestamp as string).getTime();
     if (Number.isFinite(ms)) out.push(`Quote ${formatAgeShort(now - ms)} ago`);
@@ -322,11 +338,19 @@ export function buildChartContextSegments(input: ChartContextLineInput): string[
   if (input.ronBarTime) {
     const ms = new Date(input.ronBarTime).getTime();
     if (Number.isFinite(ms)) {
-      out.push(`RON ${input.ronTimeframe ?? RON_CONTEXT_TIMEFRAME} evaluated ${formatAgeShort(now - ms)} ago`);
+      out.push(`RON ${input.ronTimeframe ?? RON_CONTEXT_TIMEFRAME} last bar ${formatAgeShort(now - ms)} ago`);
     }
   }
-  return out;
+
+  const seen = new Set<string>();
+  return out.filter((s) => {
+    const k = segKey(s);
+    if (k === "" || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
+
 
 /**
  * PATH A LIMITATION (product note, deliberately code-adjacent):
