@@ -5,7 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import ChartTabPane from "@/components/dashboard/ChartTabPane";
 import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import AddChartTabModal, { type ChartMode } from "@/components/dashboard/AddChartTabModal";
-import { ExternalLink, Cpu, Plus, X, Zap, User } from "lucide-react";
+import { ExternalLink, Cpu, Plus, X, Zap, User, AlertTriangle, Link2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import type { Position } from "@/components/dashboard/TradeExecutionPanel";
+import { useRonSnapshots } from "@/services/ron-snapshots";
+import { classifyRonSession } from "@/lib/ron-sessions";
+import {
+  describeFeedVsAccount,
+  buildChartContextSegments,
+  RON_CONTEXT_TIMEFRAME,
+  type TradingAccountInfo,
+} from "@/lib/charts-context";
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
 
@@ -38,6 +48,15 @@ export default function TradingViewChartPage() {
   const { userId, profile } = useProfile();
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [tradingAccount, setTradingAccount] = useState<TradingAccountInfo | null>(null);
+  /** Single source of truth: mirrored from the ACTIVE ChartTabPane, never re-polled. */
+  const [paneState, setPaneState] = useState<{
+    positions: Position[];
+    livePrice: number | null;
+    livePriceTime: string | null;
+    closingId: string | null;
+    closePosition: (id: string) => void;
+  }>({ positions: [], livePrice: null, livePriceTime: null, closingId: null, closePosition: () => {} });
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "live" | "demo">("disconnected");
   const [showAdd, setShowAdd] = useState(false);
 
@@ -77,7 +96,7 @@ export default function TradingViewChartPage() {
     if (!userId) return;
     setConnectionStatus("connecting");
     supabase.from("broker_connections")
-      .select("metaapi_account_id,account_type,status")
+      .select("metaapi_account_id,account_type,status,broker_name")
       .eq("user_id", userId)
       .eq("is_default", true)
       .limit(1)
@@ -86,8 +105,15 @@ export default function TradingViewChartPage() {
         if (broker?.metaapi_account_id && broker.status === "connected") {
           setAccountId(broker.metaapi_account_id);
           setConnectionStatus(broker.account_type === "demo" ? "demo" : "live");
+          setTradingAccount({
+            brokerName: broker.broker_name,
+            accountType: broker.account_type,
+            status: broker.status,
+            accountId: broker.metaapi_account_id,
+          });
         } else {
           setConnectionStatus("disconnected");
+          setTradingAccount(null);
         }
       });
   }, [userId]);
@@ -111,6 +137,37 @@ export default function TradingViewChartPage() {
   }, [activeId]);
 
   const activeTab = tabs.find((t) => t.id === activeId) ?? tabs[0];
+
+  const { snapshots } = useRonSnapshots();
+  const activeSnapshot = activeTab ? snapshots.get(activeTab.symbol) ?? null : null;
+  const feedVsAccount = describeFeedVsAccount(selectedBroker, tradingAccount);
+  const session = classifyRonSession(new Date());
+  const contextSegments = activeTab
+    ? buildChartContextSegments({
+        symbol: activeTab.symbol,
+        chartFeed: selectedBroker,
+        tradingLabel: feedVsAccount.connected ? feedVsAccount.tradingLabel.replace("Trading: ", "Trading ") : null,
+        sessionLabel: session.label,
+        marketOpen: session.market_open,
+        quoteTimestamp: paneState.livePriceTime,
+        ronBarTime: activeSnapshot?.bar_time ?? null,
+        ronTimeframe: activeSnapshot?.timeframe ?? RON_CONTEXT_TIMEFRAME,
+      })
+    : [];
+
+  const handlePaneState = useCallback((state: {
+    positions: Position[]; livePrice: number | null; livePriceTime: string | null;
+    closingId: string | null; closePosition: (id: string) => void;
+  }) => {
+    setPaneState((prev) =>
+      prev.positions === state.positions &&
+      prev.livePrice === state.livePrice &&
+      prev.livePriceTime === state.livePriceTime &&
+      prev.closingId === state.closingId
+        ? prev
+        : state,
+    );
+  }, []);
 
   const handlePopOut = () => {
     if (!activeTab) return;
@@ -167,6 +224,9 @@ export default function TradingViewChartPage() {
 
         <div className="flex items-center gap-1.5 shrink-0">
           <div className="h-4 w-px bg-border" />
+          <span className="text-[11px] font-semibold text-muted-foreground" data-testid="chart-feed-label">
+            Chart feed
+          </span>
           {BROKERS.map((broker) => (
             <button
               key={broker}
@@ -180,12 +240,40 @@ export default function TradingViewChartPage() {
               {broker}
             </button>
           ))}
+          <div className="h-4 w-px bg-border mx-1" />
+          {feedVsAccount.connected ? (
+            <span
+              className="px-2.5 py-1 rounded-full text-[11px] font-semibold border bg-card border-border text-foreground"
+              data-testid="trading-account-pill"
+              title={tradingAccount?.accountId ? `Account ${tradingAccount.accountId}` : undefined}
+            >
+              {feedVsAccount.tradingLabel}
+            </span>
+          ) : (
+            <Link
+              to="/dashboard/settings"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-border bg-card text-muted-foreground hover:text-foreground"
+              data-testid="trading-account-pill"
+            >
+              <Link2 className="w-3 h-3" /> Trading account: Not connected
+            </Link>
+          )}
+          {feedVsAccount.mismatch && (
+            <span
+              className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold border border-amber-500/40 bg-amber-500/10 text-amber-400"
+              title={feedVsAccount.mismatchNote}
+              data-testid="feed-account-mismatch"
+            >
+              <AlertTriangle className="w-3 h-3" /> {feedVsAccount.mismatchNote}
+            </span>
+          )}
           <div
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide ml-1"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold tracking-wide ml-1"
             style={{ background: "rgba(0,207,165,0.1)", border: "1px solid rgba(0,207,165,0.3)", color: "#00CFA5" }}
+            title="Falconer is one strategy context. RON is the market-intelligence layer."
           >
             <Cpu className="w-3 h-3" />
-            Falconer v7
+            Falconer v7 • Strategy
           </div>
           <button
             onClick={handlePopOut}
@@ -194,6 +282,22 @@ export default function TradingViewChartPage() {
             <ExternalLink className="w-3 h-3" /> Pop Out
           </button>
         </div>
+      </div>
+
+      {/* Instrument context / freshness strip — genuine source values only. */}
+      <div
+        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 border-b border-border bg-[#0a0e16] shrink-0 text-[12px] text-muted-foreground"
+        data-testid="chart-context-strip"
+      >
+        {contextSegments.map((seg, i) => (
+          <span key={seg} className="flex items-center gap-2">
+            {i > 0 && <span className="opacity-40">•</span>}
+            <span className={i === 0 ? "font-bold text-foreground" : ""}>{seg}</span>
+          </span>
+        ))}
+        <span className="ml-auto text-[11px] opacity-70">
+          Technical indicators are available in the TradingView Indicators menu.
+        </span>
       </div>
 
       {/* Main content: chart panes + sidebar */}
@@ -212,20 +316,23 @@ export default function TradingViewChartPage() {
                 accountId={accountId}
                 connectionStatus={connectionStatus}
                 active={tab.id === activeId}
+                onPaneState={handlePaneState}
               />
             </div>
           ))}
         </div>
 
-        <div className="w-[320px] shrink-0 hidden lg:block overflow-y-auto border-l border-border">
+        <div className="w-[340px] shrink-0 hidden lg:block overflow-y-auto border-l border-border">
           {activeTab && (
             <ChartSidePanel
               symbol={activeTab.symbol}
               userId={userId}
               accountId={accountId}
-              positions={[]}
-              onClosePosition={() => {}}
-              closingId={null}
+              positions={paneState.positions}
+              onClosePosition={paneState.closePosition}
+              closingId={paneState.closingId}
+              snapshot={activeSnapshot}
+              tradingConnected={feedVsAccount.connected}
             />
           )}
         </div>

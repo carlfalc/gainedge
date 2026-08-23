@@ -30,6 +30,18 @@ interface Props {
   accountId: string | null;
   connectionStatus: "disconnected" | "connecting" | "live" | "demo";
   active: boolean;
+  /**
+   * GAINEDGE_CHARTS_UI_V1_PATH_A — single source of truth lift. The pane already owns
+   * the genuine MetaAPI positions and the live quote; the page mirrors them into the
+   * right rail instead of starting a second independent poll.
+   */
+  onPaneState?: (state: {
+    positions: Position[];
+    livePrice: number | null;
+    livePriceTime: string | null;
+    closingId: string | null;
+    closePosition: (positionId: string) => void;
+  }) => void;
 }
 
 /**
@@ -39,7 +51,7 @@ interface Props {
  * state is preserved when the user switches tabs.
  */
 export default function ChartTabPane({
-  symbol, mode, broker, userId, accountId, connectionStatus, active,
+  symbol, mode, broker, userId, accountId, connectionStatus, active, onPaneState,
 }: Props) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
@@ -102,6 +114,11 @@ export default function ChartTabPane({
       setClosingId(null);
     }
   }, [accountId]);
+
+  useEffect(() => {
+    if (!active || !onPaneState) return;
+    onPaneState({ positions, livePrice, livePriceTime, closingId, closePosition: handleClosePosition });
+  }, [active, onPaneState, positions, livePrice, livePriceTime, closingId, handleClosePosition]);
 
   return (
     <div className={`flex flex-col h-full ${active ? "" : "hidden"}`}>
