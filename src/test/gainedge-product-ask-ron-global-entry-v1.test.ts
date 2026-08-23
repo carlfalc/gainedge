@@ -97,7 +97,9 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
       // only into the snapshot feature pipeline. The hash-pinned ron-patterns.ts and every
       // frozen V1-V8 spec stay byte-identical.
       + ` ':(exclude)supabase/functions/_shared/ron-patterns-expansion-v1.ts'`
-      + ` ':(exclude)supabase/functions/_shared/ron-features.ts'`,
+      + ` ':(exclude)supabase/functions/_shared/ron-features.ts'`
+      // GAINEDGE_SIGNALS_V1 — the working plan document is a non-runtime artifact.
+      + ` ':(exclude).lovable/plan.md'`,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");
