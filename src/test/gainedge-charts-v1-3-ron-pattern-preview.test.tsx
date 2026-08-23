@@ -305,7 +305,8 @@ describe("pattern preview modal", () => {
     expect(await screen.findByTestId("pattern-preview-title")).toHaveTextContent("XAUUSD · Double Bottom · bullish");
     expect(screen.getByTestId("pattern-preview-recency").textContent).toBe("Detected 33 completed 15m bars ago");
     expect(container.textContent).toContain("Educational pattern preview");
-    expect(container.textContent).not.toMatch(/probability|confidence|\bBUY\b|\bSELL\b|confirmed|validated/i);
+    expect(container.textContent).not.toMatch(/probability|confidence|confirmed|validated|invalidated/i);
+    expect(container.textContent).not.toMatch(/\b(BUY|SELL|LONG|SHORT)\b/);
   });
 
   it("states that price-only pivots have no stored candle position", async () => {
