@@ -32,6 +32,9 @@ const SRC = {
   list: read("src/components/signals/FalconerRecordList.tsx"),
 };
 const ALL = Object.values(SRC).join("\n");
+/** Executable code only — provenance comments are allowed to name upstream sources. */
+const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+const CODE = Object.values(SRC).map(stripComments).join("\n");
 
 const record = (over: Partial<FalconerRecord> = {}): FalconerRecord => ({
   id: "r1", symbol: "XAUUSD", timeframe: "15m", mode: "live", direction: "long",
