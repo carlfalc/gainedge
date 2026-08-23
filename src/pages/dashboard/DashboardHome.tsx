@@ -9,7 +9,9 @@ import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMa
 // LiveTradeAlert removed with legacy auto-trade engine
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
-import MoversShakersWidget from "@/components/dashboard/MoversShakersWidget";
+import MarketScannersWidget from "@/components/dashboard/MarketScannersWidget";
+import RonPulse from "@/components/dashboard/RonPulse";
+
 import InstrumentTrackingPanel from "@/components/dashboard/InstrumentTrackingPanel";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
 import { VolumeHistoryInline } from "@/components/dashboard/VolumeHistoryInline";
