@@ -108,7 +108,7 @@ describe("instrument intelligence strip", () => {
     const labels = strip.chips.map((c) => c.label);
     expect(labels).toContain("ADX 24.2");
     expect(labels).toContain("RSI 43.2");
-    expect(labels.some((l) => l.startsWith("RON 15m"))).toBe(true);
+    expect(strip.freshnessLabel?.startsWith("15m context")).toBe(true);
     expect(labels.some((l) => /%|confidence|probab/i.test(l))).toBe(false);
   });
 
