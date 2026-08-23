@@ -8,11 +8,12 @@ import AddChartTabModal, { type ChartMode } from "@/components/dashboard/AddChar
 import { ExternalLink, Cpu, Plus, X, Zap, User, AlertTriangle, Link2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
-import { useRonSnapshots } from "@/services/ron-snapshots";
+import { useRonSnapshots, ronStateColor } from "@/services/ron-snapshots";
 import { classifyRonSession } from "@/lib/ron-sessions";
 import {
   describeFeedVsAccount,
   buildChartContextSegments,
+  buildInstrumentStrip,
   RON_CONTEXT_TIMEFRAME,
   type TradingAccountInfo,
 } from "@/lib/charts-context";
@@ -141,6 +142,7 @@ export default function TradingViewChartPage() {
   const { snapshots } = useRonSnapshots();
   const activeSnapshot = activeTab ? snapshots.get(activeTab.symbol) ?? null : null;
   const feedVsAccount = describeFeedVsAccount(selectedBroker, tradingAccount);
+  const strip = buildInstrumentStrip(activeTab?.symbol ?? "", activeSnapshot);
   const session = classifyRonSession(new Date());
   const contextSegments = activeTab
     ? buildChartContextSegments({
@@ -222,7 +224,41 @@ export default function TradingViewChartPage() {
           </button>
         </div>
 
+        {/* Instrument intelligence strip — occupies the previously empty central gap. */}
+        <div
+          className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-1.5 px-3"
+          data-testid="instrument-intelligence-strip"
+        >
+          <span className="font-mono text-[12px] font-bold text-white shrink-0">{strip.symbol}</span>
+          {strip.available && strip.state ? (
+            <>
+              <span
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider shrink-0"
+                style={{ background: `${ronStateColor(strip.state)}22`, color: ronStateColor(strip.state) }}
+              >
+                {strip.state}
+              </span>
+              {strip.chips.map((chip) => (
+                <span
+                  key={chip.id}
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-white/[0.04] border border-white/10 text-white/70 whitespace-nowrap ${
+                    chip.priority === 3 ? "hidden 2xl:inline" : chip.priority === 2 ? "hidden xl:inline" : ""
+                  }`}
+                  data-testid={`strip-chip-${chip.id}`}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </>
+          ) : (
+            <span className="text-[11px] text-white/40" data-testid="strip-data-building">
+              {strip.message}
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center gap-1.5 shrink-0">
+
           <div className="h-4 w-px bg-border" />
           <span className="text-[11px] font-semibold text-muted-foreground" data-testid="chart-feed-label">
             Chart feed
@@ -284,17 +320,19 @@ export default function TradingViewChartPage() {
         </div>
       </div>
 
-      {/* Instrument context / freshness strip — genuine source values only. */}
+      {/* Slim context / freshness line — complementary to the intelligence strip above.
+          Genuine source values only, with duplicate state segments removed. */}
       <div
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 border-b border-border bg-[#0a0e16] shrink-0 text-[12px] text-muted-foreground"
+        className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-1 border-b border-border bg-[#0a0e16] shrink-0 text-[11px] text-muted-foreground"
         data-testid="chart-context-strip"
       >
         {contextSegments.map((seg, i) => (
-          <span key={seg} className="flex items-center gap-2">
-            {i > 0 && <span className="opacity-40">•</span>}
+          <span key={seg} className={`flex items-center gap-2 ${i === 0 ? "md:hidden" : ""}`}>
+            {i > 1 && <span className="opacity-40">•</span>}
             <span className={i === 0 ? "font-bold text-foreground" : ""}>{seg}</span>
           </span>
         ))}
+
         <span className="ml-auto text-[11px] opacity-70">
           Technical indicators are available in the TradingView Indicators menu.
         </span>

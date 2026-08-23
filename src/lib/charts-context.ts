@@ -126,6 +126,10 @@ export interface RonChartContextAvailable {
   regime: string | null;
   chips: RonChartEvidenceChip[];
   patternsLabel: string;
+  /** Readable current-snapshot pattern labels, max 3. */
+  patternItems: string[];
+  /** Count of current patterns beyond the 3 shown. */
+  patternsMore: number;
 }
 
 export type RonChartContext = RonChartContextUnavailable | RonChartContextAvailable;
@@ -140,6 +144,40 @@ const HEALTH_LABEL: Record<string, string> = {
 function num(v: unknown, digits: number): string | null {
   return typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : null;
 }
+
+/** Max current patterns rendered before collapsing into "+N more". */
+export const MAX_VISIBLE_PATTERNS = 3;
+
+/**
+ * Reads the REAL v6 `ron_market_snapshots.patterns` schema: `pattern_name`, `direction`,
+ * `confidence`, `start_index`/`end_index`, `key_prices`.
+ *
+ * The numeric `confidence` field is deliberately NOT surfaced: numeric probability /
+ * confidence publication remains governed and is not calibrated for user-facing
+ * opportunity semantics. Only the name and the categorical direction are shown.
+ */
+export function describeSnapshotPatterns(
+  patterns: unknown,
+): { items: string[]; more: number } {
+  const list = Array.isArray(patterns) ? patterns : [];
+  const items: string[] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object") continue;
+    const p = raw as Record<string, unknown>;
+    const nameSource = p.pattern_name ?? p.name ?? p.type;
+    if (typeof nameSource !== "string" || nameSource.trim() === "") continue;
+    const name = nameSource.replace(/_/g, " ").trim();
+    const dir = typeof p.direction === "string" && p.direction.trim() !== ""
+      ? p.direction.replace(/_/g, " ").trim()
+      : null;
+    items.push(dir ? `${name} · ${dir}` : name);
+  }
+  return {
+    items: items.slice(0, MAX_VISIBLE_PATTERNS),
+    more: Math.max(0, items.length - MAX_VISIBLE_PATTERNS),
+  };
+}
+
 
 /**
  * Builds the rail's RON context strictly from a current snapshot row.
@@ -179,12 +217,9 @@ export function buildRonChartContext(
   const atr = num(f.atr_pct, 2);
   if (atr) chips.push({ label: "ATR %", value: atr });
 
-  const patterns = Array.isArray(snapshot.patterns) ? snapshot.patterns : [];
-  const patternsLabel = patterns.length
-    ? patterns
-        .map((p: Record<string, unknown>) => String(p?.name ?? p?.type ?? "pattern").replace(/_/g, " "))
-        .slice(0, 3)
-        .join(", ")
+  const { items: patternItems, more: patternsMore } = describeSnapshotPatterns(snapshot.patterns);
+  const patternsLabel = patternItems.length
+    ? patternItems.join(", ") + (patternsMore > 0 ? `, +${patternsMore} more` : "")
     : "No pattern on the current bar";
 
   return {
@@ -202,8 +237,59 @@ export function buildRonChartContext(
     regime: f.regime ? String(f.regime).replace(/_/g, " ") : null,
     chips,
     patternsLabel,
+    patternItems,
+    patternsMore,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Compact instrument intelligence strip (top control row)
+ * ------------------------------------------------------------------ */
+
+export interface InstrumentStripChip {
+  /** Stable key for rendering / priority-based hiding. */
+  id: string;
+  label: string;
+  /** Lower priority chips hide first on narrow viewports. */
+  priority: 1 | 2 | 3;
+}
+
+export interface InstrumentStrip {
+  symbol: string;
+  available: boolean;
+  /** RON state pill text when available, otherwise null. */
+  state: RonState | null;
+  /** Truthful fallback message when no current snapshot exists. */
+  message: string | null;
+  chips: InstrumentStripChip[];
+}
+
+/**
+ * Compact glanceable strip for the top control row's central gap.
+ * Genuine v6 snapshot fields only — never probability, confidence or a recommendation.
+ */
+export function buildInstrumentStrip(
+  symbol: string,
+  snapshot: RonSnapshotRow | null | undefined,
+  now: number = Date.now(),
+): InstrumentStrip {
+  const ctx = buildRonChartContext(symbol, snapshot, now);
+  if (!ctx.available) {
+    return { symbol, available: false, state: null, message: "RON data building", chips: [] };
+  }
+  const chips: InstrumentStripChip[] = [];
+  if (ctx.regime) chips.push({ id: "regime", label: ctx.regime, priority: 1 });
+  const adx = ctx.chips.find((c) => c.label === "ADX(14)");
+  if (adx) chips.push({ id: "adx", label: `ADX ${adx.value}`, priority: 2 });
+  const rsi = ctx.chips.find((c) => c.label === "RSI(14)");
+  if (rsi) chips.push({ id: "rsi", label: `RSI ${rsi.value}`, priority: 2 });
+  const barMs = new Date(ctx.barTime).getTime();
+  if (Number.isFinite(barMs)) {
+    chips.push({ id: "ron-age", label: `RON ${ctx.timeframe} · ${formatAgeShort(now - barMs)} ago`, priority: 3 });
+  }
+  return { symbol, available: true, state: ctx.state, message: null, chips };
+}
+
 
 /* ------------------------------------------------------------------ *
  * Chart context / freshness line
@@ -221,14 +307,30 @@ export interface ChartContextLineInput {
   now?: number;
 }
 
-/** Returns ONLY the segments backed by real source values. Never fabricates. */
+/** Loose comparison key so "Market closed" and "market closed." collapse together. */
+function segKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Returns ONLY the segments backed by real source values. Never fabricates.
+ *
+ * There is exactly ONE open/closed state segment: when the market is closed we never
+ * also render a session label (a closed market has no active session), and identical or
+ * semantically duplicate segments are collapsed.
+ */
 export function buildChartContextSegments(input: ChartContextLineInput): string[] {
   const now = input.now ?? Date.now();
   const out: string[] = [input.symbol];
-  out.push(`Chart feed ${input.chartFeed}`);
+  out.push(`Chart ${input.chartFeed}`);
   if (input.tradingLabel) out.push(input.tradingLabel);
-  if (input.sessionLabel) out.push(input.sessionLabel);
+
+  const closed = input.marketOpen === false;
+  if (!closed && input.sessionLabel && segKey(input.sessionLabel) !== "marketclosed") {
+    out.push(input.sessionLabel);
+  }
   if (input.marketOpen !== null) out.push(input.marketOpen ? "Market open" : "Market closed");
+
   if (input.quoteTimestamp) {
     const ms = new Date(input.quoteTimestamp as string).getTime();
     if (Number.isFinite(ms)) out.push(`Quote ${formatAgeShort(now - ms)} ago`);
@@ -236,11 +338,19 @@ export function buildChartContextSegments(input: ChartContextLineInput): string[
   if (input.ronBarTime) {
     const ms = new Date(input.ronBarTime).getTime();
     if (Number.isFinite(ms)) {
-      out.push(`RON ${input.ronTimeframe ?? RON_CONTEXT_TIMEFRAME} evaluated ${formatAgeShort(now - ms)} ago`);
+      out.push(`RON ${input.ronTimeframe ?? RON_CONTEXT_TIMEFRAME} last bar ${formatAgeShort(now - ms)} ago`);
     }
   }
-  return out;
+
+  const seen = new Set<string>();
+  return out.filter((s) => {
+    const k = segKey(s);
+    if (k === "" || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
+
 
 /**
  * PATH A LIMITATION (product note, deliberately code-adjacent):

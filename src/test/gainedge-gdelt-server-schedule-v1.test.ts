@@ -135,6 +135,9 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/components/dashboard/ChartSidePanel.tsx'`
       + ` ':(exclude)src/components/dashboard/ChartTabPane.tsx'`
       + ` ':(exclude)src/pages/dashboard/TradingViewChartPage.tsx'`
+      // GAINEDGE_CHARTS_UI_V1_1_REFINEMENT — frontend-only charts refinement.
+      + ` ':(exclude)src/components/dashboard/TradeExecutionPanel.tsx'`
+      + ` ':(exclude)src/test/gainedge-charts-ui-v1-1-refinement.test.tsx'`
       ,
       { encoding: "utf8" },
     );

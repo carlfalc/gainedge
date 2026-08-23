@@ -179,6 +179,9 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/components/dashboard/ChartSidePanel.tsx",
       "src/components/dashboard/ChartTabPane.tsx",
       "src/pages/dashboard/TradingViewChartPage.tsx",
+      // GAINEDGE_CHARTS_UI_V1_1_REFINEMENT — frontend-only charts refinement.
+      "src/components/dashboard/TradeExecutionPanel.tsx",
+      "src/test/gainedge-charts-ui-v1-1-refinement.test.tsx",
       // Typecheck scoping only: ES2021 lib + app-source scope. No frozen artifact touched.
       "tsconfig.app.json",
     ]);
