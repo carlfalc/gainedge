@@ -9,15 +9,16 @@ import { useCallback, useEffect, useState } from "react";
 
 /**
  * The ONLY snapshot feature version the LIVE dashboard reads. Production `ron-snapshot`
- * writes feature_version 6; older versions stay in the table for audit but must never be
- * mixed into current-state queries. Pinning an older version here silently served stale
- * bars (v4 stopped at 2026-08-12 while v6 is current), so live reads pin v6.
+ * writes feature_version 7 (GAINEDGE_RON_PATTERN_EXPANSION_V1_LINEAGE_FIX: 11-pattern
+ * catalogue semantics); older versions stay in the table for audit but must never be
+ * mixed into current-state queries. v6 rows carry the legacy 7-pattern semantics and are
+ * immutable legacy — never read as current, never overwritten.
  *
- * v6 is key-for-key and vocabulary-for-vocabulary identical to v4 for every field the UI
- * consumes (rsi14, adx14, macd_state, stoch_rsi, atr_pct, regime, ema_stack), so no
- * adapter and no change to `ronStateFrom()` is required.
+ * v7 is key-for-key and vocabulary-for-vocabulary identical to v6/v4 for every scalar
+ * field the UI consumes (rsi14, adx14, macd_state, stoch_rsi, atr_pct, regime,
+ * ema_stack), so no adapter and no change to `ronStateFrom()` is required.
  */
-export const CURRENT_RON_SNAPSHOT_FEATURE_VERSION = 6;
+export const CURRENT_RON_SNAPSHOT_FEATURE_VERSION = 7;
 
 /**
  * Research-lineage feature version used ONLY for the historical outcome-label pairing

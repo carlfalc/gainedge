@@ -7,7 +7,7 @@ import {
   RON_QUALITY_VERSION, RON_QUALITY_VERSION_V3, RON_QUALITY_VERSION_V4,
 } from "../../supabase/functions/_shared/ron-data-quality";
 import {
-  RON_FEATURE_VERSION, RON_FEATURE_VERSION_V4, RON_FEATURE_VERSION_V5,
+  RON_FEATURE_VERSION, RON_FEATURE_VERSION_V4, RON_FEATURE_VERSION_V5, RON_FEATURE_VERSION_V6,
 } from "../../supabase/functions/_shared/ron-features";
 
 describe("Phase 2D.1e — recovered-source lineage versions", () => {
@@ -43,9 +43,24 @@ describe("Phase 2D.1e — recovered-source lineage versions", () => {
 describe("Phase 2D.1g — native-15m-recovered lineage versions", () => {
   it("bumps every downstream artifact version exactly once", () => {
     expect(RON_QUALITY_VERSION).toBe(5);
-    expect(RON_FEATURE_VERSION).toBe(6);
+    expect(RON_FEATURE_VERSION_V6).toBe(6);
     expect(CALIBRATION_CONTRACT_V8).toEqual({
       calibration_version: 8, feature_version: 6, label_version: 7,
     });
+  });
+});
+
+describe("GAINEDGE_RON_PATTERN_EXPANSION_V1_LINEAGE_FIX — snapshot feature v7", () => {
+  it("makes v7 the active snapshot writer version for 11-pattern semantics", () => {
+    expect(RON_FEATURE_VERSION).toBe(7);
+  });
+
+  it("leaves v6 (7-pattern semantics) as an immutable legacy version", () => {
+    expect(RON_FEATURE_VERSION_V6).toBe(6);
+    expect(RON_FEATURE_VERSION).not.toBe(RON_FEATURE_VERSION_V6);
+  });
+
+  it("does not change quality versioning", () => {
+    expect(RON_QUALITY_VERSION).toBe(5);
   });
 });

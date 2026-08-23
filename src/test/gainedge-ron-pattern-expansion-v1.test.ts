@@ -19,6 +19,12 @@ import {
 } from "../../supabase/functions/_shared/ron-patterns-expansion-v1";
 import { PATTERN_DETECTOR_SOURCE_SHA256 } from "../../supabase/functions/_shared/ron-pattern-context-spec";
 import { PATTERN_GLOSSARY, patternGlossary, extractPatternGeometry } from "@/lib/pattern-preview";
+import {
+  RON_FEATURE_VERSION, RON_FEATURE_VERSION_V6,
+} from "../../supabase/functions/_shared/ron-features";
+import {
+  CURRENT_RON_SNAPSHOT_FEATURE_VERSION, CURRENT_RON_FEATURE_VERSION, CURRENT_RON_LABEL_VERSION,
+} from "@/services/ron-snapshots";
 
 /* ── deterministic fixture builders ──────────────────────────────── */
 
@@ -375,5 +381,39 @@ describe("11. scope containment", () => {
 
   it("uses no randomness, clock or network", () => {
     expect(src).not.toMatch(/Math\.random|Date\.now|fetch\(|createClient/);
+  });
+});
+
+describe("12. GAINEDGE_RON_PATTERN_EXPANSION_V1_LINEAGE_FIX — forward-only feature v7", () => {
+  const featSrc = readFileSync(resolve("supabase/functions/_shared/ron-features.ts"), "utf8");
+  const readerSrc = readFileSync(resolve("src/services/ron-snapshots.ts"), "utf8");
+
+  it("stamps snapshots produced with the 11-pattern catalogue as feature_version 7", () => {
+    expect(RON_FEATURE_VERSION).toBe(7);
+    expect(featSrc).toContain("export const RON_FEATURE_VERSION = 7;");
+    // The writer stamps the active constant, never a literal.
+    expect(featSrc).toContain("const featureVersion = opts.featureVersion ?? RON_FEATURE_VERSION;");
+    expect(featSrc).toContain("feature_version: featureVersion,");
+  });
+
+  it("keeps v6 as immutable legacy 7-pattern semantics", () => {
+    expect(RON_FEATURE_VERSION_V6).toBe(6);
+    expect(featSrc).toMatch(/v6 rows carry 7-pattern semantics FOREVER/);
+    // Nothing recomputes or rewrites a legacy version.
+    expect(featSrc).not.toMatch(/RON_FEATURE_VERSION_V6\s*[,)]/);
+  });
+
+  it("pins the live UI reader to exactly 7 and never mixes versions", () => {
+    expect(CURRENT_RON_SNAPSHOT_FEATURE_VERSION).toBe(7);
+    expect(readerSrc).not.toContain('.in("feature_version"');
+  });
+
+  it("does not touch the research lineage constants", () => {
+    expect(CURRENT_RON_FEATURE_VERSION).toBe(4);
+    expect(CURRENT_RON_LABEL_VERSION).toBe(5);
+  });
+
+  it("still exposes all 11 named patterns under v7", () => {
+    expect(RON_NAMED_PATTERN_CATALOGUE_V1).toHaveLength(11);
   });
 });

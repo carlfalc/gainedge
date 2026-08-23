@@ -2,7 +2,7 @@
  * GAINEDGE_RON_SNAPSHOT_FEATURE_VERSION_ALIGNMENT_V1
  *
  * Read-alignment guard: the dashboard's RON snapshot reader must pin the CURRENT
- * production snapshot feature version (6), not the stale v4 pin. Static source analysis
+ * production snapshot feature version (7), not a stale pin. Static source analysis
  * plus pure-function assertions only — no network, no database, nothing persisted.
  */
 import { describe, expect, it } from "vitest";
@@ -19,8 +19,8 @@ import {
 const SERVICE = "src/services/ron-snapshots.ts";
 const src = () => readFileSync(SERVICE, "utf8");
 
-/** Representative production feature_version 6 XAUUSD 15m feature object. */
-const V6_FEATURES = {
+/** Representative production feature_version 7 XAUUSD 15m feature object. */
+const V7_FEATURES = {
   rsi14: 46.2, adx14: 18.4, macd_state: "bearish_expanding", stoch_rsi: 22.5,
   atr_pct: 0.11, regime: "transition", ema_stack: "up",
   ema9: 3421.1, ema21: 3420.4, ema50: 3418.9, ema200: 3402.2,
@@ -29,11 +29,18 @@ const V6_FEATURES = {
 };
 
 /** The same fields as they appear in a feature_version 4 row (identical vocabulary). */
-const V4_FEATURES = { ...V6_FEATURES, regime: "trending_up" };
+const V4_FEATURES = { ...V7_FEATURES, regime: "trending_up" };
 
 describe("RON snapshot reader pins the current production feature version", () => {
-  it("exposes snapshot feature version 6", () => {
-    expect(CURRENT_RON_SNAPSHOT_FEATURE_VERSION).toBe(6);
+  it("exposes snapshot feature version 7", () => {
+    expect(CURRENT_RON_SNAPSHOT_FEATURE_VERSION).toBe(7);
+  });
+
+  it("treats legacy v6 as neither current nor mixable", () => {
+    expect(CURRENT_RON_SNAPSHOT_FEATURE_VERSION).not.toBe(6);
+    const s = src();
+    // No literal version filter may exist: only the pinned constants are ever used.
+    expect(s).not.toMatch(/\.eq\("feature_version",\s*\d/);
   });
 
   it("uses the snapshot pin for the live snapshot query and the quality anchor", () => {
@@ -68,19 +75,19 @@ describe("RON snapshot reader pins the current production feature version", () =
   });
 });
 
-describe("v6 rows map onto every frontend-consumed field", () => {
+describe("v7 rows map onto every frontend-consumed field", () => {
   const CONSUMED = [
     "rsi14", "adx14", "macd_state", "stoch_rsi", "atr_pct", "regime", "ema_stack",
   ] as const;
 
-  it("accepts all consumed keys from a representative v6 row", () => {
-    for (const k of CONSUMED) expect(V6_FEATURES).toHaveProperty(k);
-    expect(typeof V6_FEATURES.rsi14).toBe("number");
-    expect(typeof V6_FEATURES.adx14).toBe("number");
-    expect(typeof V6_FEATURES.atr_pct).toBe("number");
-    expect(typeof V6_FEATURES.macd_state).toBe("string");
-    expect(typeof V6_FEATURES.regime).toBe("string");
-    expect(typeof V6_FEATURES.ema_stack).toBe("string");
+  it("accepts all consumed keys from a representative v7 row", () => {
+    for (const k of CONSUMED) expect(V7_FEATURES).toHaveProperty(k);
+    expect(typeof V7_FEATURES.rsi14).toBe("number");
+    expect(typeof V7_FEATURES.adx14).toBe("number");
+    expect(typeof V7_FEATURES.atr_pct).toBe("number");
+    expect(typeof V7_FEATURES.macd_state).toBe("string");
+    expect(typeof V7_FEATURES.regime).toBe("string");
+    expect(typeof V7_FEATURES.ema_stack).toBe("string");
   });
 
   it("selects every row field the UI renders", () => {
@@ -105,9 +112,9 @@ describe("ronStateFrom() semantics are unchanged by the version alignment", () =
     );
   });
 
-  it("produces identical output for the identical feature payload read as v6", () => {
+  it("produces identical output for the identical feature payload read as v7", () => {
     expect(ronStateFrom({ ...V4_FEATURES })).toEqual(ronStateFrom(V4_FEATURES));
-    const v6 = ronStateFrom(V6_FEATURES)!;
+    const v6 = ronStateFrom(V7_FEATURES)!;
     expect(v6.state).toBe("WATCH");
     expect(v6.why).toContain("Regime is transition");
   });
@@ -118,7 +125,7 @@ describe("ronStateFrom() semantics are unchanged by the version alignment", () =
     expect(ronStateColor("WAIT")).toBe("#555F73");
   });
 
-  it("degrades exactly as before on missing/invalid v6 fields", () => {
+  it("degrades exactly as before on missing/invalid v7 fields", () => {
     expect(ronStateFrom(null)).toBeNull();
     const partial = ronStateFrom({ regime: "range", ema_stack: "mixed", macd_state: "bearish_fading" })!;
     expect(partial.state).toBe("WAIT");
@@ -199,6 +206,8 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/functions/_shared/ron-patterns-expansion-v1.ts",
       "supabase/functions/_shared/ron-features.ts",
       "src/test/gainedge-ron-pattern-expansion-v1.test.ts",
+      // GAINEDGE_RON_PATTERN_EXPANSION_V1_LINEAGE_FIX — forward-only snapshot feature v7.
+      "src/test/ron-lineage-2d1e.test.ts",
       "src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts",
       "src/test/gainedge-product-ask-ron-global-entry-v1.test.ts",
       "src/test/ron-v3-v8-regression-guard.test.ts",

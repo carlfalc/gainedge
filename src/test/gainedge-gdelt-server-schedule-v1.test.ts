@@ -148,6 +148,8 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/functions/_shared/ron-patterns-expansion-v1.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-features.ts'`
       + ` ':(exclude)src/test/gainedge-ron-pattern-expansion-v1.test.ts'`
+      // GAINEDGE_RON_PATTERN_EXPANSION_V1_LINEAGE_FIX — forward-only snapshot feature v7.
+      + ` ':(exclude)src/test/ron-lineage-2d1e.test.ts'`
       ,
       { encoding: "utf8" },
     );
