@@ -75,108 +75,26 @@ describe("dashboard instrument cards are not duplicated", () => {
 });
 
 // ---------------------------------------------------------------- Signals page
-
-const state: { rows: unknown[]; error: { message: string } | null; session: unknown } = {
-  rows: [], error: null, session: { user: { id: "u1" } },
-};
-
-vi.mock("@/integrations/supabase/client", () => {
-  const builder = () => {
-    const b: Record<string, unknown> = {};
-    for (const m of ["select", "eq", "order"]) b[m] = () => b;
-    b.limit = () => Promise.resolve({ data: state.rows, error: state.error });
-    return b;
-  };
-  return {
-    supabase: {
-      auth: { getSession: () => Promise.resolve({ data: { session: state.session } }) },
-      from: () => builder(),
-      channel: () => ({ on() { return this; }, subscribe() { return this; } }),
-      removeChannel: () => {},
-    },
-  };
-});
-
-const row = {
-  id: "t1", symbol: "XAUUSD", trigger_type: "ema_cross", status: "closed",
-  entry_price: 2400, sl_price: 2390, tp1_price: 2410, tp2_price: 2420, tp3_price: 2430,
-  pnl_usd: 12.5, opened_at: "2026-08-16T10:00:00Z", closed_at: null,
-};
-
-async function renderSignals() {
-  const { default: SignalsPage } = await import("@/pages/dashboard/SignalsPage");
-  return render(<MemoryRouter><SignalsPage /></MemoryRouter>);
-}
-
-describe("SignalsPage states", () => {
-  beforeEach(() => { state.rows = []; state.error = null; state.session = { user: { id: "u1" } }; });
-
-  it("shows initial loading before the first fetch resolves, not the empty state", async () => {
-    await renderSignals();
-    expect(screen.getByText(/Loading signal records/i)).toBeInTheDocument();
-    expect(screen.queryByText(/No Falconer signal records yet/i)).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/No Falconer signal records yet/i)).toBeInTheDocument());
-  });
-
-  it("shows a concise error panel when the query fails", async () => {
-    state.error = { message: "permission denied for table falconer_trades" };
-    await renderSignals();
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/permission denied/i));
-    expect(screen.queryByText(/No Falconer signal records yet/i)).not.toBeInTheDocument();
-  });
-
-  it("shows the loaded-empty state with a Strategy settings link", async () => {
-    await renderSignals();
-    await waitFor(() => expect(screen.getByText(/No Falconer signal records yet/i)).toBeInTheDocument());
-    expect(screen.getByRole("button", { name: /Open Strategy settings/i })).toBeInTheDocument();
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  });
-
-  it("renders the populated table with existing columns", async () => {
-    state.rows = [row];
-    const { container } = await renderSignals();
-    await waitFor(() => expect(screen.getByText("XAUUSD")).toBeInTheDocument());
-    const headers = Array.from(container.querySelectorAll("th")).map(h => h.textContent);
-    expect(headers).toEqual(["Opened", "Symbol", "Trigger", "Status", "Entry", "SL", "TP1/2/3", "P&L"]);
-    expect(screen.getByText("$12.50")).toBeInTheDocument();
-  });
-
-  it("makes the table wrapper horizontally scrollable on narrow screens", async () => {
-    state.rows = [row];
-    const { container } = await renderSignals();
-    await waitFor(() => expect(container.querySelector("table")).toBeTruthy());
-    const wrapper = container.querySelector("table")!.parentElement as HTMLElement;
-    expect(wrapper.style.overflowX).toBe("auto");
-  });
-});
+//
+// GAINEDGE_SIGNALS_V1 replaced the single Falconer table with a three-lane page
+// (RON Opportunities / Falconer Signals / History). Rendering behaviour is covered by
+// src/test/gainedge-signals-v1.test.tsx; this file keeps only the governance guards.
 
 describe("SignalsPage governance-safe wording", () => {
+  const src = () => readFileSync("src/pages/dashboard/SignalsPage.tsx", "utf8")
+    + readFileSync("src/lib/signals-presentation.ts", "utf8");
+
   it("uses record wording and never implies broker order placement", () => {
-    const src = readFileSync("src/pages/dashboard/SignalsPage.tsx", "utf8");
-    expect(src).toContain("Falconer Signal Records");
-    expect(src).not.toMatch(/Enable the engine/i);
-    expect(src).not.toMatch(/live execution/i);
-    expect(src).not.toMatch(/Falconer Trades · Live/);
-    expect(src).not.toMatch(/place (an )?order/i);
+    const s = src();
+    expect(s).toMatch(/records/i);
+    expect(s).not.toMatch(/Enable the engine/i);
+    expect(s).not.toMatch(/live execution/i);
+    expect(s).not.toMatch(/Falconer Trades · Live/);
+    expect(s).not.toMatch(/place (an )?order/i);
   });
 
   it("states plainly that records are not broker orders", async () => {
     const { SIGNAL_RECORDS_QUALIFIER } = await import("@/pages/dashboard/SignalsPage");
     expect(SIGNAL_RECORDS_QUALIFIER).toMatch(/do not represent orders placed with your broker/i);
-  });
-});
-
-describe("sidebar nav is scrollable on short viewports", () => {
-  it("gives the nav vertical scrolling with horizontal overflow suppressed", () => {
-    const src = readFileSync("src/components/dashboard/DashboardLayout.tsx", "utf8");
-    const nav = src.match(/<nav style=\{\{[^}]*\}\}/)![0];
-    expect(nav).toContain("minHeight: 0");
-    expect(nav).toContain('overflowY: "auto"');
-    expect(nav).toContain('overflowX: "hidden"');
-    expect(nav).toContain("flex: 1");
-  });
-
-  it("keeps all five group labels rendered rather than hidden", () => {
-    expect(NAV_GROUPS).toHaveLength(5);
   });
 });

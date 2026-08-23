@@ -117,7 +117,7 @@ export const FALCONER_RECORD_BANNER =
   "Falconer strategy record · not a broker order";
 
 export const PAGE_SUBTITLE =
-  "Stored RON evidence and Falconer strategy records for review. No broker orders are placed from this page.";
+  "Stored RON evidence and Falconer strategy records for review. These records do not represent orders placed with your broker, and no broker orders are placed from this page.";
 
 /** History mode switch — never blended. */
 export type HistoryMode = "backtest" | "live_history";
