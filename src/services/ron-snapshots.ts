@@ -8,10 +8,24 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * The ONLY snapshot feature version the UI reads. v1 rows stay in the table for audit
- * but must never be mixed into current-state queries.
+ * The ONLY snapshot feature version the LIVE dashboard reads. Production `ron-snapshot`
+ * writes feature_version 6; older versions stay in the table for audit but must never be
+ * mixed into current-state queries. Pinning an older version here silently served stale
+ * bars (v4 stopped at 2026-08-12 while v6 is current), so live reads pin v6.
+ *
+ * v6 is key-for-key and vocabulary-for-vocabulary identical to v4 for every field the UI
+ * consumes (rsi14, adx14, macd_state, stoch_rsi, atr_pct, regime, ema_stack), so no
+ * adapter and no change to `ronStateFrom()` is required.
+ */
+export const CURRENT_RON_SNAPSHOT_FEATURE_VERSION = 6;
+
+/**
+ * Research-lineage feature version used ONLY for the historical outcome-label pairing
+ * (feature v4 ↔ label v5) reported as research progress. Deliberately NOT bumped here:
+ * the labelled-outcome lineage is a separate accepted artifact.
  */
 export const CURRENT_RON_FEATURE_VERSION = 4;
+
 
 export interface RonSnapshotRow {
   symbol: string;
@@ -77,7 +91,7 @@ export function useRonSnapshots() {
     const { data: rows } = await supabase
       .from("ron_market_snapshots")
       .select("symbol, timeframe, bar_time, open, high, low, close, volume, features, patterns, data_health, computed_at")
-      .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+      .eq("feature_version", CURRENT_RON_SNAPSHOT_FEATURE_VERSION)
       .order("bar_time", { ascending: false })
       .limit(200);
     const map = new Map<string, RonSnapshotRow>();
@@ -192,7 +206,7 @@ export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
         .from("ron_market_snapshots")
         .select("bar_time")
         .eq("symbol", symbol).eq("timeframe", timeframe)
-        .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+        .eq("feature_version", CURRENT_RON_SNAPSHOT_FEATURE_VERSION)
         .order("bar_time", { ascending: false }).limit(1).maybeSingle();
       if (cancelled) return;
       const currentBar = (anchorRow as any)?.bar_time
