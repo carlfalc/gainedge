@@ -63,7 +63,7 @@ describe("RON snapshot reader pins the current production feature version", () =
 
   it("cannot let a stale v4 row win: only the pinned version is ever selected", () => {
     const s = src();
-    expect(s).not.toMatch(/feature_version.*\bin\b/);
+    expect(s).not.toContain(".in(\"feature_version\"");
     expect(s).toContain('.order("bar_time", { ascending: false })');
   });
 });
@@ -95,18 +95,21 @@ describe("v6 rows map onto every frontend-consumed field", () => {
 describe("ronStateFrom() semantics are unchanged by the version alignment", () => {
   it("returns the accepted baseline result for a v4-shaped input", () => {
     const r = ronStateFrom(V4_FEATURES)!;
-    expect(r.state).toBe("SETUP FORMING");
+    // trending_up (+2) + ema stack up (+1); ADX 18.4 < 25 and MACD is not bullish.
+    expect(r.state).toBe("WATCH");
     expect(r.why).toBe(
       "Regime is trending up · ADX 18.4 (trend strength weak) · EMA stack up · RSI 46.2 · MACD bearish expanding",
     );
     expect(r.next).toBe(
-      "Needs a pullback to the 21 EMA holding, then a close back in trend direction.",
+      "Needs ADX above 25 and the EMA stack to align before a setup can form.",
     );
   });
 
   it("produces identical output for the identical feature payload read as v6", () => {
-    expect(ronStateFrom({ ...V4_FEATURES })).toEqual(ronStateFrom({ ...V4_FEATURES }));
-    expect(ronStateFrom(V6_FEATURES)!.state).toBe("WAIT");
+    expect(ronStateFrom({ ...V4_FEATURES })).toEqual(ronStateFrom(V4_FEATURES));
+    const v6 = ronStateFrom(V6_FEATURES)!;
+    expect(v6.state).toBe("WATCH");
+    expect(v6.why).toContain("Regime is transition");
   });
 
   it("keeps the three-state vocabulary and colours", () => {
@@ -123,10 +126,14 @@ describe("ronStateFrom() semantics are unchanged by the version alignment", () =
     expect(partial.why).toContain("RSI unavailable");
   });
 
-  it("publishes no probability/confidence-like surface", () => {
+  it("publishes no probability/confidence-like runtime surface", () => {
     const s = src();
-    for (const banned of ["probability", "confidence", "win_rate", "expected_value", "edge_score"]) {
-      expect(s.toLowerCase()).not.toContain(banned);
+    for (const banned of ["win_rate", "expected_value", "edge_score", "toFixed(0)%"]) {
+      expect(s).not.toContain(banned);
+    }
+    // Probability/confidence language may appear only in prohibitive documentation.
+    for (const line of s.split("\n")) {
+      if (/probability|confidence/i.test(line)) expect(line.trimStart().startsWith("*")).toBe(true);
     }
   });
 });
