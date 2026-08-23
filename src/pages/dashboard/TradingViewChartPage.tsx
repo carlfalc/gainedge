@@ -8,11 +8,12 @@ import AddChartTabModal, { type ChartMode } from "@/components/dashboard/AddChar
 import { ExternalLink, Cpu, Plus, X, Zap, User, AlertTriangle, Link2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
-import { useRonSnapshots } from "@/services/ron-snapshots";
+import { useRonSnapshots, ronStateColor } from "@/services/ron-snapshots";
 import { classifyRonSession } from "@/lib/ron-sessions";
 import {
   describeFeedVsAccount,
   buildChartContextSegments,
+  buildInstrumentStrip,
   RON_CONTEXT_TIMEFRAME,
   type TradingAccountInfo,
 } from "@/lib/charts-context";
@@ -141,6 +142,7 @@ export default function TradingViewChartPage() {
   const { snapshots } = useRonSnapshots();
   const activeSnapshot = activeTab ? snapshots.get(activeTab.symbol) ?? null : null;
   const feedVsAccount = describeFeedVsAccount(selectedBroker, tradingAccount);
+  const strip = buildInstrumentStrip(activeTab?.symbol ?? "", activeSnapshot);
   const session = classifyRonSession(new Date());
   const contextSegments = activeTab
     ? buildChartContextSegments({
