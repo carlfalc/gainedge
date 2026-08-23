@@ -5,7 +5,17 @@ import { supabase } from "@/integrations/supabase/client";
 import ChartTabPane from "@/components/dashboard/ChartTabPane";
 import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import AddChartTabModal, { type ChartMode } from "@/components/dashboard/AddChartTabModal";
-import { ExternalLink, Cpu, Plus, X, Zap, User } from "lucide-react";
+import { ExternalLink, Cpu, Plus, X, Zap, User, AlertTriangle, Link2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import type { Position } from "@/components/dashboard/TradeExecutionPanel";
+import { useRonSnapshots } from "@/services/ron-snapshots";
+import { classifyRonSession } from "@/lib/ron-sessions";
+import {
+  describeFeedVsAccount,
+  buildChartContextSegments,
+  RON_CONTEXT_TIMEFRAME,
+  type TradingAccountInfo,
+} from "@/lib/charts-context";
 
 const BROKERS = ["Eightcap", "Pepperstone", "IC Markets", "OANDA"] as const;
 
@@ -38,6 +48,15 @@ export default function TradingViewChartPage() {
   const { userId, profile } = useProfile();
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
   const [accountId, setAccountId] = useState<string | null>(null);
+  const [tradingAccount, setTradingAccount] = useState<TradingAccountInfo | null>(null);
+  /** Single source of truth: mirrored from the ACTIVE ChartTabPane, never re-polled. */
+  const [paneState, setPaneState] = useState<{
+    positions: Position[];
+    livePrice: number | null;
+    livePriceTime: string | null;
+    closingId: string | null;
+    closePosition: (id: string) => void;
+  }>({ positions: [], livePrice: null, livePriceTime: null, closingId: null, closePosition: () => {} });
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "live" | "demo">("disconnected");
   const [showAdd, setShowAdd] = useState(false);
 
@@ -77,7 +96,7 @@ export default function TradingViewChartPage() {
     if (!userId) return;
     setConnectionStatus("connecting");
     supabase.from("broker_connections")
-      .select("metaapi_account_id,account_type,status")
+      .select("metaapi_account_id,account_type,status,broker_name")
       .eq("user_id", userId)
       .eq("is_default", true)
       .limit(1)
@@ -86,8 +105,15 @@ export default function TradingViewChartPage() {
         if (broker?.metaapi_account_id && broker.status === "connected") {
           setAccountId(broker.metaapi_account_id);
           setConnectionStatus(broker.account_type === "demo" ? "demo" : "live");
+          setTradingAccount({
+            brokerName: broker.broker_name,
+            accountType: broker.account_type,
+            status: broker.status,
+            accountId: broker.metaapi_account_id,
+          });
         } else {
           setConnectionStatus("disconnected");
+          setTradingAccount(null);
         }
       });
   }, [userId]);
