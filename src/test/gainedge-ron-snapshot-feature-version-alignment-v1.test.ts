@@ -171,6 +171,8 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-dashboard-ui-v1.test.ts",
       "src/test/gainedge-product-ron-context-links-v1.test.ts",
       "src/test/gainedge-ui-provenance-readiness-v1.test.tsx",
+      // Typecheck scoping only: ES2021 lib + app-source scope. No frozen artifact touched.
+      "tsconfig.app.json",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
