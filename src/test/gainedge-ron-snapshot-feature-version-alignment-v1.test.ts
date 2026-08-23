@@ -150,7 +150,7 @@ describe("slice diff is limited to the frontend read alignment", () => {
     expect(changed).toEqual([]);
   });
 
-  it.skipIf(!haveBase)("changes only the snapshot service and this slice's tests", () => {
+  it.skipIf(!haveBase)("changes only the snapshot service, this slice's tests, and the later dashboard-UI slice", () => {
     const changed = execSync(`git diff --name-only ${BASE}`, { encoding: "utf8" })
       .split("\n").map((s) => s.trim()).filter(Boolean);
     const allowed = new Set([
@@ -158,7 +158,19 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts",
       "src/test/gainedge-gdelt-raw-headlines-v1.test.ts",
       "src/test/gainedge-gdelt-server-schedule-v1.test.ts",
+      // GAINEDGE_DASHBOARD_UI_V1 — frontend-only presentation slice, no backend touched.
+      "src/lib/dashboard-ron-summary.ts",
+      "src/lib/dashboard-pulse.ts",
+      "src/lib/dashboard-scanners.ts",
+      "src/components/dashboard/InstrumentCard.tsx",
+      "src/components/dashboard/RonPulse.tsx",
+      "src/components/dashboard/MarketScannersWidget.tsx",
+      "src/components/dashboard/MoversShakersWidget.tsx",
+      "src/components/dashboard/InstrumentTrackingPanel.tsx",
+      "src/pages/dashboard/DashboardHome.tsx",
+      "src/test/gainedge-dashboard-ui-v1.test.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
+
 });
