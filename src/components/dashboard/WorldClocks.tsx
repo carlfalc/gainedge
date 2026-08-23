@@ -122,12 +122,21 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       {allClocks.map((clock, idx) => {
         const isLocalClock = !localDuplicate && idx === 0;
-        const timeStr = now.toLocaleTimeString("en-GB", {
-          timeZone: clock.timezone,
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        });
+        const timeStr = hour12
+          ? now
+              .toLocaleTimeString("en-US", {
+                timeZone: clock.timezone,
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+              })
+              .replace(/\s/g, " ")
+          : now.toLocaleTimeString("en-GB", {
+              timeZone: clock.timezone,
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            });
 
         const isHighlighted = session.highlightTimezones.includes(clock.timezone);
         const isLocal = isLocalClock || (localDuplicate && localClock.timezone === clock.timezone);
