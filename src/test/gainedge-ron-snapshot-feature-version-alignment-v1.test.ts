@@ -160,6 +160,8 @@ describe("slice diff is limited to the frontend read alignment", () => {
     const allowedBackend = new Set([
       "supabase/functions/_shared/ron-patterns-expansion-v1.ts",
       "supabase/functions/_shared/ron-features.ts",
+      // GAINEDGE_SIGNALS_V1 — working plan document only; no runtime surface.
+      ".lovable/plan.md",
     ]);
     expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
   });
@@ -213,6 +215,20 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/ron-v3-v8-regression-guard.test.ts",
       // Typecheck scoping only: ES2021 lib + app-source scope. No frozen artifact touched.
       "tsconfig.app.json",
+      // GAINEDGE_SIGNALS_V1 — frontend-only Signals & Opportunities page.
+      "src/pages/dashboard/SignalsPage.tsx",
+      "src/lib/signals-presentation.ts",
+      "src/services/signals-data.ts",
+      "src/components/signals/SignalsSummary.tsx",
+      "src/components/signals/RonOpportunitiesTab.tsx",
+      "src/components/signals/RonOpportunityCard.tsx",
+      "src/components/signals/FalconerSignalsTab.tsx",
+      "src/components/signals/FalconerRecordList.tsx",
+      "src/components/signals/FalconerFilters.tsx",
+      "src/components/signals/HistoryTab.tsx",
+      "src/test/gainedge-signals-v1.test.tsx",
+      "src/test/gainedge-ui-dedupe-nav-v1.test.tsx",
+      ".lovable/plan.md",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
