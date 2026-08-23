@@ -1,9 +1,10 @@
 /**
- * GAINEDGE_CHARTS_UI_V1_PATH_A — instrument-specific right rail: RON | Positions | Orders.
+ * GAINEDGE_CHARTS_UI_V1_1_REFINEMENT — instrument-specific right rail: RON | TRADE.
  *
  * Truthfulness: RON content comes only from the current production snapshot; positions
- * come only from the active chart pane's genuine MetaAPI list; the Orders tab never
- * fabricates broker orders because pending-order retrieval is not available yet.
+ * come only from the active chart pane's genuine MetaAPI list; the Pending orders
+ * subsection never fabricates broker orders because pending-order retrieval is not
+ * available yet. Numeric pattern confidence is never surfaced.
  */
 import { useState } from "react";
 import { TrendingUp, TrendingDown, Loader2, MessageSquare, Info } from "lucide-react";
@@ -18,7 +19,7 @@ import {
 } from "@/lib/charts-context";
 import { askRonContextHref, askRonContextTitle } from "@/lib/ask-ron-context";
 
-type RailTab = "ron" | "positions" | "orders";
+type RailTab = "ron" | "trade";
 
 interface Props {
   symbol: string;
@@ -35,8 +36,7 @@ interface Props {
 
 const TABS: { id: RailTab; label: string }[] = [
   { id: "ron", label: "RON" },
-  { id: "positions", label: "Positions" },
-  { id: "orders", label: "Orders" },
+  { id: "trade", label: "TRADE" },
 ];
 
 export default function ChartSidePanel({
@@ -62,9 +62,10 @@ export default function ChartSidePanel({
                 ? "bg-foreground/10 text-foreground"
                 : "text-muted-foreground hover:text-foreground"
             }`}
+            data-testid={`rail-tab-${t.id}`}
           >
             {t.label}
-            {t.id === "positions" && filtered.length > 0 && (
+            {t.id === "trade" && filtered.length > 0 && (
               <span className="ml-1 text-[10px] text-muted-foreground">({filtered.length})</span>
             )}
           </button>
@@ -88,7 +89,7 @@ export default function ChartSidePanel({
                     >
                       {ron.state}
                     </span>
-                    <span className="text-[11px] text-muted-foreground">RON context: {ron.timeframe}</span>
+                    <span className="text-[11px] text-muted-foreground">RON context {ron.timeframe}</span>
                   </div>
                   <p className="mt-2 text-[11.5px] text-muted-foreground" data-testid="ron-evaluated">
                     {ron.evaluatedLabel}
@@ -117,9 +118,27 @@ export default function ChartSidePanel({
                   </div>
                 )}
 
-                <div>
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Patterns (as of snapshot bar)</div>
-                  <div className="text-[12.5px] text-foreground">{ron.patternsLabel}</div>
+                <div data-testid="ron-patterns">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Current patterns</div>
+                  {ron.patternItems.length === 0 ? (
+                    <div className="text-[12.5px] text-muted-foreground">No pattern on the current bar</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {ron.patternItems.map(p => (
+                        <span
+                          key={p}
+                          className="px-2 py-1 rounded bg-background/60 border border-border text-[12px] text-foreground"
+                        >
+                          {p}
+                        </span>
+                      ))}
+                      {ron.patternsMore > 0 && (
+                        <span className="px-2 py-1 rounded text-[12px] text-muted-foreground" data-testid="patterns-more">
+                          +{ron.patternsMore} more
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -149,86 +168,90 @@ export default function ChartSidePanel({
           </div>
         )}
 
-        {tab === "positions" && (
-          <div className="p-4" data-testid="rail-positions">
-            {!tradingConnected ? (
-              <p className="text-[12.5px] text-muted-foreground">Connect a broker to view positions</p>
-            ) : filtered.length === 0 ? (
-              <p className="text-[12.5px] text-muted-foreground">No open positions for {symbol}</p>
-            ) : (
-              <div className="space-y-2.5">
-                {filtered.map(pos => {
-                  const isBuy = pos.type?.toLowerCase().includes("buy");
-                  const pnlColor = pos.profit >= 0 ? "#22C55E" : "#EF4444";
-                  return (
-                    <div key={pos.id} className="p-3 rounded-lg bg-background/50 border border-border">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          {isBuy ? <TrendingUp size={13} style={{ color: "#22C55E" }} /> : <TrendingDown size={13} style={{ color: "#EF4444" }} />}
-                          <span className="text-[12.5px] font-bold" style={{ color: isBuy ? "#22C55E" : "#EF4444" }}>
-                            {isBuy ? "BUY" : "SELL"} {pos.volume}
-                          </span>
+        {tab === "trade" && (
+          <div className="p-4 space-y-4" data-testid="rail-trade">
+            <section data-testid="rail-open-positions">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+                Open positions{filtered.length > 0 ? ` (${filtered.length})` : ""}
+              </div>
+              {!tradingConnected ? (
+                <p className="text-[12.5px] text-muted-foreground">Connect a broker to view positions</p>
+              ) : filtered.length === 0 ? (
+                <p className="text-[12.5px] text-muted-foreground">No open positions for {symbol}</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {filtered.map(pos => {
+                    const isBuy = pos.type?.toLowerCase().includes("buy");
+                    const pnlColor = pos.profit >= 0 ? "#22C55E" : "#EF4444";
+                    return (
+                      <div key={pos.id} className="p-3 rounded-lg bg-background/50 border border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {isBuy ? <TrendingUp size={13} style={{ color: "#22C55E" }} /> : <TrendingDown size={13} style={{ color: "#EF4444" }} />}
+                            <span className="text-[12.5px] font-bold" style={{ color: isBuy ? "#22C55E" : "#EF4444" }}>
+                              {isBuy ? "BUY" : "SELL"} {pos.volume}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => onClosePosition(pos.id)}
+                            disabled={closingId === pos.id}
+                            className="px-2.5 py-1 rounded text-[10.5px] font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
+                          >
+                            {closingId === pos.id ? <Loader2 size={11} className="animate-spin" /> : "CLOSE"}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => onClosePosition(pos.id)}
-                          disabled={closingId === pos.id}
-                          className="px-2.5 py-1 rounded text-[10.5px] font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
-                        >
-                          {closingId === pos.id ? <Loader2 size={11} className="animate-spin" /> : "CLOSE"}
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11.5px]">
-                        <div>
-                          <span className="text-muted-foreground block">Entry</span>
-                          <div className="font-mono text-foreground">{pos.openPrice.toFixed(priceDec)}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">Current</span>
-                          <div className="font-mono text-foreground">
-                            {typeof pos.currentPrice === "number" ? pos.currentPrice.toFixed(priceDec) : "—"}
+                        <div className="grid grid-cols-2 gap-2 text-[11.5px]">
+                          <div>
+                            <span className="text-muted-foreground block">Entry</span>
+                            <div className="font-mono text-foreground">{pos.openPrice.toFixed(priceDec)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">Current</span>
+                            <div className="font-mono text-foreground">
+                              {typeof pos.currentPrice === "number" ? pos.currentPrice.toFixed(priceDec) : "—"}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">SL</span>
+                            <div className="font-mono text-foreground">{pos.stopLoss ? pos.stopLoss.toFixed(priceDec) : "—"}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block">TP</span>
+                            <div className="font-mono text-foreground">{pos.takeProfit ? pos.takeProfit.toFixed(priceDec) : "—"}</div>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground block">Unrealised P&L</span>
+                            <div className="font-mono font-bold" style={{ color: pnlColor }}>${pos.profit.toFixed(2)}</div>
                           </div>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground block">SL</span>
-                          <div className="font-mono text-foreground">{pos.stopLoss ? pos.stopLoss.toFixed(priceDec) : "—"}</div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground block">TP</span>
-                          <div className="font-mono text-foreground">{pos.takeProfit ? pos.takeProfit.toFixed(priceDec) : "—"}</div>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground block">Unrealised P&L</span>
-                          <div className="font-mono font-bold" style={{ color: pnlColor }}>${pos.profit.toFixed(2)}</div>
-                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            <p className="mt-3 text-[11px] text-muted-foreground/80">
-              Manual trading uses live broker funds. Verify every order before you send it.
-            </p>
-          </div>
-        )}
-
-        {tab === "orders" && (
-          <div className="p-4 space-y-3" data-testid="rail-orders">
-            <div className="flex items-start gap-2">
-              <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
-              <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="orders-not-synced">
-                {ORDERS_NOT_SYNCED_MESSAGE}
+                    );
+                  })}
+                </div>
+              )}
+              <p className="mt-3 text-[11px] text-muted-foreground/80">
+                Manual trading uses live broker funds. Verify every order before you send it.
               </p>
-            </div>
-            {orderDraftLabel && (
-              <div className="p-2.5 rounded border border-border bg-background/50">
-                <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Order draft (not sent)</div>
-                <div className="text-[12.5px] font-mono text-foreground">{orderDraftLabel}</div>
+            </section>
+
+            <section className="border-t border-border pt-3 space-y-2" data-testid="rail-pending-orders">
+              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Pending orders</div>
+              <div className="flex items-start gap-2">
+                <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
+                <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="orders-not-synced">
+                  {ORDERS_NOT_SYNCED_MESSAGE}
+                </p>
               </div>
-            )}
-            <p className="text-[11px] text-muted-foreground/80">
-              Live pending-order retrieval, modify and cancel arrive with Charts Trading V2.
-            </p>
+              {orderDraftLabel && (
+                <div className="p-2.5 rounded border border-border bg-background/50">
+                  <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Order draft (not sent)</div>
+                  <div className="text-[12.5px] font-mono text-foreground">{orderDraftLabel}</div>
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground/80">
+                Live pending-order retrieval, modify and cancel arrive with Charts Trading V2.
+              </p>
+            </section>
           </div>
         )}
       </div>
