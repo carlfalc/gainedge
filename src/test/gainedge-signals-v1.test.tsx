@@ -203,9 +203,9 @@ describe("Signals V1 — Falconer / History separation", () => {
 
 describe("Signals V1 — scope and language guards", () => {
   it("does not read market snapshots or any v6 fallback", () => {
-    expect(ALL).not.toMatch(/ron_market_snapshots/);
-    expect(ALL).not.toMatch(/feature_version/);
-    expect(ALL).not.toMatch(/useRonSnapshots|ronStateFrom/);
+    expect(CODE).not.toMatch(/ron_market_snapshots/);
+    expect(CODE).not.toMatch(/feature_version/);
+    expect(CODE).not.toMatch(/useRonSnapshots|ronStateFrom/);
   });
 
   it("scopes the falconer realtime subscription to the signed-in user", () => {
@@ -219,8 +219,8 @@ describe("Signals V1 — scope and language guards", () => {
   });
 
   it("performs no writes and touches no frozen runtime surface", () => {
-    expect(ALL).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
-    expect(ALL).not.toMatch(/metaapi|falconer-engine|ron-orchestrate|cron/i);
+    expect(CODE).not.toMatch(/\.insert\(|\.update\(|\.delete\(|\.upsert\(/);
+    expect(CODE).not.toMatch(/metaapi|falconer-engine|ron-orchestrate|cron/i);
   });
 
   it("uses only deep-link routes the target pages accept", () => {
