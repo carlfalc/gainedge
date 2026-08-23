@@ -239,7 +239,10 @@ export interface NamedPatternDetection {
   previewable: boolean;
   /** Short honest reason shown when `previewable` is false. Null when previewable. */
   notPreviewableReason: string | null;
-  /** Verbatim stored pattern object — the only source of preview geometry. */
+  /**
+   * Stored pattern object minus detector scoring fields — the only source of preview
+   * geometry. Numeric confidence never crosses this boundary.
+   */
   source: unknown;
 }
 
@@ -293,6 +296,17 @@ function approxSpan(barsAgo: number, tf: unknown): string | null {
   const mm = total % 60;
   const span = h > 0 ? (mm > 0 ? `${h}h ${mm}m` : `${h}h`) : `${mm}m`;
   return `~${span} of ${String(tf)} bars`;
+}
+
+/** Strips detector scoring fields so numeric confidence can never reach the UI. */
+const SCORE_KEYS = new Set(["confidence", "score", "probability", "strength"]);
+function sanitisePatternSource(p: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(p)) {
+    if (SCORE_KEYS.has(k.toLowerCase())) continue;
+    out[k] = v;
+  }
+  return out;
 }
 
 function titleise(raw: string): string {
@@ -382,7 +396,7 @@ export function buildPatternContext(
       approxSpanLabel: barsAgo == null ? null : approxSpan(barsAgo, timeframe),
       previewable: notPreviewableReason == null,
       notPreviewableReason,
-      source: raw,
+      source: sanitisePatternSource(p),
     });
   });
 

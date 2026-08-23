@@ -219,7 +219,10 @@ describe("Charts rail entry point", () => {
     render(<ChartSidePanel {...base} snapshot={snapshot} onShowPattern={onShowPattern} />);
     fireEvent.click(screen.getByTestId("show-pattern-latest"));
     expect(onShowPattern).toHaveBeenCalledTimes(1);
-    expect(onShowPattern.mock.calls[0][0].source).toBe(DOUBLE_BOTTOM);
+    const passed = onShowPattern.mock.calls[0][0].source as Record<string, unknown>;
+    expect(passed.key_prices).toBe(DOUBLE_BOTTOM.key_prices);
+    expect(passed.start_index).toBe(106);
+    expect(passed).not.toHaveProperty("confidence");
   });
 
   it("offers Show pattern for expanded earlier detections", () => {
