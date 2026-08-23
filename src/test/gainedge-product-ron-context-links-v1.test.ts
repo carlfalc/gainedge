@@ -6,7 +6,9 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { ronDecisionRecordHref, ronDecisionRecordTitle } from "@/lib/ron-decision-explorer";
 
-const panel = readFileSync("src/components/dashboard/InstrumentTrackingPanel.tsx", "utf8");
+// GAINEDGE_DASHBOARD_UI_V1 moved the tile markup into InstrumentCard.tsx; the wiring
+// assertions below now read the card, which is where the actions live.
+const panel = readFileSync("src/components/dashboard/InstrumentCard.tsx", "utf8");
 
 describe("deep-link helpers", () => {
   it("builds the exact explorer URL with encoded symbol and timeframe", () => {
