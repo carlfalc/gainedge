@@ -222,7 +222,41 @@ export default function TradingViewChartPage() {
           </button>
         </div>
 
+        {/* Instrument intelligence strip — occupies the previously empty central gap. */}
+        <div
+          className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-1.5 px-3"
+          data-testid="instrument-intelligence-strip"
+        >
+          <span className="font-mono text-[12px] font-bold text-white shrink-0">{strip.symbol}</span>
+          {strip.available && strip.state ? (
+            <>
+              <span
+                className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider shrink-0"
+                style={{ background: `${ronStateColor(strip.state)}22`, color: ronStateColor(strip.state) }}
+              >
+                {strip.state}
+              </span>
+              {strip.chips.map((chip) => (
+                <span
+                  key={chip.id}
+                  className={`px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-white/[0.04] border border-white/10 text-white/70 whitespace-nowrap ${
+                    chip.priority === 3 ? "hidden 2xl:inline" : chip.priority === 2 ? "hidden xl:inline" : ""
+                  }`}
+                  data-testid={`strip-chip-${chip.id}`}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </>
+          ) : (
+            <span className="text-[11px] text-white/40" data-testid="strip-data-building">
+              {strip.message}
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center gap-1.5 shrink-0">
+
           <div className="h-4 w-px bg-border" />
           <span className="text-[11px] font-semibold text-muted-foreground" data-testid="chart-feed-label">
             Chart feed
