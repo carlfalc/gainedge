@@ -155,15 +155,16 @@ export function VolumeHistoryInline() {
       background: C.card,
       border: `1px solid ${C.border}`,
       borderRadius: 12,
-      padding: open ? "12px 16px 14px" : "10px 16px",
+      padding: open ? "14px 16px 16px" : "12px 16px",
       marginTop: -8,
       marginBottom: 16,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
-        <Calendar size={13} color="#34D399" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: "#34D399" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", flexWrap: "wrap" }}>
+        <Calendar size={16} color="#34D399" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 14.5, fontWeight: 700, color: "#34D399", lineHeight: 1.25 }}>
           Historical Volume Patterns — Last 14 & 30 Days
         </span>
+
         <button
           onClick={() => setOpen(o => !o)}
           title={open ? "Collapse" : "Expand"}
