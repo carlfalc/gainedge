@@ -455,6 +455,15 @@ export interface InstrumentStrip {
   available: boolean;
   /** RON state pill text when available, otherwise null. */
   state: RonState | null;
+  /**
+   * Plain-English primary status, e.g. "RON: WATCHING". Never BUY/SELL — the
+   * persisted opportunity engine is not live in the UI.
+   */
+  statusLabel: string | null;
+  /** Secondary directional CONTEXT, only for unambiguous trending regimes. */
+  contextLabel: string | null;
+  /** Secondary freshness text, e.g. "15m context · 1d ago". */
+  freshnessLabel: string | null;
   /** Truthful fallback message when no current snapshot exists. */
   message: string | null;
   chips: InstrumentStripChip[];
@@ -471,20 +480,37 @@ export function buildInstrumentStrip(
 ): InstrumentStrip {
   const ctx = buildRonChartContext(symbol, snapshot, now);
   if (!ctx.available) {
-    return { symbol, available: false, state: null, message: "RON data building", chips: [] };
+    return {
+      symbol, available: false, state: null, statusLabel: null,
+      contextLabel: null, freshnessLabel: null,
+      message: "RON data building", chips: [],
+    };
   }
   const chips: InstrumentStripChip[] = [];
-  if (ctx.regime) chips.push({ id: "regime", label: ctx.regime, priority: 1 });
+  const contextLabel = regimeContextLabel(snapshot?.features?.regime);
+  if (ctx.regime) {
+    chips.push({ id: "regime", label: ctx.regime.charAt(0).toUpperCase() + ctx.regime.slice(1), priority: 1 });
+  }
   const adx = ctx.chips.find((c) => c.label === "ADX(14)");
   if (adx) chips.push({ id: "adx", label: `ADX ${adx.value}`, priority: 2 });
   const rsi = ctx.chips.find((c) => c.label === "RSI(14)");
   if (rsi) chips.push({ id: "rsi", label: `RSI ${rsi.value}`, priority: 2 });
   const barMs = new Date(ctx.barTime).getTime();
-  if (Number.isFinite(barMs)) {
-    chips.push({ id: "ron-age", label: `RON ${ctx.timeframe} · ${formatAgeShort(now - barMs)} ago`, priority: 3 });
-  }
-  return { symbol, available: true, state: ctx.state, message: null, chips };
+  const freshnessLabel = Number.isFinite(barMs)
+    ? `${ctx.timeframe} context · ${formatAgeShort(now - barMs)} ago`
+    : `${ctx.timeframe} context`;
+  return {
+    symbol,
+    available: true,
+    state: ctx.state,
+    statusLabel: ronPlainStatus(ctx.state),
+    contextLabel,
+    freshnessLabel,
+    message: null,
+    chips,
+  };
 }
+
 
 
 /* ------------------------------------------------------------------ *
