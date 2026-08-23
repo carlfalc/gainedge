@@ -224,6 +224,7 @@ export interface NamedPatternDetection {
   direction: string | null;
   /** "Double Bottom · bullish" */
   label: string;
+  startIndex: number | null;
   endIndex: number | null;
   /** Completed bars between the detection end and the pattern-window end. */
   barsAgo: number | null;
@@ -231,7 +232,17 @@ export interface NamedPatternDetection {
   barsAgoLabel: string | null;
   /** Optional non-authoritative "~8h 15m of 15m bars". Null when unparseable. */
   approxSpanLabel: string | null;
+  /**
+   * True only when the stored row carries provenance + a valid index span inside the
+   * detector window, so a truthful candle preview can be rebuilt. Never a guess.
+   */
+  previewable: boolean;
+  /** Short honest reason shown when `previewable` is false. Null when previewable. */
+  notPreviewableReason: string | null;
+  /** Verbatim stored pattern object — the only source of preview geometry. */
+  source: unknown;
 }
+
 
 export interface LevelContextItem {
   kind: "Support" | "Resistance";
