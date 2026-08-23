@@ -206,6 +206,8 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/functions/_shared/ron-patterns-expansion-v1.ts",
       "supabase/functions/_shared/ron-features.ts",
       "src/test/gainedge-ron-pattern-expansion-v1.test.ts",
+      // GAINEDGE_RON_PATTERN_EXPANSION_V1_LINEAGE_FIX — forward-only snapshot feature v7.
+      "src/test/ron-lineage-2d1e.test.ts",
       "src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts",
       "src/test/gainedge-product-ask-ron-global-entry-v1.test.ts",
       "src/test/ron-v3-v8-regression-guard.test.ts",
