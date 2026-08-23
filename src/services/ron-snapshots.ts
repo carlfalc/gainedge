@@ -91,7 +91,7 @@ export function useRonSnapshots() {
     const { data: rows } = await supabase
       .from("ron_market_snapshots")
       .select("symbol, timeframe, bar_time, open, high, low, close, volume, features, patterns, data_health, computed_at")
-      .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+      .eq("feature_version", CURRENT_RON_SNAPSHOT_FEATURE_VERSION)
       .order("bar_time", { ascending: false })
       .limit(200);
     const map = new Map<string, RonSnapshotRow>();
@@ -206,7 +206,7 @@ export function useRonDataQuality(symbol = "XAUUSD", timeframe = "15m") {
         .from("ron_market_snapshots")
         .select("bar_time")
         .eq("symbol", symbol).eq("timeframe", timeframe)
-        .eq("feature_version", CURRENT_RON_FEATURE_VERSION)
+        .eq("feature_version", CURRENT_RON_SNAPSHOT_FEATURE_VERSION)
         .order("bar_time", { ascending: false }).limit(1).maybeSingle();
       if (cancelled) return;
       const currentBar = (anchorRow as any)?.bar_time
