@@ -47,11 +47,18 @@ export default function ChartSidePanel({
   snapshot = null, tradingConnected = false, orderDraftLabel = null,
 }: Props) {
   const [tab, setTab] = useState<RailTab>("ron");
+  const [showEarlier, setShowEarlier] = useState(false);
   const priceDec = symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5;
   const filtered = filterPositionsForSymbol(positions, symbol);
   const ronCtx = buildRonChartContext(symbol, snapshot);
   const ron = ronCtx.available ? ronCtx : null;
-  const ronUnavailableMessage = ronCtx.available ? null : ronCtx.message;
+  const ronUnavailableMessage = ronCtx.available === false ? ronCtx.message : null;
+  const patternCtx = buildPatternContext(
+    snapshot?.patterns,
+    snapshot?.features,
+    snapshot?.timeframe || RON_CONTEXT_TIMEFRAME,
+  );
+
 
   return (
     <div className="flex flex-col h-full bg-card border-l border-border overflow-hidden" data-testid="chart-side-rail">
