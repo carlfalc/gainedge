@@ -46,9 +46,19 @@ import {
  *       additionally covers the 552 recovered genuine broker-native 15m bars. Because the
  *       eligible input series (and therefore recursive indicator state) changes, a new
  *       feature_version is mandatory. v1..v5 rows are preserved untouched.
- * v1..v3 rows are preserved for audit; readers must pin a version explicitly.
+ *  v7 — GAINEDGE_RON_PATTERN_EXPANSION_V1_LINEAGE_FIX: identical indicator MATH, identical
+ *       `last_1500_quality_eligible` window contract and identical quality_version=5
+ *       eligibility lineage as v6. The ONLY change is the `patterns` payload semantics:
+ *       the named-pattern catalogue expands from 7 to 11 (Inverse Head & Shoulders,
+ *       Symmetrical Triangle, Rising Wedge, Falling Wedge appended after the unchanged
+ *       base detector output). Because the stored snapshot contents change meaning, a new
+ *       feature_version is mandatory — v6 rows carry 7-pattern semantics FOREVER and must
+ *       never be recomputed, overwritten or reinterpreted as v7. The upsert conflict key
+ *       (symbol, timeframe, bar_time, feature_version) isolates v7 naturally.
+ * v1..v6 rows are preserved for audit; readers must pin a version explicitly.
  */
-export const RON_FEATURE_VERSION = 6;
+export const RON_FEATURE_VERSION = 7;
+export const RON_FEATURE_VERSION_V6 = 6;
 export const RON_FEATURE_VERSION_V5 = 5;
 export const RON_FEATURE_VERSION_V4 = 4;
 export const RON_FEATURE_VERSION_V3 = 3;
