@@ -77,8 +77,30 @@ interface WorldClocksProps {
   onSessionChange?: (session: string) => void;
 }
 
+const HOUR_FORMAT_KEY = "gainedge:clock-hour-format";
+
 export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProps) {
   const [now, setNow] = useState(new Date());
+  const [hour12, setHour12] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(HOUR_FORMAT_KEY) === "12";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleHourFormat = () => {
+    setHour12(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(HOUR_FORMAT_KEY, next ? "12" : "24");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   const activeClocks = clocks && clocks.length > 0 ? clocks : DEFAULT_CLOCKS;
   const localClock = getLocalClock();
   const localDuplicate = activeClocks.some(c => c.timezone === localClock.timezone);
