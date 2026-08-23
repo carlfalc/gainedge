@@ -302,6 +302,10 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/lib/pattern-preview.ts'`
       + ` ':(exclude)src/services/pattern-preview-candles.ts'`
       + ` ':(exclude)src/test/gainedge-charts-v1-3-ron-pattern-preview.test.tsx'`
+      // GAINEDGE_RON_PATTERN_EXPANSION_V1 — additive named-pattern detectors.
+      + ` ':(exclude)supabase/functions/_shared/ron-patterns-expansion-v1.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-features.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-pattern-expansion-v1.test.ts'`
       ,
       { encoding: "utf8" },
     );
