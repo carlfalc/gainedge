@@ -195,6 +195,28 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
           </div>
         );
       })}
+      <button
+        type="button"
+        onClick={toggleHourFormat}
+        title={hour12 ? "Switch to 24-hour time" : "Switch to 12-hour time"}
+        aria-label={hour12 ? "Switch to 24-hour time" : "Switch to 12-hour time"}
+        style={{
+          height: 40,
+          padding: "0 8px",
+          borderRadius: 8,
+          background: C.card,
+          border: `1px solid ${C.border}`,
+          color: C.muted,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: 0.5,
+          fontFamily: "'JetBrains Mono', monospace",
+          cursor: "pointer",
+          flexShrink: 0,
+        }}
+      >
+        {hour12 ? "12H" : "24H"}
+      </button>
     </div>
   );
 }
