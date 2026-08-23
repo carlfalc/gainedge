@@ -174,10 +174,10 @@ export function MostVolumeBar() {
 
   return (
     <>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: collapsed ? "10px 18px" : "14px 18px", marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", marginBottom: collapsed ? 0 : 10, gap: 8 }}>
-            <BarChart3 size={16} color="#34D399" />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#34D399" }}>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: collapsed ? "12px 18px" : "16px 18px", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", marginBottom: collapsed ? 0 : 12, gap: 10, flexWrap: "wrap" }}>
+            <BarChart3 size={18} color="#34D399" />
+            <span style={{ fontSize: 15.5, fontWeight: 700, color: "#34D399", letterSpacing: -0.1 }}>
               Most Volume Today
               {!collapsed && currentSession && (
                 <span style={{ color: currentSession.color, marginLeft: 6 }}>— {currentSession.label} Session</span>
@@ -188,8 +188,8 @@ export function MostVolumeBar() {
                 onClick={() => setHistoryOpen(true)}
                 style={{
                   background: "#34D39915", border: `1px solid #34D39940`, cursor: "pointer",
-                  fontSize: 10, fontWeight: 700, color: "#34D399",
-                  padding: "3px 12px", borderRadius: 20,
+                  fontSize: 11.5, fontWeight: 700, color: "#34D399",
+                  padding: "6px 14px", borderRadius: 20, lineHeight: 1.2, minHeight: 28,
                   transition: "background 0.15s",
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = "#34D39930")}
@@ -198,6 +198,7 @@ export function MostVolumeBar() {
                 History
               </button>
             )}
+
             <button
               onClick={() => setCollapsed(c => !c)}
               title={collapsed ? "Expand" : "Collapse"}
