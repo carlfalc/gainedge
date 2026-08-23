@@ -183,6 +183,11 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/components/dashboard/TradeExecutionPanel.tsx",
       "src/test/gainedge-charts-ui-v1-1-refinement.test.tsx",
       "src/test/gainedge-charts-ui-v1-2-plain-english-pattern-recency.test.tsx",
+      // GAINEDGE_CHARTS_V1_3_RON_PATTERN_PREVIEW — frontend-only educational preview.
+      "src/components/dashboard/PatternPreviewModal.tsx",
+      "src/lib/pattern-preview.ts",
+      "src/services/pattern-preview-candles.ts",
+      "src/test/gainedge-charts-v1-3-ron-pattern-preview.test.tsx",
       // Typecheck scoping only: ES2021 lib + app-source scope. No frozen artifact touched.
       "tsconfig.app.json",
     ]);

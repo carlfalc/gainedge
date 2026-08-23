@@ -139,6 +139,11 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/components/dashboard/TradeExecutionPanel.tsx'`
       + ` ':(exclude)src/test/gainedge-charts-ui-v1-1-refinement.test.tsx'`
       + ` ':(exclude)src/test/gainedge-charts-ui-v1-2-plain-english-pattern-recency.test.tsx'`
+      // GAINEDGE_CHARTS_V1_3_RON_PATTERN_PREVIEW — frontend-only educational preview.
+      + ` ':(exclude)src/components/dashboard/PatternPreviewModal.tsx'`
+      + ` ':(exclude)src/lib/pattern-preview.ts'`
+      + ` ':(exclude)src/services/pattern-preview-candles.ts'`
+      + ` ':(exclude)src/test/gainedge-charts-v1-3-ron-pattern-preview.test.tsx'`
       ,
       { encoding: "utf8" },
     );

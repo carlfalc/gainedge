@@ -224,6 +224,7 @@ export interface NamedPatternDetection {
   direction: string | null;
   /** "Double Bottom · bullish" */
   label: string;
+  startIndex: number | null;
   endIndex: number | null;
   /** Completed bars between the detection end and the pattern-window end. */
   barsAgo: number | null;
@@ -231,7 +232,20 @@ export interface NamedPatternDetection {
   barsAgoLabel: string | null;
   /** Optional non-authoritative "~8h 15m of 15m bars". Null when unparseable. */
   approxSpanLabel: string | null;
+  /**
+   * True only when the stored row carries provenance + a valid index span inside the
+   * detector window, so a truthful candle preview can be rebuilt. Never a guess.
+   */
+  previewable: boolean;
+  /** Short honest reason shown when `previewable` is false. Null when previewable. */
+  notPreviewableReason: string | null;
+  /**
+   * Stored pattern object minus detector scoring fields — the only source of preview
+   * geometry. Numeric confidence never crosses this boundary.
+   */
+  source: unknown;
 }
+
 
 export interface LevelContextItem {
   kind: "Support" | "Resistance";
@@ -282,6 +296,17 @@ function approxSpan(barsAgo: number, tf: unknown): string | null {
   const mm = total % 60;
   const span = h > 0 ? (mm > 0 ? `${h}h ${mm}m` : `${h}h`) : `${mm}m`;
   return `~${span} of ${String(tf)} bars`;
+}
+
+/** Strips detector scoring fields so numeric confidence can never reach the UI. */
+const SCORE_KEYS = new Set(["confidence", "score", "probability", "strength"]);
+function sanitisePatternSource(p: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(p)) {
+    if (SCORE_KEYS.has(k.toLowerCase())) continue;
+    out[k] = v;
+  }
+  return out;
 }
 
 function titleise(raw: string): string {
@@ -341,21 +366,40 @@ export function buildPatternContext(
     const endIndex = typeof endRaw === "number" && Number.isFinite(endRaw) && endRaw >= 0
       ? Math.floor(endRaw)
       : null;
+    const startRaw = p.start_index;
+    const startIndex = typeof startRaw === "number" && Number.isFinite(startRaw) && startRaw >= 0
+      ? Math.floor(startRaw)
+      : null;
     const barsAgo = latestIndex != null && endIndex != null
       ? Math.max(0, latestIndex - endIndex)
       : null;
+
+    // Previewable ONLY when the stored span can be mapped onto real detector bars.
+    let notPreviewableReason: string | null = null;
+    if (bars == null || latestIndex == null) {
+      notPreviewableReason = "Detector window provenance not stored for this snapshot";
+    } else if (startIndex == null || endIndex == null) {
+      notPreviewableReason = "Detector did not store a candle span for this detection";
+    } else if (startIndex > endIndex || endIndex > latestIndex) {
+      notPreviewableReason = "Stored span falls outside the detector window";
+    }
 
     named.push({
       key: `${name}-${endIndex ?? "x"}-${i}`,
       name,
       direction,
       label: direction ? `${name} · ${direction}` : name,
+      startIndex,
       endIndex,
       barsAgo,
       barsAgoLabel: barsAgo == null ? null : `${barsAgo} ${barsAgo === 1 ? "bar" : "bars"} ago`,
       approxSpanLabel: barsAgo == null ? null : approxSpan(barsAgo, timeframe),
+      previewable: notPreviewableReason == null,
+      notPreviewableReason,
+      source: sanitisePatternSource(p),
     });
   });
+
 
   // Recency ordering by end_index descending; unknown end_index sinks to the bottom.
   named.sort((a, b) => (b.endIndex ?? -1) - (a.endIndex ?? -1));

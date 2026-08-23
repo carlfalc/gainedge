@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import ChartTabPane from "@/components/dashboard/ChartTabPane";
 import ChartSidePanel from "@/components/dashboard/ChartSidePanel";
 import AddChartTabModal, { type ChartMode } from "@/components/dashboard/AddChartTabModal";
+import PatternPreviewModal from "@/components/dashboard/PatternPreviewModal";
+import type { NamedPatternDetection } from "@/lib/charts-context";
 import { ExternalLink, Cpu, Plus, X, Zap, User, AlertTriangle, Link2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Position } from "@/components/dashboard/TradeExecutionPanel";
@@ -141,6 +143,8 @@ export default function TradingViewChartPage() {
 
   const { snapshots } = useRonSnapshots();
   const activeSnapshot = activeTab ? snapshots.get(activeTab.symbol) ?? null : null;
+  // GAINEDGE_CHARTS_V1_3 — educational pattern preview, owned by GainEdge (never the iframe).
+  const [previewDetection, setPreviewDetection] = useState<NamedPatternDetection | null>(null);
   const feedVsAccount = describeFeedVsAccount(selectedBroker, tradingAccount);
   const strip = buildInstrumentStrip(activeTab?.symbol ?? "", activeSnapshot);
   const session = classifyRonSession(new Date());
@@ -376,6 +380,15 @@ export default function TradingViewChartPage() {
               />
             </div>
           ))}
+          {previewDetection && activeTab && activeSnapshot?.bar_time && (
+            <PatternPreviewModal
+              symbol={activeTab.symbol}
+              timeframe={activeSnapshot.timeframe}
+              barTime={activeSnapshot.bar_time}
+              detection={previewDetection}
+              onClose={() => setPreviewDetection(null)}
+            />
+          )}
         </div>
 
         <div className="w-[340px] shrink-0 hidden lg:block overflow-y-auto border-l border-border">
@@ -389,6 +402,7 @@ export default function TradingViewChartPage() {
               closingId={paneState.closingId}
               snapshot={activeSnapshot}
               tradingConnected={feedVsAccount.connected}
+              onShowPattern={setPreviewDetection}
             />
           )}
         </div>

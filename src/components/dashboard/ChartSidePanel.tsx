@@ -19,6 +19,7 @@ import {
   PATTERN_CONTEXT_NOTE,
   RON_CONTEXT_TIMEFRAME,
   ronPlainStatus,
+  type NamedPatternDetection,
 
 } from "@/lib/charts-context";
 
@@ -37,6 +38,8 @@ interface Props {
   tradingConnected?: boolean;
   /** Locally-entered limit/stop draft in the trade panel — never a live broker order. */
   orderDraftLabel?: string | null;
+  /** Opens the GainEdge-owned educational pattern preview for a real detection. */
+  onShowPattern?: (detection: NamedPatternDetection) => void;
 }
 
 const TABS: { id: RailTab; label: string }[] = [
@@ -47,7 +50,9 @@ const TABS: { id: RailTab; label: string }[] = [
 export default function ChartSidePanel({
   symbol, positions, onClosePosition, closingId,
   snapshot = null, tradingConnected = false, orderDraftLabel = null,
+  onShowPattern,
 }: Props) {
+
   const [tab, setTab] = useState<RailTab>("ron");
   const [showEarlier, setShowEarlier] = useState(false);
   const priceDec = symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5;
@@ -55,6 +60,7 @@ export default function ChartSidePanel({
   const ronCtx = buildRonChartContext(symbol, snapshot);
   const ron = ronCtx.available ? ronCtx : null;
   const ronUnavailableMessage = ronCtx.available === false ? ronCtx.message : null;
+  const canPreview = Boolean(onShowPattern && snapshot?.bar_time && snapshot?.timeframe);
   const patternCtx = buildPatternContext(
     snapshot?.patterns,
     snapshot?.features,
@@ -159,6 +165,20 @@ export default function ChartSidePanel({
                             </span>
                           )}
                         </div>
+                        {patternCtx.latest.previewable ? (
+                          <button
+                            onClick={() => onShowPattern?.(patternCtx.latest!)}
+                            disabled={!canPreview}
+                            className="mt-1.5 px-2.5 py-1 rounded text-[11px] font-semibold border border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/10 transition-colors disabled:opacity-40"
+                            data-testid="show-pattern-latest"
+                          >
+                            Show pattern
+                          </button>
+                        ) : (
+                          <p className="mt-1 text-[10.5px] text-muted-foreground/80" data-testid="show-pattern-latest-unavailable">
+                            {patternCtx.latest.notPreviewableReason}
+                          </p>
+                        )}
                       </div>
 
                       {patternCtx.earlier.length > 0 && (
@@ -173,15 +193,26 @@ export default function ChartSidePanel({
                           {showEarlier && (
                             <div className="mt-1.5 space-y-1">
                               {patternCtx.earlier.map(p => (
-                                <div key={p.key} className="flex items-baseline justify-between gap-2 px-2 py-1 rounded bg-background/40 border border-border">
-                                  <span className="text-[12px] text-muted-foreground">{p.label}</span>
-                                  {p.barsAgoLabel && (
-                                    <span
-                                      className="font-mono text-[11px] text-muted-foreground/80 whitespace-nowrap"
-                                      title={p.approxSpanLabel ?? undefined}
+                                <div key={p.key} className="px-2 py-1 rounded bg-background/40 border border-border">
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-[12px] text-muted-foreground">{p.label}</span>
+                                    {p.barsAgoLabel && (
+                                      <span
+                                        className="font-mono text-[11px] text-muted-foreground/80 whitespace-nowrap"
+                                        title={p.approxSpanLabel ?? undefined}
+                                      >
+                                        {p.barsAgoLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {p.previewable && canPreview && (
+                                    <button
+                                      onClick={() => onShowPattern?.(p)}
+                                      className="mt-1 text-[10.5px] font-semibold text-[#00CFA5] hover:underline"
+                                      data-testid={`show-pattern-earlier-${p.key}`}
                                     >
-                                      {p.barsAgoLabel}
-                                    </span>
+                                      Show pattern
+                                    </button>
                                   )}
                                 </div>
                               ))}
@@ -191,6 +222,7 @@ export default function ChartSidePanel({
                       )}
                     </div>
                   )}
+
                 </div>
 
                 {patternCtx.levels.length > 0 && (
