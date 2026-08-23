@@ -171,6 +171,14 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-dashboard-ui-v1.test.ts",
       "src/test/gainedge-product-ron-context-links-v1.test.ts",
       "src/test/gainedge-ui-provenance-readiness-v1.test.tsx",
+      // GAINEDGE_CHARTS_UI_V1_PATH_A + dashboard typography/clock slices — frontend only.
+      "src/components/dashboard/WorldClocks.tsx",
+      "src/components/dashboard/MostVolumeBar.tsx",
+      "src/components/dashboard/VolumeHistoryInline.tsx",
+      "src/lib/charts-context.ts",
+      "src/components/dashboard/ChartSidePanel.tsx",
+      "src/components/dashboard/ChartTabPane.tsx",
+      "src/pages/dashboard/TradingViewChartPage.tsx",
       // Typecheck scoping only: ES2021 lib + app-source scope. No frozen artifact touched.
       "tsconfig.app.json",
     ]);

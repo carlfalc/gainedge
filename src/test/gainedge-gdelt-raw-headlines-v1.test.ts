@@ -285,6 +285,14 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/gainedge-dashboard-ui-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-product-ron-context-links-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-ui-provenance-readiness-v1.test.tsx'`
+      // GAINEDGE_CHARTS_UI_V1_PATH_A + dashboard typography/clock slices — frontend only.
+      + ` ':(exclude)src/components/dashboard/WorldClocks.tsx'`
+      + ` ':(exclude)src/components/dashboard/MostVolumeBar.tsx'`
+      + ` ':(exclude)src/components/dashboard/VolumeHistoryInline.tsx'`
+      + ` ':(exclude)src/lib/charts-context.ts'`
+      + ` ':(exclude)src/components/dashboard/ChartSidePanel.tsx'`
+      + ` ':(exclude)src/components/dashboard/ChartTabPane.tsx'`
+      + ` ':(exclude)src/pages/dashboard/TradingViewChartPage.tsx'`
       ,
       { encoding: "utf8" },
     );
