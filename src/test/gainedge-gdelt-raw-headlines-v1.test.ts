@@ -271,7 +271,21 @@ describe("frozen surfaces untouched", () => {
       // alignment (snapshot feature_version pin) and its own tests.
       + ` ':(exclude)src/services/ron-snapshots.ts'`
       + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
-      + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
+      + ` ':(exclude)src/test/migration-hygiene.test.ts'`
+      // GAINEDGE_DASHBOARD_UI_V1: frontend-only dashboard presentation slice.
+      + ` ':(exclude)src/lib/dashboard-ron-summary.ts'`
+      + ` ':(exclude)src/lib/dashboard-pulse.ts'`
+      + ` ':(exclude)src/lib/dashboard-scanners.ts'`
+      + ` ':(exclude)src/components/dashboard/InstrumentCard.tsx'`
+      + ` ':(exclude)src/components/dashboard/RonPulse.tsx'`
+      + ` ':(exclude)src/components/dashboard/MarketScannersWidget.tsx'`
+      + ` ':(exclude)src/components/dashboard/MoversShakersWidget.tsx'`
+      + ` ':(exclude)src/components/dashboard/InstrumentTrackingPanel.tsx'`
+      + ` ':(exclude)src/pages/dashboard/DashboardHome.tsx'`
+      + ` ':(exclude)src/test/gainedge-dashboard-ui-v1.test.ts'`
+      + ` ':(exclude)src/test/gainedge-product-ron-context-links-v1.test.ts'`
+      + ` ':(exclude)src/test/gainedge-ui-provenance-readiness-v1.test.tsx'`
+      ,
       { encoding: "utf8" },
     );
     expect(diff.trim()).toBe("");

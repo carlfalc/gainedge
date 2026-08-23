@@ -9,7 +9,9 @@ import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMa
 // LiveTradeAlert removed with legacy auto-trade engine
 import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
 import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
-import MoversShakersWidget from "@/components/dashboard/MoversShakersWidget";
+import MarketScannersWidget from "@/components/dashboard/MarketScannersWidget";
+import RonPulse from "@/components/dashboard/RonPulse";
+
 import InstrumentTrackingPanel from "@/components/dashboard/InstrumentTrackingPanel";
 import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
 import { VolumeHistoryInline } from "@/components/dashboard/VolumeHistoryInline";
@@ -317,7 +319,14 @@ export default function DashboardHome() {
 
   return (
     <div style={{ width: "100%" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+      {/* A. What matters now — top of the cockpit. */}
+      <RonPulse />
+
+      {/* K. KPI row — explicitly labelled as simulated paper-trading history. */}
+      <div style={{ fontSize: 10, color: C.sec, letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>
+        Paper trading performance · simulated, not broker-settled
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginBottom: 20 }}>
         <SpinCard front={{ label: "Net P&L", value: `$${stats.netPnl.toLocaleString()}`, sub: "Simulated P&L (paper trading)" }} back={{ label: "P&L Breakdown", value: `${totalTrades} closed trade${totalTrades === 1 ? "" : "s"} | ${stats.wins} win / ${stats.losses} loss | simulated, not broker-settled` }} color={stats.netPnl >= 0 ? C.green : C.red} />
         <SpinCard front={{ label: "Win Rate", value: `${winRate}%`, sub: `${stats.wins}/${totalTrades} trades` }} back={{ label: "Session Detail", value: `${stats.currentStreak > 0 ? `🔥 ${stats.currentStreak} consecutive win${stats.currentStreak !== 1 ? "s" : ""}` : "No active streak"} | Best: ${stats.bestSession} | Worst: ${stats.worstSession} | ${stats.wins}/${totalTrades} trades (${winRate}%)` }} color={C.jade} />
         <SpinCard front={{ label: "Profit Factor", value: String(stats.profitFactor) }} back={{ label: "Win/Loss Detail", value: `Gross win / gross loss across ${totalTrades} closed trade${totalTrades === 1 ? "" : "s"} | Target: >1.5` }} color={C.blue} />
@@ -326,12 +335,15 @@ export default function DashboardHome() {
       {/* LiveTradeAlert removed with legacy engine */}
       <BreakingNewsTicker />
       <NewsSentimentPanel />
-      <MoversShakersWidget />
+
+      {/* C. Scanners — real tracked-market rows, replacing the fabricated movers list. */}
+      <MarketScannersWidget />
 
       <InstrumentTrackingPanel />
 
       <MostVolumeBar />
       <VolumeHistoryInline />
+
 
       {best ? (
         <div style={{

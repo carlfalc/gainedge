@@ -171,7 +171,8 @@ describe("badge components", () => {
 
 describe("chart + instrument surface wiring (audit correction)", () => {
   const chart = readFileSync("src/components/dashboard/ChartTabPane.tsx", "utf8");
-  const panel = readFileSync("src/components/dashboard/InstrumentTrackingPanel.tsx", "utf8");
+  // GAINEDGE_DASHBOARD_UI_V1: tile markup now lives in InstrumentCard.tsx.
+  const panel = readFileSync("src/components/dashboard/InstrumentCard.tsx", "utf8");
 
   it("uses the broker/source quote instant, never client receipt time", () => {
     expect(chart).toContain("setLivePriceTime(p.time ?? null)");

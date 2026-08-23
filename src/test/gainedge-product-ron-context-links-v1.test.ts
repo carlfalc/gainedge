@@ -6,7 +6,10 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { ronDecisionRecordHref, ronDecisionRecordTitle } from "@/lib/ron-decision-explorer";
 
+// GAINEDGE_DASHBOARD_UI_V1 split the tile: navigation handlers stay in the panel,
+// the action buttons moved into InstrumentCard.tsx. Both are asserted below.
 const panel = readFileSync("src/components/dashboard/InstrumentTrackingPanel.tsx", "utf8");
+const card = readFileSync("src/components/dashboard/InstrumentCard.tsx", "utf8");
 
 describe("deep-link helpers", () => {
   it("builds the exact explorer URL with encoded symbol and timeframe", () => {
@@ -32,42 +35,43 @@ describe("instrument card wiring", () => {
   });
 
   it("opens a new tab with noopener in the popout context", () => {
-    const fn = panel.slice(panel.indexOf("const openRonRecord"), panel.indexOf("const handleDragStart"));
+    const fn = panel.slice(panel.indexOf("const openRonRecord"), panel.indexOf("const openAskRon"));
     expect(fn).toContain('window.location.pathname === "/instruments-popout"');
     expect(fn).toContain('window.open(href, "_blank", "noopener")');
   });
 
   it("passes the exact tracked symbol and timeframe from the card", () => {
-    expect(panel).toContain("openRonRecord(inst.symbol, tf)");
+    expect(panel).toContain("onOpenRonRecord={() => openRonRecord(inst.symbol, tf)}");
+    expect(card).toContain("onOpenRonRecord();");
   });
 
   it("stops click propagation and mousedown drag initiation", () => {
-    expect(panel).toContain("onClick={(e) => { e.stopPropagation(); openRonRecord(inst.symbol, tf); }}");
-    const btn = panel.slice(panel.indexOf("openRonRecord(inst.symbol, tf)"));
+    expect(card).toContain("onClick={(e) => { e.stopPropagation(); onOpenRonRecord(); }}");
+    const btn = card.slice(card.indexOf("onOpenRonRecord();"));
     expect(btn.slice(0, 400)).toContain("onMouseDown={(e) => e.stopPropagation()}");
     expect(btn.slice(0, 400)).toContain("draggable={false}");
   });
 
   it("exposes accessible stored-record labelling", () => {
-    expect(panel).toContain("aria-label={ronDecisionRecordTitle(inst.symbol, tf)}");
-    expect(panel).toContain("title={ronDecisionRecordTitle(inst.symbol, tf)}");
+    expect(card).toContain("aria-label={ronDecisionRecordTitle(inst.symbol, tf)}");
+    expect(card).toContain("title={ronDecisionRecordTitle(inst.symbol, tf)}");
   });
 
   it("keeps the existing Chart action unchanged", () => {
-    expect(panel).toContain("onClick={(e) => { e.stopPropagation(); openChart(inst.symbol); }}");
+    expect(card).toContain("onClick={(e) => { e.stopPropagation(); onOpenChart(); }}");
     expect(panel).toContain('window.open(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`, "_blank", "noopener")');
     expect(panel).toContain("navigate(`/dashboard/charts?symbol=${encodeURIComponent(symbol)}`)");
-    expect(panel).toContain("Chart ↗");
+    expect(card).toContain("Chart ↗");
   });
 
   it("performs no computation, fetch, invoke or write for the action", () => {
-    const fn = panel.slice(panel.indexOf("const openRonRecord"), panel.indexOf("const handleDragStart"));
+    const fn = panel.slice(panel.indexOf("const openRonRecord"), panel.indexOf("const openAskRon"));
     expect(fn).not.toMatch(/functions\.invoke|fetch\(|\.insert\(|\.update\(|\.upsert\(|\.delete\(/);
   });
 
   it("introduces no probability, ranking or execution wording in the action", () => {
-    const start = panel.indexOf("openRonRecord(inst.symbol, tf)");
-    const btn = panel.slice(start - 200, start + 900);
+    const start = card.indexOf("onOpenRonRecord();");
+    const btn = card.slice(start - 200, start + 500);
     expect(btn).not.toMatch(/probabilit|confidence|opportunity score|rank|profit|entry|stop loss|take profit|execute|live/i);
     expect(btn).toContain("RON record ↗");
   });
