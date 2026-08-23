@@ -159,6 +159,20 @@ export default function ChartSidePanel({
                             </span>
                           )}
                         </div>
+                        {patternCtx.latest.previewable ? (
+                          <button
+                            onClick={() => onShowPattern?.(patternCtx.latest!)}
+                            disabled={!canPreview}
+                            className="mt-1.5 px-2.5 py-1 rounded text-[11px] font-semibold border border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/10 transition-colors disabled:opacity-40"
+                            data-testid="show-pattern-latest"
+                          >
+                            Show pattern
+                          </button>
+                        ) : (
+                          <p className="mt-1 text-[10.5px] text-muted-foreground/80" data-testid="show-pattern-latest-unavailable">
+                            {patternCtx.latest.notPreviewableReason}
+                          </p>
+                        )}
                       </div>
 
                       {patternCtx.earlier.length > 0 && (
@@ -173,15 +187,26 @@ export default function ChartSidePanel({
                           {showEarlier && (
                             <div className="mt-1.5 space-y-1">
                               {patternCtx.earlier.map(p => (
-                                <div key={p.key} className="flex items-baseline justify-between gap-2 px-2 py-1 rounded bg-background/40 border border-border">
-                                  <span className="text-[12px] text-muted-foreground">{p.label}</span>
-                                  {p.barsAgoLabel && (
-                                    <span
-                                      className="font-mono text-[11px] text-muted-foreground/80 whitespace-nowrap"
-                                      title={p.approxSpanLabel ?? undefined}
+                                <div key={p.key} className="px-2 py-1 rounded bg-background/40 border border-border">
+                                  <div className="flex items-baseline justify-between gap-2">
+                                    <span className="text-[12px] text-muted-foreground">{p.label}</span>
+                                    {p.barsAgoLabel && (
+                                      <span
+                                        className="font-mono text-[11px] text-muted-foreground/80 whitespace-nowrap"
+                                        title={p.approxSpanLabel ?? undefined}
+                                      >
+                                        {p.barsAgoLabel}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {p.previewable && canPreview && (
+                                    <button
+                                      onClick={() => onShowPattern?.(p)}
+                                      className="mt-1 text-[10.5px] font-semibold text-[#00CFA5] hover:underline"
+                                      data-testid={`show-pattern-earlier-${p.key}`}
                                     >
-                                      {p.barsAgoLabel}
-                                    </span>
+                                      Show pattern
+                                    </button>
                                   )}
                                 </div>
                               ))}
@@ -191,6 +216,7 @@ export default function ChartSidePanel({
                       )}
                     </div>
                   )}
+
                 </div>
 
                 {patternCtx.levels.length > 0 && (
