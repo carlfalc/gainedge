@@ -1,57 +1,21 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sparkline } from "@/components/dashboard/Sparkline";
 import { C as CBase } from "@/lib/mock-data";
-import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ExternalLink, LineChart } from "lucide-react";
+import { Eye, Move, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
-import { formatPrintedLocal } from "@/lib/signal-time";
-import { explainPatterns, summariseStructure, fmtLevel } from "@/lib/pattern-interpretation";
-import { deriveFalconerSignalState } from "@/lib/falconer-signal-state";
-import { ronDecisionRecordHref, ronDecisionRecordTitle } from "@/lib/ron-decision-explorer";
+import { ronDecisionRecordHref } from "@/lib/ron-decision-explorer";
+import { askRonContextHref } from "@/lib/ask-ron-context";
 import { useLiveMarketData } from "@/services/broker-data";
-import { useLiveQuotes, isQuoteFresh } from "@/services/live-quotes";
-import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
-import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
+import { useLiveQuotes } from "@/services/live-quotes";
+import InstrumentCard, { type InstrumentScanRow } from "@/components/dashboard/InstrumentCard";
 import {
   useRonSnapshots, useRonOutcomeStats, useRonDataQuality, useRonRebuildStatus,
-  ronStateFrom, ronStateColor,
-  CURRENT_RON_FEATURE_VERSION, CURRENT_RON_LABEL_VERSION, CURRENT_RON_QUALITY_VERSION,
 } from "@/services/ron-snapshots";
-import { assessDataHealth } from "@/lib/market-hours";
-import { classifyRonSession } from "@/lib/ron-sessions";
 
 const C = { ...CBase, text: "#FFFFFF", sec: "#FFFFFF" };
-interface ScanResult {
-  id: string; symbol: string;
-  /** Falconer signal-history direction ("long"/"short"), or null when no signal exists. */
-  direction: string | null;
-  entry_price: number | null; take_profit: number | null; stop_loss: number | null;
-  risk_reward: string | null; adx: number | null; rsi: number | null;
-  macd_status: string | null; stoch_rsi: number | null; reasoning: string;
-  ema_crossover_status: string; verdict: string;
-  /** Genuine falconer_trades.opened_at, or null when the instrument has no signal history. */
-  scanned_at: string | null;
-  /** Verbatim falconer_trades.status ("open" | "closed_sl" | ...), null when no row. */
-  status: string | null;
-  /** Verbatim falconer_trades.closed_at, null while open or when no row. */
-  closed_at: string | null;
-}
 
-const adxLabel = (v: number) =>
-  v < 20 ? "weak / no trend" : v < 25 ? "trend waking up" : v < 40 ? "stronger trend" : "very strong trend";
+type ScanResult = InstrumentScanRow;
 
-const rsiLabel = (v: number) =>
-  v > 70 ? <>overbought, <span style={{ color: C.red }}>sell</span> maybe coming</> : v < 30 ? <>oversold, <span style={{ color: C.green }}>buy</span> maybe coming</> : v >= 45 && v <= 55 ? "neutral" : v < 45 ? "slightly weak" : "slightly strong";
-
-const stochLabel = (v: number) =>
-  v < 20 ? "near oversold zone" : v < 40 ? "low momentum zone" : v <= 60 ? "mid momentum" : v <= 80 ? "building upward momentum" : "near overbought zone";
-
-const num = (v: unknown, dp = 1): string =>
-  v === null || v === undefined || Number.isNaN(Number(v)) ? "—" : Number(v).toFixed(dp);
-
-const macdLabel = (s: string | null | undefined) =>
-  !s ? "—" : s.replace("_", " ");
 
 interface InstrumentTrackingPanelProps {
   /** When true, renders the "Pop Out" button. Hide it on the popout page itself. */
@@ -72,6 +36,16 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
   });
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  // Per-tile disclosure: the compact glance state is the default so the grid stays scannable.
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const toggleExpanded = (symbol: string) => {
+    setExpandedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol); else next.add(symbol);
+      return next;
+    });
+  };
+
   const { data: liveData } = useLiveMarketData(userId);
   const { snapshots } = useRonSnapshots();
   const outcomeStats = useRonOutcomeStats();
@@ -146,9 +120,8 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
         risk_reward: t && t.entry_price != null && t.sl_price != null && t.tp3_price != null && t.entry_price !== t.sl_price
           ? `1:${(Math.abs(t.tp3_price - t.entry_price) / Math.abs(t.entry_price - t.sl_price)).toFixed(2)}`
           : null,
-        adx: null, rsi: null, macd_status: null, stoch_rsi: null,
         reasoning: t ? `Falconer v7 ${t.trigger_type}` : "",
-        ema_crossover_status: "",
+
         verdict: t?.status ?? "PENDING",
         // Truthfulness: never manufacture a scan time. No signal row ⇒ null.
         scanned_at: t?.opened_at ?? null,
@@ -235,6 +208,20 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
     navigate(href);
   };
 
+  /**
+   * Ask RON about this exact stored {symbol, timeframe} pair. Navigation only —
+   * the pair is the sole context that travels, exactly as the V1 bridge allows.
+   */
+  const openAskRon = (symbol: string, timeframe: string) => {
+    const href = askRonContextHref(symbol, timeframe);
+    if (window.opener || window.location.pathname === "/instruments-popout") {
+      window.open(href, "_blank", "noopener");
+      return;
+    }
+    navigate(href);
+  };
+
+
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDragIndex(idx);
     e.dataTransfer.effectAllowed = "move";
@@ -309,406 +296,35 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 16, marginBottom: 20 }}>
         {visibleScans.map((inst, idx) => {
           const tf = instrumentTfs.get(inst.symbol) || "15m";
-          // Signal history (Falconer) — explicitly NOT RON analysis.
-          const sig = deriveFalconerSignalState(
-            { direction: inst.direction, opened_at: inst.scanned_at, status: inst.status, closed_at: inst.closed_at },
-            tf,
-          );
-          const hasSignal = sig.hasSignal;
-          const active = sig.isActive;
-          const sigDir = sig.direction;
-          const badgeText = sig.badgeText;
-          const badgeColor = sig.badgeTone === "active-long" ? C.green : sig.badgeTone === "active-short" ? C.red : C.muted;
-          const countdown = nextScanSeconds(tf);
-          const live = liveData.get(inst.symbol);
-          const snap = snapshots.get(inst.symbol);
-          const f = snap?.features ?? null;
-          const ron = ronStateFrom(f);
-          const health = assessDataHealth(snap?.bar_time ?? null, 15);
-          // Canonical all-session context — a pure function of the completed bar's
-          // instant, so it is reproducible server-side and never invented.
-          const sess = snap ? classifyRonSession(snap.bar_time) : null;
-          const sparkColor = live?.price_direction === "up" ? "#22C55E" : live?.price_direction === "down" ? "#EF4444" : "#F59E0B";
-          // Deterministic pattern education, grounded only in persisted pattern objects.
-          const patternExplanations = explainPatterns(snap?.patterns as any[] | undefined, 3);
-          const structureSummary = summariseStructure((snap?.patterns as any[] | undefined)?.slice(0, 3) ?? []);
-          // Prefer the live feed only while it is actually fresh; otherwise fall back to the
-          // RON snapshot so the indicator row can never contradict RON's own reasoning.
-          const liveFresh = !!live && Date.now() - new Date(live.updated_at).getTime() < 10 * 60 * 1000;
-          // Headline quote — genuine broker feed only. Never live_market_data, never a RON close.
-          const quote = liveQuotes.get(inst.symbol);
-          const quoteFresh = isQuoteFresh(quote);
-          const quoteInstant = quote?.broker_time ?? quote?.fetched_at ?? null;
-          const quoteSourceLabel = quote?.broker_time ? "broker quote time" : "server fetch time";
-          // Truthfulness: only real AND fresh price paths are plotted. No synthetic sparkline,
-          // and never a stale series presented as live.
-          const sparkData = liveFresh && live?.sparkline_data?.length ? live.sparkline_data : null;
-          const liveRsi = (liveFresh ? live?.rsi : null) ?? (f?.rsi14 ?? null);
-          const liveAdx = (liveFresh ? live?.adx : null) ?? (f?.adx14 ?? null);
-          const liveMacd = (liveFresh ? live?.macd_status : null) ?? (f?.macd_state ?? null);
-          const liveStoch = (liveFresh ? live?.stoch_rsi : null) ?? (f?.stoch_rsi ?? null);
-          const isDragOver = dragOverIndex === idx && dragIndex !== idx;
           return (
-            <div
+            <InstrumentCard
               key={inst.symbol}
-              draggable
-              onDragStart={(e) => handleDragStart(e, idx)}
-              onDragOver={(e) => handleDragOver(e, idx)}
-              onDrop={(e) => handleDrop(e, idx)}
-              onDragEnd={handleDragEnd}
-              style={{
-                background: C.card,
-                border: `1px solid ${isDragOver ? C.jade : C.border}`,
-                borderRadius: 14, padding: 18,
-                opacity: dragIndex === idx ? 0.5 : hasSignal && !active ? 0.9 : 1,
-                transition: "opacity 0.3s, border-color 0.2s",
-                cursor: "grab",
+              inst={inst}
+              tf={tf}
+              snap={snapshots.get(inst.symbol)}
+              live={liveData.get(inst.symbol)}
+              quote={liveQuotes.get(inst.symbol)}
+              dataQuality={dataQuality}
+              outcomeStats={outcomeStats}
+              rebuild={rebuild}
+              expanded={expandedCards.has(inst.symbol)}
+              onToggleExpanded={() => toggleExpanded(inst.symbol)}
+              onHide={() => hidePane(inst.symbol)}
+              onOpenChart={() => openChart(inst.symbol)}
+              onOpenRonRecord={() => openRonRecord(inst.symbol, tf)}
+              onAskRon={() => openAskRon(inst.symbol, tf)}
+              isDragOver={dragOverIndex === idx && dragIndex !== idx}
+              isDragging={dragIndex === idx}
+              dragHandlers={{
+                onDragStart: (e) => handleDragStart(e, idx),
+                onDragOver: (e) => handleDragOver(e, idx),
+                onDrop: (e) => handleDrop(e, idx),
+                onDragEnd: handleDragEnd,
               }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    {active && sigDir === "LONG" ? (
-                      <ArrowUp size={16} color="#22C55E" strokeWidth={3} />
-                    ) : active && sigDir === "SHORT" ? (
-                      <ArrowDown size={16} color="#EF4444" strokeWidth={3} />
-                    ) : (
-                      <Circle size={16} color="#555F73" fill="#555F73" />
-                    )}
-                    <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openChart(inst.symbol); }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      draggable={false}
-                      aria-label={`Open ${inst.symbol} chart`}
-                      title={`Open the GainEdge chart for ${inst.symbol}`}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
-                        color: C.jade, background: "transparent", border: `1px solid ${C.jade}30`,
-                        borderRadius: 5, padding: "1px 6px", cursor: "pointer",
-                      }}
-                    >
-                      <LineChart size={10} /> Chart ↗
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openRonRecord(inst.symbol, tf); }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      draggable={false}
-                      aria-label={ronDecisionRecordTitle(inst.symbol, tf)}
-                      title={ronDecisionRecordTitle(inst.symbol, tf)}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
-                        color: C.jade, background: "transparent", border: `1px solid ${C.jade}30`,
-                        borderRadius: 5, padding: "1px 6px", cursor: "pointer",
-                      }}
-                    >
-                      <Eye size={10} /> RON record ↗
-                    </button>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
-                      {tf}
-                    </span>
-                    {quote && (
-                      <span
-                        style={{ width: 6, height: 6, borderRadius: "50%", background: quoteFresh ? "#22C55E" : "#555F73", display: "inline-block" }}
-                        title={quoteFresh ? "Live broker quote streaming" : "No fresh broker quote"}
-                      />
-                    )}
-                  </div>
-                  {quote && quote.bid != null ? (
-                    <div style={{ marginTop: 2 }}>
-                      <div
-                        style={{
-                          fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace",
-                          color: !quoteFresh ? C.text : quote.direction === "up" ? C.green : quote.direction === "down" ? C.red : C.text,
-                        }}
-                        title={`${quote.symbol} → ${quote.broker_symbol ?? "—"} · bid ${quote.bid} / ask ${quote.ask ?? "—"} · ${quoteSourceLabel} ${quoteInstant}`}
-                      >
-                        {quote.bid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
-                      </div>
-                      <div style={{ fontSize: 9, color: quoteFresh ? C.text : "#F59E0B", fontFamily: "'JetBrains Mono', monospace" }}>
-                        {quoteFresh
-                          ? `Live broker bid · ask ${quote.ask ?? "—"} · ${formatAge(quoteInstant!)}`
-                          : `Market closed / feed idle · last quote ${formatAge(quoteInstant!)}`}
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
-                        <PriceProvenanceBadge kind="live_quote" timestamp={quoteInstant} />
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: 2 }}>
-                      <div style={{ fontSize: 10, color: "#F59E0B", fontStyle: "italic" }}>
-                        No live price feed
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
-                        <PriceProvenanceBadge kind="live_quote" timestamp={null} />
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
-                    <CalibrationScopeBadge symbol={inst.symbol} timeframe={tf} />
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text }}>
-                    {hasSignal ? (
-                      <>
-                        <Clock size={10} />
-                        <span>Falconer signal printed {formatAge(inst.scanned_at!)}</span>
-                      </>
-                    ) : (
-                      <span style={{ fontStyle: "italic" }}>No signal history</span>
-                    )}
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div
-                      style={{
-                        fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6,
-                        background: badgeColor + "20", color: badgeColor,
-                      }}
-                      title={hasSignal
-                        ? `Falconer signal history (not RON analysis) · printed ${formatPrintedLocal(inst.scanned_at!)} local time`
-                        : "No Falconer signal has been printed for this instrument"}
-                    >
-                      {badgeText}
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); hidePane(inst.symbol); }}
-                      style={{
-                        background: "transparent", border: "none", cursor: "pointer",
-                        padding: 2, display: "flex", alignItems: "center", justifyContent: "center",
-                        borderRadius: 4, opacity: 0.4, transition: "opacity 0.2s",
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-                      onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.4")}
-                      title="Hide this card"
-                    >
-                      <X size={14} color={C.text} />
-                    </button>
-                  </div>
-                  <span style={{ fontSize: 9, color: countdown === -1 ? "#F59E0B" : C.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 3, fontFamily: "'JetBrains Mono', monospace" }}>
-                    <Clock size={9} /> {countdown === -1 ? "Market closed" : `Next scan: ${formatCountdown(countdown)}`}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase" }}>RON state</div>
-                  {(() => {
-                    // Phase 2C.2: the headline is a statement about the CURRENT source bar
-                    // only. Historical flag counts are detail, never the current verdict.
-                    const quarantined = inst.symbol === "XAUUSD" && !!dataQuality?.currentSourceQuarantined;
-                    return (
-                      <>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: quarantined ? "#F59E0B" : ron ? ronStateColor(ron.state) : C.text, fontFamily: "'JetBrains Mono', monospace" }}>
-                          {quarantined ? "NO TRADABLE SETUP" : ron ? ron.state : "DATA BUILDING"}
-                        </div>
-                        {inst.symbol === "XAUUSD" && dataQuality && (
-                         <div style={{ fontSize: 9, marginTop: 2, color: quarantined ? "#F59E0B" : C.text }}
-                              title={`Deterministic source-data quality v${CURRENT_RON_QUALITY_VERSION} for source anchor ${dataQuality.currentBar ?? "unavailable"}. Historical detail: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags across all stored history. Raw candle history is never modified.`}>
-                            Current source: {!dataQuality.currentBar ? "Unavailable" : quarantined ? "Quarantined" : "Healthy"}
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                  <div style={{ fontSize: 9, color: C.text, marginTop: 2 }}>
-                    Probability: {ron ? "Not calibrated yet · building evidence" : "Not calibrated yet"}
-                  </div>
-                  <div style={{
-                    fontSize: 9, marginTop: 2, fontWeight: 600,
-                    color: health.label === "LIVE" ? C.jade
-                      : health.label === "STALE / FEED BEHIND" ? "#EF4444"
-                        : "#F59E0B",
-                  }} title={health.detail}>
-                    {health.label}{snap ? ` · ${formatAge(snap.bar_time)}` : ""}
-                  </div>
-                  {snap && (
-                    <div style={{ fontSize: 9, color: snap.data_health === "healthy" ? C.text : "#F59E0B" }}>
-                      {snap.timeframe} bar {new Date(snap.bar_time).toISOString().slice(5, 16).replace("T", " ")}Z
-                      {snap.data_health !== "healthy" ? ` · ${snap.data_health}` : ""}
-                    </div>
-                  )}
-                </div>
-                {sparkData ? (
-                  <Sparkline data={sparkData} color={sparkColor} w={120} h={32} />
-                ) : (
-                  <span style={{ fontSize: 9, color: C.text, fontStyle: "italic" }} title="No genuine intraday series available; nothing is synthesised.">
-                    No sparkline series
-                  </span>
-                )}
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text, marginBottom: 12 }}>
-                <span>ADX <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveAdx)}</span>{liveAdx != null && <span style={{ color: C.text, fontSize: 10 }}> - {adxLabel(Number(liveAdx))}</span>}</span>
-                <span>RSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveRsi)}</span>{liveRsi != null && <span style={{ color: C.text, fontSize: 10 }}> - {rsiLabel(Number(liveRsi))}</span>}</span>
-                <span>MACD <span style={{ color: String(liveMacd).startsWith("bullish") || liveMacd === "Bullish" ? C.green : String(liveMacd).startsWith("bearish") || liveMacd === "Bearish" ? C.red : C.text, fontWeight: 600 }}>{macdLabel(liveMacd)}</span></span>
-                <span>StochRSI <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ color: C.text, fontSize: 10 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
-              </div>
-
-              {snap && f ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text, marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                  <span>Completed {snap.timeframe} close <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{snap.close}</span></span>
-                  <span style={{ display: "inline-flex", alignItems: "center" }}>
-                    <PriceProvenanceBadge kind="completed_bar" timestamp={snap.bar_time} timeframe={snap.timeframe} />
-                  </span>
-                  <span>ATR% <span style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>{num(f.atr_pct, 3)}</span></span>
-                  <span>Regime <span style={{ color: C.text }}>{String(f.regime ?? "—").replace("_", " ")}</span></span>
-                  <span>
-                    Context <span style={{ color: sess?.overlap ? C.jade : C.text, fontWeight: sess?.overlap ? 700 : 400 }}>
-                      {sess ? sess.label : "—"}
-                    </span>
-                  </span>
-                  <span style={{ gridColumn: "1 / -1", color: C.text, fontSize: 10 }}>
-                    {sess
-                      ? `${sess.active.length ? sess.active.join(" + ") : "no cash session"}` +
-                        `${sess.minutes_into_session != null ? ` · ${sess.minutes_into_session}m in` : ""}` +
-                        `${sess.in_asian_range_window ? " · inside Asian range window 22:00-06:00Z" : ""}`
-                      : ""}
-                  </span>
-                  <span style={{ gridColumn: "1 / -1" }}>
-                    Patterns <span style={{ color: C.text }}>
-                      {snap.patterns?.length
-                        ? snap.patterns
-                            .slice(0, 3)
-                            .map((p: any) =>
-                              [p?.pattern_name, p?.direction].filter(Boolean).join(" ") || "unnamed",
-                            )
-                            .join(", ")
-                        : "No pattern detected"}
-                    </span>
-                  </span>
-                  <span style={{ gridColumn: "1 / -1", color: C.text, fontSize: 10 }}>
-                    Completed bar close — not a live tick quote.
-                  </span>
-                  <span style={{ gridColumn: "1 / -1", color: C.text, fontSize: 10 }}>
-                    {rebuild && !rebuild.complete
-                      ? `Historical evidence: rebuilding (clean lineage quality v${CURRENT_RON_QUALITY_VERSION} · feature v${CURRENT_RON_FEATURE_VERSION} · label v${CURRENT_RON_LABEL_VERSION}). Nothing on this dashboard is derived from it.`
-                      : `Outcome labels (research only, label v${CURRENT_RON_LABEL_VERSION}, feature v${CURRENT_RON_FEATURE_VERSION}, XAUUSD 15m): ${outcomeStats
-                        ? `${outcomeStats.labelled.toLocaleString()} labelled, ${outcomeStats.excluded.toLocaleString()} excluded (venue-closed minutes and/or missing 1m candles). Nothing shown on this dashboard is derived from them.`
-                        : "loading"}`}
-                  </span>
-                </div>
-              ) : (
-                <div style={{ fontSize: 10, color: "#F59E0B", marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                  DATA BUILDING — no RON snapshot for {inst.symbol} yet. Indicators unavailable; this is not a current assessment.
-                </div>
-              )}
-
-              {/* ── C. Pattern interpretation (educational, deterministic, grounded) ── */}
-              {snap && patternExplanations.length > 0 && (
-                <div style={{ marginBottom: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                  <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
-                    Pattern interpretation
-                  </div>
-                  {structureSummary && (
-                    <div style={{ fontSize: 10, color: C.amber, marginBottom: 6, overflowWrap: "anywhere" }}>
-                      {structureSummary}
-                    </div>
-                  )}
-                  {patternExplanations.map((e, i) => {
-                    const body = (
-                      <div style={{ fontSize: 10, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
-                        <div>{e.meaning}</div>
-                        <div style={{ marginTop: 2 }}><span style={{ color: C.green }}>Stronger if:</span> {e.strengthens}</div>
-                        <div style={{ marginTop: 2 }}><span style={{ color: C.red }}>Weaker if:</span> {e.weakens}</div>
-                        {e.levels.length > 0 && (
-                          <div style={{ marginTop: 2, fontFamily: "'JetBrains Mono', monospace" }}>
-                            Detected levels: {e.levels.map(l => `${l.label} ${fmtLevel(l.value)}`).join(" · ")}
-                          </div>
-                        )}
-                      </div>
-                    );
-                    const title = (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: e.direction === "bullish" ? C.green : e.direction === "bearish" ? C.red : C.text }}>
-                        {e.title}
-                      </span>
-                    );
-                    // First explanation is open by default so it is discoverable.
-                    return i === 0 ? (
-                      <div key={i} style={{ marginBottom: 8 }}>{title}{body}</div>
-                    ) : (
-                      <details key={i} style={{ marginBottom: 6 }}>
-                        <summary style={{ cursor: "pointer", listStyle: "revert" }} title={`Show interpretation for ${e.title}`}>{title}</summary>
-                        {body}
-                      </details>
-                    );
-                  })}
-                  <div style={{ fontSize: 9, color: C.text, opacity: 0.85, marginTop: 4, overflowWrap: "anywhere" }}>
-                    Educational context on detected chart structure — not a trade recommendation, and not a RON opportunity.
-                  </div>
-                </div>
-              )}
-
-              {/* ── D1. RON Opportunity (truthful placeholder until calibration) ── */}
-              <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 9, color: C.jade, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
-                  RON opportunity
-                </div>
-                <div style={{ fontSize: 11, color: C.text, marginBottom: 4 }}>No qualified RON opportunity yet</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text }}>
-                  <div>Probability: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>Not calibrated yet</span></div>
-                  <div>Entry: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
-                  <div>Stop: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
-                  <div>Targets: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
-                  <div>R:R: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
-                </div>
-              </div>
-
-              {/* ── D2. Falconer signal history — clearly separate from RON ── */}
-              <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>
-                  Signal history
-                </div>
-                {hasSignal ? (
-                  <details>
-                    <summary style={{ cursor: "pointer", fontSize: 10, color: C.text, overflowWrap: "anywhere" }}
-                             title="Historical Falconer signal — separate from RON analysis">
-                      Falconer {sigDir} · printed {formatPrintedLocal(inst.scanned_at!)} · {formatAge(inst.scanned_at!)}
-                      {!active ? (sig.isOpenFalconerSignal ? " · Expired / historical" : " · Closed") : ""}
-                    </summary>
-                    <div style={{ fontSize: 10, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
-                      {!active && (
-                        <div style={{ color: "#F59E0B", fontWeight: 600, marginBottom: 2 }}>
-                          {sig.isOpenFalconerSignal
-                            ? "Expired / historical — not a current signal."
-                            : "Closed trade — not a current signal."}
-                        </div>
-                      )}
-                      {sig.closedMeta && (
-                        <div style={{ opacity: 0.85 }}>{sig.closedMeta}</div>
-                      )}
-                      <div style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                        Entry {inst.entry_price ?? "—"} · SL {inst.stop_loss ?? "—"} · TP {inst.take_profit ?? "—"} · R:R {inst.risk_reward ?? "—"}
-                      </div>
-                      <div style={{ opacity: 0.85 }}>Source: Falconer · status {sig.status ?? "—"}{inst.reasoning ? ` · ${inst.reasoning}` : ""}</div>
-                    </div>
-                  </details>
-                ) : (
-                  <div style={{ fontSize: 10, color: C.text, fontStyle: "italic" }}>No signal history</div>
-                )}
-              </div>
-
-              <div style={{ fontSize: 11, color: C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                <span style={{ color: C.jade, fontWeight: 600 }}>RON: </span>
-                {ron ? (
-                  <>
-                    {ron.why}
-                    <div style={{ marginTop: 4, color: C.text }}>What would change it: {ron.next}</div>
-                  </>
-                ) : (
-                  "DATA BUILDING — RON has not computed a snapshot for this instrument yet."
-                )}
-              </div>
-
-              {hasSignal && !active && (
-                <div style={{ fontSize: 10, color: countdown === -1 ? "#F59E0B" : C.text, marginTop: 8, display: "flex", alignItems: "center", gap: 4, fontFamily: "'JetBrains Mono', monospace" }}>
-                  <Clock size={10} /> {countdown === -1 ? `Market closed · Opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan: ${formatCountdown(countdown)}`}
-                </div>
-              )}
-            </div>
+            />
           );
         })}
+
       </div>
     </>
   );
