@@ -126,6 +126,10 @@ export interface RonChartContextAvailable {
   regime: string | null;
   chips: RonChartEvidenceChip[];
   patternsLabel: string;
+  /** Readable current-snapshot pattern labels, max 3. */
+  patternItems: string[];
+  /** Count of current patterns beyond the 3 shown. */
+  patternsMore: number;
 }
 
 export type RonChartContext = RonChartContextUnavailable | RonChartContextAvailable;
@@ -140,6 +144,40 @@ const HEALTH_LABEL: Record<string, string> = {
 function num(v: unknown, digits: number): string | null {
   return typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : null;
 }
+
+/** Max current patterns rendered before collapsing into "+N more". */
+export const MAX_VISIBLE_PATTERNS = 3;
+
+/**
+ * Reads the REAL v6 `ron_market_snapshots.patterns` schema: `pattern_name`, `direction`,
+ * `confidence`, `start_index`/`end_index`, `key_prices`.
+ *
+ * The numeric `confidence` field is deliberately NOT surfaced: numeric probability /
+ * confidence publication remains governed and is not calibrated for user-facing
+ * opportunity semantics. Only the name and the categorical direction are shown.
+ */
+export function describeSnapshotPatterns(
+  patterns: unknown,
+): { items: string[]; more: number } {
+  const list = Array.isArray(patterns) ? patterns : [];
+  const items: string[] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== "object") continue;
+    const p = raw as Record<string, unknown>;
+    const nameSource = p.pattern_name ?? p.name ?? p.type;
+    if (typeof nameSource !== "string" || nameSource.trim() === "") continue;
+    const name = nameSource.replace(/_/g, " ").trim();
+    const dir = typeof p.direction === "string" && p.direction.trim() !== ""
+      ? p.direction.replace(/_/g, " ").trim()
+      : null;
+    items.push(dir ? `${name} · ${dir}` : name);
+  }
+  return {
+    items: items.slice(0, MAX_VISIBLE_PATTERNS),
+    more: Math.max(0, items.length - MAX_VISIBLE_PATTERNS),
+  };
+}
+
 
 /**
  * Builds the rail's RON context strictly from a current snapshot row.
