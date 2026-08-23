@@ -169,6 +169,8 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/components/dashboard/InstrumentTrackingPanel.tsx",
       "src/pages/dashboard/DashboardHome.tsx",
       "src/test/gainedge-dashboard-ui-v1.test.ts",
+      "src/test/gainedge-product-ron-context-links-v1.test.ts",
+      "src/test/gainedge-ui-provenance-readiness-v1.test.tsx",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
