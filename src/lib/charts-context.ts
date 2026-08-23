@@ -217,12 +217,9 @@ export function buildRonChartContext(
   const atr = num(f.atr_pct, 2);
   if (atr) chips.push({ label: "ATR %", value: atr });
 
-  const patterns = Array.isArray(snapshot.patterns) ? snapshot.patterns : [];
-  const patternsLabel = patterns.length
-    ? patterns
-        .map((p: Record<string, unknown>) => String(p?.name ?? p?.type ?? "pattern").replace(/_/g, " "))
-        .slice(0, 3)
-        .join(", ")
+  const { items: patternItems, more: patternsMore } = describeSnapshotPatterns(snapshot.patterns);
+  const patternsLabel = patternItems.length
+    ? patternItems.join(", ") + (patternsMore > 0 ? `, +${patternsMore} more` : "")
     : "No pattern on the current bar";
 
   return {
@@ -240,8 +237,59 @@ export function buildRonChartContext(
     regime: f.regime ? String(f.regime).replace(/_/g, " ") : null,
     chips,
     patternsLabel,
+    patternItems,
+    patternsMore,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Compact instrument intelligence strip (top control row)
+ * ------------------------------------------------------------------ */
+
+export interface InstrumentStripChip {
+  /** Stable key for rendering / priority-based hiding. */
+  id: string;
+  label: string;
+  /** Lower priority chips hide first on narrow viewports. */
+  priority: 1 | 2 | 3;
+}
+
+export interface InstrumentStrip {
+  symbol: string;
+  available: boolean;
+  /** RON state pill text when available, otherwise null. */
+  state: RonState | null;
+  /** Truthful fallback message when no current snapshot exists. */
+  message: string | null;
+  chips: InstrumentStripChip[];
+}
+
+/**
+ * Compact glanceable strip for the top control row's central gap.
+ * Genuine v6 snapshot fields only — never probability, confidence or a recommendation.
+ */
+export function buildInstrumentStrip(
+  symbol: string,
+  snapshot: RonSnapshotRow | null | undefined,
+  now: number = Date.now(),
+): InstrumentStrip {
+  const ctx = buildRonChartContext(symbol, snapshot, now);
+  if (!ctx.available) {
+    return { symbol, available: false, state: null, message: "RON data building", chips: [] };
+  }
+  const chips: InstrumentStripChip[] = [];
+  if (ctx.regime) chips.push({ id: "regime", label: ctx.regime, priority: 1 });
+  const adx = ctx.chips.find((c) => c.label === "ADX(14)");
+  if (adx) chips.push({ id: "adx", label: `ADX ${adx.value}`, priority: 2 });
+  const rsi = ctx.chips.find((c) => c.label === "RSI(14)");
+  if (rsi) chips.push({ id: "rsi", label: `RSI ${rsi.value}`, priority: 2 });
+  const barMs = new Date(ctx.barTime).getTime();
+  if (Number.isFinite(barMs)) {
+    chips.push({ id: "ron-age", label: `RON ${ctx.timeframe} · ${formatAgeShort(now - barMs)} ago`, priority: 3 });
+  }
+  return { symbol, available: true, state: ctx.state, message: null, chips };
+}
+
 
 /* ------------------------------------------------------------------ *
  * Chart context / freshness line
