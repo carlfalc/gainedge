@@ -46,7 +46,9 @@ export default function ChartSidePanel({
   const [tab, setTab] = useState<RailTab>("ron");
   const priceDec = symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5;
   const filtered = filterPositionsForSymbol(positions, symbol);
-  const ron = buildRonChartContext(symbol, snapshot);
+  const ronCtx = buildRonChartContext(symbol, snapshot);
+  const ron = ronCtx.available ? ronCtx : null;
+  const ronUnavailableMessage = ronCtx.available ? null : ronCtx.message;
 
   return (
     <div className="flex flex-col h-full bg-card border-l border-border overflow-hidden" data-testid="chart-side-rail">
@@ -72,9 +74,9 @@ export default function ChartSidePanel({
       <div className="flex-1 overflow-y-auto">
         {tab === "ron" && (
           <div className="p-4 space-y-4" data-testid="rail-ron">
-            {!ron.available ? (
+            {!ron ? (
               <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="ron-data-building">
-                {ron.message}
+                {ronUnavailableMessage}
               </p>
             ) : (
               <>
