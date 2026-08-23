@@ -164,8 +164,9 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
             </span>
             <span
               style={{
-                fontSize: 13,
+                fontSize: hour12 ? 11 : 13,
                 fontFamily: "'JetBrains Mono', monospace",
+                whiteSpace: "nowrap",
                 color: isHighlighted ? C.jade : C.text,
                 fontWeight: 600,
                 lineHeight: 1.3,
