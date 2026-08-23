@@ -77,8 +77,30 @@ interface WorldClocksProps {
   onSessionChange?: (session: string) => void;
 }
 
+const HOUR_FORMAT_KEY = "gainedge:clock-hour-format";
+
 export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProps) {
   const [now, setNow] = useState(new Date());
+  const [hour12, setHour12] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(HOUR_FORMAT_KEY) === "12";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleHourFormat = () => {
+    setHour12(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(HOUR_FORMAT_KEY, next ? "12" : "24");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
   const activeClocks = clocks && clocks.length > 0 ? clocks : DEFAULT_CLOCKS;
   const localClock = getLocalClock();
   const localDuplicate = activeClocks.some(c => c.timezone === localClock.timezone);
@@ -100,12 +122,21 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
       {allClocks.map((clock, idx) => {
         const isLocalClock = !localDuplicate && idx === 0;
-        const timeStr = now.toLocaleTimeString("en-GB", {
-          timeZone: clock.timezone,
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        });
+        const timeStr = hour12
+          ? now
+              .toLocaleTimeString("en-US", {
+                timeZone: clock.timezone,
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+              })
+              .replace(/\s/g, " ")
+          : now.toLocaleTimeString("en-GB", {
+              timeZone: clock.timezone,
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            });
 
         const isHighlighted = session.highlightTimezones.includes(clock.timezone);
         const isLocal = isLocalClock || (localDuplicate && localClock.timezone === clock.timezone);
@@ -133,8 +164,9 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
             </span>
             <span
               style={{
-                fontSize: 13,
+                fontSize: hour12 ? 11 : 13,
                 fontFamily: "'JetBrains Mono', monospace",
+                whiteSpace: "nowrap",
                 color: isHighlighted ? C.jade : C.text,
                 fontWeight: 600,
                 lineHeight: 1.3,
@@ -163,6 +195,28 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
           </div>
         );
       })}
+      <button
+        type="button"
+        onClick={toggleHourFormat}
+        title={hour12 ? "Switch to 24-hour time" : "Switch to 12-hour time"}
+        aria-label={hour12 ? "Switch to 24-hour time" : "Switch to 12-hour time"}
+        style={{
+          height: 40,
+          padding: "0 8px",
+          borderRadius: 8,
+          background: C.card,
+          border: `1px solid ${C.border}`,
+          color: C.muted,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: 0.5,
+          fontFamily: "'JetBrains Mono', monospace",
+          cursor: "pointer",
+          flexShrink: 0,
+        }}
+      >
+        {hour12 ? "12H" : "24H"}
+      </button>
     </div>
   );
 }
