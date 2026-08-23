@@ -267,6 +267,10 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-spec-v1.ts'`
       + ` ':(exclude)src/test/ron-opportunity-context-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      // GAINEDGE_RON_SNAPSHOT_FEATURE_VERSION_ALIGNMENT_V1: authorized frontend read
+      // alignment (snapshot feature_version pin) and its own tests.
+      + ` ':(exclude)src/services/ron-snapshots.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
       + ` ':(exclude)src/test/migration-hygiene.test.ts'`,
       { encoding: "utf8" },
     );
