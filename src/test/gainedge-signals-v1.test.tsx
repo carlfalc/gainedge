@@ -130,7 +130,7 @@ describe("Signals V1 — pure helpers", () => {
       ronRecordCount: 1, ronLatestAsOf: "2026-08-21T11:45:00Z", liveRecordCount: 1,
       liveLatestOpenedAt: "2026-08-10T01:45:00Z", liveRecordsToday: 0,
     });
-    expect(some.map((m) => m.label)).toContain("Stored RON decisions");
+    expect(some.map((m) => m.label)).toContain("Tracked pairs with RON records");
     expect(some.map((m) => m.label)).toContain("Live records today");
   });
 });
