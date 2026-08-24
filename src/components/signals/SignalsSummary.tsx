@@ -26,9 +26,9 @@ export function buildSummaryMetrics(input: {
   const out: SummaryMetric[] = [];
   if (input.ronRecordCount !== null) {
     out.push({
-      label: "Stored RON decisions",
+      label: "Tracked pairs with RON records",
       value: String(input.ronRecordCount),
-      hint: "Tracked pairs with a stored decision record",
+      hint: "Count of your tracked pairs that have a latest stored decision",
     });
   }
   if (input.ronLatestAsOf) {
@@ -69,12 +69,12 @@ export default function SignalsSummary({ metrics, now }: { metrics: SummaryMetri
             color: closed ? C.sec : C.jade,
           }}
         >
-          {closed ? "Market closed (weekend)" : "Market open"}
+          {closed ? "Weekend closure active" : "Weekend closure inactive"}
         </span>
         <span style={{ color: C.muted }}>
           {closed
             ? "No new records are expected until the session reopens — this is not a data fault."
-            : "New records appear as the engines evaluate completed candles."}
+            : "Outside the weekend close. Holiday schedules and broker availability are not checked here."}
         </span>
       </div>
 

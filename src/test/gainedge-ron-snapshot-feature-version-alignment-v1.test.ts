@@ -229,6 +229,9 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-signals-v1.test.tsx",
       "src/test/gainedge-ui-dedupe-nav-v1.test.tsx",
       ".lovable/plan.md",
+      // Platform-managed preview auth storage (auto-generated, not part of any slice).
+      "src/integrations/supabase/client.ts",
+      "src/integrations/supabase/previewAuthStorage.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

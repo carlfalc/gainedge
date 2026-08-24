@@ -165,21 +165,9 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
-      // GAINEDGE_SIGNALS_V1 — frontend-only Signals & Opportunities page (read-only
-      // presentation over already-stored RON decisions and Falconer records) plus the
-      // working plan document. No backend, runtime or frozen artifact is touched.
-      + ` ':(exclude).lovable/plan.md'`
-      + ` ':(exclude)src/pages/dashboard/SignalsPage.tsx'`
-      + ` ':(exclude)src/lib/signals-presentation.ts'`
-      + ` ':(exclude)src/services/signals-data.ts'`
-      + ` ':(exclude)src/components/signals'`
-      + ` ':(exclude)src/test/gainedge-signals-v1.test.tsx'`
-      + ` ':(exclude)src/test/gainedge-ui-dedupe-nav-v1.test.tsx'`
-      + ` ':(exclude)src/test/gainedge-gdelt-raw-headlines-v1.test.ts'`
-      + ` ':(exclude)src/test/gainedge-gdelt-server-schedule-v1.test.ts'`
-      + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`
-      + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`
-      + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
+      // Platform-managed preview auth storage (auto-generated, not part of any slice).
+      + ` ':(exclude)src/integrations/supabase/client.ts'`
+      + ` ':(exclude)src/integrations/supabase/previewAuthStorage.ts'`
       ,
       { encoding: "utf8" },
     );
