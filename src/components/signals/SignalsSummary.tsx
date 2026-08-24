@@ -26,9 +26,9 @@ export function buildSummaryMetrics(input: {
   const out: SummaryMetric[] = [];
   if (input.ronRecordCount !== null) {
     out.push({
-      label: "Stored RON decisions",
+      label: "Tracked pairs with RON records",
       value: String(input.ronRecordCount),
-      hint: "Tracked pairs with a stored decision record",
+      hint: "Count of your tracked pairs that have a latest stored decision",
     });
   }
   if (input.ronLatestAsOf) {

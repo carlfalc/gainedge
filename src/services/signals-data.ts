@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchLatestRonDecision, type RonDecisionView } from "@/services/ron-decisions";
-import { FALLBACK_PAIR, normaliseTracked, pairKey, type TrackedPair } from "@/lib/ron-decision-explorer";
+import { normaliseTracked, pairKey, type TrackedPair } from "@/lib/ron-decision-explorer";
 
 export interface FalconerRecord {
   id: string;
@@ -127,13 +127,20 @@ export interface RonOpportunityFeed {
   reload: () => void;
 }
 
-/** Hard ceiling on how many stored records one page load will request. */
-export const MAX_RON_OPPORTUNITY_PAIRS = 8;
+/**
+ * Purely technical concurrency ceiling on parallel stored-record reads in one page load.
+ * This is NOT a plan/entitlement limit: it exists only to bound simultaneous requests,
+ * and is far above any realistic tracked-instrument list.
+ */
+export const RON_OPPORTUNITY_REQUEST_CONCURRENCY_CEILING = 100;
 
 /**
  * Resolves the user's tracked instrument+timeframe pairs and reads the latest stored
  * RON decision for each. A pair with no stored record stays in the list with
  * `view === null` so the UI can say so honestly.
+ *
+ * Truthfulness rules: no default/monitored pair is ever substituted. Zero tracked pairs
+ * yields an empty list, and a failed tracked read yields a warning with an empty list.
  */
 export function useRonOpportunities(): RonOpportunityFeed {
   const [opportunities, setOpportunities] = useState<RonOpportunity[]>([]);
@@ -146,24 +153,38 @@ export function useRonOpportunities(): RonOpportunityFeed {
     try {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth?.user?.id;
-      if (uid) {
-        const { data, error } = await supabase
-          .from("user_instruments")
-          .select("symbol, timeframe")
-          .eq("user_id", uid);
-        if (error) {
-          setTrackedWarning("Could not load your tracked instruments. Showing the default pair only.");
-        } else {
-          pairs = normaliseTracked(data ?? []);
-          setTrackedWarning(null);
-        }
+      if (!uid) {
+        setTrackedWarning("Sign in to read stored RON decisions for your tracked instruments.");
+        setOpportunities([]);
+        setLoading(false);
+        return;
       }
+      const { data, error } = await supabase
+        .from("user_instruments")
+        .select("symbol, timeframe")
+        .eq("user_id", uid);
+      if (error) {
+        setTrackedWarning(
+          "Could not load your tracked instruments, so no RON opportunities can be shown. "
+          + "Nothing is assumed about what you monitor.",
+        );
+        setOpportunities([]);
+        setLoading(false);
+        return;
+      }
+      pairs = normaliseTracked(data ?? []);
+      setTrackedWarning(null);
     } catch {
-      setTrackedWarning("Could not load your tracked instruments. Showing the default pair only.");
+      setTrackedWarning(
+        "Could not load your tracked instruments, so no RON opportunities can be shown. "
+        + "Nothing is assumed about what you monitor.",
+      );
+      setOpportunities([]);
+      setLoading(false);
+      return;
     }
 
-    if (!pairs.length) pairs = [FALLBACK_PAIR];
-    const selected = pairs.slice(0, MAX_RON_OPPORTUNITY_PAIRS);
+    const selected = pairs.slice(0, RON_OPPORTUNITY_REQUEST_CONCURRENCY_CEILING);
 
     const results = await Promise.all(selected.map(async (pair): Promise<RonOpportunity> => {
       try {
