@@ -165,6 +165,9 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-product-ask-ron-global-entry-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
+      // Platform-managed preview auth storage (auto-generated, not part of any slice).
+      + ` ':(exclude)src/integrations/supabase/client.ts'`
+      + ` ':(exclude)src/integrations/supabase/previewAuthStorage.ts'`
       ,
       { encoding: "utf8" },
     );
