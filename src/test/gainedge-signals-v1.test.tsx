@@ -2,10 +2,10 @@
  * GAINEDGE_SIGNALS_V1 — truthfulness and separation guards for the
  * Signals & Opportunities page.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, renderHook, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   FALCONER_CLOSED_STATUSES, FALCONER_MANAGED_STATUSES, HISTORY_MODE_LABELS, PAGE_SUBTITLE,
@@ -227,5 +227,82 @@ describe("Signals V1 — scope and language guards", () => {
     expect(chartsHref("XAU USD")).toBe("/dashboard/charts?symbol=XAU%20USD");
     expect(SRC.card).toMatch(/ronDecisionRecordHref/);
     expect(SRC.card).toMatch(/askRonContextHref/);
+  });
+});
+
+// ---------------------------------------------------------- tracked-pair truth
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    auth: {
+      getUser: async () => ({ data: { user: trackedState.user } }),
+      getSession: async () => ({ data: { session: null } }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: async () => ({ data: trackedState.rows, error: trackedState.error }),
+      }),
+    }),
+    channel: () => ({ on() { return this; }, subscribe() { return this; } }),
+    removeChannel: () => {},
+  },
+}));
+
+vi.mock("@/services/ron-decisions", () => ({
+  fetchLatestRonDecision: async () => null,
+}));
+
+const trackedState: {
+  user: { id: string } | null;
+  rows: { symbol: string; timeframe: string }[] | null;
+  error: { message: string } | null;
+} = { user: { id: "u1" }, rows: [], error: null };
+
+describe("Signals V1 — tracked instrument truth", () => {
+  beforeEach(() => {
+    trackedState.user = { id: "u1" };
+    trackedState.rows = [];
+    trackedState.error = null;
+  });
+
+  it("returns zero opportunities (never a fallback pair) when the user tracks nothing", async () => {
+    const { useRonOpportunities } = await import("@/services/signals-data");
+    const { result } = renderHook(() => useRonOpportunities());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.opportunities).toEqual([]);
+    expect(result.current.trackedWarning).toBeNull();
+  });
+
+  it("warns and substitutes no monitored default when the tracked read fails", async () => {
+    trackedState.error = { message: "permission denied" };
+    const { useRonOpportunities } = await import("@/services/signals-data");
+    const { result } = renderHook(() => useRonOpportunities());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.opportunities).toEqual([]);
+    expect(result.current.trackedWarning).toMatch(/Could not load your tracked instruments/i);
+    expect(JSON.stringify(result.current.opportunities)).not.toMatch(/XAUUSD/);
+  });
+
+  it("does not truncate a long tracked list with a plan-shaped cap", async () => {
+    trackedState.rows = Array.from({ length: 14 }, (_, i) => ({ symbol: `SYM${i}`, timeframe: "15m" }));
+    const { useRonOpportunities, RON_OPPORTUNITY_REQUEST_CONCURRENCY_CEILING } =
+      await import("@/services/signals-data");
+    expect(RON_OPPORTUNITY_REQUEST_CONCURRENCY_CEILING).toBeGreaterThanOrEqual(50);
+    const { result } = renderHook(() => useRonOpportunities());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.opportunities).toHaveLength(14);
+  });
+
+  it("imports no FALLBACK_PAIR into the Signals data layer", () => {
+    expect(SRC.data).not.toMatch(/FALLBACK_PAIR/);
+    expect(SRC.data).not.toMatch(/MAX_RON_OPPORTUNITY_PAIRS/);
+  });
+});
+
+describe("Signals V1 — weekend-helper wording is not overstated", () => {
+  it("never claims the market is open, only that weekend closure is inactive", () => {
+    const summary = read("src/components/signals/SignalsSummary.tsx");
+    expect(summary).toMatch(/Weekend closure inactive/);
+    expect(summary).not.toMatch(/"Market open"/);
+    expect(summary).toMatch(/Weekend closure active/);
   });
 });
