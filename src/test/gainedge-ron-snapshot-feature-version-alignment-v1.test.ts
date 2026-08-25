@@ -162,6 +162,16 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/functions/_shared/ron-features.ts",
       // GAINEDGE_SIGNALS_V1 — working plan document only; no runtime surface.
       ".lovable/plan.md",
+      // GAINEDGE_RON_ALWAYS_ON_RUNTIME_RECOVERY_V1 — authorized forward-only repair of the
+      // unattended runtime: additive TTL policy v2, Opportunity/Risk V4, Orchestration V9.
+      "supabase/functions/_shared/ron-agent-contracts.ts",
+      "supabase/functions/_shared/ron-orchestrator.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec-v4.ts",
+      "supabase/functions/_shared/ron-orchestration-run-v9.ts",
+      "supabase/functions/ron-agent-opportunity-risk/index.ts",
+      "supabase/functions/ron-orchestrate-run/index.ts",
+      "supabase/functions/ron-schedule-orchestration/index.ts",
     ]);
     expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
   });
@@ -238,6 +248,23 @@ describe("slice diff is limited to the frontend read alignment", () => {
       // Platform-managed preview auth storage (auto-generated, not part of any slice).
       "src/integrations/supabase/client.ts",
       "src/integrations/supabase/previewAuthStorage.ts",
+      // GAINEDGE_RON_ALWAYS_ON_RUNTIME_RECOVERY_V1 — tests for the runtime repair.
+      "src/test/ron-always-on-runtime-recovery-v1.test.ts",
+      "src/test/ron-v3-v8-regression-guard.test.ts",
+      "src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts",
+      "src/test/gainedge-ron-live-anchor-compat-v3.test.ts",
+      "src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts",
+      "src/test/gainedge-gdelt-raw-headlines-v1.test.ts",
+      "src/test/gainedge-gdelt-server-schedule-v1.test.ts",
+      "src/test/gainedge-product-ask-ron-global-entry-v1.test.ts",
+      "supabase/functions/_shared/ron-agent-contracts.ts",
+      "supabase/functions/_shared/ron-orchestrator.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec-v4.ts",
+      "supabase/functions/_shared/ron-orchestration-run-v9.ts",
+      "supabase/functions/ron-agent-opportunity-risk/index.ts",
+      "supabase/functions/ron-orchestrate-run/index.ts",
+      "supabase/functions/ron-schedule-orchestration/index.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

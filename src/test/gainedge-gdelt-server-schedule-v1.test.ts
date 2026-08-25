@@ -173,6 +173,19 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/gainedge-global-signal-popup-v1.test.tsx'`
       // Platform-managed preview auth storage (auto-generated, not part of any slice).
       + ` ':(exclude)src/integrations/supabase/client.ts'`
+      // GAINEDGE_RON_ALWAYS_ON_RUNTIME_RECOVERY_V1: forward-only artifact-clock TTL repair.
+      + ` ':(exclude)supabase/functions/_shared/ron-agent-contracts.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-orchestrator.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-risk-spec.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-risk-spec-v4.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-orchestration-run-v9.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-opportunity-risk/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
+      + ` ':(exclude)src/test/ron-always-on-runtime-recovery-v1.test.ts'`
+      + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
+      + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
       + ` ':(exclude)src/integrations/supabase/previewAuthStorage.ts'`
       ,
       { encoding: "utf8" },

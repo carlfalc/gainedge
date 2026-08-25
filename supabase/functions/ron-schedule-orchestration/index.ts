@@ -23,12 +23,13 @@ const corsHeaders = {
 /**
  * Pinned seven-agent orchestration run version. Never inferred from a request.
  *
- * V8 = the single-evaluation-anchor run: identical seven-agent plan and identical
- * persistence path, with Session/Pattern/Cross-Asset pinned to their V3 specs and
- * Opportunity/Risk to V3, so ONE completed-bar-close anchor is admissible to every
- * specialist. Frozen run versions 1-7 remain explicitly reachable and unmodified.
+ * V9 = the artifact-clock TTL run: identical seven-agent plan, identical anchor contract
+ * and identical persistence path to V8, with Opportunity/Risk pinned to spec 4 and the run
+ * evaluated under registered TTL policy v2, which exempts artifact-clock evidence (the
+ * sealed calibration artifact) from the market-freshness budget only. Frozen run versions
+ * 1-8 remain explicitly reachable and unmodified.
  */
-const ORCHESTRATION_RUN_VERSION = 8;
+const ORCHESTRATION_RUN_VERSION = 9;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -108,7 +109,7 @@ Deno.serve(async (req) => {
         timeframe: RUNTIME_TIMEFRAME,
         evaluation_anchor: gate.anchor,
         orchestration_run_version: ORCHESTRATION_RUN_VERSION,
-        trace_id: `ron_sched_v8_${gate.anchor}_${RUNTIME_INSTRUMENT}_${RUNTIME_TIMEFRAME}`,
+        trace_id: `ron_sched_v9_${gate.anchor}_${RUNTIME_INSTRUMENT}_${RUNTIME_TIMEFRAME}`,
         persist: true,
       }),
     });

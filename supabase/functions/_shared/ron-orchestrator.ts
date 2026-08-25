@@ -18,6 +18,7 @@ import { PROMOTED_STATE_VARIABLES } from "./ron-agentic-architecture.ts";
 import {
   EVIDENCE_TTL_POLICY_V1, EvidenceContractError, RON_AGENT_IDS, RON_AGENT_REGISTRY,
   RON_EVIDENCE_SCHEMA_VERSION, agentSpec, authorityRankOf, evidenceHash, evidenceTtlMinutes,
+  resolveEvidenceTtlMinutes,
   hashCanonical, registryHash, validateEvidence,
   type EvidenceEnvelopeV1, type QualitativeDirection, type RecommendationV1, type RonAgentId,
 } from "./ron-agent-contracts.ts";
@@ -55,6 +56,11 @@ export interface OrchestrationContext {
   /** Decision instant (UTC ISO). Staleness is measured against this, never against "now". */
   as_of: string;
   expected_agents?: readonly RonAgentId[];
+  /**
+   * Registered TTL policy version for this run. Absent -> the frozen v1 policy, so every
+   * existing run version keeps byte-identical freshness semantics.
+   */
+  ttl_policy_version?: number;
 }
 
 export interface EvidenceRef {
@@ -177,7 +183,9 @@ export async function synthesizeDecision(
   // 2. Freshness against the explicit policy (never against wall-clock "now").
   const refs: EvidenceRef[] = [];
   for (const e of ordered) {
-    const ttl = evidenceTtlMinutes(e.agent_id, e.timeframe);
+    const ttl = resolveEvidenceTtlMinutes(
+      ctx.ttl_policy_version ?? EVIDENCE_TTL_POLICY_V1.policy_version, e.agent_id, e.timeframe,
+    );
     const age = minutesBetween(ctx.as_of, e.as_of);
     refs.push({
       agent_id: e.agent_id,
@@ -300,7 +308,7 @@ export async function synthesizeDecision(
     orchestrator_version: RON_ORCHESTRATOR_VERSION,
     evidence_schema_version: RON_EVIDENCE_SCHEMA_VERSION,
     registry_hash: await registryHash(),
-    ttl_policy_version: EVIDENCE_TTL_POLICY_V1.policy_version,
+    ttl_policy_version: ctx.ttl_policy_version ?? EVIDENCE_TTL_POLICY_V1.policy_version,
     trace_id: ctx.trace_id,
     instrument: ctx.instrument,
     timeframe: ctx.timeframe,

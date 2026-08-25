@@ -181,7 +181,9 @@ const TOUCHED: Touched[] = [
     invariants: [
       // The frozen acceptance list is reused verbatim; V8 is a separate additive term.
       "[1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)",
-      "const isV8 = requestedRunVersion === 8;",
+      // V9 (GAINEDGE_RON_ALWAYS_ON_RUNTIME_RECOVERY_V1) inherits every V8 semantic, so the
+      // V8 term is now `=== 8 || isV9`. V1-V8 stay explicitly reachable and unchanged.
+      "const isV8 = requestedRunVersion === 8 || isV9;",
       "const isV7 = requestedRunVersion === 7 || isV8;",
       // Default run version is unchanged.
       "? RON_ORCHESTRATION_RUN_VERSION_V2",
@@ -204,7 +206,7 @@ const TOUCHED: Touched[] = [
       ["const gate = selectAnchor({", "});"],
     ],
     invariants: [
-      "const ORCHESTRATION_RUN_VERSION = 8;",
+      "const ORCHESTRATION_RUN_VERSION = 9;",
       "ron_verify_cron_token",
       "persist: true,",
     ],
@@ -255,6 +257,14 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       // feature pipeline that composes it. The hash-pinned ron-patterns.ts is untouched.
       "supabase/functions/_shared/ron-patterns-expansion-v1.ts",
       "supabase/functions/_shared/ron-features.ts",
+      // GAINEDGE_RON_ALWAYS_ON_RUNTIME_RECOVERY_V1: additive TTL policy v2 helpers, the
+      // optional (default-off) ttl_policy_version plumbing, and the forward-only V4/V9
+      // artifacts. Every frozen V1-V8 behaviour path is unchanged and still default.
+      "supabase/functions/_shared/ron-agent-contracts.ts",
+      "supabase/functions/_shared/ron-orchestrator.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec-v4.ts",
+      "supabase/functions/_shared/ron-orchestration-run-v9.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

@@ -314,14 +314,18 @@ describe("endpoint wiring is additive", () => {
 
   it("the coordinator accepts run version 8 and keeps default 2", () => {
     const r = src("supabase/functions/ron-orchestrate-run/index.ts");
-    expect(r).toContain("[1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion) || requestedRunVersion === 8");
-    expect(r).toContain("const isV8 = requestedRunVersion === 8;");
+    expect(r).toContain("[1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)");
+    expect(r).toContain("requestedRunVersion === 8");
+    // V9 (artifact-clock TTL repair) inherits every V8 semantic, so the V8 term now
+    // includes it. V8 itself stays explicitly reachable and byte-identical in behaviour.
+    expect(r).toContain("const isV8 = requestedRunVersion === 8 || isV9;");
     expect(r).toContain("? RON_ORCHESTRATION_RUN_VERSION_V2\n    : Number(body.orchestration_run_version)");
   });
 
-  it("the 24x7 scheduler is pinned to run version 8 only", () => {
+  it("the 24x7 scheduler is pinned to exactly one current run version", () => {
     const s = src("supabase/functions/ron-schedule-orchestration/index.ts");
-    expect(s).toContain("const ORCHESTRATION_RUN_VERSION = 8");
+    expect(s).toContain("const ORCHESTRATION_RUN_VERSION = 9");
     expect(s).not.toContain("ORCHESTRATION_RUN_VERSION = 7");
+    expect(s).not.toContain("ORCHESTRATION_RUN_VERSION = 8");
   });
 });

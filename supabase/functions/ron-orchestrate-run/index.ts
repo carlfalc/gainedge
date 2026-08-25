@@ -73,6 +73,10 @@ import {
   RON_ORCHESTRATION_RUN_VERSION_V8, SESSION_STRUCTURE_AGENT,
   SESSION_STRUCTURE_SPEC_VERSION_V8,
 } from "../_shared/ron-orchestration-run-v8.ts";
+import {
+  assertOpportunityRiskV4Sealed, deriveRunIdsV9, ORCHESTRATION_RUN_PLAN_V9,
+  orchestrationRunPlanHashV9, RON_ORCHESTRATION_RUN_VERSION_V9, TTL_POLICY_VERSION_V9,
+} from "../_shared/ron-orchestration-run-v9.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -145,14 +149,18 @@ Deno.serve(async (req) => {
     : Number(body.orchestration_run_version);
   // The frozen V1-V7 acceptance list is reused VERBATIM; V8 is a separate, additive term.
   const runVersionSupported =
-    [1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion) || requestedRunVersion === 8;
+    [1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)
+    || requestedRunVersion === 8 || requestedRunVersion === 9;
   if (!runVersionSupported) {
     return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
   }
   // V8 is the forward-only SINGLE-EVALUATION-ANCHOR run: identical seven-agent plan, but
   // Session/Pattern/Cross-Asset are pinned to their V3 specs and Opportunity/Risk to V3.
   // Every specialist still receives the SAME anchor string; nothing is offset here.
-  const isV8 = requestedRunVersion === 8;
+  // V9 is the forward-only ARTIFACT-CLOCK TTL run: every V8 semantic is inherited, with
+  // opportunity_risk pinned to spec 4 and the run evaluated under TTL policy v2.
+  const isV9 = requestedRunVersion === 9;
+  const isV8 = requestedRunVersion === 8 || isV9;
   const isV7 = requestedRunVersion === 7 || isV8;
   // V7 inherits every V6 semantic (all seven as-returned seal proofs + every earlier gate).
   const isV6 = requestedRunVersion === 6 || isV7;
@@ -167,10 +175,13 @@ Deno.serve(async (req) => {
 
   const ctx: OrchestrationContext = {
     trace_id: traceId, instrument, timeframe, as_of: anchor,
+    ...(isV9 ? { ttl_policy_version: TTL_POLICY_VERSION_V9 } : {}),
   };
 
   try {
-    const runIds = isV8
+    const runIds = isV9
+      ? await deriveRunIdsV9(traceId, anchor)
+      : isV8
       ? await deriveRunIdsV8(traceId, anchor)
       : isV7
       ? await deriveRunIdsV7(traceId, anchor)
@@ -195,7 +206,8 @@ Deno.serve(async (req) => {
     let falconerSignalSourceHash: string | null = null;
 
     const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
-      isV8 ? ORCHESTRATION_RUN_PLAN_V8
+      isV9 ? ORCHESTRATION_RUN_PLAN_V9
+        : isV8 ? ORCHESTRATION_RUN_PLAN_V8
         : isV7 ? ORCHESTRATION_RUN_PLAN_V7
         : isV6 ? ORCHESTRATION_RUN_PLAN_V6
         : isV5 ? ORCHESTRATION_RUN_PLAN_V5
@@ -274,7 +286,9 @@ Deno.serve(async (req) => {
         collected.push(envelope);
       } else if (isV8 && entry.agent_id === OPPORTUNITY_RISK_AGENT) {
         // V8 ONLY: Opportunity/Risk V3 readiness gate over the V3 specialist lineages.
-        opportunityRiskHash = await assertOpportunityRiskV3Sealed(envelope, ctx);
+        opportunityRiskHash = isV9
+          ? await assertOpportunityRiskV4Sealed(envelope, ctx)
+          : await assertOpportunityRiskV3Sealed(envelope, ctx);
         collected.push(envelope);
       } else if (v2entry && entry.agent_id === "session_market_structure") {
         // Validate + seal immediately, and retain THAT immutable envelope as the single
@@ -397,7 +411,9 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: isV8
+      orchestration_run_version: isV9
+        ? RON_ORCHESTRATION_RUN_VERSION_V9
+        : isV8
         ? RON_ORCHESTRATION_RUN_VERSION_V8
         : isV7
         ? RON_ORCHESTRATION_RUN_VERSION_V7
@@ -410,7 +426,9 @@ Deno.serve(async (req) => {
         : isV3
         ? RON_ORCHESTRATION_RUN_VERSION_V3
         : isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: isV8
+      orchestration_run_plan_hash: isV9
+        ? await orchestrationRunPlanHashV9()
+        : isV8
         ? await orchestrationRunPlanHashV8()
         : isV7
         ? await orchestrationRunPlanHashV7()
