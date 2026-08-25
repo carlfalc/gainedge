@@ -257,6 +257,14 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-gdelt-raw-headlines-v1.test.ts",
       "src/test/gainedge-gdelt-server-schedule-v1.test.ts",
       "src/test/gainedge-product-ask-ron-global-entry-v1.test.ts",
+      "supabase/functions/_shared/ron-agent-contracts.ts",
+      "supabase/functions/_shared/ron-orchestrator.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec-v4.ts",
+      "supabase/functions/_shared/ron-orchestration-run-v9.ts",
+      "supabase/functions/ron-agent-opportunity-risk/index.ts",
+      "supabase/functions/ron-orchestrate-run/index.ts",
+      "supabase/functions/ron-schedule-orchestration/index.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
