@@ -14,9 +14,14 @@ import {
 } from "@/lib/signals-presentation";
 import type { FalconerFeed } from "@/services/signals-data";
 
-export default function FalconerSignalsTab({ feed }: { feed: FalconerFeed }) {
+export default function FalconerSignalsTab(
+  { feed, initialSymbol = "" }: { feed: FalconerFeed; initialSymbol?: string },
+) {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<FalconerFilterValue>(EMPTY_FILTER);
+  // Deep links may prefilter by symbol; manual filter interaction stays fully in control.
+  const [filter, setFilter] = useState<FalconerFilterValue>(
+    initialSymbol ? { ...EMPTY_FILTER, symbol: initialSymbol } : EMPTY_FILTER,
+  );
 
   const rows = useMemo(() => feed.records.filter((r) =>
     (!filter.symbol || r.symbol === filter.symbol)
