@@ -17,6 +17,7 @@ import { buildSummaryMetrics } from "@/components/signals/SignalsSummary";
 import FalconerRecordList from "@/components/signals/FalconerRecordList";
 import RonOpportunityCard from "@/components/signals/RonOpportunityCard";
 import HistoryTab from "@/components/signals/HistoryTab";
+import RonOpportunitiesTab from "@/components/signals/RonOpportunitiesTab";
 import type { FalconerFeed, FalconerRecord } from "@/services/signals-data";
 
 const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), "utf8");
@@ -308,5 +309,85 @@ describe("Signals V1 — weekend-helper wording is not overstated", () => {
     expect(summary).toMatch(/Weekend closure inactive/);
     expect(summary).not.toMatch(/"Market open"/);
     expect(summary).toMatch(/Weekend closure active/);
+  });
+});
+
+// -------------------------------------------- GAINEDGE_RON_SIGNALS_CONTEXT_PRIMARY_V1
+const ctxRecord = (over: Record<string, unknown> = {}) => ({
+  id: "c1", instrument: "XAUUSD", timeframe: "15m",
+  evaluation_anchor: "2026-08-25T06:45:00Z", analytical_bar_open: "2026-08-25T06:30:00Z",
+  spec_version: 1, runtime_version: 1, decision_id: "d1",
+  direction_context: "bullish", direction_authority: "session_aligned",
+  setup_family: "ha_trend_continuation", lifecycle: "forming",
+  material_change_type: "new_forming", data_state: "healthy", data_blocked: false,
+  pattern_context_state: "supportive", cross_asset_context_state: "neutral",
+  macro_context_state: "neutral", ha_states: null, limitations: [],
+  created_at: "2026-08-25T06:45:10Z", ...over,
+} as never);
+
+const incompleteView: any = {
+  decision: {
+    instrument: "XAUUSD", timeframe: "15m", state: "OPPORTUNITY_INCOMPLETE",
+    as_of: "2026-08-25T06:45:00Z", recommendation: "none", direction: "none",
+  },
+  explanation: { why: [], what_would_change: [] },
+  evidence_count: 7,
+};
+
+const ctxFeed = (opps: unknown[]) => ({
+  opportunities: opps as never, loading: false, trackedWarning: null, reload: vi.fn(),
+});
+
+describe("Signals V1 — context-primary RON opportunities", () => {
+  it("suppresses lifecycle none from the active lane", () => {
+    wrap(<RonOpportunitiesTab feed={ctxFeed([{
+      pair: { symbol: "XAUUSD", timeframe: "15m" }, view: incompleteView,
+      context: ctxRecord({ lifecycle: "none", setup_family: "mixed_or_none", direction_context: "neutral" }),
+      error: null,
+    }])} />);
+    expect(screen.queryByTestId("ron-opportunity-XAUUSD-15m")).toBeNull();
+    expect(screen.getByTestId("ron-lane-empty").textContent)
+      .toMatch(/No current RON opportunity context/);
+  });
+
+  it("headlines a forming bullish contextual opportunity", () => {
+    wrap(<RonOpportunitiesTab feed={ctxFeed([{
+      pair: { symbol: "XAUUSD", timeframe: "15m" }, view: incompleteView,
+      context: ctxRecord(), error: null,
+    }])} />);
+    expect(screen.getByTestId("ron-opportunity-lifecycle").textContent).toBe("Forming");
+    expect(screen.getByTestId("ron-opportunity-direction").textContent).toBe("Bullish context");
+    expect(screen.getByText(/RON contextual opportunity · signal-only/)).toBeTruthy();
+  });
+
+  it("headlines a strengthening contextual opportunity", () => {
+    wrap(<RonOpportunityCard item={{
+      pair: { symbol: "XAUUSD", timeframe: "15m" }, view: incompleteView,
+      context: ctxRecord({ lifecycle: "strengthening", material_change_type: "strengthened" }),
+      error: null,
+    } as never} />);
+    expect(screen.getByTestId("ron-opportunity-lifecycle").textContent).toBe("Strengthening");
+    expect(screen.getByTestId("ron-opportunity-context-XAUUSD-15m")).toBeTruthy();
+  });
+
+  it("never lets OPPORTUNITY_INCOMPLETE replace the contextual lifecycle", () => {
+    wrap(<RonOpportunityCard item={{
+      pair: { symbol: "XAUUSD", timeframe: "15m" }, view: incompleteView,
+      context: ctxRecord(), error: null,
+    } as never} />);
+    expect(screen.queryByTestId("ron-opportunity-state")).toBeNull();
+    expect(screen.getByTestId("ron-opportunity-audit-note").textContent)
+      .toMatch(/Audit detail only/);
+    expect(screen.getByTestId("signals-link-decision-XAUUSD-15m")).toBeTruthy();
+    expect(screen.getByTestId("signals-link-ask-XAUUSD-15m")).toBeTruthy();
+    expect(screen.getByTestId("signals-link-chart-XAUUSD-15m")).toBeTruthy();
+  });
+
+  it("introduces no probability, confidence or execution language", () => {
+    expect(/probability of|confidence score|entry at|place (a )?trade|lot size/i.test(ALL)).toBe(false);
+  });
+
+  it("leaves the Falconer lane untouched", () => {
+    expect(SRC.falconerTab).not.toMatch(/lifecycle|opportunity_context/i);
   });
 });
