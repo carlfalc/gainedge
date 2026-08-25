@@ -12,6 +12,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { brokerVariantsFor } from "../_shared/broker-symbol-variants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,19 +21,27 @@ const MARKET_DATA_ACCOUNT_ID = Deno.env.get("METAAPI_MARKET_DATA_ACCOUNT_ID") ??
 const MARKET_DATA_URL = "https://mt-market-data-client-api-v1.london.agiliumtrade.ai";
 
 const TF_MS: Record<string, number> = { "1m": 60_000, "5m": 300_000, "15m": 900_000, "1h": 3_600_000 };
-// Broker symbol mapping (canonical -> Eightcap/MetaApi). Unchanged from existing paths.
-const BROKER_SYMBOL: Record<string, string> = { NAS100: "NDX100" };
-
-const DEFAULT_TARGETS = [
+/**
+ * Multi-asset unattended targets (GAINEDGE_MULTI_ASSET_FOUNDATION_V1).
+ * Broker aliases come from the shared provider alias table, not one-off maps.
+ */
+export const DEFAULT_TARGETS = [
   { symbol: "XAUUSD", timeframe: "15m" },
   { symbol: "NAS100", timeframe: "15m" },
+  { symbol: "HK50", timeframe: "15m" },
+  { symbol: "NZDUSD", timeframe: "15m" },
+  { symbol: "USDCAD", timeframe: "15m" },
+  { symbol: "USOUSD", timeframe: "15m" },
+  { symbol: "UKOUSD", timeframe: "15m" },
   { symbol: "XAUUSD", timeframe: "1m" },
 ];
 
 const PAGE_LIMIT = 1000;
 const MAX_PAGES = 8;
+const MAX_RECOVERY_PAGES = 24;          // bounded recovery ceiling
+const MAX_RECOVERY_LOOKBACK_DAYS = 120; // bounded recovery ceiling
 const OVERLAP_BARS = 3;          // small overlap for idempotent correction
-const MAX_LOOKBACK_MS = 21 * 24 * 3_600_000;
+const DEFAULT_LOOKBACK_DAYS = 21;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -74,6 +83,16 @@ Deno.serve(async (req) => {
     const accountId = (typeof body.account_id === "string" && body.account_id) || MARKET_DATA_ACCOUNT_ID;
     if (!accountId) return json({ error: "NO_MARKET_DATA_ACCOUNT" }, 409);
 
+    const lookbackDays = Math.min(
+      MAX_RECOVERY_LOOKBACK_DAYS,
+      Math.max(1, Number(body.lookback_days ?? DEFAULT_LOOKBACK_DAYS) || DEFAULT_LOOKBACK_DAYS),
+    );
+    const maxPages = Math.min(
+      MAX_RECOVERY_PAGES,
+      Math.max(1, Number(body.max_pages ?? MAX_PAGES) || MAX_PAGES),
+    );
+    const lookbackMs = lookbackDays * 24 * 3_600_000;
+
     const targets = Array.isArray(body.targets) && body.targets.length
       ? body.targets as { symbol: string; timeframe: string }[]
       : DEFAULT_TARGETS;
@@ -81,10 +100,12 @@ Deno.serve(async (req) => {
     const now = Date.now();
     const results: Record<string, unknown>[] = [];
 
+    // Per-symbol failure isolation: one unavailable symbol never blocks the rest.
     for (const { symbol, timeframe } of targets) {
+      try {
       const barMs = TF_MS[timeframe];
       if (!barMs) { results.push({ symbol, timeframe, error: "unsupported timeframe" }); continue; }
-      const brokerSymbol = BROKER_SYMBOL[symbol] ?? symbol;
+      const variants = brokerVariantsFor(symbol);
 
       const { data: latest } = await supabase
         .from("candle_history")
@@ -92,7 +113,7 @@ Deno.serve(async (req) => {
         .eq("symbol", symbol).eq("timeframe", timeframe)
         .order("timestamp", { ascending: false }).limit(1);
       const lastStored = latest?.[0]?.timestamp ? new Date(latest[0].timestamp).getTime() : 0;
-      const floor = Math.max(lastStored - OVERLAP_BARS * barMs, now - MAX_LOOKBACK_MS);
+      const floor = Math.max(lastStored - OVERLAP_BARS * barMs, now - lookbackMs);
 
       // Latest legitimately CLOSED bar boundary.
       const lastClosedOpen = Math.floor(now / barMs) * barMs - barMs;
@@ -104,10 +125,24 @@ Deno.serve(async (req) => {
       const collected = new Map<number, MetaCandle>();
       let anchor = new Date(now);
       let pages = 0, apiError: string | null = null;
-      while (pages < MAX_PAGES) {
-        let page: MetaCandle[];
-        try { page = await fetchPage(accountId, brokerSymbol, timeframe, anchor); }
-        catch (e) { apiError = (e as Error).message; break; }
+      // Per-symbol alias resolution: first variant the broker actually serves wins.
+      let resolved: string | null = null;
+      while (pages < maxPages) {
+        let page: MetaCandle[] | null = null;
+        if (resolved) {
+          try { page = await fetchPage(accountId, resolved, timeframe, anchor); }
+          catch (e) { apiError = (e as Error).message; break; }
+        } else {
+          const errs: string[] = [];
+          for (const v of variants) {
+            try {
+              const p = await fetchPage(accountId, v, timeframe, anchor);
+              if (p.length) { resolved = v; page = p; break; }
+              if (page === null) page = p;
+            } catch (e) { errs.push(`${v}: ${(e as Error).message}`); }
+          }
+          if (page === null) { apiError = errs.join(" | ") || "no broker variant available"; break; }
+        }
         pages++;
         if (page.length === 0) break;
         for (const c of page) collected.set(new Date(c.time).getTime(), c);
@@ -137,9 +172,13 @@ Deno.serve(async (req) => {
       }
       results.push({
         symbol, timeframe, pages, fetched: rows.length, inserted, apiError,
+        brokerSymbol: resolved,
         lastStoredBefore: lastStored ? new Date(lastStored).toISOString() : null,
         newest: rows.length ? rows[rows.length - 1].timestamp : null,
       });
+      } catch (e) {
+        results.push({ symbol, timeframe, error: (e as Error).message, isolated: true });
+      }
     }
 
     return json({ success: true, at: new Date(now).toISOString(), results });

@@ -115,6 +115,22 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/services/signals-data.ts'`
       + ` ':(exclude)src/integrations/supabase/types.ts'`
       + ` ':(exclude)src/test/gainedge-ron-opportunity-context-runtime-v1.test.ts'`
+      // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion targets/aliases,
+      // chart symbol coverage and session-scoped Charts hosting. No RON runtime touched.
+      + ` ':(exclude)supabase/functions/_shared/broker-symbol-variants.ts'`
+      + ` ':(exclude)supabase/functions/ingest-candles/index.ts'`
+      + ` ':(exclude)src/App.tsx'`
+      + ` ':(exclude)src/components/dashboard/DashboardLayout.tsx'`
+      + ` ':(exclude)src/components/dashboard/PersistentChartsHost.tsx'`
+      + ` ':(exclude)src/components/dashboard/TradingViewWidget.tsx'`
+      + ` ':(exclude)src/components/dashboard/AddChartTabModal.tsx'`
+      + ` ':(exclude)src/components/dashboard/ChartTabPane.tsx'`
+      + ` ':(exclude)src/components/dashboard/TradeExecutionPanel.tsx'`
+      + ` ':(exclude)src/pages/dashboard/TradingViewChartPage.tsx'`
+      + ` ':(exclude)src/pages/ChartPopout.tsx'`
+      + ` ':(exclude)src/test/gainedge-multi-asset-foundation-and-chart-persistence-v1.test.tsx'`
+      + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
       + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-ha-pattern-context-spec-v1.ts'`
       + ` ':(exclude)src/test/ron-ha-pattern-context-v1.test.ts'`
@@ -210,6 +226,22 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/services/signals-data.ts'`
       + ` ':(exclude)src/integrations/supabase/types.ts'`
       + ` ':(exclude)src/test/gainedge-ron-opportunity-context-runtime-v1.test.ts'`
+      // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion targets/aliases,
+      // chart symbol coverage and session-scoped Charts hosting. No RON runtime touched.
+      + ` ':(exclude)supabase/functions/_shared/broker-symbol-variants.ts'`
+      + ` ':(exclude)supabase/functions/ingest-candles/index.ts'`
+      + ` ':(exclude)src/App.tsx'`
+      + ` ':(exclude)src/components/dashboard/DashboardLayout.tsx'`
+      + ` ':(exclude)src/components/dashboard/PersistentChartsHost.tsx'`
+      + ` ':(exclude)src/components/dashboard/TradingViewWidget.tsx'`
+      + ` ':(exclude)src/components/dashboard/AddChartTabModal.tsx'`
+      + ` ':(exclude)src/components/dashboard/ChartTabPane.tsx'`
+      + ` ':(exclude)src/components/dashboard/TradeExecutionPanel.tsx'`
+      + ` ':(exclude)src/pages/dashboard/TradingViewChartPage.tsx'`
+      + ` ':(exclude)src/pages/ChartPopout.tsx'`
+      + ` ':(exclude)src/test/gainedge-multi-asset-foundation-and-chart-persistence-v1.test.tsx'`
+      + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
       + ` ':(exclude)src/integrations/supabase/previewAuthStorage.ts'`
       ,
       { encoding: "utf8" },

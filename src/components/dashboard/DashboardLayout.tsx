@@ -15,6 +15,7 @@ import ronAvatar from "@/assets/ron-avatar.png";
 /** Light background context — consumed by any page that wants to adapt */
 export const LightBgContext = createContext<boolean>(false);
 import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
+import PersistentChartsHost, { CHARTS_ROUTE_PATH } from "./PersistentChartsHost";
 import BrokerModal from "./BrokerModal";
 import { openRonPopout } from "@/lib/ron-popout";
 import GlobalSignalNotifications from "./GlobalSignalNotifications";
@@ -37,6 +38,7 @@ export default function DashboardLayout() {
   const [authReady, setAuthReady] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const chartsActive = location.pathname.startsWith(CHARTS_ROUTE_PATH);
 
   useSeedData(userId);
   useAutoTradeNotifications(userId ?? null);
@@ -355,7 +357,11 @@ export default function DashboardLayout() {
         {/* PAGE CONTENT */}
         <main style={{ flex: 1, padding: 24, overflowY: "auto", background: lightBg ? "#F8FAFC" : "transparent", transition: "background 0.3s" }}>
           <LightBgContext.Provider value={lightBg}>
-            <Outlet />
+            {/* Charts is hosted at shell level so its TradingView widget survives navigation. */}
+            <div style={{ display: chartsActive ? "none" : "block", height: "100%" }}>
+              <Outlet />
+            </div>
+            <PersistentChartsHost visible={chartsActive} />
           </LightBgContext.Provider>
         </main>
       </div>

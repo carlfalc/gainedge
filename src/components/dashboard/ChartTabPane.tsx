@@ -31,6 +31,12 @@ interface Props {
   connectionStatus: "disconnected" | "connecting" | "live" | "demo";
   active: boolean;
   /**
+   * Route-level visibility of the Charts tree. The Charts route stays mounted across
+   * navigation (session-scoped TradingView persistence), so GainEdge-owned polling is
+   * gated on this explicit signal — never inferred from CSS.
+   */
+  chartsVisible?: boolean;
+  /**
    * GAINEDGE_CHARTS_UI_V1_PATH_A — single source of truth lift. The pane already owns
    * the genuine MetaAPI positions and the live quote; the page mirrors them into the
    * right rail instead of starting a second independent poll.
@@ -52,6 +58,7 @@ interface Props {
  */
 export default function ChartTabPane({
   symbol, mode, broker, userId, accountId, connectionStatus, active, onPaneState,
+  chartsVisible = true,
 }: Props) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [closingId, setClosingId] = useState<string | null>(null);
@@ -71,6 +78,7 @@ export default function ChartTabPane({
   /* live mid-price polling (used by P&L bar + chart header) */
   useEffect(() => {
     if (!isLive) { setLivePrice(null); setLivePriceTime(null); return; }
+    if (!chartsVisible) return; // paused while Charts is not the active route
     let cancelled = false;
     const variants = BROKER_SYMBOL_MAP[symbol] ?? [symbol];
     const poll = async () => {
@@ -84,7 +92,7 @@ export default function ChartTabPane({
     poll();
     const iv = setInterval(poll, 2000);
     return () => { cancelled = true; clearInterval(iv); };
-  }, [isLive, accountId, symbol]);
+  }, [isLive, accountId, symbol, chartsVisible]);
 
   const handleClosePosition = useCallback(async (positionId: string) => {
     if (!accountId) return;
@@ -171,6 +179,7 @@ export default function ChartTabPane({
           onOrderModeChange={setOrderMode}
           onLimitPricesChange={setLimitPrices}
           onPositionsChange={setPositions}
+          polling={chartsVisible}
         />
       </div>
     </div>

@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { X } from "lucide-react";
+import { getTvSymbol } from "@/components/dashboard/TradingViewWidget";
 
-const TV_SYMBOL_MAP: Record<string, string> = {
-  XAUUSD: "OANDA:XAUUSD", XAGUSD: "OANDA:XAGUSD",
-  EURUSD: "FX:EURUSD", GBPUSD: "FX:GBPUSD", USDJPY: "FX:USDJPY",
-  AUDUSD: "FX:AUDUSD", NZDUSD: "FX:NZDUSD", USDCAD: "FX:USDCAD",
-  USDCHF: "FX:USDCHF", NAS100: "PEPPERSTONE:NAS100", US30: "TVC:DJI",
-  SPX500: "SP:SPX", UK100: "TVC:UKX", GER40: "XETR:DAX",
-  BTCUSD: "COINBASE:BTCUSD", ETHUSD: "COINBASE:ETHUSD",
-};
 
 export default function ChartPopout() {
   const [params] = useSearchParams();
@@ -34,7 +27,7 @@ export default function ChartPopout() {
     script.async = true;
     script.innerHTML = JSON.stringify({
       autosize: true,
-      symbol: TV_SYMBOL_MAP[symbol] || `FX:${symbol}`,
+      symbol: getTvSymbol(symbol, ""),
       interval: "15",
       timezone: "Etc/UTC",
       theme: "dark",

@@ -24,6 +24,11 @@ export const TV_SYMBOL_MAP: Record<string, Record<string, string>> = {
   SPX500: { default: "SP:SPX", EIGHTCAP: "EIGHTCAP:SPX500", PEPPERSTONE: "PEPPERSTONE:SPX500", ICMARKETS: "ICMARKETS:SPX500" },
   UK100: { default: "TVC:UKX" },
   GER40: { default: "XETR:DAX" },
+  // Hang Seng 50 — an index, never an FX pair. TVC:HSI is the correct public fallback.
+  HK50: { default: "TVC:HSI", EIGHTCAP: "EIGHTCAP:HK50", PEPPERSTONE: "PEPPERSTONE:HK50", ICMARKETS: "ICMARKETS:HK50" },
+  // Energy — WTI / Brent, never FX pairs.
+  USOUSD: { default: "TVC:USOIL", EIGHTCAP: "EIGHTCAP:XTIUSD", PEPPERSTONE: "PEPPERSTONE:XTIUSD", ICMARKETS: "ICMARKETS:XTIUSD" },
+  UKOUSD: { default: "TVC:UKOIL", EIGHTCAP: "EIGHTCAP:XBRUSD", PEPPERSTONE: "PEPPERSTONE:XBRUSD", ICMARKETS: "ICMARKETS:XBRUSD" },
   BTCUSD: { default: "COINBASE:BTCUSD" },
   ETHUSD: { default: "COINBASE:ETHUSD" },
 };
@@ -35,7 +40,7 @@ const BROKER_EXCHANGES: Record<string, string> = {
   OANDA: "OANDA",
 };
 
-function getTvSymbol(sym: string, broker: string): string {
+export function getTvSymbol(sym: string, broker: string): string {
   const exchange = BROKER_EXCHANGES[broker] || "";
   const map = TV_SYMBOL_MAP[sym];
   if (map) return map[exchange] || map.default || `FX:${sym}`;
