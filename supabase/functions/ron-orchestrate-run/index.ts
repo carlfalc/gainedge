@@ -73,6 +73,10 @@ import {
   RON_ORCHESTRATION_RUN_VERSION_V8, SESSION_STRUCTURE_AGENT,
   SESSION_STRUCTURE_SPEC_VERSION_V8,
 } from "../_shared/ron-orchestration-run-v8.ts";
+import {
+  assertOpportunityRiskV4Sealed, deriveRunIdsV9, ORCHESTRATION_RUN_PLAN_V9,
+  orchestrationRunPlanHashV9, RON_ORCHESTRATION_RUN_VERSION_V9, TTL_POLICY_VERSION_V9,
+} from "../_shared/ron-orchestration-run-v9.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
