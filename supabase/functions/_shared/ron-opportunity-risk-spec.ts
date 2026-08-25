@@ -23,7 +23,7 @@
  * a trade authorization and never emits geometry in V1.
  */
 import {
-  evidenceHash, evidenceTtlMinutes, isIsoUtc, validateEvidence, hashCanonical,
+  evidenceHash, EVIDENCE_TTL_POLICY_V1, isIsoUtc, resolveEvidenceTtlMinutes, validateEvidence, hashCanonical,
   type EvidenceEnvelopeV1, type EvidenceStatus, type Observation,
   type QualitativeDirection, type RecommendationV1, type RonAgentId,
 } from "./ron-agent-contracts.ts";
@@ -160,6 +160,11 @@ export interface OpportunityRiskInputV1 {
   promoted_state_variables: readonly string[];
   run_id: string;
   trace_id: string;
+  /**
+   * Registered TTL policy version used for the required-evidence freshness gate. Absent ->
+   * the frozen v1 policy, so V1/V2/V3 replays stay byte-identical.
+   */
+  ttl_policy_version?: number;
 }
 
 /**
@@ -334,7 +339,9 @@ export async function buildOpportunityRiskEvidenceV1(
   for (const id of OPPORTUNITY_REQUIRED_AGENTS) {
     const e = get(id)!;
     const age = ageOf(e);
-    const ttl = evidenceTtlMinutes(id, input.timeframe);
+    const ttl = resolveEvidenceTtlMinutes(
+      input.ttl_policy_version ?? EVIDENCE_TTL_POLICY_V1.policy_version, id, input.timeframe,
+    );
     observations.push(
       num(`${id}_age_minutes`, age, at, "minutes"),
       num(`${id}_ttl_minutes`, ttl, at, "minutes"),
