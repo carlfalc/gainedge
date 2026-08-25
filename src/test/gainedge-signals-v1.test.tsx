@@ -240,6 +240,10 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: () => ({
       select: () => ({
         eq: async () => ({ data: trackedState.rows, error: trackedState.error }),
+        // ron_opportunity_context read path: no stored context in these tests.
+        in: () => ({
+          order: () => ({ limit: async () => ({ data: [], error: null }) }),
+        }),
       }),
     }),
     channel: () => ({ on() { return this; }, subscribe() { return this; } }),

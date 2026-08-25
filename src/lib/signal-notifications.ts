@@ -10,13 +10,17 @@
  *     assigned a meaning.
  *   • Live-mode records only. Backtest rows are ignored outright.
  *
- * RON note: RON decisions have no persisted realtime event path today, so RON popup
- * delivery is deliberately NOT implemented in this slice. It must wait for a genuine
- * realtime/persisted event source — polling is not an acceptable substitute.
+ * RON note: RON opportunity-context popups are delivered from the append-only
+ * `ron_opportunity_context` table (see the second section of this file). RON orchestrator
+ * DECISIONS still have no persisted realtime event path and are deliberately NOT
+ * surfaced here — polling would fabricate delivery semantics.
  */
 import {
   presentFalconerStatus, presentFalconerTrigger, relativeAge,
 } from "@/lib/signals-presentation";
+import {
+  isNotifiableMaterialChange, presentDirection, presentLifecycle, presentMaterialChange,
+} from "@/lib/ron-opportunity-context-presentation";
 
 /** Visible stack cap. Older toasts fall off the stack but stay in dedupe history. */
 export const MAX_VISIBLE_NOTIFICATIONS = 4;
@@ -185,5 +189,125 @@ export function pushVisible(
   next: SignalNotification,
   cap: number = MAX_VISIBLE_NOTIFICATIONS,
 ): SignalNotification[] {
+  return [next, ...current.filter((n) => n.key !== next.key)].slice(0, cap);
+}
+
+/* ------------------------------------------------------------------------- *
+ * GAINEDGE_RON_OPPORTUNITY_CONTEXT_UI_V1 — RON opportunity-context popups.
+ *
+ * These are now genuinely event-driven: `ron_opportunity_context` is an append-only,
+ * realtime-published table written only by the server-side RON runtime, so an INSERT is
+ * a real persisted event rather than a polled inference. Only a stored material change
+ * notifies, a data condition never notifies, and only instruments the user actually
+ * tracks are surfaced.
+ * ------------------------------------------------------------------------- */
+
+/** Small qualifier shown on every opportunity-context popup. */
+export const OPPORTUNITY_NOTIFICATION_QUALIFIER =
+  "RON opportunity context record · descriptive only, not a trade instruction";
+
+export interface OpportunityNotificationRow {
+  id: string;
+  instrument: string;
+  timeframe: string;
+  evaluation_anchor: string;
+  lifecycle: string;
+  direction_context: string;
+  material_change_type: string;
+  data_state: string;
+  data_blocked?: boolean | null;
+}
+
+export interface OpportunityNotification {
+  key: string;
+  recordId: string;
+  kind: "opportunity";
+  symbol: string;
+  timeframe: string;
+  lifecycleLabel: string;
+  changeLabel: string;
+  directionLabel: string;
+  anchor: string;
+  ageLabel: string;
+  createdAt: number;
+}
+
+export interface OpportunityNotificationState {
+  seen: Set<string>;
+  baselineReady: boolean;
+}
+
+export function createOpportunityNotificationState(): OpportunityNotificationState {
+  return { seen: new Set<string>(), baselineReady: false };
+}
+
+export function resetOpportunityNotificationState(state: OpportunityNotificationState): void {
+  state.seen.clear();
+  state.baselineReady = false;
+}
+
+export function opportunityEventKey(row: { id: string }): string {
+  return `opportunity:${row.id}`;
+}
+
+/** Rows already stored at first load never pop up. */
+export function applyOpportunityBaseline(
+  state: OpportunityNotificationState,
+  rows: OpportunityNotificationRow[],
+): OpportunityNotificationState {
+  for (const row of rows) state.seen.add(opportunityEventKey(row));
+  state.baselineReady = true;
+  return state;
+}
+
+export function normaliseTrackedInstruments(symbols: string[]): Set<string> {
+  return new Set(symbols.map((s) => (s ?? "").trim().toUpperCase()).filter(Boolean));
+}
+
+/**
+ * Derives at most one opportunity popup from a persisted row, mutating dedupe state.
+ * Returns null unless the row is a genuine, tracked, non-data material change.
+ */
+export function deriveOpportunityNotification(
+  state: OpportunityNotificationState,
+  row: OpportunityNotificationRow,
+  tracked: Set<string>,
+  now: Date = new Date(),
+): OpportunityNotification | null {
+  if (!state.baselineReady) return null;
+  if (!row?.id || !row.instrument) return null;
+  if (!tracked.has(row.instrument.trim().toUpperCase())) return null;
+  if (row.data_blocked === true) return null;
+  if (!isNotifiableMaterialChange(row.material_change_type)) return null;
+
+  const key = opportunityEventKey(row);
+  if (state.seen.has(key)) return null;
+  state.seen.add(key);
+
+  return {
+    key,
+    recordId: row.id,
+    kind: "opportunity",
+    symbol: row.instrument,
+    timeframe: row.timeframe,
+    lifecycleLabel: presentLifecycle(row.lifecycle).label,
+    changeLabel: presentMaterialChange(row.material_change_type).label,
+    directionLabel: presentDirection(row.direction_context).label,
+    anchor: row.evaluation_anchor,
+    ageLabel: relativeAge(row.evaluation_anchor, now),
+    createdAt: now.getTime(),
+  };
+}
+
+/** Deep link into the RON Opportunities lane for this pair. */
+export function viewOpportunityHref(symbol: string): string {
+  return `/dashboard/signals?tab=ron&symbol=${encodeURIComponent(symbol)}`;
+}
+
+export function pushVisibleOpportunity(
+  current: OpportunityNotification[],
+  next: OpportunityNotification,
+  cap: number = MAX_VISIBLE_NOTIFICATIONS,
+): OpportunityNotification[] {
   return [next, ...current.filter((n) => n.key !== next.key)].slice(0, cap);
 }

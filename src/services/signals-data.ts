@@ -11,7 +11,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchLatestRonDecision, type RonDecisionView } from "@/services/ron-decisions";
+import {
+  contextKey, fetchOpportunityContexts, type RonOpportunityContextRecord,
+} from "@/services/ron-opportunity-context";
 import { normaliseTracked, pairKey, type TrackedPair } from "@/lib/ron-decision-explorer";
+
 
 export interface FalconerRecord {
   id: string;
@@ -114,11 +118,17 @@ export interface RonOpportunity {
   pair: TrackedPair;
   /** Null when no stored decision exists for this pair — never inferred. */
   view: RonDecisionView | null;
+  /**
+   * Newest stored RON opportunity-context record for this pair, when one exists.
+   * Absent means genuinely absent: no lifecycle is ever inferred client-side.
+   */
+  context: RonOpportunityContextRecord | null;
   /** Read-contract hashes, when the endpoint returned them. */
   viewHash?: string;
   specHash?: string;
   error: string | null;
 }
+
 
 export interface RonOpportunityFeed {
   opportunities: RonOpportunity[];
@@ -186,20 +196,31 @@ export function useRonOpportunities(): RonOpportunityFeed {
 
     const selected = pairs.slice(0, RON_OPPORTUNITY_REQUEST_CONCURRENCY_CEILING);
 
-    const results = await Promise.all(selected.map(async (pair): Promise<RonOpportunity> => {
-      try {
-        const res = await fetchLatestRonDecision({
-          instrument: pair.symbol, timeframe: pair.timeframe,
-        });
-        return {
-          pair, view: res?.view ?? null, viewHash: res?.view_hash, specHash: res?.spec_hash, error: null,
-        };
-      } catch (e) {
-        return {
-          pair, view: null, error: e instanceof Error ? e.message : "Could not read the stored RON record.",
-        };
-      }
-    }));
+    // The stored decision read and the stored opportunity-context read are independent
+    // sources. Neither is allowed to substitute for the other.
+    const [results, contexts] = await Promise.all([
+      Promise.all(selected.map(async (pair): Promise<RonOpportunity> => {
+        try {
+          const res = await fetchLatestRonDecision({
+            instrument: pair.symbol, timeframe: pair.timeframe,
+          });
+          return {
+            pair, view: res?.view ?? null, context: null,
+            viewHash: res?.view_hash, specHash: res?.spec_hash, error: null,
+          };
+        } catch (e) {
+          return {
+            pair, view: null, context: null,
+            error: e instanceof Error ? e.message : "Could not read the stored RON record.",
+          };
+        }
+      })),
+      fetchOpportunityContexts(selected),
+    ]);
+
+    for (const item of results) {
+      item.context = contexts.get(contextKey(item.pair.symbol, item.pair.timeframe)) ?? null;
+    }
 
     // Deterministic order: records with a stored decision first (newest as_of), then the rest.
     results.sort((a, b) => {
@@ -210,6 +231,7 @@ export function useRonOpportunities(): RonOpportunityFeed {
     });
 
     setOpportunities(results);
+
     setLoading(false);
   }, []);
 

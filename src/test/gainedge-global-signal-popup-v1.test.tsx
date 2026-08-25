@@ -128,8 +128,20 @@ describe("scoping, links and copy", () => {
     expect(LAYOUT).toContain("<GlobalSignalNotifications />");
   });
 
-  it("15. RON popup delivery stays deferred, with no polling workaround", () => {
-    expect(COMPONENT).toMatch(/RON popups are intentionally NOT delivered/);
+  it("15. RON orchestrator DECISION popups stay deferred, with no polling workaround", () => {
+    expect(COMPONENT).toMatch(/RON orchestrator DECISIONS still have no realtime event/);
     expect(COMPONENT).not.toContain("setInterval");
+  });
+
+  it("16. RON opportunity-context popups come from a genuine append-only realtime event", () => {
+    // The only added source is an INSERT on the append-only, realtime-published
+    // ron_opportunity_context table written solely by the server-side RON runtime.
+    expect(COMPONENT).toContain('table: "ron_opportunity_context"');
+    expect(COMPONENT).toContain('event: "INSERT"');
+    expect(COMPONENT).toContain("deriveOpportunityNotification");
+    // Tracked-instrument scoping, and never an execution or probability claim.
+    expect(COMPONENT).toContain("normaliseTrackedInstruments");
+    expect(COMPONENT).toContain("user_instruments");
+    expect(COMPONENT).not.toMatch(/probability|confidence|order placed/i);
   });
 });
