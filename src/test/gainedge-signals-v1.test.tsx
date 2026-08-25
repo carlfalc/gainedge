@@ -322,7 +322,7 @@ const ctxRecord = (over: Record<string, unknown> = {}) => ({
   material_change_type: "new_forming", data_state: "healthy", data_blocked: false,
   pattern_context_state: "supportive", cross_asset_context_state: "neutral",
   macro_context_state: "neutral", ha_states: null, limitations: [],
-  created_at: "2026-08-25T06:45:10Z",
+  created_at: "2026-08-25T06:45:10Z", ...over,
 } as never);
 
 const incompleteView: any = {
