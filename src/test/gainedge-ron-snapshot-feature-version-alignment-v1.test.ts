@@ -229,6 +229,12 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-signals-v1.test.tsx",
       "src/test/gainedge-ui-dedupe-nav-v1.test.tsx",
       ".lovable/plan.md",
+      // GAINEDGE_GLOBAL_SIGNAL_POPUP_V1 — frontend-only global notification layer.
+      "src/components/dashboard/GlobalSignalNotifications.tsx",
+      "src/components/dashboard/TradeNotificationPopup.tsx",
+      "src/components/dashboard/DashboardLayout.tsx",
+      "src/lib/signal-notifications.ts",
+      "src/test/gainedge-global-signal-popup-v1.test.tsx",
       // Platform-managed preview auth storage (auto-generated, not part of any slice).
       "src/integrations/supabase/client.ts",
       "src/integrations/supabase/previewAuthStorage.ts",
