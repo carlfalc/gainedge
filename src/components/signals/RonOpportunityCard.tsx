@@ -157,7 +157,6 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
             ? item.error
             : "Nothing is inferred in the absence of a record. A card will appear here as soon as an evaluation has been stored for this pair."}
         </p>
-        {item.context && <RonOpportunityContextPanel record={item.context} />}
         <LinkRow symbol={pair.symbol} timeframe={pair.timeframe} />
 
       </section>
@@ -240,8 +239,6 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
       <p className="mt-3 text-[11px]" style={{ color: C.muted }}>
         {view.evidence_count} specialist evidence records stored · open the decision record for full evidence.
       </p>
-
-      {item.context && <RonOpportunityContextPanel record={item.context} />}
 
       <LinkRow symbol={pair.symbol} timeframe={pair.timeframe} />
 
