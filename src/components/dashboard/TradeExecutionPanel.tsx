@@ -65,6 +65,11 @@ interface TradeExecutionPanelProps {
   onLimitPricesChange?: (prices: LimitOrderPrices) => void;
   onPositionsChange?: (positions: Position[]) => void;
   positions?: Position[];
+  /**
+   * GAINEDGE session-scoped charts persistence: when the Charts route is hidden the
+   * tree stays mounted, so GainEdge-owned polling must be explicitly paused.
+   */
+  polling?: boolean;
 }
 
 async function callTrade(body: Record<string, unknown>) {
@@ -84,7 +89,7 @@ async function callTrade(body: Record<string, unknown>) {
   return data;
 }
 
-const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPanelProps>(function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, mode = "manual", onOrderModeChange, onLimitPricesChange, onPositionsChange, positions: externalPositions }, ref) {
+const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPanelProps>(function TradeExecutionPanel({ symbol, accountId, connectionStatus, currentPrice: chartPrice, mode = "manual", onOrderModeChange, onLimitPricesChange, onPositionsChange, positions: externalPositions, polling = true }, ref) {
   const [collapsed, setCollapsed] = useState(false);
   const [lotSize, setLotSize] = useState("0.01");
   const [sl, setSl] = useState("");
@@ -309,7 +314,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
   // Poll bid/ask
   useEffect(() => {
     if (priceRef.current) clearInterval(priceRef.current);
-    if (!isLive) { setBid(null); setAsk(null); return; }
+    if (!isLive || !polling) { if (!isLive) { setBid(null); setAsk(null); } return; }
 
     const poll = async () => {
       const variants = BROKER_SYMBOL_MAP[symbol] ?? [symbol];
@@ -323,12 +328,12 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
     poll();
     priceRef.current = setInterval(poll, 2000);
     return () => { if (priceRef.current) clearInterval(priceRef.current); };
-  }, [symbol, accountId, isLive]);
+  }, [symbol, accountId, isLive, polling]);
 
   // Poll positions
   useEffect(() => {
     if (posRef.current) clearInterval(posRef.current);
-    if (!isLive) return;
+    if (!isLive || !polling) return;
 
     const load = async () => {
       try {
@@ -341,7 +346,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
     load();
     posRef.current = setInterval(load, 5000);
     return () => { if (posRef.current) clearInterval(posRef.current); };
-  }, [isLive, accountId, onPositionsChange]);
+  }, [isLive, accountId, onPositionsChange, polling]);
 
   // Load history when toggled
   useEffect(() => {

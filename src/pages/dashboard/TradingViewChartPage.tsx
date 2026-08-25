@@ -47,7 +47,15 @@ function loadTabs(): { tabs: ChartTab[]; activeId: string } {
   return { tabs: [def], activeId: def.id };
 }
 
-export default function TradingViewChartPage() {
+/** Max simultaneously mounted TradingView panes (LRU). Non-resident tabs stay listed. */
+export const MAX_RESIDENT_CHART_PANES = 4;
+
+export interface TradingViewChartPageProps {
+  /** Explicit route-active signal from the dashboard shell. Never inferred from CSS. */
+  chartsVisible?: boolean;
+}
+
+export default function TradingViewChartPage({ chartsVisible = true }: TradingViewChartPageProps = {}) {
   const { userId, profile } = useProfile();
   const [selectedBroker, setSelectedBroker] = useState<string>("Pepperstone");
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -83,6 +91,16 @@ export default function TradingViewChartPage() {
     // keeping this a normal history entry so browser Back works.
     setSearchParams({}, { replace: true });
   }, [requestedSymbol, setSearchParams]);
+
+  /* LRU of mounted chart panes — user tabs are never deleted, only non-resident. */
+  const [residentIds, setResidentIds] = useState<string[]>([initial.activeId]);
+  useEffect(() => {
+    setResidentIds((prev) => {
+      if (prev[0] === activeId) return prev;
+      const next = [activeId, ...prev.filter((id) => id !== activeId)];
+      return next.slice(0, MAX_RESIDENT_CHART_PANES);
+    });
+  }, [activeId]);
 
   /* persist */
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(tabs)); }, [tabs]);
@@ -355,15 +373,18 @@ export default function TradingViewChartPage() {
           </span>
         ))}
 
-        <span className="ml-auto text-[11px] opacity-70">
-          Technical indicators are available in the TradingView Indicators menu.
+        <span
+          className="ml-auto text-[11px] opacity-70"
+          title="Chart indicators and drawings are preserved while this GainEdge session stays open. Full saved layouts are planned for Advanced Charts."
+        >
+          Chart indicators and drawings are preserved while this GainEdge session stays open. Full saved layouts are planned for Advanced Charts.
         </span>
       </div>
 
       {/* Main content: chart panes + sidebar */}
       <div className="flex flex-1 min-h-0">
         <div className="flex-1 min-w-0 relative">
-          {tabs.map((tab) => (
+          {tabs.filter((tab) => residentIds.includes(tab.id)).map((tab) => (
             <div
               key={tab.id}
               className={`absolute inset-0 ${tab.id === activeId ? "" : "hidden"}`}
@@ -377,6 +398,7 @@ export default function TradingViewChartPage() {
                 connectionStatus={connectionStatus}
                 active={tab.id === activeId}
                 onPaneState={handlePaneState}
+                chartsVisible={chartsVisible}
               />
             </div>
           ))}

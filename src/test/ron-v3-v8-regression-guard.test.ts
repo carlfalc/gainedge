@@ -268,6 +268,9 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       // GAINEDGE_RON_OPPORTUNITY_CONTEXT_RUNTIME_V1 — additive server-side runtime binding
       // for the frozen pure spec plus its read-only UI surface. No frozen artifact is mutated.
       "supabase/functions/_shared/ron-opportunity-context-runtime-v1.ts",
+      // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — shared broker alias table,
+      // additive and unrelated to any RON spec.
+      "supabase/functions/_shared/broker-symbol-variants.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

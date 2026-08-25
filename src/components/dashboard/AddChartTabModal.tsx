@@ -18,6 +18,8 @@ const CATEGORY_OF: Record<string, string> = {
   AUDJPY: "Forex Crosses", EURNZD: "Forex Crosses", AUDNZD: "Forex Crosses",
   AUDCAD: "Forex Crosses", NZDCAD: "Forex Crosses", GBPCAD: "Forex Crosses",
   NAS100: "Indices", US30: "Indices", SPX500: "Indices", UK100: "Indices", GER40: "Indices",
+  HK50: "Indices",
+  USOUSD: "Energy", UKOUSD: "Energy",
   BTCUSD: "Crypto", ETHUSD: "Crypto",
 };
 

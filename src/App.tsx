@@ -23,7 +23,7 @@ import SettingsPage from "./pages/dashboard/SettingsPage.tsx";
 import ClockSettingsPage from "./pages/dashboard/ClockSettingsPage.tsx";
 import NewsSettingsPage from "./pages/dashboard/NewsSettingsPage.tsx";
 import MyNewsPage from "./pages/dashboard/MyNewsPage.tsx";
-import TradingViewChartPage from "./pages/dashboard/TradingViewChartPage.tsx";
+import { ChartsRoutePlaceholder } from "./components/dashboard/PersistentChartsHost.tsx";
 import WhiskyCigarLoungePage from "./pages/dashboard/WhiskyCigarLoungePage.tsx";
 import StrategyPage from "./pages/dashboard/StrategyPage.tsx";
 import RonDecisionPage from "./pages/dashboard/RonDecisionPage";
@@ -57,7 +57,7 @@ const App = () => (
             <Route path="clock-settings" element={<ClockSettingsPage />} />
             <Route path="news-settings" element={<NewsSettingsPage />} />
             <Route path="my-news" element={<MyNewsPage />} />
-            <Route path="charts" element={<TradingViewChartPage />} />
+            <Route path="charts" element={<ChartsRoutePlaceholder />} />
             <Route path="strategy" element={<StrategyPage />} />
             <Route path="ai" element={<GainEdgeAIPage />} />
             <Route path="ron-decision" element={<RonDecisionPage />} />

@@ -177,6 +177,9 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/functions/_shared/ron-opportunity-context-runtime-v1.ts",
       "supabase/functions/ron-opportunity-context/index.ts",
       "supabase/migrations/20260825062420_e7f3ebc6-73e3-4798-9c0f-a301a1c7a519.sql",
+      // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion foundation only.
+      "supabase/functions/_shared/broker-symbol-variants.ts",
+      "supabase/functions/ingest-candles/index.ts",
     ]);
     expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
   });
@@ -282,6 +285,25 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/services/signals-data.ts",
       "src/integrations/supabase/types.ts",
       "src/test/gainedge-ron-opportunity-context-runtime-v1.test.ts",
+      // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion/chart/UI slice only.
+      "supabase/functions/_shared/broker-symbol-variants.ts",
+      "supabase/functions/ingest-candles/index.ts",
+      "src/App.tsx",
+      "src/components/dashboard/DashboardLayout.tsx",
+      "src/components/dashboard/PersistentChartsHost.tsx",
+      "src/components/dashboard/TradingViewWidget.tsx",
+      "src/components/dashboard/AddChartTabModal.tsx",
+      "src/components/dashboard/ChartTabPane.tsx",
+      "src/components/dashboard/TradeExecutionPanel.tsx",
+      "src/pages/dashboard/TradingViewChartPage.tsx",
+      "src/pages/ChartPopout.tsx",
+      "src/test/gainedge-multi-asset-foundation-and-chart-persistence-v1.test.tsx",
+      "src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts",
+      "src/test/gainedge-gdelt-raw-headlines-v1.test.ts",
+      "src/test/gainedge-gdelt-server-schedule-v1.test.ts",
+      "src/test/gainedge-product-ask-ron-global-entry-v1.test.ts",
+      "src/test/ron-v3-v8-regression-guard.test.ts",
+      "src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
