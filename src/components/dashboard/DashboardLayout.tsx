@@ -17,7 +17,7 @@ export const LightBgContext = createContext<boolean>(false);
 import WorldClocks, { DEFAULT_CLOCKS, type ClockConfig } from "./WorldClocks";
 import BrokerModal from "./BrokerModal";
 import { openRonPopout } from "@/lib/ron-popout";
-import TradeNotificationPopup from "./TradeNotificationPopup";
+import GlobalSignalNotifications from "./GlobalSignalNotifications";
 
 
 export default function DashboardLayout() {
@@ -362,7 +362,7 @@ export default function DashboardLayout() {
       <BrokerModal open={brokerOpen} onClose={() => setBrokerOpen(false)} userId={userId} />
       
       
-      <TradeNotificationPopup />
+      <GlobalSignalNotifications />
     </div>
     </LanguageProvider>
   );

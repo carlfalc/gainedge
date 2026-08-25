@@ -10,6 +10,7 @@
  * state, probability or freshness value is invented client-side.
  */
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import SignalsSummary, { buildSummaryMetrics } from "@/components/signals/SignalsSummary";
@@ -30,8 +31,16 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "history", label: "History" },
 ];
 
+/** Safe, minimal query-param reader: `?tab=falconer&symbol=XAUUSD`. */
+function readTabParam(raw: string | null): TabId | null {
+  return raw === "ron" || raw === "falconer" || raw === "history" ? raw : null;
+}
+
 export default function SignalsPage() {
-  const [tab, setTab] = useState<TabId>("ron");
+  const [params] = useSearchParams();
+  const initialTab = readTabParam(params.get("tab"));
+  const initialSymbol = (params.get("symbol") ?? "").trim();
+  const [tab, setTab] = useState<TabId>(initialTab ?? "ron");
   const ron = useRonOpportunities();
   const live = useFalconerRecords("live");
   const backtest = useFalconerRecords("backtest");
@@ -90,7 +99,7 @@ export default function SignalsPage() {
       </div>
 
       {tab === "ron" && <RonOpportunitiesTab feed={ron} />}
-      {tab === "falconer" && <FalconerSignalsTab feed={live} />}
+      {tab === "falconer" && <FalconerSignalsTab feed={live} initialSymbol={initialSymbol} />}
       {tab === "history" && <HistoryTab liveFeed={live} backtestFeed={backtest} />}
     </div>
   );
