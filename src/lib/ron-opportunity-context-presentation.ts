@@ -145,3 +145,22 @@ export const NOTIFIABLE_MATERIAL_CHANGES = [
 export function isNotifiableMaterialChange(value: string | null | undefined): boolean {
   return (NOTIFIABLE_MATERIAL_CHANGES as readonly string[]).includes((value ?? "").trim());
 }
+
+/**
+ * GAINEDGE_RON_SIGNALS_CONTEXT_PRIMARY_V1 — stored lifecycle tokens that represent an
+ * ACTIVE contextual opportunity in the Signals lane. `none` is deliberately excluded:
+ * an absent context is shown as absent, never as an opportunity.
+ */
+export const ACTIVE_OPPORTUNITY_LIFECYCLES = [
+  "watch", "forming", "strengthening", "confirmed", "weakening", "invalidated",
+] as const;
+
+export function isActiveOpportunityLifecycle(value: string | null | undefined): boolean {
+  return (ACTIVE_OPPORTUNITY_LIFECYCLES as readonly string[]).includes((value ?? "").trim());
+}
+
+/** Fixed source wording for the context-primary card. Not a recommendation. */
+export const OPPORTUNITY_SOURCE_LINE = "RON contextual opportunity · signal-only";
+
+/** Fixed wording for the empty active lane. */
+export const NO_ACTIVE_OPPORTUNITY_LINE = "No current RON opportunity context";
