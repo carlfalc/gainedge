@@ -114,6 +114,50 @@ Deno.serve(async (req) => {
       }),
     });
     const out = await res.json().catch(() => ({}));
+    const orchestrationPersisted = res.ok && out?.persisted === true;
+
+    /**
+     * GAINEDGE_RON_OPPORTUNITY_CONTEXT_RUNTIME_V1 — strictly downstream, strictly optional.
+     *
+     * Runs ONLY after the frozen orchestration decision has actually been persisted for
+     * this exact anchor, reuses that decision's own anchor/trace identity, and can never
+     * alter the decision, the evidence or the scheduler's own outcome. A failure here is
+     * reported and otherwise ignored: opportunity context is a review record, never a
+     * precondition of the RON runtime.
+     */
+    let opportunity: Record<string, unknown> | null = null;
+    if (orchestrationPersisted) {
+      try {
+        const oppRes = await fetch(`${supabaseUrl}/functions/v1/ron-opportunity-context`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({
+            instrument: RUNTIME_INSTRUMENT,
+            timeframe: RUNTIME_TIMEFRAME,
+            evaluation_anchor: gate.anchor,
+            persist: true,
+          }),
+        });
+        const oppOut = await oppRes.json().catch(() => ({}));
+        opportunity = {
+          http_status: oppRes.status,
+          persisted: oppOut?.persisted === true,
+          lifecycle: oppOut?.lifecycle ?? null,
+          direction_context: oppOut?.direction_context ?? null,
+          material_change_type: oppOut?.material_change_type ?? null,
+          data_state: oppOut?.data_state ?? null,
+          reason: oppRes.ok ? null : (oppOut?.reason ?? "opportunity_context_failed"),
+        };
+      } catch (oppErr) {
+        opportunity = {
+          http_status: null, persisted: false, lifecycle: null, direction_context: null,
+          material_change_type: null, data_state: null,
+          reason: `opportunity_context_unreachable:${String((oppErr as Error)?.message ?? oppErr)}`,
+        };
+      }
+    }
+
+
 
     return json({
       scheduled: true,
@@ -124,6 +168,8 @@ Deno.serve(async (req) => {
       orchestration_run_version: ORCHESTRATION_RUN_VERSION,
       orchestration_http_status: res.status,
       persisted: out?.persisted === true,
+      opportunity_context: opportunity,
+
       decision_id: out?.decision?.decision_id ?? null,
       decision_hash: out?.decision?.decision_hash ?? null,
       state: out?.decision?.state ?? null,

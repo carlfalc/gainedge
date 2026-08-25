@@ -1639,6 +1639,105 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_opportunity_context: {
+        Row: {
+          analytical_bar_open: string
+          context_admissibility: Json
+          created_at: string
+          cross_asset_context_state: string
+          data_blocked: boolean
+          data_state: string
+          decision_id: string | null
+          direction_authority: string
+          direction_context: string
+          evaluation_anchor: string
+          execution_allowed: boolean
+          execution_path: string
+          ha_states: Json
+          id: string
+          instrument: string
+          lifecycle: string
+          limitations: Json
+          macro_context_state: string
+          material_change_type: string
+          observations: Json
+          pattern_context_state: string
+          reason_tokens: Json
+          run_id: string
+          runtime_version: number
+          setup_family: string
+          spec_hash: string
+          spec_id: string
+          spec_version: number
+          timeframe: string
+          trace_id: string
+        }
+        Insert: {
+          analytical_bar_open: string
+          context_admissibility?: Json
+          created_at?: string
+          cross_asset_context_state: string
+          data_blocked?: boolean
+          data_state: string
+          decision_id?: string | null
+          direction_authority: string
+          direction_context: string
+          evaluation_anchor: string
+          execution_allowed?: boolean
+          execution_path?: string
+          ha_states?: Json
+          id?: string
+          instrument: string
+          lifecycle: string
+          limitations?: Json
+          macro_context_state: string
+          material_change_type: string
+          observations?: Json
+          pattern_context_state: string
+          reason_tokens?: Json
+          run_id: string
+          runtime_version: number
+          setup_family: string
+          spec_hash: string
+          spec_id: string
+          spec_version: number
+          timeframe: string
+          trace_id: string
+        }
+        Update: {
+          analytical_bar_open?: string
+          context_admissibility?: Json
+          created_at?: string
+          cross_asset_context_state?: string
+          data_blocked?: boolean
+          data_state?: string
+          decision_id?: string | null
+          direction_authority?: string
+          direction_context?: string
+          evaluation_anchor?: string
+          execution_allowed?: boolean
+          execution_path?: string
+          ha_states?: Json
+          id?: string
+          instrument?: string
+          lifecycle?: string
+          limitations?: Json
+          macro_context_state?: string
+          material_change_type?: string
+          observations?: Json
+          pattern_context_state?: string
+          reason_tokens?: Json
+          run_id?: string
+          runtime_version?: number
+          setup_family?: string
+          spec_hash?: string
+          spec_id?: string
+          spec_version?: number
+          timeframe?: string
+          trace_id?: string
+        }
+        Relationships: []
+      }
       ron_orchestrator_decisions: {
         Row: {
           as_of: string

@@ -14,7 +14,9 @@ import {
 import { ronDecisionRecordHref } from "@/lib/ron-decision-explorer";
 import { askRonContextHref } from "@/lib/ask-ron-context";
 import { chartsHref, formatLocalDateTime } from "@/lib/signals-presentation";
+import RonOpportunityContextPanel from "@/components/signals/RonOpportunityContextPanel";
 import type { RonOpportunity } from "@/services/signals-data";
+
 
 const TONE_COLOR: Record<string, string> = {
   blocked: C.red, caution: C.amber, supported: C.jade, neutral: C.sec,
@@ -81,7 +83,9 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
             ? item.error
             : "Nothing is inferred in the absence of a record. A card will appear here as soon as an evaluation has been stored for this pair."}
         </p>
+        {item.context && <RonOpportunityContextPanel record={item.context} />}
         <LinkRow symbol={pair.symbol} timeframe={pair.timeframe} />
+
       </section>
     );
   }
@@ -163,7 +167,10 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
         {view.evidence_count} specialist evidence records stored · open the decision record for full evidence.
       </p>
 
+      {item.context && <RonOpportunityContextPanel record={item.context} />}
+
       <LinkRow symbol={pair.symbol} timeframe={pair.timeframe} />
+
     </section>
   );
 }
