@@ -201,8 +201,15 @@ export function isArtifactClockAgent(agent_id: RonAgentId): boolean {
   return ARTIFACT_CLOCK_AGENTS.includes(agent_id);
 }
 
+/**
+ * Finite, JSON-safe, deterministic exemption sentinel (10 years in minutes). A non-finite
+ * value could not be canonically hashed or persisted, so the exemption is expressed as an
+ * explicit, replayable budget no genuine artifact age can exceed.
+ */
+export const ARTIFACT_CLOCK_TTL_SENTINEL_MINUTES = 5_256_000;
+
 export function evidenceTtlMinutesV2(agent_id: RonAgentId, timeframe: string): number {
-  if (isArtifactClockAgent(agent_id)) return Number.POSITIVE_INFINITY;
+  if (isArtifactClockAgent(agent_id)) return ARTIFACT_CLOCK_TTL_SENTINEL_MINUTES;
   return evidenceTtlMinutes(agent_id, timeframe);
 }
 
