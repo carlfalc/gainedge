@@ -99,6 +99,19 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
       + ` ':(exclude)supabase/functions/_shared/ron-patterns-expansion-v1.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-features.ts'`
       // GAINEDGE_SIGNALS_V1 — the working plan document is a non-runtime artifact.
+      // GAINEDGE_RON_ALWAYS_ON_RUNTIME_RECOVERY_V1: forward-only artifact-clock TTL repair.
+      + ` ':(exclude)supabase/functions/_shared/ron-agent-contracts.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-orchestrator.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-risk-spec.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-risk-spec-v4.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-orchestration-run-v9.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-opportunity-risk/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
+      + ` ':(exclude)src/test/ron-always-on-runtime-recovery-v1.test.ts'`
+      + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
+      + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
       + ` ':(exclude).lovable/plan.md'`,
       { encoding: "utf8" },
     );
