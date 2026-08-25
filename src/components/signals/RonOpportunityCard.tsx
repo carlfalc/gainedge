@@ -14,7 +14,12 @@ import {
 import { ronDecisionRecordHref } from "@/lib/ron-decision-explorer";
 import { askRonContextHref } from "@/lib/ask-ron-context";
 import { chartsHref, formatLocalDateTime } from "@/lib/signals-presentation";
+import {
+  OPPORTUNITY_SOURCE_LINE, isActiveOpportunityLifecycle, opportunityTone,
+  presentDirection, presentLifecycle,
+} from "@/lib/ron-opportunity-context-presentation";
 import RonOpportunityContextPanel from "@/components/signals/RonOpportunityContextPanel";
+
 import type { RonOpportunity } from "@/services/signals-data";
 
 
