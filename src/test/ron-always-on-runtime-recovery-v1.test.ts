@@ -99,8 +99,8 @@ describe("Orchestration Run V9 — forward only", () => {
     expect(ORCHESTRATION_RUN_SPEC_V9.execution_allowed).toBe(false);
     expect(ORCHESTRATION_RUN_SPEC_V9.execution_path).toBe("signal_only");
     expect(ORCHESTRATION_RUN_SPEC_V9.numeric_probability).toBeNull();
-    for (const b of ["metaapi", "place_order", "createOrder", "broker"]) {
-      expect(v9Src.toLowerCase().includes(b)).toBe(b === "broker");
+    for (const b of ["metaapi", "place_order", "createorder", "broker", "order("]) {
+      expect(v9Src.toLowerCase().includes(b)).toBe(false);
     }
   });
 });
