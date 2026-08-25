@@ -115,8 +115,8 @@ describe("scheduler endpoint safety", () => {
     expect(indexSrc).toContain("unauthorized: internal service-role endpoint");
   });
 
-  it("pins the frozen seven-agent orchestration run version", () => {
-    expect(indexSrc).toContain("const ORCHESTRATION_RUN_VERSION = 8");
+  it("pins the current seven-agent orchestration run version", () => {
+    expect(indexSrc).toContain("const ORCHESTRATION_RUN_VERSION = 9");
     expect(indexSrc).toContain("ron-orchestrate-run");
   });
 
