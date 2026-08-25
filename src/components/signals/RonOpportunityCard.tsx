@@ -63,7 +63,76 @@ function LinkRow({ symbol, timeframe }: { symbol: string; timeframe: string }) {
 export default function RonOpportunityCard({ item, now }: { item: RonOpportunity; now?: Date }) {
   const { pair, view } = item;
 
+  // GAINEDGE_RON_SIGNALS_CONTEXT_PRIMARY_V1 — when a stored contextual opportunity
+  // record exists and its stored lifecycle is active, THAT record is the headline.
+  // The orchestrator decision stays available strictly as secondary audit context.
+  if (item.context && isActiveOpportunityLifecycle(item.context.lifecycle)) {
+    const ctx = item.context;
+    const lifecycle = presentLifecycle(ctx.lifecycle);
+    const direction = presentDirection(ctx.direction_context);
+    const ctxTone = TONE_COLOR[opportunityTone(ctx.lifecycle, ctx.data_state)] ?? C.sec;
+    return (
+      <section
+        className="rounded-xl p-4"
+        style={{ background: C.card, border: `1px solid ${C.border}` }}
+        data-testid={`ron-opportunity-${pair.symbol}-${pair.timeframe}`}
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span className="text-sm font-semibold" style={{ color: C.text }}>
+            {ctx.instrument} · {ctx.timeframe}
+          </span>
+          <span
+            className="rounded-md px-2 py-0.5 text-xs"
+            style={{ background: `${ctxTone}1A`, color: ctxTone }}
+            data-testid="ron-opportunity-lifecycle"
+          >
+            {lifecycle.label}
+          </span>
+          <span
+            className="rounded-md px-2 py-0.5 text-xs"
+            style={{ background: `${C.muted}22`, color: C.sec }}
+            data-testid="ron-opportunity-direction"
+          >
+            {direction.label}
+          </span>
+          <span className="text-[11px] uppercase tracking-widest" style={{ color: C.muted }}>
+            {OPPORTUNITY_SOURCE_LINE}
+          </span>
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]" style={{ color: C.sec }}>
+          <span data-testid="ron-opportunity-context-asof">
+            Evaluated as of {formatLocalDateTime(ctx.evaluation_anchor)} · {formatAge(ctx.evaluation_anchor, now)}
+          </span>
+          <span>{PROBABILITY_LINE}</span>
+          <span>{EXECUTION_LINE}</span>
+        </div>
+
+        <RonOpportunityContextPanel record={ctx} />
+
+        {ctx.limitations && ctx.limitations.length > 0 && (
+          <ul className="mt-2 space-y-1" data-testid="ron-opportunity-limitations">
+            {ctx.limitations.filter((s) => s?.trim()).slice(0, 4).map((s) => (
+              <li key={s} className="break-words text-[11px] leading-relaxed" style={{ color: C.muted }}>— {s}</li>
+            ))}
+          </ul>
+        )}
+
+        {view && (
+          <p className="mt-3 text-[11px]" style={{ color: C.muted }} data-testid="ron-opportunity-audit-note">
+            Audit detail only — the separate readiness/calibration record for this pair is
+            “{presentState(view.decision.state).label}”, evaluated {formatLocalDateTime(view.decision.as_of)}.
+            It is not the opportunity state shown above.
+          </p>
+        )}
+
+        <LinkRow symbol={pair.symbol} timeframe={pair.timeframe} />
+      </section>
+    );
+  }
+
   if (!view) {
+
     return (
       <section
         className="rounded-xl p-4"
