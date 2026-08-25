@@ -1,113 +1,140 @@
-# GAINEDGE_SIGNALS_V1_AUDIT — read-only findings + proposed V1 scope
+# GAINEDGE_MULTI_ASSET_AND_CHART_PERSISTENCE_AUDIT_V1
 
-No code was edited, committed or deployed. Database access was read-only counts.
+Read-only audit. No code was changed, nothing deployed.
 
-## 1. What was inspected
+## Files / services inspected
 
-Page / route
-- `src/App.tsx` — route `/dashboard/signals` → `SignalsPage`
-- `src/pages/dashboard/SignalsPage.tsx` (127 lines, entire page)
-- `src/lib/dashboard-nav.ts` — nav entry `nav.signals`
+Backend runtime
+- `supabase/functions/ingest-candles/index.ts` (DEFAULT_TARGETS, BROKER_SYMBOL alias map)
+- `supabase/functions/metaapi-candles/index.ts`, `metaapi-backfill`, `ron-recover-15m`, `ron-recover-candles`
+- `supabase/functions/ron-snapshot/index.ts`, `_shared/ron-features.ts`, `_shared/ron-window.ts`, `_shared/ron-quality-contract.ts`
+- `supabase/functions/_shared/ron-data-quality.ts`, `_shared/ron-sessions.ts`, `_shared/ron-venue-calendar.ts`
+- All seven specialists: `ron-agent-session-structure`, `ron-agent-pattern-context`, `ron-agent-calibration-validation`, `ron-agent-cross-asset-correlation`, `ron-agent-macro-news-geopolitics`, `ron-agent-opportunity-risk`, `ron-agent-falconer-signal-source` and their `_shared` specs (session v1/v2/v3, pattern v1/v2/v3, cross-asset v1/v2/v3, macro spec + temporal v2, calibration validation + diagnostic v2, opportunity-risk v1–v4, falconer signal source, HA pattern context v1)
+- `_shared/ron-orchestration-run-v9.ts`, `ron-orchestrate-run`
+- `_shared/ron-opportunity-context-spec-v1.ts`, `_shared/ron-opportunity-context-runtime-v1.ts`, `ron-opportunity-context`
+- `supabase/functions/ron-schedule-orchestration/index.ts` + `anchor-gate.ts`
 
-Directly supporting frontend data paths
-- `src/integrations/supabase/client.ts` (direct table read + realtime)
-- `src/lib/mock-data.ts` (`C` palette only)
-- `src/lib/falconer-signal-state.ts` (truthful Falconer state derivation — **not used by Signals**, only by `InstrumentCard`)
-- `src/lib/expiry.ts`, `src/lib/signal-time.ts` (freshness/age/market-closed helpers — **not used by Signals**)
-- `src/services/ron-decisions.ts` + `src/pages/dashboard/RonDecisionPage.tsx`, `src/components/ron/*` (adjacent, unlinked)
-- `src/services/ron-snapshots.ts` (v7 pin, `ronStateFrom`) — **not used by Signals**
-- `src/lib/ask-ron-context.ts`, `src/lib/charts-context.ts`, `src/lib/pattern-preview.ts` (deep-link surfaces that exist and are unused here)
+Frontend
+- `src/pages/dashboard/TradingViewChartPage.tsx`, `src/components/dashboard/ChartTabPane.tsx`, `TradingViewWidget.tsx`, `AddChartTabModal.tsx`, `src/pages/ChartPopout.tsx`
+- `src/services/signals-data.ts`, `ron-opportunity-context.ts`, `ron-decisions.ts`, `ron-snapshots.ts`
+- `src/lib/signal-notifications.ts`, `src/components/dashboard/GlobalSignalNotifications.tsx`
 
-Data reality checked (read-only)
-- `falconer_trades`: 666 rows total, **1 with `mode='live'`** (status `be_active`, opened 2026-08-10), 665 `backtest`; 0 rows `status='open'`
-- `ron_orchestrator_decisions`: 5 rows, latest `as_of` 2026-08-21 11:45Z
-- `ron_market_snapshots`: feature_version 7 → **1 row**; version 6 → 12,243 rows
+Production data (read-only queries)
+- `candle_history` per symbol/timeframe currency
+- `ron_market_snapshots` per symbol/feature_version
 
-## 2. Current page anatomy
+## Verified production state
 
-One flat page, no components:
-1. H1 "Falconer Signal Records" + a governance qualifier paragraph.
-2. Optional error banner.
-3. Loading text / empty state with a single "Open Strategy settings" button.
-4. A single monospace table: Opened · Symbol · Trigger · Status · Entry · SL · TP1/2/3 · P&L.
+`candle_history` 15m latest bar (as of audit):
+- XAUUSD 09:45Z today, NAS100 09:45Z today (both live)
+- HK50, NZDUSD, USDCAD, USOUSD, UKOUSD, US30, SPX500, EURUSD, GBPUSD, USDJPY, XAGUSD, GER40, UK100, JPN225 — all frozen at 2026-05-28 11:15Z
+- Correction to a pre-audit assumption: oil **does** exist as `USOUSD` (WTI, 3970 bars) and `UKOUSD` (Brent, 3978 bars), both stale. Provider aliases already exist in `metaapi-candles`: `USOUSD -> XTIUSD/USOUSD/XTIUSD.i/WTI`, `UKOUSD -> XBRUSD/UKOUSD/XBRUSD.i/BRENT`, `HK50 -> HK50/HK50.i`, `USDCAD -> USDCAD.i/USDCAD`.
 
-Data path: one query — `falconer_trades` filtered `user_id = session.user.id` and `mode='live'`, ordered `opened_at desc`, limit 100 — plus a realtime subscription on the whole `falconer_trades` table that re-runs the query on any change.
+`ron_market_snapshots`: feature_version 7 exists only for XAUUSD 15m (139 rows, latest 09:45Z). Versions 1–6 also XAUUSD only.
 
-## 3. Truth / data issues
+Root cause of staleness: `ingest-candles` `DEFAULT_TARGETS` is only `XAUUSD 15m`, `NAS100 15m`, `XAUUSD 1m`. Everything else was backfilled once in May and never re-ingested. Its `BROKER_SYMBOL` map contains one entry (`NAS100 -> NDX100`) and does not carry the richer alias table that `metaapi-candles` already has.
 
-Critical
-- **The page is effectively always empty.** Only one `mode='live'` row exists across the whole table, from 2026-08-10. Everything the engine has produced is `mode='backtest'` and silently excluded, so a user sees "No Falconer signal records yet" while 665 records exist.
-- **No timeframe anywhere.** Rows carry `timeframe` in the table but the query does not select it and the UI never shows it. Instrument identity is a bare `symbol` string with no broker/feed identity and no canonical-symbol resolution.
-- **Zero freshness truth.** No generated/evaluated age, no completed-candle anchor, no quote age, no session context, no market-closed state. `opened_at` is printed with raw `toLocaleString()` and nothing marks a stale row as stale — despite `expiry.ts` / `signal-time.ts` / `falconer-signal-state.ts` already providing exactly these primitives and being used correctly on the Dashboard.
-- **Raw status tokens leak.** `closed_sl`, `closed_ha_flip`, `be_active` render verbatim; there is no lifecycle vocabulary and no active-vs-historical distinction on the page.
+Scope locks found (every specialist declares `instrument_scope: ["XAUUSD"], timeframe_scope: ["15m"]` and fails closed on anything else):
+- `ron-session-structure-spec.ts:28`, `-v2.ts:41` (v3 inherits v2)
+- `ron-pattern-context-spec.ts:60` (v2/v3 inherit)
+- `ron-cross-asset-spec.ts:67` plus `counterpart_scope` fixed to NAS100 (v2/v3 inherit)
+- `ron-macro-news-geopolitics-spec.ts:112`, `ron-macro-temporal-context-v2.ts:83`
+- `ron-calibration-validation-spec.ts:64` (diagnostic v2 inherits)
+- `ron-opportunity-risk-spec.ts:75` with a hard type-level check at line 272 (`input.instrument as "XAUUSD"`); v2–v4 inherit
+- `ron-falconer-signal-source-spec.ts:129`
+- `ron-ha-pattern-context-spec-v1.ts:53` with enforcement at line 450
+- `ron-opportunity-context-spec-v1.ts:66` with enforcement at line 472, and its runtime re-checks at `ron-opportunity-context-runtime-v1.ts:116`
 
-High
-- **Ambiguous provenance.** The page is Falconer-only, but titled generically enough that users read it as "RON signals". It has no relationship at all to RON V8 stored decisions, HA Pattern Intelligence V1, Opportunity Context V1, Pattern Context, or the 11-pattern snapshot catalogue.
-- **No point-in-time reconstruction.** Rows show current mutable columns only; nothing records what the evidence looked like when the signal was generated, and there is no link to a decision/evidence hash.
-- **Realtime is unscoped** — it listens to every `falconer_trades` change (all users, all modes) and refetches, which is noisy and wasteful.
-- **P&L is presented unqualified** as `$x.xx` with no currency/lot/commission/swap context, even though `commission_usd`, `swap_usd`, `slippage_points`, `actual_entry_price` exist on the row.
+Snapshot writer: `ron-snapshot/index.ts:20` `const SYMBOL = "XAUUSD"`, plus a hardcoded XAUUSD venue schedule (`marketOpen`, Sun 17:00 NY → Fri 17:00 NY with the 17:00 break). `computeRonSnapshot` in `_shared/ron-features.ts` is itself symbol-agnostic — it takes candles. The lock is the worker, not the maths.
 
-Medium
-- **Snapshot lineage risk adjacent to this page.** Live readers are pinned to feature_version 7 but only one v7 row exists (12,243 v6 rows). Signals V1 must not build on snapshot reads until v7 has real coverage. No v4/v6 assumption exists *inside* Signals today (it reads no snapshots at all) — the risk is in what V1 would add.
-- **No deep links.** Nothing navigates to Charts, RON Decision, Ask RON, Pattern Preview, or evidence.
-- **Mobile:** a `minWidth: 860px` table inside a horizontal scroller — usable but a raw data grid, not a workflow surface.
+Session logic: `_shared/ron-sessions.ts` and `ron-venue-calendar.ts` encode the XAUUSD/FX 24×5 venue with Asian/London/NY windows. This is correct for XAUUSD, NZDUSD, USDCAD and acceptable for NAS100 (index CFD tracks the same 24×5 CFD clock). It is **not** correct for HK50, which trades HKEX cash hours with a lunch break and Hong Kong holidays. Nothing in the codebase models exchange-hour instruments.
 
-Low
-- All-inline styles, no shadcn/token usage, no memoised formatting; hardcoded `#E2E8F0` in the `td` style bypasses the palette.
-- Error copy is good; empty state offers only one action.
+Scheduler: `ron-schedule-orchestration/index.ts` queries with `.eq(..., RUNTIME_INSTRUMENT)` at lines 70/73/76/79 and builds a single-instrument trace id at line 112; `anchor-gate.ts` exports `RUNTIME_INSTRUMENT = "XAUUSD"`, `RUNTIME_TIMEFRAME = "15m"` and selects at most one anchor per tick. It is single-instrument by construction but the gate function itself is pure and parameterisable — the constants are the only obstacle, plus the one-anchor-per-tick shape.
 
-## 4. Genuine vs placeholder
+Frontend: `signals-data.ts` already honours the user's tracked instrument list with no caps or fallback pair. `ron-decisions.ts` / `ron-opportunity-context.ts` / `GlobalSignalNotifications.tsx` filter by symbol against tracked instruments and subscribe to table-level realtime, so they generalise to N instruments with no change. Chart mappings: `TradingViewWidget.tsx` `TV_SYMBOL_MAP` has NAS100, NZDUSD, USDCAD — but **no HK50 and no oil**. Fallback for an unknown symbol is `FX:<symbol>`, which would render a broken/incorrect chart for HK50 (correct would be `HSI` / `TVC:HSI` or a broker-prefixed `HK50`) and for oil (`TVC:USOIL`, `TVC:UKOIL`). `AddChartTabModal.tsx` catalogue also lacks HK50/oil.
 
-- **Genuine:** every rendered value comes from a real `falconer_trades` row. Nothing is synthetic, mocked or hardcoded, and there are no invented confidence, probability or win-rate numbers anywhere on the page.
-- **Effectively placeholder:** the page itself — the `mode='live'` filter makes it a permanently empty shell in practice.
-- **UI invention risk (not yet present):** there is no persisted `opportunity / watch / forming / confirmed / weakening / invalidated` state anywhere. `ronStateFrom()` derives WAIT/WATCH/SETUP FORMING client-side from snapshot features; RON's persisted vocabulary is decision `state` + evidence `status`/`recommendation`. Signals V1 must source lifecycle from persisted evidence, never invent it.
+## Five-instrument readiness matrix
 
-## 5. Recommended Signals V1 information architecture
+| Stage | XAUUSD | NAS100 | HK50 | NZDUSD | USDCAD |
+|---|---|---|---|---|---|
+| Live 15m ingestion | READY | READY | NEEDS WORK — not in `DEFAULT_TARGETS`, stale since 2026-05-28; alias `HK50.i` exists in metaapi-candles only | NEEDS WORK — same, alias trivial | NEEDS WORK — same, alias `USDCAD.i` exists |
+| v7 snapshots | READY | NEEDS WORK — writer hardcodes `SYMBOL="XAUUSD"` | NEEDS WORK — writer lock **plus** wrong venue calendar (HKEX hours/lunch/holidays unmodelled) | NEEDS WORK — writer lock only | NEEDS WORK — writer lock only |
+| 7-agent orchestration | READY | BLOCKED — all 7 frozen specs scope-locked to XAUUSD; cross-asset additionally pins NAS100 as the counterpart, so NAS100-as-primary needs a new counterpart definition | BLOCKED — same, plus session-structure semantics assume a continuous venue | BLOCKED — spec scope only | BLOCKED — spec scope only |
+| Opportunity Context | READY | BLOCKED — spec V1 scope-locked and self-declares that widening requires a new spec version | BLOCKED | BLOCKED | BLOCKED |
+| Signals read surface | READY | READY | READY | READY | READY |
+| Realtime popups | READY | READY | READY | READY | READY |
+| Chart mapping | READY | READY | NEEDS WORK — absent from `TV_SYMBOL_MAP`; `FX:HK50` fallback is wrong | READY | READY |
 
-Two clearly labelled, separately sourced sections — never blended:
+Oil (`USOUSD`/`UKOUSD`): ingestion is straightforward (rows + aliases already exist), chart mapping needs two `TV_SYMBOL_MAP` entries; RON stages carry the same spec-scope block as the others. It is a cheap add once the generic path exists — no reason to hold it back beyond sequencing.
 
-```text
-Signals
-├── Header: scope + governance line + feed/market-status strip
-│     "records only — no orders placed"; market open/closed; last evaluation age
-├── A. Live opportunity lane  (source: RON stored decisions, per tracked pair)
-│     one card per tracked instrument+timeframe
-│     · instrument · timeframe · state (stored token, plain-English) 
-│     · evaluated at + age + completed-candle anchor + session
-│     · what supports / what weakens (from stored explanation)
-│     · "not calibrated" probability posture, verbatim from the read contract
-│     · links: Charts · RON Decision · Ask RON · Pattern Preview
-└── B. Falconer signal history  (source: falconer_trades, mode shown explicitly)
-      mode filter (live / backtest) with counts, timeframe column,
-      plain-English lifecycle badge via deriveFalconerSignalState(),
-      opened + closed times with age, levels, qualified P&L
-```
+## Recommended rollout order
 
-Principles: lifecycle over confidence; every row states instrument, timeframe, time, age and source; no BUY/SELL styling; expired/closed rows dim rather than disappear.
+1. **Ingestion first, RON untouched.** Bring HK50 / NZDUSD / USDCAD (and optionally USOUSD/UKOUSD) 15m candles current and keep them current. This is low risk, changes no frozen artifact, and gives the data foundation everything else needs.
+2. **Chart mappings + instrument catalogue.** HK50 and oil TradingView symbols. Pure frontend.
+3. **Instrument-aware venue calendar.** Introduce an explicit venue registry (`fx_24x5` vs `exchange_hours`) covering HKEX; this is the prerequisite that makes HK50 honest rather than silently mis-sessioned. Until it exists, HK50 should stay ingestion+charts only.
+4. **Snapshot writer generalisation** to a symbol/timeframe parameter, writing feature_version 7 rows for the additional instruments. Existing XAUUSD rows are untouched; the version does not need to bump because the feature semantics are unchanged — only the subject widens.
+5. **Forward-only specialist V-next** for the four FX/index instruments (see below), proven first on NZDUSD + USDCAD (continuous venue, simplest), then NAS100, then HK50.
+6. **Oil** as phase two, riding the now-generic path.
+7. Broader indices/FX only after the pilot demonstrates the architecture is genuinely subject-generic.
 
-## 6. Recommended RON interactions / deep links
+## Exact forward-versioning required
 
-- Per opportunity card and per history row: **Charts** (`/dashboard/charts?symbol=&timeframe=`), **RON Decision** (`/dashboard/ron-decision?instrument=&timeframe=`), **Ask RON** (`askRonContextHref`), **Pattern Preview** (existing modal, reusing `pattern-preview.ts`).
-- Evidence disclosure reuses `RonEvidenceList` / `RonExplanationPanels` rather than a second presentation layer.
+Nothing below widens a frozen spec in place. Each is a new file/version whose only semantic delta is the subject set.
 
-## 7. Proposed contained scope for Signals V1
+- Session Structure **V4** — `instrument_scope: [XAUUSD, NAS100, NZDUSD, USDCAD]` (+ HK50 only once venue-awareness lands), venue class as an explicit spec input rather than an implicit XAUUSD assumption.
+- Pattern Context **V4** — inherits Session V4 provenance binding.
+- HA Pattern Context **V2** — widened scope; pattern maths already symbol-agnostic.
+- Cross-Asset **V4** — replaces the fixed XAUUSD→NAS100 pair with a declared `pair_registry` (e.g. NAS100→XAUUSD, NZDUSD→AUDUSD, USDCAD→USOUSD). Every pair must be explicitly registered; no inferred counterparts.
+- Macro / News / Geopolitics **V3** (and temporal context V3) — per-instrument keyword taxonomy; `fetch-news` already has HK50 and USDCAD keyword sets to reuse.
+- Calibration Validation **V3** — per-instrument calibration artifacts. Note: no calibration artifact exists for any non-XAUUSD instrument, so these instruments will legitimately report unavailable calibration until artifacts are built.
+- Opportunity/Risk **V5** — widened scope and removal of the `as "XAUUSD"` type-level narrowing; keeps the fail-closed readiness gate.
+- Falconer Signal Source **V2** — widened subject binding, user-scope contract unchanged.
+- Orchestration Run **V10** — pins the above V-next specs; V1–V9 remain reachable and unmodified.
+- Opportunity Context **V2** — widened `instrument_scope`, consuming Session V4 / Pattern V4 / Cross-Asset V4 / Macro V3 envelopes, per its own clause that widening scope requires a new spec version.
 
-Frontend/presentation only:
-- Rewrite `src/pages/dashboard/SignalsPage.tsx` as a thin composition.
-- New `src/components/signals/*`: `SignalsHeader`, `OpportunityLane`, `OpportunityCard`, `FalconerHistoryTable`, `SignalsEmptyState`.
-- New pure `src/lib/signals-presentation.ts`: mode/status vocabulary, age + anchor lines, deep-link builders — fully unit-tested.
-- Reuse (do not fork): `falconer-signal-state.ts`, `expiry.ts`, `signal-time.ts`, `ron-decisions.ts`, `ron-decision-explorer.ts`, `ask-ron-context.ts`, existing `components/ron/*`.
-- Scope the realtime channel to the signed-in user.
-- New test file `src/test/gainedge-signals-v1.test.tsx`.
+Expected outcome for new instruments in early runs: `OPPORTUNITY_INCOMPLETE` / `lifecycle: none` until calibration and history mature. That is correct fail-closed behaviour, and the Signals lane already suppresses `none`.
 
-Explicitly out of scope: any backend/edge/migration change, RON V8 / HA V1 / Opportunity Context V1 / Falconer / MetaAPI / schedulers / ingestion / research / global nav, and any trade execution.
+## Ingestion / snapshot / scheduler changes required
 
-## 8. Must be resolved before UI work starts
+- `ingest-candles`: extend `DEFAULT_TARGETS` to the pilot set; import the fuller alias table (`HK50.i`, `USDCAD.i`, `XTIUSD`, `XBRUSD`) rather than the one-entry `BROKER_SYMBOL` map; keep per-target failure isolation so one bad symbol never blocks the rest. Backfill the 2026-05-28 → now gap with the existing bounded `metaapi-backfill` / `ron-recover-15m` paths.
+- `ron-snapshot`: accept `{ symbol, timeframe }`, default XAUUSD for backward compatibility, and take the venue schedule from the venue registry instead of the inline XAUUSD `marketOpen`.
+- Data quality: `ron-quality` and the flags table are already keyed by symbol; only the invocation list widens.
+- Scheduler: keep one pure `selectAnchor` per instrument, loop over a declared instrument list, and preserve idempotency through the existing `(instrument, timeframe, as_of)` decision check. Decisions are global, not per-user, so no duplication risk. Guard against a slow tick by bounding to one anchor per instrument per tick and invoking `ron-orchestrate-run` sequentially or with small concurrency; 5 instruments × 15m is well within budget.
 
-1. **Mode policy decision.** Keep `mode='live'` only (page stays empty), or surface backtest records behind an explicit, labelled filter. This determines whether Signals V1 has any content at all.
-2. **Opportunity-lane source.** Confirm the lane reads RON stored decisions via `ron-decision-read` per tracked pair (5 decisions exist today, XAUUSD-centric) — and accept that pairs with no stored record show an honest "no record yet" tile.
-3. **Lifecycle vocabulary sign-off.** Agree the exact plain-English mapping for stored tokens (`open`, `be_active`, `closed_sl`, `closed_tp3`, `closed_ha_flip`, and RON decision states) so nothing is invented.
-4. **Point-in-time expectation.** Confirm V1 only claims "current stored row + linked decision record", since `falconer_trades` has no per-row evidence snapshot.
-5. **Snapshot v7 coverage.** Do not base any Signals surface on `ron_market_snapshots` until v7 has meaningful coverage (currently 1 row).
+## Part B — chart persistence
 
-GAINEDGE_SIGNALS_V1_AUDIT_READY
+**Root cause.** Two independent causes, both real:
+1. `TradingViewChartPage` is a route component. Navigating to any other dashboard route unmounts it, which unmounts every `ChartTabPane` and destroys the `tv.js` widget iframe. On return, `TradingViewWidget`'s effect clears `containerRef.innerHTML` and constructs a brand-new widget with `studies: []`. Nothing about the previous native state is read back.
+2. Even if the component stayed mounted, the **public** `tv.js` widget is a cross-origin iframe with no save/load surface. There is no `save()`/`load()`, no `charts_storage_url`, no `auto_save_delay`, no `widget.subscribe('onAutoSaveNeeded')` — those belong to the licensed Advanced Charts / Trading Platform library. So today there is no way to serialise indicators or drawings out of it. The `chart_drawings` and `user_indicator_preferences` tables exist in the database but are referenced by **no** frontend code (legacy from the removed lightweight-charts page).
+
+**What can and cannot be persisted from the public widget**
+- Can: symbol, interval, theme, style, and a *preset* `studies` array supplied at construction (default indicator set, not user edits).
+- Cannot: user-added indicators and their settings, drawings/markups, templates, pane layout, or any per-user chart state. All of it lives inside TradingView's origin and is unreadable.
+
+**Tier A — immediate V1 workaround (viable, contained).** Keep the Charts route mounted across dashboard navigation by hoisting it into the shared dashboard shell and hiding it with CSS when another route is active (the same `display:none` technique `ChartTabPane` already uses for inactive tabs). This preserves indicators and drawings for the whole session while the user moves between dashboard pages. It does **not** survive a page reload, a new tab, or another device, and the UI must say so plainly rather than implying durable persistence.
+
+Safety assessment of keeping it mounted:
+- Memory: each TradingView widget is a full iframe, roughly 40–80 MB resident. Three or four tabs is acceptable on desktop; beyond that it degrades, so cap concurrent live tabs (e.g. 4) and lazily destroy the least-recently-used beyond that.
+- Network/CPU: TradingView's own datafeed keeps streaming in a hidden iframe. That is TradingView's socket, not ours, but it is real background traffic.
+- **Hidden MetaAPI activity is a genuine risk and must be handled.** `ChartTabPane` runs a 2-second `fetchCurrentPrice` poll (lines 72–87) and `TradeExecutionPanel` polls positions. Left mounted, those keep hitting MetaAPI from non-chart routes. Any Tier A implementation must gate the polling effect on a "charts route is visible" flag so polling pauses when the user is elsewhere. Without that gate, Tier A is not safe.
+- Mobile: iframes should be torn down entirely on small viewports.
+
+**Tier B — durable per-user persistence.** Requires the licensed TradingView Advanced Charts / Trading Platform library, self-hosted, with `save_load_adapter` (or `charts_storage_url`) wired to a per-user backend table plus a datafeed implementation. That is a licensing decision and a substantial build (custom datafeed against our candle store, layout/drawing storage schema, migration). The alternative without a licence is returning to a self-rendered chart (lightweight-charts) where we own and can persist every indicator and drawing — the `chart_drawings` / `user_indicator_preferences` tables were built for exactly that — at the cost of losing TradingView's toolset.
+
+**Recommendation.** Do Tier A now, correctly gated, and label it as session-scoped. Treat Tier B as a separate product decision: licensed Advanced Charts if TradingView's toolset is a requirement, otherwise a self-rendered chart with true persistence.
+
+## Contained implementation sequence (no code written yet)
+
+1. `GAINEDGE_MULTI_ASSET_INGESTION_V1` — widen `ingest-candles` targets + aliases, backfill the gap for HK50/NZDUSD/USDCAD (+ USOUSD/UKOUSD). No RON change.
+2. `GAINEDGE_CHARTS_SYMBOL_COVERAGE_V1` — HK50 and oil entries in `TV_SYMBOL_MAP`, `ChartPopout`, `AddChartTabModal`.
+3. `GAINEDGE_CHARTS_SESSION_PERSISTENCE_V1` — Tier A hoist + visibility-gated polling + LRU tab cap + honest session-scoped labelling.
+4. `GAINEDGE_RON_VENUE_REGISTRY_V1` — explicit instrument→venue-class calendar including HKEX.
+5. `GAINEDGE_RON_SNAPSHOT_MULTI_INSTRUMENT_V1` — parameterised v7 snapshot writer + quality flags for the pilot set.
+6. `GAINEDGE_RON_SPECIALIST_SCOPE_VNEXT_V1` — the forward-only specialist versions above, proven on NZDUSD/USDCAD first.
+7. `GAINEDGE_RON_ORCHESTRATION_V10` + `GAINEDGE_RON_OPPORTUNITY_CONTEXT_V2` — multi-instrument orchestration and context.
+8. `GAINEDGE_RON_MULTI_INSTRUMENT_SCHEDULER_V1` — per-instrument anchor loop with existing idempotency.
+9. `GAINEDGE_RON_OIL_PHASE_2` — oil onto the proven generic path.
+
+Steps 1–3 are independent of all RON freezes and can ship immediately. Steps 4–8 are strictly ordered.
+
+`GAINEDGE_MULTI_ASSET_AND_CHART_PERSISTENCE_AUDIT_V1_READY`
