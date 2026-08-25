@@ -86,6 +86,18 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
       + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
       + ` ':(exclude)supabase/functions/ron-schedule-orchestration'`
       + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
+      // GAINEDGE_RON_OPPORTUNITY_CONTEXT_RUNTIME_V1 — additive server-side runtime binding
+      // for the frozen pure spec plus its read-only UI surface. No frozen artifact is mutated.
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-runtime-v1.ts'`
+      + ` ':(exclude)supabase/functions/ron-opportunity-context/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260825062420_e7f3ebc6-73e3-4798-9c0f-a301a1c7a519.sql'`
+      + ` ':(exclude)src/lib/ron-opportunity-context-presentation.ts'`
+      + ` ':(exclude)src/services/ron-opportunity-context.ts'`
+      + ` ':(exclude)src/components/signals/RonOpportunityContextPanel.tsx'`
+      + ` ':(exclude)src/components/signals/RonOpportunityCard.tsx'`
+      + ` ':(exclude)src/services/signals-data.ts'`
+      + ` ':(exclude)src/integrations/supabase/types.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-opportunity-context-runtime-v1.test.ts'`
       + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-ha-pattern-context-spec-v1.ts'`
       + ` ':(exclude)src/test/ron-ha-pattern-context-v1.test.ts'`
@@ -112,6 +124,18 @@ describe("GAINEDGE_PRODUCT_ASK_RON_GLOBAL_ENTRY_V1", () => {
       + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
       + ` ':(exclude)src/test/gainedge-24x7-candle-ron-runtime-v1.test.ts'`
       + ` ':(exclude)src/test/gainedge-ron-live-anchor-compat-v3.test.ts'`
+      // GAINEDGE_RON_OPPORTUNITY_CONTEXT_RUNTIME_V1 — additive server-side runtime binding
+      // for the frozen pure spec plus its read-only UI surface. No frozen artifact is mutated.
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-runtime-v1.ts'`
+      + ` ':(exclude)supabase/functions/ron-opportunity-context/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260825062420_e7f3ebc6-73e3-4798-9c0f-a301a1c7a519.sql'`
+      + ` ':(exclude)src/lib/ron-opportunity-context-presentation.ts'`
+      + ` ':(exclude)src/services/ron-opportunity-context.ts'`
+      + ` ':(exclude)src/components/signals/RonOpportunityContextPanel.tsx'`
+      + ` ':(exclude)src/components/signals/RonOpportunityCard.tsx'`
+      + ` ':(exclude)src/services/signals-data.ts'`
+      + ` ':(exclude)src/integrations/supabase/types.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-opportunity-context-runtime-v1.test.ts'`
       + ` ':(exclude).lovable/plan.md'`,
       { encoding: "utf8" },
     );

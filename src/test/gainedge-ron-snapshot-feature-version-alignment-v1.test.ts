@@ -172,6 +172,11 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/functions/ron-agent-opportunity-risk/index.ts",
       "supabase/functions/ron-orchestrate-run/index.ts",
       "supabase/functions/ron-schedule-orchestration/index.ts",
+      // GAINEDGE_RON_OPPORTUNITY_CONTEXT_RUNTIME_V1 — additive server-side runtime binding
+      // for the frozen pure spec plus its read-only UI surface. No frozen artifact is mutated.
+      "supabase/functions/_shared/ron-opportunity-context-runtime-v1.ts",
+      "supabase/functions/ron-opportunity-context/index.ts",
+      "supabase/migrations/20260825062420_e7f3ebc6-73e3-4798-9c0f-a301a1c7a519.sql",
     ]);
     expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
   });
@@ -265,6 +270,18 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/functions/ron-agent-opportunity-risk/index.ts",
       "supabase/functions/ron-orchestrate-run/index.ts",
       "supabase/functions/ron-schedule-orchestration/index.ts",
+      // GAINEDGE_RON_OPPORTUNITY_CONTEXT_RUNTIME_V1 — additive server-side runtime binding
+      // for the frozen pure spec plus its read-only UI surface. No frozen artifact is mutated.
+      "supabase/functions/_shared/ron-opportunity-context-runtime-v1.ts",
+      "supabase/functions/ron-opportunity-context/index.ts",
+      "supabase/migrations/20260825062420_e7f3ebc6-73e3-4798-9c0f-a301a1c7a519.sql",
+      "src/lib/ron-opportunity-context-presentation.ts",
+      "src/services/ron-opportunity-context.ts",
+      "src/components/signals/RonOpportunityContextPanel.tsx",
+      "src/components/signals/RonOpportunityCard.tsx",
+      "src/services/signals-data.ts",
+      "src/integrations/supabase/types.ts",
+      "src/test/gainedge-ron-opportunity-context-runtime-v1.test.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

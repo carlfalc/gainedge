@@ -265,6 +265,9 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       "supabase/functions/_shared/ron-opportunity-risk-spec.ts",
       "supabase/functions/_shared/ron-opportunity-risk-spec-v4.ts",
       "supabase/functions/_shared/ron-orchestration-run-v9.ts",
+      // GAINEDGE_RON_OPPORTUNITY_CONTEXT_RUNTIME_V1 — additive server-side runtime binding
+      // for the frozen pure spec plus its read-only UI surface. No frozen artifact is mutated.
+      "supabase/functions/_shared/ron-opportunity-context-runtime-v1.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
