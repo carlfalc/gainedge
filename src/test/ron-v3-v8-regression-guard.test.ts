@@ -198,7 +198,6 @@ const TOUCHED: Touched[] = [
     allowedRemovals: [
       "/** Frozen seven-agent orchestration run version. Pinned; never inferred from a request. */",
       "const ORCHESTRATION_RUN_VERSION = 7;",
-      "const ORCHESTRATION_RUN_VERSION = 8;",
       "trace_id: `ron_sched_v1_${gate.anchor}_${RUNTIME_INSTRUMENT}_${RUNTIME_TIMEFRAME}`,",
     ],
     frozenRegions: [
