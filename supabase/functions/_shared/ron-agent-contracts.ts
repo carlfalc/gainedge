@@ -164,6 +164,57 @@ export function evidenceTtlMinutes(agent_id: RonAgentId, timeframe: string): num
   return base * agentSpec(agent_id)!.ttl_multiplier;
 }
 
+/* ------------------------------------------------------------- TTL policy v2 */
+
+/**
+ * Agents whose evidence `as_of` is an ARTIFACT CLOCK, not a market clock.
+ *
+ * `calibration_model_validation` reports the validity of a SEALED, accepted calibration /
+ * research artifact. Its `as_of` is the artifact's immutable source instant, which by
+ * construction never advances with market time. Measuring it against a market-freshness
+ * budget is a category error: the evidence is not "stale market data", it is a correctly
+ * dated statement about a frozen artifact. Its own `status` / `data_health` remain the
+ * authoritative statement of whether that artifact is still acceptable, and TTL policy v2
+ * changes nothing about those.
+ */
+export const ARTIFACT_CLOCK_AGENTS: readonly RonAgentId[] = [
+  "calibration_model_validation",
+] as const;
+
+/**
+ * Forward-only TTL policy v2. Identical market-freshness budgets to v1; the ONLY delta is
+ * that artifact-clock agents are exempt from the market-clock TTL. Policy v1 is frozen and
+ * remains the default for every run that does not explicitly opt in.
+ */
+export const EVIDENCE_TTL_POLICY_V2 = {
+  policy_version: 2,
+  base_minutes_by_timeframe: EVIDENCE_TTL_POLICY_V1.base_minutes_by_timeframe,
+  fallback_minutes: EVIDENCE_TTL_POLICY_V1.fallback_minutes,
+  supersedes_policy_version: EVIDENCE_TTL_POLICY_V1.policy_version,
+  artifact_clock_agents: ARTIFACT_CLOCK_AGENTS,
+  artifact_clock_exempt_from_market_ttl: true,
+  market_clock_budgets_changed: false,
+  health_or_status_gates_changed: false,
+} as const;
+
+export function isArtifactClockAgent(agent_id: RonAgentId): boolean {
+  return ARTIFACT_CLOCK_AGENTS.includes(agent_id);
+}
+
+export function evidenceTtlMinutesV2(agent_id: RonAgentId, timeframe: string): number {
+  if (isArtifactClockAgent(agent_id)) return Number.POSITIVE_INFINITY;
+  return evidenceTtlMinutes(agent_id, timeframe);
+}
+
+/** Resolve the registered TTL under an explicit policy version. Unknown -> v1. */
+export function resolveEvidenceTtlMinutes(
+  policy_version: number, agent_id: RonAgentId, timeframe: string,
+): number {
+  return policy_version === EVIDENCE_TTL_POLICY_V2.policy_version
+    ? evidenceTtlMinutesV2(agent_id, timeframe)
+    : evidenceTtlMinutes(agent_id, timeframe);
+}
+
 /* ------------------------------------------------------------ evidence types */
 
 export type EvidenceStatus =
