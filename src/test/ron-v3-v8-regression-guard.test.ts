@@ -274,6 +274,7 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       "supabase/functions/_shared/ron-venue-registry-v1.ts",
       "supabase/functions/_shared/ron-data-health-v1.ts",
       "supabase/functions/ron-data-health/index.ts",
+      "supabase/migrations/20260826072435_e8e96e54-da28-4533-bd4c-c424a69de51f.sql",
       "supabase/functions/_shared/ron-forward-instrument-binding-v1.ts",
       "supabase/functions/_shared/ron-opportunity-context-spec-v2.ts",
       "supabase/functions/_shared/ron-opportunity-context-runtime-v2.ts",

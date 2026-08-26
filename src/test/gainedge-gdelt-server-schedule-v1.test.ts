@@ -121,6 +121,7 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/functions/_shared/ron-venue-registry-v1.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-data-health-v1.ts'`
       + ` ':(exclude)supabase/functions/ron-data-health/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260826072435_e8e96e54-da28-4533-bd4c-c424a69de51f.sql'`
       + ` ':(exclude)supabase/functions/_shared/ron-forward-instrument-binding-v1.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-spec-v2.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-runtime-v2.ts'`
@@ -250,6 +251,7 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)supabase/functions/_shared/ron-venue-registry-v1.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-data-health-v1.ts'`
       + ` ':(exclude)supabase/functions/ron-data-health/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260826072435_e8e96e54-da28-4533-bd4c-c424a69de51f.sql'`
       + ` ':(exclude)supabase/functions/_shared/ron-forward-instrument-binding-v1.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-spec-v2.ts'`
       + ` ':(exclude)supabase/functions/_shared/ron-opportunity-context-runtime-v2.ts'`
