@@ -2975,6 +2975,7 @@ export type Database = {
           read_ct: number
         }[]
       }
+      ron_context_scheduler_cron_tick: { Args: never; Returns: undefined }
       ron_data_health_cron_tick: { Args: never; Returns: undefined }
       ron_invoke_worker: {
         Args: { _fn: string; _payload?: Json }
@@ -2982,6 +2983,7 @@ export type Database = {
       }
       ron_multi_snapshot_cron_tick: { Args: never; Returns: undefined }
       ron_orchestration_cron_tick: { Args: never; Returns: undefined }
+      ron_outcome_cron_tick: { Args: never; Returns: undefined }
       ron_rebuild_cron_tick: { Args: never; Returns: undefined }
       ron_rebuild_finish: { Args: never; Returns: boolean }
       ron_snapshot_cron_tick: { Args: never; Returns: undefined }
