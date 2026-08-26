@@ -41,8 +41,12 @@ import {
   hashCanonical, type Observation,
 } from "./ron-agent-contracts.ts";
 import {
+  resolveInstrumentScope, type ForwardScopeBinding,
+} from "./ron-forward-instrument-binding-v1.ts";
+import {
   acceptSessionStructureContextV3, type SessionContextResultV3,
 } from "./ron-pattern-structure-context-v3.ts";
+
 
 /* ------------------------------------------------------------------- spec */
 
@@ -348,6 +352,14 @@ export type HaLifecycle =
 export interface HaPatternContextInputV1 {
   instrument: string;
   timeframe: string;
+  /**
+   * OPTIONAL forward-scope binding supplied by a LATER spec version. Purely additive:
+   * omitted (the frozen default) the producer admits exactly `instrument_scope` above,
+   * and an invalid binding is ignored rather than trusted. The frozen spec object and
+   * its hash are unaffected.
+   */
+  forward_scope?: ForwardScopeBinding | null;
+
   /** COMPLETED bar CLOSE, epoch ms, grid aligned. Analytical bar opens anchor - 15m. */
   evaluation_anchor: number;
   /** Ascending COMPLETED raw bars keyed by bar OPEN. Bars after the analytical bar are rejected. */
@@ -447,10 +459,13 @@ export async function buildHaPatternContextV1(
   if (anchor % BAR_MS !== 0) {
     throw new HaPatternContextAnchorError("evaluation_anchor_not_bar_close_aligned", iso(anchor));
   }
-  if (!(HA_PATTERN_CONTEXT_SPEC_V1.instrument_scope as readonly string[])
-    .includes(input.instrument)) {
+  const haScope = resolveInstrumentScope(
+    HA_PATTERN_CONTEXT_SPEC_V1.spec_id, HA_PATTERN_CONTEXT_SPEC_V1.spec_version,
+    HA_PATTERN_CONTEXT_SPEC_V1.instrument_scope, input.forward_scope);
+  if (!haScope.includes(input.instrument)) {
     throw new HaPatternContextAnchorError("instrument_out_of_scope", input.instrument);
   }
+
   if (!(HA_PATTERN_CONTEXT_SPEC_V1.timeframe_scope as readonly string[])
     .includes(input.timeframe)) {
     throw new HaPatternContextAnchorError("timeframe_out_of_scope", input.timeframe);

@@ -1639,6 +1639,180 @@ export type Database = {
           },
         ]
       }
+      ron_event_lessons: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          evaluation_anchor: string
+          event_id: string
+          future_data_cutoff: string
+          horizons_covered: number[]
+          id: string
+          instrument: string
+          invalidated_at: string | null
+          lesson_version: number
+          lifecycle_path: string[]
+          note: string
+          reason_tags: string[]
+          reviewed_at: string
+          timeframe: string
+          weakened_at: string | null
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          evaluation_anchor: string
+          event_id: string
+          future_data_cutoff: string
+          horizons_covered?: number[]
+          id?: string
+          instrument: string
+          invalidated_at?: string | null
+          lesson_version?: number
+          lifecycle_path?: string[]
+          note: string
+          reason_tags?: string[]
+          reviewed_at?: string
+          timeframe: string
+          weakened_at?: string | null
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          evaluation_anchor?: string
+          event_id?: string
+          future_data_cutoff?: string
+          horizons_covered?: number[]
+          id?: string
+          instrument?: string
+          invalidated_at?: string | null
+          lesson_version?: number
+          lifecycle_path?: string[]
+          note?: string
+          reason_tags?: string[]
+          reviewed_at?: string
+          timeframe?: string
+          weakened_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_event_lessons_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "ron_material_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ron_event_outcomes: {
+        Row: {
+          bars_observed: number
+          created_at: string
+          direction_context: string
+          evaluation_anchor: string
+          event_id: string
+          follow_through: string
+          future_data_cutoff: string
+          horizon_bars: number
+          id: string
+          instrument: string
+          last_price: number
+          mae: number
+          mae_pct: number
+          mfe: number
+          mfe_pct: number
+          outcome_version: number
+          price_change: number
+          price_change_pct: number
+          reference_price: number
+          reviewed_at: string
+          tags: string[]
+          timeframe: string
+        }
+        Insert: {
+          bars_observed: number
+          created_at?: string
+          direction_context: string
+          evaluation_anchor: string
+          event_id: string
+          follow_through: string
+          future_data_cutoff: string
+          horizon_bars: number
+          id?: string
+          instrument: string
+          last_price: number
+          mae: number
+          mae_pct: number
+          mfe: number
+          mfe_pct: number
+          outcome_version?: number
+          price_change: number
+          price_change_pct: number
+          reference_price: number
+          reviewed_at?: string
+          tags?: string[]
+          timeframe: string
+        }
+        Update: {
+          bars_observed?: number
+          created_at?: string
+          direction_context?: string
+          evaluation_anchor?: string
+          event_id?: string
+          follow_through?: string
+          future_data_cutoff?: string
+          horizon_bars?: number
+          id?: string
+          instrument?: string
+          last_price?: number
+          mae?: number
+          mae_pct?: number
+          mfe?: number
+          mfe_pct?: number
+          outcome_version?: number
+          price_change?: number
+          price_change_pct?: number
+          reference_price?: number
+          reviewed_at?: string
+          tags?: string[]
+          timeframe?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_event_outcomes_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "ron_material_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ron_event_reads: {
+        Row: {
+          event_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          event_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_event_reads_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "ron_material_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ron_market_snapshots: {
         Row: {
           bar_time: string
@@ -1699,14 +1873,102 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_material_events: {
+        Row: {
+          analytical_bar_open: string
+          context_id: string | null
+          created_at: string
+          data_blocked: boolean
+          data_state: string
+          decision_id: string | null
+          direction_authority: string
+          direction_context: string
+          evaluation_anchor: string
+          event_key: string
+          id: string
+          instrument: string
+          lifecycle: string
+          material_change_type: string
+          outcome_state: string
+          popup_capable: boolean
+          runtime_version: number
+          setup_family: string
+          source: string
+          spec_version: number
+          timeframe: string
+          trace_id: string | null
+          venue_state: string | null
+        }
+        Insert: {
+          analytical_bar_open: string
+          context_id?: string | null
+          created_at?: string
+          data_blocked?: boolean
+          data_state: string
+          decision_id?: string | null
+          direction_authority: string
+          direction_context: string
+          evaluation_anchor: string
+          event_key: string
+          id?: string
+          instrument: string
+          lifecycle: string
+          material_change_type: string
+          outcome_state?: string
+          popup_capable?: boolean
+          runtime_version: number
+          setup_family: string
+          source?: string
+          spec_version: number
+          timeframe: string
+          trace_id?: string | null
+          venue_state?: string | null
+        }
+        Update: {
+          analytical_bar_open?: string
+          context_id?: string | null
+          created_at?: string
+          data_blocked?: boolean
+          data_state?: string
+          decision_id?: string | null
+          direction_authority?: string
+          direction_context?: string
+          evaluation_anchor?: string
+          event_key?: string
+          id?: string
+          instrument?: string
+          lifecycle?: string
+          material_change_type?: string
+          outcome_state?: string
+          popup_capable?: boolean
+          runtime_version?: number
+          setup_family?: string
+          source?: string
+          spec_version?: number
+          timeframe?: string
+          trace_id?: string | null
+          venue_state?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ron_material_events_context_id_fkey"
+            columns: ["context_id"]
+            isOneToOne: false
+            referencedRelation: "ron_opportunity_context"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ron_opportunity_context: {
         Row: {
           analytical_bar_open: string
+          calibration_artifact_available: boolean | null
           context_admissibility: Json
           created_at: string
           cross_asset_context_state: string
           data_blocked: boolean
           data_state: string
+          decision_bound: boolean | null
           decision_id: string | null
           direction_authority: string
           direction_context: string
@@ -1721,6 +1983,7 @@ export type Database = {
           macro_context_state: string
           material_change_type: string
           observations: Json
+          orchestration_lineage_available: boolean | null
           pattern_context_state: string
           reason_tokens: Json
           run_id: string
@@ -1731,14 +1994,17 @@ export type Database = {
           spec_version: number
           timeframe: string
           trace_id: string
+          venue_state: string | null
         }
         Insert: {
           analytical_bar_open: string
+          calibration_artifact_available?: boolean | null
           context_admissibility?: Json
           created_at?: string
           cross_asset_context_state: string
           data_blocked?: boolean
           data_state: string
+          decision_bound?: boolean | null
           decision_id?: string | null
           direction_authority: string
           direction_context: string
@@ -1753,6 +2019,7 @@ export type Database = {
           macro_context_state: string
           material_change_type: string
           observations?: Json
+          orchestration_lineage_available?: boolean | null
           pattern_context_state: string
           reason_tokens?: Json
           run_id: string
@@ -1763,14 +2030,17 @@ export type Database = {
           spec_version: number
           timeframe: string
           trace_id: string
+          venue_state?: string | null
         }
         Update: {
           analytical_bar_open?: string
+          calibration_artifact_available?: boolean | null
           context_admissibility?: Json
           created_at?: string
           cross_asset_context_state?: string
           data_blocked?: boolean
           data_state?: string
+          decision_bound?: boolean | null
           decision_id?: string | null
           direction_authority?: string
           direction_context?: string
@@ -1785,6 +2055,7 @@ export type Database = {
           macro_context_state?: string
           material_change_type?: string
           observations?: Json
+          orchestration_lineage_available?: boolean | null
           pattern_context_state?: string
           reason_tokens?: Json
           run_id?: string
@@ -1795,6 +2066,7 @@ export type Database = {
           spec_version?: number
           timeframe?: string
           trace_id?: string
+          venue_state?: string | null
         }
         Relationships: []
       }

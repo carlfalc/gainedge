@@ -17,24 +17,29 @@ import SignalsSummary, { buildSummaryMetrics } from "@/components/signals/Signal
 import RonOpportunitiesTab from "@/components/signals/RonOpportunitiesTab";
 import FalconerSignalsTab from "@/components/signals/FalconerSignalsTab";
 import HistoryTab from "@/components/signals/HistoryTab";
+import EventReviewTab from "@/components/signals/EventReviewTab";
 import { PAGE_SUBTITLE, countToday, latestInstant } from "@/lib/signals-presentation";
 import { useFalconerRecords, useRonOpportunities } from "@/services/signals-data";
 
 /** Plain-English governance qualifier — records only, never order placement. */
 export const SIGNAL_RECORDS_QUALIFIER = PAGE_SUBTITLE;
 
-type TabId = "ron" | "falconer" | "history";
+type TabId = "ron" | "falconer" | "history" | "review";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "ron", label: "RON Opportunities" },
   { id: "falconer", label: "Falconer Signals" },
+  { id: "review", label: "24/7 Review" },
   { id: "history", label: "History" },
 ];
 
 /** Safe, minimal query-param reader: `?tab=falconer&symbol=XAUUSD`. */
 function readTabParam(raw: string | null): TabId | null {
-  return raw === "ron" || raw === "falconer" || raw === "history" ? raw : null;
+  return raw === "ron" || raw === "falconer" || raw === "history" || raw === "review"
+    ? raw
+    : null;
 }
+
 
 export default function SignalsPage() {
   const [params] = useSearchParams();
@@ -100,7 +105,9 @@ export default function SignalsPage() {
 
       {tab === "ron" && <RonOpportunitiesTab feed={ron} />}
       {tab === "falconer" && <FalconerSignalsTab feed={live} initialSymbol={initialSymbol} />}
+      {tab === "review" && <EventReviewTab />}
       {tab === "history" && <HistoryTab liveFeed={live} backtestFeed={backtest} />}
+
     </div>
   );
 }
