@@ -155,6 +155,14 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
       // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion targets/aliases,
       // chart symbol coverage and session-scoped Charts hosting. No RON runtime touched.
       + ` ':(exclude)supabase/functions/_shared/broker-symbol-variants.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-venue-registry-v1.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-data-health-v1.ts'`
+      + ` ':(exclude)supabase/functions/ron-data-health/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260826064238_ca543cd1-29d2-4872-81dd-96acfa83d6ca.sql'`
+      + ` ':(exclude)supabase/migrations/20260826064431_3ebf58b0-f9af-4bf0-83f0-937336669d68.sql'`
+      + ` ':(exclude)supabase/migrations/20260826064528_9d6949fd-c285-46b5-8ac3-ccb10c30d725.sql'`
+      + ` ':(exclude)supabase/functions/ron-snapshot/index.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-always-on-agentic-v1.test.ts'`
       + ` ':(exclude)supabase/functions/ingest-candles/index.ts'`
       + ` ':(exclude)src/App.tsx'`
       + ` ':(exclude)src/components/dashboard/DashboardLayout.tsx'`
@@ -209,6 +217,14 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
       // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion targets/aliases,
       // chart symbol coverage and session-scoped Charts hosting. No RON runtime touched.
       + ` ':(exclude)supabase/functions/_shared/broker-symbol-variants.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-venue-registry-v1.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-data-health-v1.ts'`
+      + ` ':(exclude)supabase/functions/ron-data-health/index.ts'`
+      + ` ':(exclude)supabase/migrations/20260826064238_ca543cd1-29d2-4872-81dd-96acfa83d6ca.sql'`
+      + ` ':(exclude)supabase/migrations/20260826064431_3ebf58b0-f9af-4bf0-83f0-937336669d68.sql'`
+      + ` ':(exclude)supabase/migrations/20260826064528_9d6949fd-c285-46b5-8ac3-ccb10c30d725.sql'`
+      + ` ':(exclude)supabase/functions/ron-snapshot/index.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-always-on-agentic-v1.test.ts'`
       + ` ':(exclude)supabase/functions/ingest-candles/index.ts'`
       + ` ':(exclude)src/App.tsx'`
       + ` ':(exclude)src/components/dashboard/DashboardLayout.tsx'`

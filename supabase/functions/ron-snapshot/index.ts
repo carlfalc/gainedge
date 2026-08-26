@@ -1,11 +1,18 @@
 /**
- * RON snapshot worker — Phase 1A (XAUUSD 15m only).
+ * RON snapshot worker.
  *
  * Modes:
  *   { mode: "live" }                                  -> snapshot the latest CLOSED 15m bar (no-op if present)
  *   { mode: "backfill", start, end, limit, force }    -> bounded chronological replay
  *
- * Guarantees: no future bars are used, no LLM calls, no order placement, idempotent upserts.
+ * GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1: the worker now accepts an explicit
+ * { symbol, timeframe } subject drawn from the declared venue registry. XAUUSD/15m
+ * remains the default and its computation, feature version and market-open semantics are
+ * byte-identical to before — widening the SUBJECT does not change the feature semantics,
+ * so no feature-version bump is warranted. Unregistered symbols are refused.
+ *
+ * Guarantees: no future bars are used, no synthetic candles, no LLM calls, no order
+ * placement, idempotent upserts keyed on (symbol, timeframe, bar_time, feature_version).
  */
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
@@ -15,10 +22,13 @@ import {
   buildEligibleSeries, windowAtEligibleIndex,
   RON_CANONICAL_WINDOW, RON_WINDOW_CONTRACT,
 } from "../_shared/ron-window.ts";
+import {
+  RON_DATA_INSTRUMENTS, assessVenue, venueReasoningAllowed,
+} from "../_shared/ron-venue-registry-v1.ts";
 import type { Candle } from "../_shared/falconer-strategy.ts";
 
-const SYMBOL = "XAUUSD";
-const TIMEFRAME = "15m";
+const DEFAULT_SYMBOL = "XAUUSD";
+const DEFAULT_TIMEFRAME = "15m";
 const WARMUP_BARS = 400;      // >= EMA200 + ADX warmup
 /**
  * CANONICAL WINDOW (Phase 1B determinism fix).
@@ -31,6 +41,7 @@ const WARMUP_BARS = 400;      // >= EMA200 + ADX warmup
 const CANONICAL_WINDOW = RON_CANONICAL_WINDOW;
 const BAR_MS = 15 * 60 * 1000;
 const BAR_MINUTES = 15;
+
 
 type SourceCandle = Candle & { created_at?: number | null };
 
@@ -92,6 +103,26 @@ Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body == live tick */ }
   const mode = body.mode === "backfill" ? "backfill" : "live";
+
+  // ── declared subject (GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1) ───────────
+  const SYMBOL = String(body.symbol ?? DEFAULT_SYMBOL).toUpperCase();
+  const TIMEFRAME = String(body.timeframe ?? DEFAULT_TIMEFRAME);
+  if (!(RON_DATA_INSTRUMENTS as readonly string[]).includes(SYMBOL)) {
+    return json({ error: "instrument_not_in_venue_registry", symbol: SYMBOL }, 400);
+  }
+  if (TIMEFRAME !== DEFAULT_TIMEFRAME) {
+    return json({ error: "timeframe_not_supported", timeframe: TIMEFRAME }, 400);
+  }
+  const venue = assessVenue(SYMBOL, Date.now());
+  // XAUUSD keeps its accepted holiday-aware calendar path unchanged. For every other
+  // instrument a non-authoritative calendar must block reasoning rather than guess.
+  if (SYMBOL !== DEFAULT_SYMBOL && !venueReasoningAllowed(venue)) {
+    return json({
+      ok: true, mode, symbol: SYMBOL, skipped: "venue_calendar_unavailable",
+      venue_state: venue.state, venue_reason: venue.reason,
+    });
+  }
+
 
   try {
     /**
@@ -208,7 +239,11 @@ Deno.serve(async (req) => {
       });
       // Freshness: only call the feed stale when the market should actually be open.
       const ageMin = (nowMs - new Date(targetIso).getTime()) / 60000;
-      const isOpen = marketOpen(new Date(nowMs));
+      // XAUUSD: unchanged legacy schedule. Others: instrument-aware venue registry.
+      const isOpen = SYMBOL === DEFAULT_SYMBOL
+        ? marketOpen(new Date(nowMs))
+        : assessVenue(SYMBOL, nowMs).state === "open";
+
       if (ageMin > 45 && isOpen && snap.data_health === "healthy") snap.data_health = "stale";
       await upsert([snap]);
       return json({
