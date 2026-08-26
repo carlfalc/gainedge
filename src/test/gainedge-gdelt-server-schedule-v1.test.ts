@@ -118,6 +118,11 @@ describe("frozen surfaces untouched", () => {
       // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion targets/aliases,
       // chart symbol coverage and session-scoped Charts hosting. No RON runtime touched.
       + ` ':(exclude)supabase/functions/_shared/broker-symbol-variants.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-venue-registry-v1.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-data-health-v1.ts'`
+      + ` ':(exclude)supabase/functions/ron-data-health/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-snapshot/index.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-always-on-agentic-v1.test.ts'`
       + ` ':(exclude)supabase/functions/ingest-candles/index.ts'`
       + ` ':(exclude)src/App.tsx'`
       + ` ':(exclude)src/components/dashboard/DashboardLayout.tsx'`
@@ -229,6 +234,11 @@ describe("frozen surfaces untouched", () => {
       // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion targets/aliases,
       // chart symbol coverage and session-scoped Charts hosting. No RON runtime touched.
       + ` ':(exclude)supabase/functions/_shared/broker-symbol-variants.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-venue-registry-v1.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-data-health-v1.ts'`
+      + ` ':(exclude)supabase/functions/ron-data-health/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-snapshot/index.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-always-on-agentic-v1.test.ts'`
       + ` ':(exclude)supabase/functions/ingest-candles/index.ts'`
       + ` ':(exclude)src/App.tsx'`
       + ` ':(exclude)src/components/dashboard/DashboardLayout.tsx'`

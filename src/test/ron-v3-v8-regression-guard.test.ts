@@ -271,6 +271,11 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — shared broker alias table,
       // additive and unrelated to any RON spec.
       "supabase/functions/_shared/broker-symbol-variants.ts",
+      "supabase/functions/_shared/ron-venue-registry-v1.ts",
+      "supabase/functions/_shared/ron-data-health-v1.ts",
+      "supabase/functions/ron-data-health/index.ts",
+      "supabase/functions/ron-snapshot/index.ts",
+      "src/test/gainedge-ron-always-on-agentic-v1.test.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

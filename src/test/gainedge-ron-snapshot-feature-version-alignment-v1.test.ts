@@ -179,6 +179,11 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/migrations/20260825062420_e7f3ebc6-73e3-4798-9c0f-a301a1c7a519.sql",
       // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion foundation only.
       "supabase/functions/_shared/broker-symbol-variants.ts",
+      "supabase/functions/_shared/ron-venue-registry-v1.ts",
+      "supabase/functions/_shared/ron-data-health-v1.ts",
+      "supabase/functions/ron-data-health/index.ts",
+      "supabase/functions/ron-snapshot/index.ts",
+      "src/test/gainedge-ron-always-on-agentic-v1.test.ts",
       "supabase/functions/ingest-candles/index.ts",
     ]);
     expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
@@ -287,6 +292,11 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-ron-opportunity-context-runtime-v1.test.ts",
       // GAINEDGE_MULTI_ASSET_FOUNDATION_AND_CHART_PERSISTENCE_V1 — ingestion/chart/UI slice only.
       "supabase/functions/_shared/broker-symbol-variants.ts",
+      "supabase/functions/_shared/ron-venue-registry-v1.ts",
+      "supabase/functions/_shared/ron-data-health-v1.ts",
+      "supabase/functions/ron-data-health/index.ts",
+      "supabase/functions/ron-snapshot/index.ts",
+      "src/test/gainedge-ron-always-on-agentic-v1.test.ts",
       "supabase/functions/ingest-candles/index.ts",
       "src/App.tsx",
       "src/components/dashboard/DashboardLayout.tsx",
