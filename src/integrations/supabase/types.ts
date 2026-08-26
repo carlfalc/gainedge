@@ -1405,6 +1405,66 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_data_health_events: {
+        Row: {
+          age_minutes: number | null
+          created_at: string
+          critical_flag_count: number
+          evaluation_allowed: boolean
+          health_version: number
+          id: string
+          instrument: string
+          latest_bar_time: string | null
+          next_expected_open: string | null
+          observed_at: string
+          reason: string
+          registry_version: number
+          status: string
+          timeframe: string
+          venue_class: string | null
+          venue_reason: string
+          venue_state: string
+        }
+        Insert: {
+          age_minutes?: number | null
+          created_at?: string
+          critical_flag_count?: number
+          evaluation_allowed?: boolean
+          health_version?: number
+          id?: string
+          instrument: string
+          latest_bar_time?: string | null
+          next_expected_open?: string | null
+          observed_at?: string
+          reason: string
+          registry_version?: number
+          status: string
+          timeframe: string
+          venue_class?: string | null
+          venue_reason: string
+          venue_state: string
+        }
+        Update: {
+          age_minutes?: number | null
+          created_at?: string
+          critical_flag_count?: number
+          evaluation_allowed?: boolean
+          health_version?: number
+          id?: string
+          instrument?: string
+          latest_bar_time?: string | null
+          next_expected_open?: string | null
+          observed_at?: string
+          reason?: string
+          registry_version?: number
+          status?: string
+          timeframe?: string
+          venue_class?: string | null
+          venue_reason?: string
+          venue_state?: string
+        }
+        Relationships: []
+      }
       ron_data_quality_flags: {
         Row: {
           bar_time: string
@@ -2643,10 +2703,12 @@ export type Database = {
           read_ct: number
         }[]
       }
+      ron_data_health_cron_tick: { Args: never; Returns: undefined }
       ron_invoke_worker: {
         Args: { _fn: string; _payload?: Json }
         Returns: number
       }
+      ron_multi_snapshot_cron_tick: { Args: never; Returns: undefined }
       ron_orchestration_cron_tick: { Args: never; Returns: undefined }
       ron_rebuild_cron_tick: { Args: never; Returns: undefined }
       ron_rebuild_finish: { Args: never; Returns: boolean }
