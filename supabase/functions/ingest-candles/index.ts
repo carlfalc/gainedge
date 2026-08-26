@@ -170,6 +170,8 @@ Deno.serve(async (req) => {
         if (error) { results.push({ symbol, timeframe, error: error.message, fetched: rows.length }); continue; }
         inserted = Number(n ?? 0);
       }
+      // Observability only: records which broker alias actually served the symbol.
+      console.info(`ingest-candles: ${symbol} ${timeframe} → alias=${resolved ?? "none"} fetched=${rows.length} inserted=${inserted}${apiError ? ` apiError=${apiError}` : ""}`);
       results.push({
         symbol, timeframe, pages, fetched: rows.length, inserted, apiError,
         brokerSymbol: resolved,
