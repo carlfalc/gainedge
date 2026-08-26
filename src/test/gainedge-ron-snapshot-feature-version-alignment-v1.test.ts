@@ -187,6 +187,7 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/migrations/20260826064528_9d6949fd-c285-46b5-8ac3-ccb10c30d725.sql",
       "supabase/functions/ron-snapshot/index.ts",
       "src/test/gainedge-ron-always-on-agentic-v1.test.ts",
+      "src/test/migration-hygiene.test.ts",
       "supabase/functions/ingest-candles/index.ts",
     ]);
     expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
@@ -303,6 +304,7 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "supabase/migrations/20260826064528_9d6949fd-c285-46b5-8ac3-ccb10c30d725.sql",
       "supabase/functions/ron-snapshot/index.ts",
       "src/test/gainedge-ron-always-on-agentic-v1.test.ts",
+      "src/test/migration-hygiene.test.ts",
       "supabase/functions/ingest-candles/index.ts",
       "src/App.tsx",
       "src/components/dashboard/DashboardLayout.tsx",
