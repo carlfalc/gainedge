@@ -50,6 +50,11 @@ const ALLOWLIST = new Set([
   // internal RON scheduler (XAUUSD 15m stored decision records only). Definition only; no
   // side effect at replay beyond (re)registering the named job.
   "20260821061910_bfc73e53-1fc1-4b70-bffb-8e1b54cdf36b.sql",
+  // GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1: health-watchdog table plus cron tick-function
+  // definitions for the always-on multi-instrument runtime. Definitions only.
+  "20260826064238_ca543cd1-29d2-4872-81dd-96acfa83d6ca.sql",
+  "20260826064431_3ebf58b0-f9af-4bf0-83f0-937336669d68.sql",
+  "20260826064528_9d6949fd-c285-46b5-8ac3-ccb10c30d725.sql",
 ]);
 
 
