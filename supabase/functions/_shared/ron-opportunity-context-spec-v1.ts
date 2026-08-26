@@ -54,6 +54,10 @@ import {
 } from "./ron-cross-asset-relationship-context-v3.ts";
 import { MACRO_NEWS_SPEC_V2 } from "./ron-macro-temporal-context-v2.ts";
 import {
+  resolveInstrumentScope, type ForwardScopeBinding,
+} from "./ron-forward-instrument-binding-v1.ts";
+
+import {
   HA_PATTERN_CONTEXT_SPEC_V1, type HaPatternContextResultV1,
 } from "./ron-ha-pattern-context-spec-v1.ts";
 
@@ -326,6 +330,12 @@ export class OpportunityContextAnchorError extends Error {
 export interface OpportunityContextInputV1 {
   instrument: string;
   timeframe: string;
+  /**
+   * OPTIONAL forward-scope binding supplied by a LATER spec version. Purely additive and
+   * ignored when absent or invalid, so the frozen V1 admission behaviour is unchanged.
+   */
+  forward_scope?: ForwardScopeBinding | null;
+
   /** COMPLETED bar CLOSE, epoch ms, grid aligned. */
   evaluation_anchor: number;
   /** REQUIRED accepted HA Pattern Context V1 result at the SAME anchor. */
@@ -469,10 +479,13 @@ export async function buildOpportunityContextV1(
     throw new OpportunityContextAnchorError(
       "evaluation_anchor_not_bar_close_aligned", iso(anchor));
   }
-  if (!(OPPORTUNITY_CONTEXT_SPEC_V1.instrument_scope as readonly string[])
-    .includes(input.instrument)) {
+  const oppScope = resolveInstrumentScope(
+    OPPORTUNITY_CONTEXT_SPEC_V1.spec_id, OPPORTUNITY_CONTEXT_SPEC_V1.spec_version,
+    OPPORTUNITY_CONTEXT_SPEC_V1.instrument_scope, input.forward_scope);
+  if (!oppScope.includes(input.instrument)) {
     throw new OpportunityContextAnchorError("instrument_out_of_scope", input.instrument);
   }
+
   if (!(OPPORTUNITY_CONTEXT_SPEC_V1.timeframe_scope as readonly string[])
     .includes(input.timeframe)) {
     throw new OpportunityContextAnchorError("timeframe_out_of_scope", input.timeframe);
