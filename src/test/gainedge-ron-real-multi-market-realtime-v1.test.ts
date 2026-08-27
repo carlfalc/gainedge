@@ -31,8 +31,8 @@ describe("real multi-market RON chain", () => {
   it("orchestration V10 is attempted before any context write", () => {
     expect(SCHEDULER).toContain("ron-orchestrate-run");
     expect(SCHEDULER).toContain("RON_ORCHESTRATION_RUN_VERSION_V10");
-    expect(SCHEDULER.indexOf("ron-orchestrate-run"))
-      .toBeLessThan(SCHEDULER.indexOf("ron-opportunity-context"));
+    expect(SCHEDULER.indexOf("functions/v1/ron-orchestrate-run"))
+      .toBeLessThan(SCHEDULER.indexOf("functions/v1/ron-opportunity-context"));
   });
 
   it("an anchor already decided is never re-run", () => {
