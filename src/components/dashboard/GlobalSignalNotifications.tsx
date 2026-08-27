@@ -10,7 +10,9 @@
  *   • On sign-out / user change, the channel, visible stack and dedupe state are cleared.
  *
  * RON opportunity-context popups ARE delivered here (GAINEDGE_RON_OPPORTUNITY_CONTEXT_UI_V1):
- * `ron_opportunity_context` is an append-only, realtime-published table written only by the
+ * `ron_material_events` is the durable, append-only, realtime-published event table written
+ * only by the server-side RON runtime — the same record the 24/7 Review lane reads, so an
+ * offline user loses nothing. It is
  * server-side RON runtime, so an INSERT is a genuine persisted event. Only rows for
  * instruments the user actually tracks, and only stored MATERIAL changes, are surfaced; a
  * data condition never notifies. RON orchestrator DECISIONS still have no realtime event
@@ -26,7 +28,8 @@ import {
   NOTIFICATION_AUTO_DISMISS_MS, NOTIFICATION_SOURCE_QUALIFIER, applyBaseline,
   createSignalNotificationState, deriveNotification, pushVisible,
   resetSignalNotificationState, viewSignalHref,
-  applyOpportunityBaseline, createOpportunityNotificationState,
+  applyOpportunityBaseline, bufferOpportunityRow, createOpportunityNotificationState,
+  drainBufferedOpportunities,
   deriveOpportunityNotification, normaliseTrackedInstruments,
   OPPORTUNITY_NOTIFICATION_QUALIFIER, pushVisibleOpportunity,
   resetOpportunityNotificationState, viewOpportunityHref,
@@ -37,9 +40,10 @@ import {
 const BASELINE_COLUMNS = "id,symbol,timeframe,mode,direction,trigger_type,status,opened_at";
 const BASELINE_LIMIT = 200;
 
+/** Durable material-event columns: the same stored record the 24/7 Review lane reads. */
 const OPPORTUNITY_COLUMNS =
-  "id,instrument,timeframe,evaluation_anchor,lifecycle,direction_context," +
-  "material_change_type,data_state,data_blocked";
+  "id,event_key,instrument,timeframe,evaluation_anchor,lifecycle,direction_context," +
+  "material_change_type,popup_capable,data_state,data_blocked";
 const OPPORTUNITY_BASELINE_LIMIT = 100;
 
 export default function GlobalSignalNotifications() {
@@ -140,12 +144,16 @@ export default function GlobalSignalNotifications() {
       tracked = normaliseTrackedInstruments((instruments ?? []).map((r) => String(r.symbol)));
 
       const { data } = await supabase
-        .from("ron_opportunity_context")
+        .from("ron_material_events")
         .select(OPPORTUNITY_COLUMNS)
         .order("evaluation_anchor", { ascending: false })
         .limit(OPPORTUNITY_BASELINE_LIMIT);
       if (cancelled) return;
       applyOpportunityBaseline(state, (data ?? []) as unknown as OpportunityNotificationRow[]);
+      const buffered = drainBufferedOpportunities(state, tracked);
+      if (buffered.length) {
+        setOppNotes((prev) => buffered.reduce((acc, n) => pushVisibleOpportunity(acc, n), prev));
+      }
     };
     void start();
 
@@ -153,10 +161,13 @@ export default function GlobalSignalNotifications() {
       .channel(`global-opportunity-popup-${userId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "ron_opportunity_context" },
+        { event: "INSERT", schema: "public", table: "ron_material_events" },
         (payload: { new?: unknown }) => {
           const row = payload.new as OpportunityNotificationRow | undefined;
           if (!row) return;
+          // Before the baseline lands, buffer instead of dropping: the event is durable
+          // and must not be silently lost to a race with the initial read.
+          if (!state.baselineReady) { bufferOpportunityRow(state, row); return; }
           const note = deriveOpportunityNotification(state, row, tracked);
           if (!note) return;
           setOppNotes((prev) => pushVisibleOpportunity(prev, note));

@@ -212,6 +212,26 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/ron-outcome-learning-v1.test.ts",
       "src/test/migration-hygiene.test.ts",
       "supabase/functions/ingest-candles/index.ts",
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1 slice.
+      "supabase/functions/_shared/ron-multi-market-scope-v1.ts",
+      "supabase/functions/_shared/ron-orchestration-run-v10.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec.ts",
+      "supabase/functions/_shared/ron-native-roster-v1.ts",
+      "supabase/functions/ron-agent-session-structure/index.ts",
+      "supabase/functions/ron-agent-pattern-context/index.ts",
+      "supabase/functions/ron-agent-cross-asset-correlation/index.ts",
+      "supabase/functions/ron-agent-calibration-validation/index.ts",
+      "supabase/functions/ron-agent-macro-news-geopolitics/index.ts",
+      "supabase/functions/ron-agent-opportunity-risk/index.ts",
+      "supabase/functions/ron-agent-falconer-signal-source/index.ts",
+      "supabase/functions/ron-orchestrate-run/index.ts",
+      "supabase/functions/ron-context-scheduler/index.ts",
+      "src/lib/signal-notifications.ts",
+      "src/components/dashboard/GlobalSignalNotifications.tsx",
+      "src/test/gainedge-ron-real-multi-market-realtime-v1.test.ts",
+      "src/test/gainedge-global-signal-popup-v1.test.tsx",
+      "src/test/ron-v3-v8-regression-guard.test.ts",
+      "src/test/gainedge-ron-always-on-runtime-completion-v1.test.ts",
     ]);
     expect(changed.filter((f) => !allowedBackend.has(f))).toEqual([]);
   });
@@ -368,6 +388,26 @@ describe("slice diff is limited to the frontend read alignment", () => {
       "src/test/gainedge-product-ask-ron-global-entry-v1.test.ts",
       "src/test/ron-v3-v8-regression-guard.test.ts",
       "src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts",
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1 slice.
+      "supabase/functions/_shared/ron-multi-market-scope-v1.ts",
+      "supabase/functions/_shared/ron-orchestration-run-v10.ts",
+      "supabase/functions/_shared/ron-opportunity-risk-spec.ts",
+      "supabase/functions/_shared/ron-native-roster-v1.ts",
+      "supabase/functions/ron-agent-session-structure/index.ts",
+      "supabase/functions/ron-agent-pattern-context/index.ts",
+      "supabase/functions/ron-agent-cross-asset-correlation/index.ts",
+      "supabase/functions/ron-agent-calibration-validation/index.ts",
+      "supabase/functions/ron-agent-macro-news-geopolitics/index.ts",
+      "supabase/functions/ron-agent-opportunity-risk/index.ts",
+      "supabase/functions/ron-agent-falconer-signal-source/index.ts",
+      "supabase/functions/ron-orchestrate-run/index.ts",
+      "supabase/functions/ron-context-scheduler/index.ts",
+      "src/lib/signal-notifications.ts",
+      "src/components/dashboard/GlobalSignalNotifications.tsx",
+      "src/test/gainedge-ron-real-multi-market-realtime-v1.test.ts",
+      "src/test/gainedge-global-signal-popup-v1.test.tsx",
+      "src/test/ron-v3-v8-regression-guard.test.ts",
+      "src/test/gainedge-ron-always-on-runtime-completion-v1.test.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });

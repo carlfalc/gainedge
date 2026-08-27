@@ -1,16 +1,25 @@
 /**
- * GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1 — MULTI-INSTRUMENT UNATTENDED SCHEDULER.
+ * GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1 — MULTI-INSTRUMENT
+ * UNATTENDED RON RUNTIME (supersedes the context-only scheduler of
+ * GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1).
  *
  * Server-side only, browser-independent, service-role gated. On each tick it walks the
  * declared pilot instruments (XAUUSD keeps its own frozen V1 scheduler and is excluded
- * here) and, for each one, evaluates AT MOST ONE new completed 15m anchor through the
- * forward Opportunity Context V2 path.
+ * here) and, for each one, drives the REAL chain on at most one new completed 15m anchor:
+ *
+ *   completed candle -> accepted v7 snapshot -> seven-specialist orchestration run V10
+ *   -> stored evidence + stored decision -> Opportunity Context V2 -> material event
+ *
+ * Opportunity Context is NEVER invoked as a stand-in for the agents: it runs only after
+ * the orchestration attempt for that exact anchor, and the cycle record states plainly
+ * whether the agent chain settled.
  *
  * Fail-closed on every axis:
  *   • no authoritative venue truth  -> reported, instrument skipped, others continue
  *   • no completed candle           -> reported, nothing invented
- *   • no accepted v7 snapshot       -> reported, nothing inferred
- *   • anchor already has a V2 row   -> skipped (idempotent, no duplicate work)
+ *   • completed bar, snapshot not landed yet -> DEFERRED (ordinary latency), retried
+ *   • snapshot still absent past the grace period -> blocked_data, nothing inferred
+ *   • anchor already evaluated      -> skipped (idempotent, no duplicate work)
  * It never places an order, never emits a probability and never writes candles.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
@@ -20,6 +29,9 @@ import { OPPORTUNITY_CONTEXT_RUNTIME_V1 } from "../_shared/ron-opportunity-conte
 import {
   evaluateCycleCompleteness, type CycleCompleteness, type CycleStatus,
 } from "../_shared/ron-native-roster-v1.ts";
+import {
+  RON_ORCHESTRATION_RUN_VERSION_V10,
+} from "../_shared/ron-orchestration-run-v10.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,10 +46,17 @@ const json = (body: unknown, status = 200) =>
 const BAR_MS = 15 * 60_000;
 const TIMEFRAME = "15m";
 const MAX_ANCHOR_AGE_MS = 6 * 60 * 60_000;
+/**
+ * How long after a bar closes an accepted snapshot may still be in flight before the
+ * absence stops being ordinary latency. Snapshot ingestion runs on its own cadence, so a
+ * few minutes of lag is normal pipeline behaviour, not a data fault.
+ */
+const SNAPSHOT_GRACE_MS = 25 * 60_000;
 const FEATURE_VERSION = OPPORTUNITY_CONTEXT_RUNTIME_V1.source_contract.feature_version;
 
 /** XAUUSD stays on its own frozen decision-bound scheduler. */
 const SCHEDULED_INSTRUMENTS = FORWARD_CONTEXT_INSTRUMENTS.filter((i) => i !== "XAUUSD");
+
 
 function timingSafeEq(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -80,7 +99,10 @@ Deno.serve(async (req) => {
    * incomplete, or was blocked — silence is never used to imply success. Failure to log
    * never affects the evaluation itself.
    */
-  async function recordCycle(c: CycleCompleteness, venueState: string, venueReason: string | null) {
+  async function recordCycle(
+    c: CycleCompleteness, venueState: string, venueReason: string | null,
+    orchestration: Record<string, unknown> | null = null,
+  ) {
     try {
       await db.from("ron_data_health_events").insert({
         instrument: c.instrument,
@@ -98,6 +120,9 @@ Deno.serve(async (req) => {
         missing_components: c.missing_components,
         context_written: c.context_written,
         material_event_written: c.material_event_written,
+        // Exactly what the real specialist chain did for this anchor: attempted, already
+        // decided, or the deterministic reason it did not settle. Contract fields only.
+        orchestration,
       });
     } catch (_err) {
       // Observability must never break the runtime.
@@ -163,22 +188,86 @@ Deno.serve(async (req) => {
         .sort((a, b) => b - a);
 
       if (candidates.length === 0) {
-        // Distinguish "market gives us nothing yet" from "our own data is missing".
+        // Distinguish ordinary pipeline latency, a closed market and a real data gap.
         const alreadyDone = done.has(lastCompletedCloseIso);
+        // A genuine completed bar whose accepted snapshot simply has not landed yet.
+        const awaitingSnapshot = (candles.data ?? [])
+          .map((r) => new Date(String(r.timestamp)).getTime())
+          .filter((t) => Number.isFinite(t) && t % BAR_MS === 0)
+          .filter((t) => t + BAR_MS <= nowMs)
+          .filter((t) => !snapSet.has(new Date(t).toISOString()))
+          .filter((t) => !done.has(new Date(t + BAR_MS).toISOString()))
+          .some((t) => nowMs - (t + BAR_MS) <= SNAPSHOT_GRACE_MS);
         if (!alreadyDone) {
           await blockedCycle(instrument, lastCompletedCloseIso,
-            venue.state === "closed" ? "blocked_market" : "blocked_data",
-            venue.state === "closed" ? "venue_closed_no_new_completed_bar" : "no_accepted_snapshot_for_completed_bar",
+            venue.state === "closed"
+              ? "blocked_market"
+              : awaitingSnapshot ? "deferred" : "blocked_data",
+            venue.state === "closed"
+              ? "venue_closed_no_new_completed_bar"
+              : awaitingSnapshot
+              ? "deferred_awaiting_accepted_snapshot"
+              : "no_accepted_snapshot_for_completed_bar",
             venue.state, venue.reason ?? null);
         }
-        results.push({ instrument, scheduled: false, reason: "no_new_eligible_anchor", venue_state: venue.state });
+        results.push({
+          instrument, scheduled: false,
+          reason: awaitingSnapshot ? "deferred_awaiting_accepted_snapshot" : "no_new_eligible_anchor",
+          deferred: awaitingSnapshot,
+          venue_state: venue.state,
+        });
         continue;
       }
 
       const anchorIso = new Date(candidates[0]).toISOString();
+
+      /**
+       * THE REAL RON CHAIN. The seven-specialist orchestration run is attempted FIRST for
+       * this exact anchor, so stored specialist evidence and (where the contract accepts
+       * it) a stored decision exist before any context record is written. It is idempotent
+       * per anchor: a decision already stored for this anchor is never re-run.
+       */
+      let orchestration: Record<string, unknown> = { attempted: false };
+      const { data: existingDecision } = await db.from("ron_orchestrator_decisions")
+        .select("decision_id").eq("instrument", instrument).eq("timeframe", TIMEFRAME)
+        .eq("as_of", anchorIso).limit(1);
+      if (existingDecision?.length) {
+        orchestration = { attempted: false, reason: "already_decided", persisted: true };
+      } else {
+        try {
+          const orchRes = await fetch(`${supabaseUrl}/functions/v1/ron-orchestrate-run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
+              orchestration_run_version: RON_ORCHESTRATION_RUN_VERSION_V10,
+              trace_id: `ron_sched_v10_${anchorIso}_${instrument}_${TIMEFRAME}`,
+              persist: true,
+            }),
+          });
+          const orchOut = await orchRes.json().catch(() => ({}));
+          orchestration = {
+            attempted: true,
+            http_status: orchRes.status,
+            persisted: orchOut?.persisted === true,
+            state: orchOut?.decision?.state ?? null,
+            decision_id: orchOut?.decision?.decision_id ?? null,
+            // Deterministic contract reasons only: no evidence content, no keys.
+            error: orchRes.ok ? null : (orchOut?.error ?? "orchestration_failed"),
+            reasons: Array.isArray(orchOut?.reasons) ? orchOut.reasons : null,
+          };
+        } catch (orchErr) {
+          orchestration = {
+            attempted: true, persisted: false,
+            error: `orchestration_unreachable:${String((orchErr as Error)?.message ?? orchErr)}`,
+          };
+        }
+      }
+
       const res = await fetch(`${supabaseUrl}/functions/v1/ron-opportunity-context`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+
         body: JSON.stringify({
           instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
           runtime_version: 2, persist: true,
@@ -197,10 +286,13 @@ Deno.serve(async (req) => {
             : null)
           : { status: "blocked_data" as const, reason: String(out?.reason ?? "opportunity_context_failed") },
       });
-      await recordCycle(completeness, String(out?.venue_state ?? venue.state), venue.reason ?? null);
+      await recordCycle(
+        completeness, String(out?.venue_state ?? venue.state), venue.reason ?? null, orchestration,
+      );
 
       results.push({
         instrument, scheduled: true, evaluation_anchor: anchorIso,
+        orchestration,
         http_status: res.status,
         persisted: out?.persisted === true,
         venue_state: out?.venue_state ?? venue.state,
@@ -208,9 +300,11 @@ Deno.serve(async (req) => {
         material_change_type: out?.material_change_type ?? null,
         material_event: out?.material_event ?? null,
         cycle_status: completeness.cycle_status,
+        completed_components: completeness.completed_components,
         missing_components: completeness.missing_components,
         reason: res.ok ? null : (out?.reason ?? "opportunity_context_failed"),
       });
+
     } catch (err) {
       results.push({
         instrument, scheduled: false, reason: "instrument_tick_error",

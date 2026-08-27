@@ -133,10 +133,15 @@ describe("scoping, links and copy", () => {
     expect(COMPONENT).not.toContain("setInterval");
   });
 
-  it("16. RON opportunity-context popups come from a genuine append-only realtime event", () => {
+  it("16. RON popups come from the DURABLE append-only material-event table", () => {
     // The only added source is an INSERT on the append-only, realtime-published
-    // ron_opportunity_context table written solely by the server-side RON runtime.
-    expect(COMPONENT).toContain('table: "ron_opportunity_context"');
+    // ron_material_events table written solely by the server-side RON runtime — the same
+    // stored record the 24/7 Review lane reads, so an offline user loses nothing.
+    expect(COMPONENT).toContain('table: "ron_material_events"');
+    expect(COMPONENT).toContain('.from("ron_material_events")');
+    // A realtime event racing the baseline read is buffered, never dropped.
+    expect(COMPONENT).toContain("bufferOpportunityRow");
+    expect(COMPONENT).toContain("drainBufferedOpportunities");
     expect(COMPONENT).toContain('event: "INSERT"');
     expect(COMPONENT).toContain("deriveOpportunityNotification");
     // Tracked-instrument scoping, and never an execution or probability claim.

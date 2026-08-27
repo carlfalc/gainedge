@@ -155,7 +155,14 @@ export type CycleStatus =
   | "incomplete"          // at least one applicable required component missing
   | "blocked_data"        // source/quality condition prevented evaluation
   | "blocked_market"      // venue closed / no tradable completed bar yet
-  | "blocked_venue";      // venue calendar not authoritative for this instrument
+  | "blocked_venue"       // venue calendar not authoritative for this instrument
+  /**
+   * GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1: ordinary pipeline
+   * latency, NOT an error. A genuine completed bar exists but its accepted snapshot has
+   * not landed yet. The unattended scheduler retries the same anchor on a later tick, so
+   * this state must never be recorded as a lasting data failure.
+   */
+  | "deferred";
 
 export interface CycleCompletenessInput {
   instrument: string;

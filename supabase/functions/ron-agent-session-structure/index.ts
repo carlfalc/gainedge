@@ -27,6 +27,9 @@ import {
   buildSessionStructureEvidenceV3, sessionStructureSpecHashV3,
   SESSION_STRUCTURE_SPEC_V3, SessionStructureV3AnchorError,
 } from "../_shared/ron-session-structure-spec-v3.ts";
+import {
+  instrumentAdmitted, multiMarketRequested,
+} from "../_shared/ron-multi-market-scope-v1.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -81,7 +84,7 @@ Deno.serve(async (req) => {
   const spec = specVersion === 1
     ? SESSION_STRUCTURE_SPEC_V1
     : specVersion === 3 ? SESSION_STRUCTURE_SPEC_V3 : SESSION_STRUCTURE_SPEC_V2;
-  if (!spec.instrument_scope.includes(instrument as "XAUUSD")
+  if (!instrumentAdmitted(spec, instrument, multiMarketRequested(body))
     || !spec.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_spec_v1", instrument, timeframe }, 400);
   }

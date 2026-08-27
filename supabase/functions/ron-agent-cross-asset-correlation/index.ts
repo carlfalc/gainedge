@@ -27,6 +27,9 @@ import {
   buildCrossAssetRelationshipEvidenceV3, crossAssetRelationshipSpecHashV3,
   CrossAssetV3AnchorError,
 } from "../_shared/ron-cross-asset-relationship-context-v3.ts";
+import {
+  instrumentAdmitted, multiMarketRequested,
+} from "../_shared/ron-multi-market-scope-v1.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,7 +77,7 @@ Deno.serve(async (req) => {
   const instrument = typeof body.instrument === "string" ? body.instrument : SYMBOL;
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : TIMEFRAME;
   const counterpart = CROSS_ASSET_COUNTERPART_V1;
-  if (!CROSS_ASSET_SPEC_V1.instrument_scope.includes(instrument as "XAUUSD")
+  if (!instrumentAdmitted(CROSS_ASSET_SPEC_V1, instrument, multiMarketRequested(body))
     || !CROSS_ASSET_SPEC_V1.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_cross_asset_spec_v1", instrument, timeframe }, 400);
   }

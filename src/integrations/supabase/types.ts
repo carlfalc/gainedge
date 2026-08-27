@@ -1424,6 +1424,7 @@ export type Database = {
           missing_components: string[] | null
           next_expected_open: string | null
           observed_at: string
+          orchestration: Json | null
           reason: string
           registry_version: number
           roster_version: number | null
@@ -1451,6 +1452,7 @@ export type Database = {
           missing_components?: string[] | null
           next_expected_open?: string | null
           observed_at?: string
+          orchestration?: Json | null
           reason: string
           registry_version?: number
           roster_version?: number | null
@@ -1478,6 +1480,7 @@ export type Database = {
           missing_components?: string[] | null
           next_expected_open?: string | null
           observed_at?: string
+          orchestration?: Json | null
           reason?: string
           registry_version?: number
           roster_version?: number | null

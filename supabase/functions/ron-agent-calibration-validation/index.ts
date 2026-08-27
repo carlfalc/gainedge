@@ -22,6 +22,9 @@ import {
 import {
   buildCalibrationDiagnosticContextEvidenceV2, calibrationDiagnosticContextSpecHashV2,
 } from "../_shared/ron-calibration-diagnostic-context-v2.ts";
+import {
+  instrumentAdmitted, multiMarketRequested,
+} from "../_shared/ron-multi-market-scope-v1.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -92,7 +95,7 @@ Deno.serve(async (req) => {
     return json({ error: "unsupported_spec_version", spec_version: body.spec_version }, 400);
   }
   const isV2 = specVersion === 2;
-  if (!S.instrument_scope.includes(instrument as "XAUUSD")
+  if (!instrumentAdmitted(S, instrument, multiMarketRequested(body))
     || !S.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_calibration_validation_spec_v1", instrument, timeframe }, 400);
   }

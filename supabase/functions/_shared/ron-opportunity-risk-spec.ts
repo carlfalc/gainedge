@@ -27,6 +27,7 @@ import {
   type EvidenceEnvelopeV1, type EvidenceStatus, type Observation,
   type QualitativeDirection, type RecommendationV1, type RonAgentId,
 } from "./ron-agent-contracts.ts";
+import { instrumentAdmitted } from "./ron-multi-market-scope-v1.ts";
 
 /** Required, in canonical order. Both must be genuine, sealed, fresh and healthy. */
 export const OPPORTUNITY_REQUIRED_AGENTS: readonly RonAgentId[] = [
@@ -165,7 +166,15 @@ export interface OpportunityRiskInputV1 {
    * the frozen v1 policy, so V1/V2/V3 replays stay byte-identical.
    */
   ttl_policy_version?: number;
+  /**
+   * GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1: explicit opt-in to the
+   * audited forward pilot instrument binding. Absent/false -> the frozen XAUUSD-only scope,
+   * so every historical replay is byte-identical. It widens ADMISSION only and never
+   * supplies or substitutes data for another market.
+   */
+  multi_market_scope?: boolean;
 }
+
 
 /**
  * Deterministic, typed contract rejection of a pure input. Thrown BEFORE any date
@@ -269,7 +278,7 @@ export async function buildOpportunityRiskEvidenceV1(
     return envelope("blocked", "critical", "unknown", "no_action");
   };
 
-  if (!S.instrument_scope.includes(input.instrument as "XAUUSD")
+  if (!instrumentAdmitted(S, input.instrument, input.multi_market_scope === true)
     || !S.timeframe_scope.includes(input.timeframe as "15m")) {
     return fail("blocked_contract_mismatch", ["out_of_scope_instrument_or_timeframe"]);
   }
