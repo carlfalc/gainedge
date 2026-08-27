@@ -112,6 +112,7 @@ Deno.serve(async (req) => {
       evidence: evidence as EvidenceEnvelopeV1[],
       promoted_state_variables: PROMOTED_STATE_VARIABLES,
       run_id, trace_id,
+      multi_market_scope: multiMarketRequested(body),
     });
 
     const envelope = await build();

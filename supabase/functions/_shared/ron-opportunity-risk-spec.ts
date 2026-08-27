@@ -27,6 +27,7 @@ import {
   type EvidenceEnvelopeV1, type EvidenceStatus, type Observation,
   type QualitativeDirection, type RecommendationV1, type RonAgentId,
 } from "./ron-agent-contracts.ts";
+import { instrumentAdmitted } from "./ron-multi-market-scope-v1.ts";
 
 /** Required, in canonical order. Both must be genuine, sealed, fresh and healthy. */
 export const OPPORTUNITY_REQUIRED_AGENTS: readonly RonAgentId[] = [
@@ -277,7 +278,7 @@ export async function buildOpportunityRiskEvidenceV1(
     return envelope("blocked", "critical", "unknown", "no_action");
   };
 
-  if (!S.instrument_scope.includes(input.instrument as "XAUUSD")
+  if (!instrumentAdmitted(S, input.instrument, input.multi_market_scope === true)
     || !S.timeframe_scope.includes(input.timeframe as "15m")) {
     return fail("blocked_contract_mismatch", ["out_of_scope_instrument_or_timeframe"]);
   }
