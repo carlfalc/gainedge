@@ -193,16 +193,18 @@ export function pushVisible(
 }
 
 /* ------------------------------------------------------------------------- *
- * GAINEDGE_RON_OPPORTUNITY_CONTEXT_UI_V1 — RON opportunity-context popups.
+ * GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1 — RON popups.
  *
- * These are now genuinely event-driven: `ron_opportunity_context` is an append-only,
- * realtime-published table written only by the server-side RON runtime, so an INSERT is
- * a real persisted event rather than a polled inference. Only a stored material change
- * notifies, a data condition never notifies, and only instruments the user actually
- * tracks are surfaced.
+ * The popup source is the DURABLE, append-only `ron_material_events` table: the same
+ * record the 24/7 Review lane reads, written server-side whether or not anyone is
+ * online. A popup is therefore a view onto a stored event, never a transient UI-only
+ * artefact, and an offline user loses nothing — the event is still there on return.
+ *
+ * Only a stored, popup-capable material change notifies; a data condition never
+ * notifies; and only instruments the user actually tracks are surfaced.
  * ------------------------------------------------------------------------- */
 
-/** Small qualifier shown on every opportunity-context popup. */
+/** Small qualifier shown on every RON material-event popup. */
 export const OPPORTUNITY_NOTIFICATION_QUALIFIER =
   "RON opportunity context record · descriptive only, not a trade instruction";
 
@@ -214,8 +216,15 @@ export interface OpportunityNotificationRow {
   lifecycle: string;
   direction_context: string;
   material_change_type: string;
-  data_state: string;
+  data_state?: string;
   data_blocked?: boolean | null;
+  /**
+   * Durable material-event fields. `event_key` is the server's deterministic dedupe
+   * identity, so the same event re-delivered under a new row id still pops once.
+   * `popup_capable` is the server's own decision and is never overridden here.
+   */
+  event_key?: string | null;
+  popup_capable?: boolean | null;
 }
 
 export interface OpportunityNotification {
@@ -235,20 +244,52 @@ export interface OpportunityNotification {
 export interface OpportunityNotificationState {
   seen: Set<string>;
   baselineReady: boolean;
+  /**
+   * Realtime events that arrived before the baseline finished loading. Dropping them
+   * would silently lose a genuine stored event, so they are replayed once the baseline
+   * is known and then deduped normally.
+   */
+  pending: OpportunityNotificationRow[];
 }
 
 export function createOpportunityNotificationState(): OpportunityNotificationState {
-  return { seen: new Set<string>(), baselineReady: false };
+  return { seen: new Set<string>(), baselineReady: false, pending: [] };
 }
 
 export function resetOpportunityNotificationState(state: OpportunityNotificationState): void {
   state.seen.clear();
   state.baselineReady = false;
+  state.pending = [];
 }
 
-export function opportunityEventKey(row: { id: string }): string {
-  return `opportunity:${row.id}`;
+export function opportunityEventKey(row: { id: string; event_key?: string | null }): string {
+  const durable = (row.event_key ?? "").trim();
+  return durable ? `event:${durable}` : `opportunity:${row.id}`;
 }
+
+/** Holds a pre-baseline realtime row so no genuine stored event is dropped. */
+export function bufferOpportunityRow(
+  state: OpportunityNotificationState,
+  row: OpportunityNotificationRow,
+  cap = 50,
+): void {
+  state.pending = [...state.pending.filter((r) => opportunityEventKey(r) !== opportunityEventKey(row)), row]
+    .slice(-cap);
+}
+
+/** Drains rows buffered before the baseline; each is subject to the normal rules. */
+export function drainBufferedOpportunities(
+  state: OpportunityNotificationState,
+  tracked: Set<string>,
+  now: Date = new Date(),
+): OpportunityNotification[] {
+  const rows = state.pending;
+  state.pending = [];
+  return rows
+    .map((row) => deriveOpportunityNotification(state, row, tracked, now))
+    .filter((n): n is OpportunityNotification => n !== null);
+}
+
 
 /** Rows already stored at first load never pop up. */
 export function applyOpportunityBaseline(
