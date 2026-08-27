@@ -1,16 +1,25 @@
 /**
- * GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1 — MULTI-INSTRUMENT UNATTENDED SCHEDULER.
+ * GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1 — MULTI-INSTRUMENT
+ * UNATTENDED RON RUNTIME (supersedes the context-only scheduler of
+ * GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1).
  *
  * Server-side only, browser-independent, service-role gated. On each tick it walks the
  * declared pilot instruments (XAUUSD keeps its own frozen V1 scheduler and is excluded
- * here) and, for each one, evaluates AT MOST ONE new completed 15m anchor through the
- * forward Opportunity Context V2 path.
+ * here) and, for each one, drives the REAL chain on at most one new completed 15m anchor:
+ *
+ *   completed candle -> accepted v7 snapshot -> seven-specialist orchestration run V10
+ *   -> stored evidence + stored decision -> Opportunity Context V2 -> material event
+ *
+ * Opportunity Context is NEVER invoked as a stand-in for the agents: it runs only after
+ * the orchestration attempt for that exact anchor, and the cycle record states plainly
+ * whether the agent chain settled.
  *
  * Fail-closed on every axis:
  *   • no authoritative venue truth  -> reported, instrument skipped, others continue
  *   • no completed candle           -> reported, nothing invented
- *   • no accepted v7 snapshot       -> reported, nothing inferred
- *   • anchor already has a V2 row   -> skipped (idempotent, no duplicate work)
+ *   • completed bar, snapshot not landed yet -> DEFERRED (ordinary latency), retried
+ *   • snapshot still absent past the grace window -> blocked_data, nothing inferred
+ *   • anchor already evaluated      -> skipped (idempotent, no duplicate work)
  * It never places an order, never emits a probability and never writes candles.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
@@ -20,6 +29,9 @@ import { OPPORTUNITY_CONTEXT_RUNTIME_V1 } from "../_shared/ron-opportunity-conte
 import {
   evaluateCycleCompleteness, type CycleCompleteness, type CycleStatus,
 } from "../_shared/ron-native-roster-v1.ts";
+import {
+  RON_ORCHESTRATION_RUN_VERSION_V10,
+} from "../_shared/ron-orchestration-run-v10.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,10 +46,17 @@ const json = (body: unknown, status = 200) =>
 const BAR_MS = 15 * 60_000;
 const TIMEFRAME = "15m";
 const MAX_ANCHOR_AGE_MS = 6 * 60 * 60_000;
+/**
+ * How long after a bar closes an accepted snapshot may still be in flight before the
+ * absence stops being ordinary latency. Snapshot ingestion runs on its own cadence, so a
+ * few minutes of lag is normal pipeline behaviour, not a data fault.
+ */
+const SNAPSHOT_GRACE_MS = 25 * 60_000;
 const FEATURE_VERSION = OPPORTUNITY_CONTEXT_RUNTIME_V1.source_contract.feature_version;
 
 /** XAUUSD stays on its own frozen decision-bound scheduler. */
 const SCHEDULED_INSTRUMENTS = FORWARD_CONTEXT_INSTRUMENTS.filter((i) => i !== "XAUUSD");
+
 
 function timingSafeEq(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
