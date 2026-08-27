@@ -284,6 +284,7 @@ Deno.serve(async (req) => {
 
       results.push({
         instrument, scheduled: true, evaluation_anchor: anchorIso,
+        orchestration,
         http_status: res.status,
         persisted: out?.persisted === true,
         venue_state: out?.venue_state ?? venue.state,
@@ -291,9 +292,11 @@ Deno.serve(async (req) => {
         material_change_type: out?.material_change_type ?? null,
         material_event: out?.material_event ?? null,
         cycle_status: completeness.cycle_status,
+        completed_components: completeness.completed_components,
         missing_components: completeness.missing_components,
         reason: res.ok ? null : (out?.reason ?? "opportunity_context_failed"),
       });
+
     } catch (err) {
       results.push({
         instrument, scheduled: false, reason: "instrument_tick_error",
