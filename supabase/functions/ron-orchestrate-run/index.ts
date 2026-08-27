@@ -77,6 +77,11 @@ import {
   assertOpportunityRiskV4Sealed, deriveRunIdsV9, ORCHESTRATION_RUN_PLAN_V9,
   orchestrationRunPlanHashV9, RON_ORCHESTRATION_RUN_VERSION_V9, TTL_POLICY_VERSION_V9,
 } from "../_shared/ron-orchestration-run-v9.ts";
+import {
+  deriveRunIdsV10, ORCHESTRATION_RUN_PLAN_V10, orchestrationRunPlanHashV10,
+  RON_ORCHESTRATION_RUN_VERSION_V10,
+} from "../_shared/ron-orchestration-run-v10.ts";
+import { RON_MULTI_MARKET_SCOPE_VERSION } from "../_shared/ron-multi-market-scope-v1.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -150,7 +155,8 @@ Deno.serve(async (req) => {
   // The frozen V1-V7 acceptance list is reused VERBATIM; V8 is a separate, additive term.
   const runVersionSupported =
     [1, 2, 3, 4, 5, 6, 7].includes(requestedRunVersion)
-    || requestedRunVersion === 8 || requestedRunVersion === 9;
+    || requestedRunVersion === 8 || requestedRunVersion === 9
+    || requestedRunVersion === RON_ORCHESTRATION_RUN_VERSION_V10;
   if (!runVersionSupported) {
     return json({ error: "unsupported_orchestration_run_version", orchestration_run_version: body.orchestration_run_version }, 400);
   }
@@ -159,7 +165,11 @@ Deno.serve(async (req) => {
   // Every specialist still receives the SAME anchor string; nothing is offset here.
   // V9 is the forward-only ARTIFACT-CLOCK TTL run: every V8 semantic is inherited, with
   // opportunity_risk pinned to spec 4 and the run evaluated under TTL policy v2.
-  const isV9 = requestedRunVersion === 9;
+  // V10 is the forward-only MULTI-MARKET run: every V9 semantic is inherited verbatim and
+  // each specialist call additionally carries the audited forward instrument binding, so a
+  // declared pilot instrument is ADMITTED by the frozen producers. No data is substituted.
+  const isV10 = requestedRunVersion === RON_ORCHESTRATION_RUN_VERSION_V10;
+  const isV9 = requestedRunVersion === 9 || isV10;
   const isV8 = requestedRunVersion === 8 || isV9;
   const isV7 = requestedRunVersion === 7 || isV8;
   // V7 inherits every V6 semantic (all seven as-returned seal proofs + every earlier gate).
@@ -179,7 +189,9 @@ Deno.serve(async (req) => {
   };
 
   try {
-    const runIds = isV9
+    const runIds = isV10
+      ? await deriveRunIdsV10(traceId, anchor)
+      : isV9
       ? await deriveRunIdsV9(traceId, anchor)
       : isV8
       ? await deriveRunIdsV8(traceId, anchor)
@@ -206,7 +218,8 @@ Deno.serve(async (req) => {
     let falconerSignalSourceHash: string | null = null;
 
     const plan: readonly (AgentCallPlanEntryV2 | typeof ORCHESTRATION_RUN_PLAN_V1[number])[] =
-      isV9 ? ORCHESTRATION_RUN_PLAN_V9
+      isV10 ? ORCHESTRATION_RUN_PLAN_V10
+        : isV9 ? ORCHESTRATION_RUN_PLAN_V9
         : isV8 ? ORCHESTRATION_RUN_PLAN_V8
         : isV7 ? ORCHESTRATION_RUN_PLAN_V7
         : isV6 ? ORCHESTRATION_RUN_PLAN_V6
@@ -221,6 +234,9 @@ Deno.serve(async (req) => {
       const payload: Record<string, unknown> = {
         instrument, timeframe, trace_id: traceId, run_id: runIds[entry.agent_id],
         persist: false,
+        // V10 ONLY: explicit, audited multi-market admission. Deny-by-default everywhere
+        // else, and never a licence to substitute another market's data.
+        ...(isV10 ? { multi_market_scope: RON_MULTI_MARKET_SCOPE_VERSION } : {}),
       };
       payload[entry.anchor_param] = anchor;
       if (entry.requires_evidence_batch) payload.evidence = canonicalOrder(collected);
