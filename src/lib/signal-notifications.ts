@@ -319,7 +319,10 @@ export function deriveOpportunityNotification(
   if (!row?.id || !row.instrument) return null;
   if (!tracked.has(row.instrument.trim().toUpperCase())) return null;
   if (row.data_blocked === true) return null;
+  // The server already decided popup capability; false is honoured, absent stays neutral.
+  if (row.popup_capable === false) return null;
   if (!isNotifiableMaterialChange(row.material_change_type)) return null;
+
 
   const key = opportunityEventKey(row);
   if (state.seen.has(key)) return null;
