@@ -80,6 +80,10 @@ const TOUCHED: Touched[] = [
   {
     path: "supabase/functions/ron-agent-session-structure/index.ts",
     allowedRemovals: [
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1: the frozen
+      // XAUUSD-only admission line is replaced by the audited multi-market opt-in,
+      // which widens ADMISSION only and keeps the frozen scope when not requested.
+      "  if (!spec.instrument_scope.includes(instrument as \"XAUUSD\")",
       "const specVersion = body.spec_version === 1 ? 1 : 2;",
       "const spec = specVersion === 1 ? SESSION_STRUCTURE_SPEC_V1 : SESSION_STRUCTURE_SPEC_V2;",
       "spec_hash: specVersion === 1 ? await sessionStructureSpecHash() : await sessionStructureSpecHashV2(),",
@@ -100,6 +104,10 @@ const TOUCHED: Touched[] = [
   {
     path: "supabase/functions/ron-agent-pattern-context/index.ts",
     allowedRemovals: [
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1: the frozen
+      // XAUUSD-only admission line is replaced by the audited multi-market opt-in,
+      // which widens ADMISSION only and keeps the frozen scope when not requested.
+      "  if (!PATTERN_CONTEXT_SPEC_V1.instrument_scope.includes(instrument as \"XAUUSD\")",
       "if (specVersion !== 1 && specVersion !== 2) {",
       "const build = () => specVersion === 2",
       "spec_hash: specVersion === 2 ? await patternContextSpecHashV2() : await patternContextSpecHash(),",
@@ -118,6 +126,10 @@ const TOUCHED: Touched[] = [
   {
     path: "supabase/functions/ron-agent-cross-asset-correlation/index.ts",
     allowedRemovals: [
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1: the frozen
+      // XAUUSD-only admission line is replaced by the audited multi-market opt-in,
+      // which widens ADMISSION only and keeps the frozen scope when not requested.
+      "  if (!CROSS_ASSET_SPEC_V1.instrument_scope.includes(instrument as \"XAUUSD\")",
       "if (specVersion !== 1 && specVersion !== 2) {",
       "const ns = specVersion === 2 ? await provenTimes(counterpart) : await times(counterpart);",
       "asOf = pick;",
@@ -144,6 +156,10 @@ const TOUCHED: Touched[] = [
   {
     path: "supabase/functions/ron-agent-opportunity-risk/index.ts",
     allowedRemovals: [
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1: the frozen
+      // XAUUSD-only admission line is replaced by the audited multi-market opt-in,
+      // which widens ADMISSION only and keeps the frozen scope when not requested.
+      "  if (!S.instrument_scope.includes(instrument as \"XAUUSD\")",
       "if (requested !== 1 && requested !== 2) {",
       'return json({ error: "unsupported_spec_version", supported: [1, 2] }, 400);',
       "const producer = useV2 ? buildOpportunityRiskEvidenceV2 : buildOpportunityRiskEvidenceV1;",
@@ -300,6 +316,10 @@ describe("V3/V8 slice — no frozen shared artifact was touched", () => {
       "src/components/signals/EventReviewTab.tsx",
       "src/pages/dashboard/SignalsPage.tsx",
       "src/test/ron-outcome-learning-v1.test.ts",
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1 — additive,
+      // opt-in-only multi-market admission and the forward-only V10 run plan.
+      "supabase/functions/_shared/ron-multi-market-scope-v1.ts",
+      "supabase/functions/_shared/ron-orchestration-run-v10.ts",
     ]);
     expect(changed.filter((f) => !allowed.has(f))).toEqual([]);
   });
