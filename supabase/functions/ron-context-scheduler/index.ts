@@ -18,7 +18,7 @@
  *   • no authoritative venue truth  -> reported, instrument skipped, others continue
  *   • no completed candle           -> reported, nothing invented
  *   • completed bar, snapshot not landed yet -> DEFERRED (ordinary latency), retried
- *   • snapshot still absent past the grace window -> blocked_data, nothing inferred
+ *   • snapshot still absent past the grace period -> blocked_data, nothing inferred
  *   • anchor already evaluated      -> skipped (idempotent, no duplicate work)
  * It never places an order, never emits a probability and never writes candles.
  */
