@@ -99,7 +99,10 @@ Deno.serve(async (req) => {
    * incomplete, or was blocked — silence is never used to imply success. Failure to log
    * never affects the evaluation itself.
    */
-  async function recordCycle(c: CycleCompleteness, venueState: string, venueReason: string | null) {
+  async function recordCycle(
+    c: CycleCompleteness, venueState: string, venueReason: string | null,
+    orchestration: Record<string, unknown> | null = null,
+  ) {
     try {
       await db.from("ron_data_health_events").insert({
         instrument: c.instrument,
@@ -117,6 +120,9 @@ Deno.serve(async (req) => {
         missing_components: c.missing_components,
         context_written: c.context_written,
         material_event_written: c.material_event_written,
+        // Exactly what the real specialist chain did for this anchor: attempted, already
+        // decided, or the deterministic reason it did not settle. Contract fields only.
+        orchestration,
       });
     } catch (_err) {
       // Observability must never break the runtime.
@@ -280,7 +286,9 @@ Deno.serve(async (req) => {
             : null)
           : { status: "blocked_data" as const, reason: String(out?.reason ?? "opportunity_context_failed") },
       });
-      await recordCycle(completeness, String(out?.venue_state ?? venue.state), venue.reason ?? null);
+      await recordCycle(
+        completeness, String(out?.venue_state ?? venue.state), venue.reason ?? null, orchestration,
+      );
 
       results.push({
         instrument, scheduled: true, evaluation_anchor: anchorIso,
