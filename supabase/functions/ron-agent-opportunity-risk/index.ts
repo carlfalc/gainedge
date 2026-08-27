@@ -27,6 +27,9 @@ import {
 import {
   buildOpportunityRiskEvidenceV4, opportunityRiskSpecHashV4, OPPORTUNITY_RISK_SPEC_V4,
 } from "../_shared/ron-opportunity-risk-spec-v4.ts";
+import {
+  instrumentAdmitted, multiMarketRequested,
+} from "../_shared/ron-multi-market-scope-v1.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -78,7 +81,7 @@ Deno.serve(async (req) => {
   const S = OPPORTUNITY_RISK_SPEC_V1;
   const instrument = typeof body.instrument === "string" ? body.instrument : "XAUUSD";
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : "15m";
-  if (!S.instrument_scope.includes(instrument as "XAUUSD")
+  if (!instrumentAdmitted(S, instrument, multiMarketRequested(body))
     || !S.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_opportunity_risk_spec_v1", instrument, timeframe }, 400);
   }

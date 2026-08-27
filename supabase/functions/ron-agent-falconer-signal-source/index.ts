@@ -20,6 +20,9 @@ import {
   type FalconerEventRow, type FalconerTradeStateRow,
 } from "../_shared/ron-falconer-signal-source-spec.ts";
 import { resolveFalconerSpecVersion } from "../_shared/ron-falconer-endpoint-version-selector.ts";
+import {
+  instrumentAdmitted, multiMarketRequested,
+} from "../_shared/ron-multi-market-scope-v1.ts";
 
 /** Safe, explicit signal-state projection. Never `*`, never a private/geometry field. */
 const TRADE_STATE_COLUMNS =
@@ -107,7 +110,7 @@ Deno.serve(async (req) => {
 
   const instrument = typeof body.instrument === "string" ? body.instrument : SYMBOL;
   const timeframe = typeof body.timeframe === "string" ? body.timeframe : TIMEFRAME;
-  if (!FALCONER_SIGNAL_SOURCE_SPEC_V1.instrument_scope.includes(instrument as "XAUUSD")
+  if (!instrumentAdmitted(FALCONER_SIGNAL_SOURCE_SPEC_V1, instrument, multiMarketRequested(body))
     || !FALCONER_SIGNAL_SOURCE_SPEC_V1.timeframe_scope.includes(timeframe as "15m")) {
     return json({ error: "out_of_scope_for_falconer_signal_source_spec_v1", instrument, timeframe }, 400);
   }
