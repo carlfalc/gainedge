@@ -446,6 +446,26 @@ describe("frozen surfaces untouched", () => {
       + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
       + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
       + ` ':(exclude)src/integrations/supabase/previewAuthStorage.ts'`
+      // GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1 slice.
+      + ` ':(exclude)supabase/functions/_shared/ron-multi-market-scope-v1.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-orchestration-run-v10.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-opportunity-risk-spec.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-native-roster-v1.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-session-structure/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-pattern-context/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-cross-asset-correlation/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-calibration-validation/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-macro-news-geopolitics/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-opportunity-risk/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-agent-falconer-signal-source/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-orchestrate-run/index.ts'`
+      + ` ':(exclude)supabase/functions/ron-context-scheduler/index.ts'`
+      + ` ':(exclude)src/lib/signal-notifications.ts'`
+      + ` ':(exclude)src/components/dashboard/GlobalSignalNotifications.tsx'`
+      + ` ':(exclude)src/test/gainedge-ron-real-multi-market-realtime-v1.test.ts'`
+      + ` ':(exclude)src/test/gainedge-global-signal-popup-v1.test.tsx'`
+      + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-always-on-runtime-completion-v1.test.ts'`
       ,
       { encoding: "utf8" },
     );
