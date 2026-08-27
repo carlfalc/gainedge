@@ -427,7 +427,9 @@ Deno.serve(async (req) => {
     }
 
     const summary = {
-      orchestration_run_version: isV9
+      orchestration_run_version: isV10
+        ? RON_ORCHESTRATION_RUN_VERSION_V10
+        : isV9
         ? RON_ORCHESTRATION_RUN_VERSION_V9
         : isV8
         ? RON_ORCHESTRATION_RUN_VERSION_V8
@@ -442,7 +444,9 @@ Deno.serve(async (req) => {
         : isV3
         ? RON_ORCHESTRATION_RUN_VERSION_V3
         : isV2 ? RON_ORCHESTRATION_RUN_VERSION_V2 : RON_ORCHESTRATION_RUN_VERSION,
-      orchestration_run_plan_hash: isV9
+      orchestration_run_plan_hash: isV10
+        ? await orchestrationRunPlanHashV10()
+        : isV9
         ? await orchestrationRunPlanHashV9()
         : isV8
         ? await orchestrationRunPlanHashV8()
@@ -457,6 +461,8 @@ Deno.serve(async (req) => {
         : isV3
         ? await orchestrationRunPlanHashV3()
         : isV2 ? await orchestrationRunPlanHashV2() : await orchestrationRunPlanHash(),
+      // V10-ONLY field: earlier replays keep their exact historical summary shape.
+      ...(isV10 ? { multi_market_scope_version: RON_MULTI_MARKET_SCOPE_VERSION } : {}),
       persistence_atomicity: isV2
         ? ORCHESTRATION_RUN_SPEC_V2.persistence_atomicity
         : ORCHESTRATION_RUN_SPEC_V1.persistence_atomicity,
