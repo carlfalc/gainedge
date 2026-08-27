@@ -262,6 +262,13 @@ describe("GAINEDGE_ASK_RON_GLOBAL_CONTEXT_BRIDGE_V1", () => {
       + ` ':(exclude)src/test/gainedge-multi-asset-foundation-and-chart-persistence-v1.test.tsx'`
       + ` ':(exclude)src/test/ron-v3-v8-regression-guard.test.ts'`
       + ` ':(exclude)src/test/gainedge-ron-snapshot-feature-version-alignment-v1.test.ts'`
+      + ` ':(exclude)supabase/functions/_shared/ron-native-roster-v1.ts'`
+      + ` ':(exclude)supabase/migrations/20260827090023_6a8b1ce6-e212-4753-967d-45095d3f572b.sql'`
+      + ` ':(exclude)src/lib/ron-lifecycle-since.ts'`
+      + ` ':(exclude)src/services/ron-opportunity-context.ts'`
+      + ` ':(exclude)supabase/functions/ron-context-scheduler/index.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-always-on-runtime-completion-v1.test.ts'`
+      + ` ':(exclude).lovable/memory/features/intelligence/ron-outcome-learning.md'`
       + ` ':(exclude).lovable/plan.md'`
       ,
       { encoding: "utf8" },

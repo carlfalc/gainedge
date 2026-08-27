@@ -17,6 +17,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { assessVenue } from "../_shared/ron-venue-registry-v1.ts";
 import { FORWARD_CONTEXT_INSTRUMENTS } from "../_shared/ron-forward-instrument-binding-v1.ts";
 import { OPPORTUNITY_CONTEXT_RUNTIME_V1 } from "../_shared/ron-opportunity-context-runtime-v1.ts";
+import {
+  evaluateCycleCompleteness, type CycleCompleteness, type CycleStatus,
+} from "../_shared/ron-native-roster-v1.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,12 +63,64 @@ Deno.serve(async (req) => {
 
   const nowMs = Date.now();
   const floorIso = new Date(nowMs - MAX_ANCHOR_AGE_MS).toISOString();
+  /** Close of the most recent fully completed bar. Used to key blocked cycle records. */
+  const lastCompletedCloseIso = new Date(Math.floor(nowMs / BAR_MS) * BAR_MS).toISOString();
   const results: Record<string, unknown>[] = [];
+
+  /** Reads the component ids that genuinely settled for this exact anchor. */
+  async function observedComponents(instrument: string, anchorIso: string): Promise<string[]> {
+    const { data, error } = await db.from("ron_agent_runs").select("agent_id")
+      .eq("instrument", instrument).eq("timeframe", TIMEFRAME).eq("as_of", anchorIso);
+    if (error) return [];
+    return [...new Set((data ?? []).map((r) => String(r.agent_id ?? "")).filter(Boolean))];
+  }
+
+  /**
+   * Append-only observability record. A cycle is logged whether it completed, was
+   * incomplete, or was blocked — silence is never used to imply success. Failure to log
+   * never affects the evaluation itself.
+   */
+  async function recordCycle(c: CycleCompleteness, venueState: string, venueReason: string | null) {
+    try {
+      await db.from("ron_data_health_events").insert({
+        instrument: c.instrument,
+        timeframe: c.timeframe,
+        status: c.cycle_status === "complete" ? "ok" : "degraded",
+        reason: c.reason,
+        venue_state: venueState,
+        venue_reason: venueReason,
+        evaluation_allowed: c.cycle_status === "complete" || c.cycle_status === "incomplete",
+        evaluation_anchor: c.evaluation_anchor,
+        cycle_status: c.cycle_status,
+        roster_version: c.roster_version,
+        expected_components: c.expected_components,
+        completed_components: c.completed_components,
+        missing_components: c.missing_components,
+        context_written: c.context_written,
+        material_event_written: c.material_event_written,
+      });
+    } catch (_err) {
+      // Observability must never break the runtime.
+    }
+  }
+
+  async function blockedCycle(
+    instrument: string, anchorIso: string, status: Exclude<CycleStatus, "complete" | "incomplete">,
+    reason: string, venueState: string, venueReason: string | null,
+  ) {
+    await recordCycle(evaluateCycleCompleteness({
+      instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
+      observed_components: [], context_written: false, material_event_written: false,
+      blocked: { status, reason },
+    }), venueState, venueReason);
+  }
 
   for (const instrument of SCHEDULED_INSTRUMENTS) {
     try {
       const venue = assessVenue(instrument, nowMs);
       if (venue.state !== "open" && venue.state !== "closed") {
+        await blockedCycle(instrument, lastCompletedCloseIso, "blocked_venue",
+          "venue_not_authoritative", venue.state, venue.reason ?? null);
         results.push({ instrument, scheduled: false, reason: "venue_not_authoritative", venue_state: venue.state });
         continue;
       }
@@ -86,6 +141,8 @@ Deno.serve(async (req) => {
       ]);
       const readErr = candles.error ?? snaps.error ?? contexts.error;
       if (readErr) {
+        await blockedCycle(instrument, lastCompletedCloseIso, "blocked_data",
+          "source_read_failed", venue.state, venue.reason ?? null);
         results.push({ instrument, scheduled: false, reason: "source_read_failed", detail: readErr.message });
         continue;
       }
@@ -106,6 +163,14 @@ Deno.serve(async (req) => {
         .sort((a, b) => b - a);
 
       if (candidates.length === 0) {
+        // Distinguish "market gives us nothing yet" from "our own data is missing".
+        const alreadyDone = done.has(lastCompletedCloseIso);
+        if (!alreadyDone) {
+          await blockedCycle(instrument, lastCompletedCloseIso,
+            venue.state === "closed" ? "blocked_market" : "blocked_data",
+            venue.state === "closed" ? "venue_closed_no_new_completed_bar" : "no_accepted_snapshot_for_completed_bar",
+            venue.state, venue.reason ?? null);
+        }
         results.push({ instrument, scheduled: false, reason: "no_new_eligible_anchor", venue_state: venue.state });
         continue;
       }
@@ -120,6 +185,20 @@ Deno.serve(async (req) => {
         }),
       });
       const out = await res.json().catch(() => ({}));
+
+      const completeness = evaluateCycleCompleteness({
+        instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
+        observed_components: await observedComponents(instrument, anchorIso),
+        context_written: out?.persisted === true,
+        material_event_written: !!out?.material_event,
+        blocked: res.ok
+          ? (out?.data_blocked === true
+            ? { status: "blocked_data" as const, reason: String(out?.data_state ?? "data_blocked") }
+            : null)
+          : { status: "blocked_data" as const, reason: String(out?.reason ?? "opportunity_context_failed") },
+      });
+      await recordCycle(completeness, String(out?.venue_state ?? venue.state), venue.reason ?? null);
+
       results.push({
         instrument, scheduled: true, evaluation_anchor: anchorIso,
         http_status: res.status,
@@ -128,6 +207,8 @@ Deno.serve(async (req) => {
         lifecycle: out?.lifecycle ?? null,
         material_change_type: out?.material_change_type ?? null,
         material_event: out?.material_event ?? null,
+        cycle_status: completeness.cycle_status,
+        missing_components: completeness.missing_components,
         reason: res.ok ? null : (out?.reason ?? "opportunity_context_failed"),
       });
     } catch (err) {
@@ -137,6 +218,7 @@ Deno.serve(async (req) => {
       });
     }
   }
+
 
   return json({
     ok: true,

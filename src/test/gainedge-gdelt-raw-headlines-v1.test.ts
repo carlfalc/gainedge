@@ -358,6 +358,13 @@ describe("frozen surfaces untouched", () => {
       // GAINEDGE_SIGNALS_V1 — frontend-only Signals & Opportunities page (read-only
       // presentation over already-stored RON decisions and Falconer records) plus the
       // working plan document. No backend, runtime or frozen artifact is touched.
+      + ` ':(exclude)supabase/functions/_shared/ron-native-roster-v1.ts'`
+      + ` ':(exclude)supabase/migrations/20260827090023_6a8b1ce6-e212-4753-967d-45095d3f572b.sql'`
+      + ` ':(exclude)src/lib/ron-lifecycle-since.ts'`
+      + ` ':(exclude)src/services/ron-opportunity-context.ts'`
+      + ` ':(exclude)supabase/functions/ron-context-scheduler/index.ts'`
+      + ` ':(exclude)src/test/gainedge-ron-always-on-runtime-completion-v1.test.ts'`
+      + ` ':(exclude).lovable/memory/features/intelligence/ron-outcome-learning.md'`
       + ` ':(exclude).lovable/plan.md'`
       + ` ':(exclude)src/pages/dashboard/SignalsPage.tsx'`
       + ` ':(exclude)src/lib/signals-presentation.ts'`

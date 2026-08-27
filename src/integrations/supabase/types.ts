@@ -1408,17 +1408,25 @@ export type Database = {
       ron_data_health_events: {
         Row: {
           age_minutes: number | null
+          completed_components: string[] | null
+          context_written: boolean | null
           created_at: string
           critical_flag_count: number
+          cycle_status: string | null
           evaluation_allowed: boolean
+          evaluation_anchor: string | null
+          expected_components: string[] | null
           health_version: number
           id: string
           instrument: string
           latest_bar_time: string | null
+          material_event_written: boolean | null
+          missing_components: string[] | null
           next_expected_open: string | null
           observed_at: string
           reason: string
           registry_version: number
+          roster_version: number | null
           status: string
           timeframe: string
           venue_class: string | null
@@ -1427,17 +1435,25 @@ export type Database = {
         }
         Insert: {
           age_minutes?: number | null
+          completed_components?: string[] | null
+          context_written?: boolean | null
           created_at?: string
           critical_flag_count?: number
+          cycle_status?: string | null
           evaluation_allowed?: boolean
+          evaluation_anchor?: string | null
+          expected_components?: string[] | null
           health_version?: number
           id?: string
           instrument: string
           latest_bar_time?: string | null
+          material_event_written?: boolean | null
+          missing_components?: string[] | null
           next_expected_open?: string | null
           observed_at?: string
           reason: string
           registry_version?: number
+          roster_version?: number | null
           status: string
           timeframe: string
           venue_class?: string | null
@@ -1446,17 +1462,25 @@ export type Database = {
         }
         Update: {
           age_minutes?: number | null
+          completed_components?: string[] | null
+          context_written?: boolean | null
           created_at?: string
           critical_flag_count?: number
+          cycle_status?: string | null
           evaluation_allowed?: boolean
+          evaluation_anchor?: string | null
+          expected_components?: string[] | null
           health_version?: number
           id?: string
           instrument?: string
           latest_bar_time?: string | null
+          material_event_written?: boolean | null
+          missing_components?: string[] | null
           next_expected_open?: string | null
           observed_at?: string
           reason?: string
           registry_version?: number
+          roster_version?: number | null
           status?: string
           timeframe?: string
           venue_class?: string | null

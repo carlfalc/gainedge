@@ -8,6 +8,9 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import type { TrackedPair } from "@/lib/ron-decision-explorer";
+import {
+  deriveStateSince, type LifecycleHistoryRow, type LifecycleSince,
+} from "@/lib/ron-lifecycle-since";
 
 export interface RonOpportunityContextRecord {
   id: string;
@@ -89,4 +92,52 @@ export async function fetchOpportunityContexts(
   const rows = ((data ?? []) as unknown as RonOpportunityContextRecord[])
     .filter((r) => wanted.has(contextKey(r.instrument, r.timeframe)));
   return latestByPair(rows);
+}
+
+/* ------------------------------------------------------------------------- *
+ * GAINEDGE_RON_ALWAYS_ON_RUNTIME_COMPLETION_V1 — lifecycle transition start time.
+ * Derived from stored append-only history only. See `@/lib/ron-lifecycle-since`.
+ * ------------------------------------------------------------------------- */
+
+/** How far back the transition-start derivation is allowed to look, per pair. */
+export const STATE_SINCE_HISTORY_LIMIT = 64;
+
+/**
+ * Reads recent lifecycle history and derives when each pair's current state began.
+ * A pair with no readable history is simply absent — never defaulted.
+ */
+export async function fetchStateSince(
+  pairs: TrackedPair[],
+  perPairLimit = STATE_SINCE_HISTORY_LIMIT,
+): Promise<Map<string, LifecycleSince>> {
+  const instruments = Array.from(new Set(pairs.map((p) => p.symbol.trim().toUpperCase())))
+    .filter(Boolean);
+  if (instruments.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from(OPPORTUNITY_CONTEXT_TABLE)
+    .select("instrument,timeframe,evaluation_anchor,lifecycle")
+    .in("instrument", instruments)
+    .order("evaluation_anchor", { ascending: false })
+    .limit(Math.max(1, instruments.length * perPairLimit));
+  if (error) return new Map();
+
+  const grouped = new Map<string, LifecycleHistoryRow[]>();
+  for (const row of (data ?? []) as unknown as
+    (LifecycleHistoryRow & { instrument: string; timeframe: string })[]) {
+    if (!row?.instrument || !row?.timeframe) continue;
+    const key = contextKey(row.instrument, row.timeframe);
+    const bucket = grouped.get(key) ?? [];
+    bucket.push({ evaluation_anchor: row.evaluation_anchor, lifecycle: row.lifecycle });
+    grouped.set(key, bucket);
+  }
+
+  const wanted = new Set(pairs.map((p) => contextKey(p.symbol, p.timeframe)));
+  const out = new Map<string, LifecycleSince>();
+  for (const [key, rows] of grouped) {
+    if (!wanted.has(key)) continue;
+    const since = deriveStateSince(rows);
+    if (since) out.set(key, since);
+  }
+  return out;
 }
