@@ -182,22 +182,86 @@ Deno.serve(async (req) => {
         .sort((a, b) => b - a);
 
       if (candidates.length === 0) {
-        // Distinguish "market gives us nothing yet" from "our own data is missing".
+        // Distinguish ordinary pipeline latency, a closed market and a real data gap.
         const alreadyDone = done.has(lastCompletedCloseIso);
+        // A genuine completed bar whose accepted snapshot simply has not landed yet.
+        const awaitingSnapshot = (candles.data ?? [])
+          .map((r) => new Date(String(r.timestamp)).getTime())
+          .filter((t) => Number.isFinite(t) && t % BAR_MS === 0)
+          .filter((t) => t + BAR_MS <= nowMs)
+          .filter((t) => !snapSet.has(new Date(t).toISOString()))
+          .filter((t) => !done.has(new Date(t + BAR_MS).toISOString()))
+          .some((t) => nowMs - (t + BAR_MS) <= SNAPSHOT_GRACE_MS);
         if (!alreadyDone) {
           await blockedCycle(instrument, lastCompletedCloseIso,
-            venue.state === "closed" ? "blocked_market" : "blocked_data",
-            venue.state === "closed" ? "venue_closed_no_new_completed_bar" : "no_accepted_snapshot_for_completed_bar",
+            venue.state === "closed"
+              ? "blocked_market"
+              : awaitingSnapshot ? "deferred" : "blocked_data",
+            venue.state === "closed"
+              ? "venue_closed_no_new_completed_bar"
+              : awaitingSnapshot
+              ? "deferred_awaiting_accepted_snapshot"
+              : "no_accepted_snapshot_for_completed_bar",
             venue.state, venue.reason ?? null);
         }
-        results.push({ instrument, scheduled: false, reason: "no_new_eligible_anchor", venue_state: venue.state });
+        results.push({
+          instrument, scheduled: false,
+          reason: awaitingSnapshot ? "deferred_awaiting_accepted_snapshot" : "no_new_eligible_anchor",
+          deferred: awaitingSnapshot,
+          venue_state: venue.state,
+        });
         continue;
       }
 
       const anchorIso = new Date(candidates[0]).toISOString();
+
+      /**
+       * THE REAL RON CHAIN. The seven-specialist orchestration run is attempted FIRST for
+       * this exact anchor, so stored specialist evidence and (where the contract accepts
+       * it) a stored decision exist before any context record is written. It is idempotent
+       * per anchor: a decision already stored for this anchor is never re-run.
+       */
+      let orchestration: Record<string, unknown> = { attempted: false };
+      const { data: existingDecision } = await db.from("ron_orchestrator_decisions")
+        .select("decision_id").eq("instrument", instrument).eq("timeframe", TIMEFRAME)
+        .eq("as_of", anchorIso).limit(1);
+      if (existingDecision?.length) {
+        orchestration = { attempted: false, reason: "already_decided", persisted: true };
+      } else {
+        try {
+          const orchRes = await fetch(`${supabaseUrl}/functions/v1/ron-orchestrate-run`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
+              orchestration_run_version: RON_ORCHESTRATION_RUN_VERSION_V10,
+              trace_id: `ron_sched_v10_${anchorIso}_${instrument}_${TIMEFRAME}`,
+              persist: true,
+            }),
+          });
+          const orchOut = await orchRes.json().catch(() => ({}));
+          orchestration = {
+            attempted: true,
+            http_status: orchRes.status,
+            persisted: orchOut?.persisted === true,
+            state: orchOut?.decision?.state ?? null,
+            decision_id: orchOut?.decision?.decision_id ?? null,
+            // Deterministic contract reasons only: no evidence content, no keys.
+            error: orchRes.ok ? null : (orchOut?.error ?? "orchestration_failed"),
+            reasons: Array.isArray(orchOut?.reasons) ? orchOut.reasons : null,
+          };
+        } catch (orchErr) {
+          orchestration = {
+            attempted: true, persisted: false,
+            error: `orchestration_unreachable:${String((orchErr as Error)?.message ?? orchErr)}`,
+          };
+        }
+      }
+
       const res = await fetch(`${supabaseUrl}/functions/v1/ron-opportunity-context`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+
         body: JSON.stringify({
           instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
           runtime_version: 2, persist: true,
