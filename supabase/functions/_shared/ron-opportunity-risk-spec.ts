@@ -165,7 +165,15 @@ export interface OpportunityRiskInputV1 {
    * the frozen v1 policy, so V1/V2/V3 replays stay byte-identical.
    */
   ttl_policy_version?: number;
+  /**
+   * GAINEDGE_RON_REAL_MULTI_MARKET_AND_REALTIME_SIGNAL_DELIVERY_V1: explicit opt-in to the
+   * audited forward pilot instrument binding. Absent/false -> the frozen XAUUSD-only scope,
+   * so every historical replay is byte-identical. It widens ADMISSION only and never
+   * supplies or substitutes data for another market.
+   */
+  multi_market_scope?: boolean;
 }
+
 
 /**
  * Deterministic, typed contract rejection of a pure input. Thrown BEFORE any date
