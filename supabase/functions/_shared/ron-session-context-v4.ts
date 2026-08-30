@@ -4,18 +4,11 @@
  * Forward-only, instrument-aware session semantics for the multi-market RON runtime.
  * The historical Session V1-V3 XAUUSD contracts remain untouched and replayable.
  *
- * This module deliberately separates:
- *   - venue availability truth (open/closed/calendar-unavailable), from
- *   - descriptive market-session context (Asia/London/New York, US cash, HKEX AM/PM).
- *
- * Session labels are descriptive evidence for RON and later cohort research. They are
- * never a BUY/SELL instruction and never imply a probability of success.
+ * Venue availability truth and descriptive session context are separate. Session labels
+ * are evidence/research dimensions, never BUY/SELL instructions or probabilities.
  */
 import { localClock, VENUE_REGISTRY, type VenueAssessment } from "./ron-venue-registry-v1.ts";
-import {
-  assessVenueV2,
-  type NativeCompletedBarProof,
-} from "./ron-venue-registry-v2.ts";
+import { assessVenueV2, type NativeCompletedBarProof } from "./ron-venue-registry-v2.ts";
 
 export const RON_SESSION_CONTEXT_VERSION_V4 = 4;
 
@@ -25,7 +18,7 @@ export type RonSessionLabel =
   | "london"
   | "new_york"
   | "london_new_york_overlap"
-  | "new_york_late"
+  | "global_transition"
   | "us_pre_cash"
   | "us_cash_opening"
   | "us_cash_mid"
@@ -49,11 +42,9 @@ export interface RonSessionContextV4 {
   local_weekday: number;
   local_minutes: number;
   local_day_name: string;
-  /** Stable 15-minute local clock bucket, e.g. `09:45`. */
+  /** Stable 15-minute bucket in the instrument's venue-local timezone. */
   local_time_bucket: string;
-  /** True only when the venue assessment can prove this anchor traded/open. */
   active_trading_session: boolean;
-  /** Research dimensions RON may use later for outcome cohorts. */
   cohort_dimensions: {
     weekday: string;
     session: RonSessionLabel;
@@ -76,17 +67,28 @@ function familyFor(instrument: string): RonSessionFamily {
   return "metals";
 }
 
-/** FX/metals global session taxonomy expressed in UTC, independent of XAU venue rules. */
+function inside(minutes: number, fromHour: number, toHour: number): boolean {
+  return minutes >= fromHour * 60 && minutes < toHour * 60;
+}
+
+/**
+ * DST-aware global market-session taxonomy. The clocks are evaluated in their native
+ * IANA timezones instead of assuming fixed UTC offsets. These are descriptive liquidity
+ * windows; venue availability still comes exclusively from the venue assessment.
+ */
 function globalSessionLabel(anchorMs: number): RonSessionLabel {
-  const d = new Date(anchorMs);
-  const mins = d.getUTCHours() * 60 + d.getUTCMinutes();
-  // Descriptive windows only. They intentionally overlap where London and New York are
-  // simultaneously active. DST-specific venue truth remains separate from these labels.
-  if (mins >= 12 * 60 && mins < 16 * 60) return "london_new_york_overlap";
-  if (mins >= 7 * 60 && mins < 12 * 60) return "london";
-  if (mins >= 16 * 60 && mins < 21 * 60) return "new_york";
-  if (mins >= 21 * 60 || mins < 22) return "new_york_late";
-  return "asia";
+  const london = localClock(anchorMs, "Europe/London");
+  const newYork = localClock(anchorMs, "America/New_York");
+  const tokyo = localClock(anchorMs, "Asia/Tokyo");
+  const londonActive = inside(london.minutes, 8, 17);
+  const newYorkActive = inside(newYork.minutes, 8, 17);
+  const asiaActive = inside(tokyo.minutes, 9, 18);
+
+  if (londonActive && newYorkActive) return "london_new_york_overlap";
+  if (londonActive) return "london";
+  if (newYorkActive) return "new_york";
+  if (asiaActive) return "asia";
+  return "global_transition";
 }
 
 function nas100Label(localMinutes: number): RonSessionLabel {
@@ -126,8 +128,6 @@ export function buildRonSessionContextV4(args: {
   let session: RonSessionLabel;
   if (venue.state === "calendar_unavailable") session = "calendar_unavailable";
   else if (venue.state === "closed") {
-    // Preserve lunch as a meaningful HKEX research regime rather than flattening it into
-    // generic closure. No specialist trade reasoning is permitted during this state.
     session = family === "hk_index" && clock.minutes >= 12 * 60 && clock.minutes < 13 * 60
       ? "hkex_lunch_break"
       : "market_closed";
@@ -136,6 +136,7 @@ export function buildRonSessionContextV4(args: {
   else session = globalSessionLabel(anchorMs);
 
   const localDay = DAY_NAMES[clock.dow] ?? "Unknown";
+  const timeBucket = hhmm(clock.minutes);
   return {
     version: RON_SESSION_CONTEXT_VERSION_V4,
     instrument: args.instrument,
@@ -147,13 +148,9 @@ export function buildRonSessionContextV4(args: {
     local_weekday: clock.dow,
     local_minutes: clock.minutes,
     local_day_name: localDay,
-    local_time_bucket: hhmm(clock.minutes),
+    local_time_bucket: timeBucket,
     active_trading_session: venue.state === "open",
-    cohort_dimensions: {
-      weekday: localDay,
-      session,
-      local_time_bucket: hhmm(clock.minutes),
-    },
+    cohort_dimensions: { weekday: localDay, session, local_time_bucket: timeBucket },
   };
 }
 
@@ -162,6 +159,7 @@ export function sessionContextV4Payload() {
     "ron_session_context_version", RON_SESSION_CONTEXT_VERSION_V4,
     "venue_registry_version", 2,
     "instrument_aware", true,
+    "dst_aware_global_sessions", true,
     "xau_v1_v3_unchanged", true,
     "cohort_dimensions", ["weekday", "session", "local_time_bucket"],
     "trade_instruction", false,
