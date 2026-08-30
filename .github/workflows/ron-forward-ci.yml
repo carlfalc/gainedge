@@ -52,5 +52,8 @@ jobs:
       - name: Deno check HK50 forward venue contract
         run: deno check supabase/functions/_shared/ron-venue-registry-v2.ts
 
+      - name: Deno check instrument-aware Session V4
+        run: deno check supabase/functions/_shared/ron-session-context-v4.ts
+
       - name: Deno check post-V4 data readiness
         run: deno check supabase/functions/ron-post-v4-data-readiness/index.ts
