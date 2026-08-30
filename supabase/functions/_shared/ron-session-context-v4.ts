@@ -56,7 +56,9 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 function hhmm(minutes: number): string {
   const h = Math.floor(minutes / 60).toString().padStart(2, "0");
-  const m = (Math.floor(minutes / 15) * 15).toString().padStart(2, "0");
+  const minuteWithinHour = minutes % 60;
+  const bucketMinute = Math.floor(minuteWithinHour / 15) * 15;
+  const m = bucketMinute.toString().padStart(2, "0");
   return `${h}:${m}`;
 }
 
