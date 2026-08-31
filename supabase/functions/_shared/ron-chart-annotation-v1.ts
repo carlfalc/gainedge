@@ -192,8 +192,8 @@ function validateGeometry(kind: RonChartAnnotationKind, geometry: unknown): stri
   } else if (kind === "fib") {
     const allowed = new Set([0.382, 0.5, 0.618, 0.786, 1.272, 1.618]);
     if (!finite(g.ratio) || !allowed.has(Number(g.ratio)) || !finite(g.price)) return "invalid_fib_geometry";
-    if (!validAnchor(g.swing_start) || !finite((g.swing_start as Record<string, unknown>).price)) return "fib_swing_start_required";
-    if (!validAnchor(g.swing_end) || !finite((g.swing_end as Record<string, unknown>).price)) return "fib_swing_end_required";
+    if (!validAnchor(g.swing_start) || !finite(g.swing_start.price)) return "fib_swing_start_required";
+    if (!validAnchor(g.swing_end) || !finite(g.swing_end.price)) return "fib_swing_end_required";
   } else if (kind === "pivot") {
     const levels = new Set(["P", "R1", "R2", "R3", "S1", "S2", "S3"]);
     if (!levels.has(String(g.level)) || !finite(g.price)) return "invalid_pivot_geometry";
@@ -207,7 +207,7 @@ function validateGeometry(kind: RonChartAnnotationKind, geometry: unknown): stri
     if (!periods.has(Number(g.fast_period)) || !finite(g.fast_value)) return "invalid_ema_fast_evidence";
     if (g.slow_period != null && !periods.has(Number(g.slow_period))) return "invalid_ema_slow_period";
     if (g.slow_value != null && !finite(g.slow_value)) return "invalid_ema_slow_value";
-    if (!validAnchor(g.event_anchor) || !finite((g.event_anchor as Record<string, unknown>).price)) return "ema_event_anchor_required";
+    if (!validAnchor(g.event_anchor) || !finite(g.event_anchor.price)) return "ema_event_anchor_required";
   } else if (kind === "pattern_marker") {
     if (!validAnchor(g.start_anchor) || !validAnchor(g.end_anchor)) return "pattern_span_required";
   } else if (kind === "scenario") {
