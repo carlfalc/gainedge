@@ -25,7 +25,7 @@ describe("RON selected-watch runtime completion V1", () => {
 
   it("feeds GER40 through unattended ingestion and snapshot cron", () => {
     const ingest = read("supabase/functions/ingest-candles/index.ts");
-    const migration = read("supabase/migrations/20260831090000_ron_selected_watch_ger40_v1.sql");
+    const migration = read("supabase/migrations/20260831222806_70225501-7611-44ad-8e74-68a4f85feace.sql");
     expect(RON_DATA_INSTRUMENTS_V2).toContain("GER40");
     expect(ingest).toContain('{ symbol: "GER40", timeframe: "15m" }');
     expect(migration).toContain("'HK50','GER40'");
