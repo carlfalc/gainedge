@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1840,69 +1840,6 @@ export type Database = {
           },
         ]
       }
-      ron_market_snapshots: {
-        Row: {
-          bar_time: string
-          chart_annotations_v1: Json
-          close: number
-          computed_at: string
-          data_health: string
-          feature_version: number
-          features: Json
-          high: number
-          id: string
-          low: number
-          model_signals: Json
-          open: number
-          patterns: Json
-          source: string | null
-          spread: number | null
-          symbol: string
-          timeframe: string
-          volume: number | null
-        }
-        Insert: {
-          bar_time: string
-          chart_annotations_v1?: Json
-          close: number
-          computed_at?: string
-          data_health?: string
-          feature_version?: number
-          features?: Json
-          high: number
-          id?: string
-          low: number
-          model_signals?: Json
-          open: number
-          patterns?: Json
-          source?: string | null
-          spread?: number | null
-          symbol: string
-          timeframe: string
-          volume?: number | null
-        }
-        Update: {
-          bar_time?: string
-          chart_annotations_v1?: Json
-          close?: number
-          computed_at?: string
-          data_health?: string
-          feature_version?: number
-          features?: Json
-          high?: number
-          id?: string
-          low?: number
-          model_signals?: Json
-          open?: number
-          patterns?: Json
-          source?: string | null
-          spread?: number | null
-          symbol?: string
-          timeframe?: string
-          volume?: number | null
-        }
-        Relationships: []
-      }
       ron_historical_setup_observations: {
         Row: {
           adverse_excursion_price: number | null
@@ -1978,6 +1915,69 @@ export type Database = {
           timeframe?: string
           volatility_regime?: string
           weekday?: string
+        }
+        Relationships: []
+      }
+      ron_market_snapshots: {
+        Row: {
+          bar_time: string
+          chart_annotations_v1: Json
+          close: number
+          computed_at: string
+          data_health: string
+          feature_version: number
+          features: Json
+          high: number
+          id: string
+          low: number
+          model_signals: Json
+          open: number
+          patterns: Json
+          source: string | null
+          spread: number | null
+          symbol: string
+          timeframe: string
+          volume: number | null
+        }
+        Insert: {
+          bar_time: string
+          chart_annotations_v1?: Json
+          close: number
+          computed_at?: string
+          data_health?: string
+          feature_version?: number
+          features?: Json
+          high: number
+          id?: string
+          low: number
+          model_signals?: Json
+          open: number
+          patterns?: Json
+          source?: string | null
+          spread?: number | null
+          symbol: string
+          timeframe: string
+          volume?: number | null
+        }
+        Update: {
+          bar_time?: string
+          chart_annotations_v1?: Json
+          close?: number
+          computed_at?: string
+          data_health?: string
+          feature_version?: number
+          features?: Json
+          high?: number
+          id?: string
+          low?: number
+          model_signals?: Json
+          open?: number
+          patterns?: Json
+          source?: string | null
+          spread?: number | null
+          symbol?: string
+          timeframe?: string
+          volume?: number | null
         }
         Relationships: []
       }
@@ -2098,10 +2098,10 @@ export type Database = {
           run_id: string
           runtime_version: number
           setup_family: string
-          specialist_commentary_v1: Json
           spec_hash: string
           spec_id: string
           spec_version: number
+          specialist_commentary_v1: Json
           timeframe: string
           trace_id: string
           venue_state: string | null
@@ -2136,10 +2136,10 @@ export type Database = {
           run_id: string
           runtime_version: number
           setup_family: string
-          specialist_commentary_v1?: Json
           spec_hash: string
           spec_id: string
           spec_version: number
+          specialist_commentary_v1?: Json
           timeframe: string
           trace_id: string
           venue_state?: string | null
@@ -2174,10 +2174,10 @@ export type Database = {
           run_id?: string
           runtime_version?: number
           setup_family?: string
-          specialist_commentary_v1?: Json
           spec_hash?: string
           spec_id?: string
           spec_version?: number
+          specialist_commentary_v1?: Json
           timeframe?: string
           trace_id?: string
           venue_state?: string | null
