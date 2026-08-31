@@ -242,6 +242,36 @@ Deno.serve(async (req) => {
         native_completed_bar: { bar_open: candidateBarOpenIso, timeframe_minutes: 15 },
       });
 
+      // Refresh the recent measured setup-outcome ledger BEFORE specialist commentary is
+      // assembled. This is fail-soft research enrichment: an unavailable refresh never
+      // blocks the genuine live agent chain, and no incomplete future horizon is written.
+      let historicalRefresh: Record<string, unknown> = { attempted: false };
+      try {
+        const refreshRes = await fetch(`${supabaseUrl}/functions/v1/ron-historical-setup-refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({
+            instrument,
+            start: new Date(candidates[0] - 24 * 60 * 60_000).toISOString(),
+            end: candidateBarOpenIso,
+            limit: 128,
+            horizon_bars: 4,
+          }),
+        });
+        const refreshOut = await refreshRes.json().catch(() => ({}));
+        historicalRefresh = {
+          attempted: true,
+          http_status: refreshRes.status,
+          observations: Number(refreshOut?.observations ?? 0),
+          error: refreshRes.ok ? null : String(refreshOut?.error ?? "historical_refresh_failed"),
+        };
+      } catch (refreshErr) {
+        historicalRefresh = {
+          attempted: true,
+          error: `historical_refresh_unreachable:${String((refreshErr as Error)?.message ?? refreshErr)}`,
+        };
+      }
+
       /**
        * THE REAL RON CHAIN. The seven-specialist orchestration run is attempted FIRST for
        * this exact anchor, so stored specialist evidence and (where the contract accepts
@@ -319,6 +349,7 @@ Deno.serve(async (req) => {
         persisted: out?.persisted === true,
         venue_state: out?.venue_state ?? venue.state,
         session_context_v5: sessionContext,
+        historical_setup_refresh: historicalRefresh,
         lifecycle: out?.lifecycle ?? null,
         material_change_type: out?.material_change_type ?? null,
         material_event: out?.material_event ?? null,

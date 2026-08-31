@@ -1903,6 +1903,84 @@ export type Database = {
         }
         Relationships: []
       }
+      ron_historical_setup_observations: {
+        Row: {
+          adverse_excursion_price: number | null
+          aligned_ha_candles_15m: number | null
+          bar_time: string
+          bars_to_peak_favourable: number | null
+          created_at: string
+          direction_context: string
+          evaluation_anchor: string
+          favourable_excursion_price: number | null
+          future_data_cutoff: string
+          horizon_bars: number
+          id: string
+          local_time_bucket: string
+          observation_version: number
+          outcome_atr_threshold: number
+          outcome_observed: boolean
+          point_size: number | null
+          session: string
+          setup_id: string
+          source_agent: string
+          symbol: string
+          timeframe: string
+          volatility_regime: string
+          weekday: string
+        }
+        Insert: {
+          adverse_excursion_price?: number | null
+          aligned_ha_candles_15m?: number | null
+          bar_time: string
+          bars_to_peak_favourable?: number | null
+          created_at?: string
+          direction_context: string
+          evaluation_anchor: string
+          favourable_excursion_price?: number | null
+          future_data_cutoff: string
+          horizon_bars: number
+          id?: string
+          local_time_bucket: string
+          observation_version?: number
+          outcome_atr_threshold: number
+          outcome_observed: boolean
+          point_size?: number | null
+          session: string
+          setup_id: string
+          source_agent: string
+          symbol: string
+          timeframe: string
+          volatility_regime: string
+          weekday: string
+        }
+        Update: {
+          adverse_excursion_price?: number | null
+          aligned_ha_candles_15m?: number | null
+          bar_time?: string
+          bars_to_peak_favourable?: number | null
+          created_at?: string
+          direction_context?: string
+          evaluation_anchor?: string
+          favourable_excursion_price?: number | null
+          future_data_cutoff?: string
+          horizon_bars?: number
+          id?: string
+          local_time_bucket?: string
+          observation_version?: number
+          outcome_atr_threshold?: number
+          outcome_observed?: boolean
+          point_size?: number | null
+          session?: string
+          setup_id?: string
+          source_agent?: string
+          symbol?: string
+          timeframe?: string
+          volatility_regime?: string
+          weekday?: string
+        }
+        Relationships: []
+      }
       ron_material_events: {
         Row: {
           analytical_bar_open: string
@@ -2006,6 +2084,7 @@ export type Database = {
           execution_allowed: boolean
           execution_path: string
           ha_states: Json
+          historical_insights_v1: Json
           id: string
           instrument: string
           lifecycle: string
@@ -2019,6 +2098,7 @@ export type Database = {
           run_id: string
           runtime_version: number
           setup_family: string
+          specialist_commentary_v1: Json
           spec_hash: string
           spec_id: string
           spec_version: number
@@ -2042,6 +2122,7 @@ export type Database = {
           execution_allowed?: boolean
           execution_path?: string
           ha_states?: Json
+          historical_insights_v1?: Json
           id?: string
           instrument: string
           lifecycle: string
@@ -2055,6 +2136,7 @@ export type Database = {
           run_id: string
           runtime_version: number
           setup_family: string
+          specialist_commentary_v1?: Json
           spec_hash: string
           spec_id: string
           spec_version: number
@@ -2078,6 +2160,7 @@ export type Database = {
           execution_allowed?: boolean
           execution_path?: string
           ha_states?: Json
+          historical_insights_v1?: Json
           id?: string
           instrument?: string
           lifecycle?: string
@@ -2091,6 +2174,7 @@ export type Database = {
           run_id?: string
           runtime_version?: number
           setup_family?: string
+          specialist_commentary_v1?: Json
           spec_hash?: string
           spec_id?: string
           spec_version?: number
