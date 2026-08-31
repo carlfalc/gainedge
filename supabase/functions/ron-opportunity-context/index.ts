@@ -13,7 +13,10 @@
  * Safety: no order, no probability, no execution intent, no user-identifiable material,
  * no mutation of any frozen artifact, and ZERO database writes when `persist` is not true.
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import {
+  createClient,
+  type SupabaseClient,
+} from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import {
   buildHaPatternContextV1,
 } from "../_shared/ron-ha-pattern-context-spec-v1.ts";
@@ -53,6 +56,8 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status, headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+type RuntimeDbClient = SupabaseClient<any, "public", "public", any, any>;
 
 function timingSafeEq(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -265,7 +270,7 @@ Deno.serve(async (req) => {
  * reported but never invalidates the already-persisted context record.
  * ===================================================================== */
 async function emitMaterialEvent(
-  db: ReturnType<typeof createClient>,
+  db: RuntimeDbClient,
   source: Parameters<typeof buildMaterialEventRow>[0],
 ): Promise<{ emitted: boolean; reason: string | null }> {
   const row = buildMaterialEventRow(source);
@@ -294,7 +299,7 @@ async function emitMaterialEvent(
  * (`spec_version = 2`, `runtime_version = 2`) and never overwrite a V1 row.
  * ===================================================================== */
 async function runV2(
-  db: ReturnType<typeof createClient>,
+  db: RuntimeDbClient,
   instrument: string, timeframe: string, anchorRaw: string, persist: boolean,
 ): Promise<Response> {
   try {
