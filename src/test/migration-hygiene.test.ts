@@ -55,6 +55,9 @@ const ALLOWLIST = new Set([
   "20260826064238_ca543cd1-29d2-4872-81dd-96acfa83d6ca.sql",
   "20260826064431_3ebf58b0-f9af-4bf0-83f0-937336669d68.sql",
   "20260826064528_9d6949fd-c285-46b5-8ac3-ccb10c30d725.sql",
+  // GAINEDGE_RON_SELECTED_WATCH_RUNTIME_V1: CREATE OR REPLACE FUNCTION body extending
+  // the existing scheduled snapshot loop to GER40. Definition only; no replay invocation.
+  "20260831090000_ron_selected_watch_ger40_v1.sql",
 ]);
 
 
