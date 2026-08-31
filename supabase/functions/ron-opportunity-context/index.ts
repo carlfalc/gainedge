@@ -363,8 +363,15 @@ async function runV2(
     if (snapshots.error) return json({ error: "snapshot_read_failed", detail: snapshots.error.message }, 500);
 
     const bars = selectHaSourceBars((candles.data ?? []) as unknown as RawCandleRow[], anchorMs);
+    type SnapshotWithAnnotations = {
+      bar_time: string;
+      features: Record<string, unknown> | null;
+      chart_annotations_v1: unknown;
+    };
+    const snapshotRows =
+      (snapshots.data ?? []) as unknown as SnapshotWithAnnotations[];
     const snapAt = (iso: string) =>
-      (snapshots.data ?? []).find((s) => new Date(String(s.bar_time)).toISOString() === iso) ?? null;
+      snapshotRows.find((s) => new Date(String(s.bar_time)).toISOString() === iso) ?? null;
     const features = pickSnapshotFeatures(snapAt(analyticalIso)?.features);
     const priorFeatures = pickSnapshotFeatures(snapAt(priorBarIso)?.features);
 
@@ -404,7 +411,9 @@ async function runV2(
       if (historicalError) {
         historicalReadLimitation = `historical_setup_read_failed:${historicalError.message}`;
       } else {
-        const observations: HistoricalSetupObservationV1[] = (historicalRows ?? []).map((r) => ({
+        const typedHistoricalRows =
+          (historicalRows ?? []) as unknown as Array<Record<string, unknown>>;
+        const observations: HistoricalSetupObservationV1[] = typedHistoricalRows.map((r) => ({
           observation_version: 1,
           setup_id: String(r.setup_id),
           source_agent: String(r.source_agent),
@@ -498,12 +507,22 @@ async function runV2(
     let persisted = false;
     let event: { emitted: boolean; reason: string | null } = { emitted: false, reason: "not_persisted" };
     if (persist) {
-      const { error: insErr } = await db
-        .from("ron_opportunity_context")
-        .upsert(row, {
+      // This function deploys in the same release as the migration adding the two JSONB
+      // columns. Narrow the post-migration table boundary explicitly until generated Edge
+      // Function database types include those columns.
+      const opportunityContextTable = db.from("ron_opportunity_context") as unknown as {
+        upsert: (
+          values: Record<string, unknown>,
+          options: { onConflict: string; ignoreDuplicates: boolean },
+        ) => Promise<{ error: { message: string } | null }>;
+      };
+      const { error: insErr } = await opportunityContextTable.upsert(
+        row as unknown as Record<string, unknown>,
+        {
           onConflict: OPPORTUNITY_CONTEXT_RUNTIME_V2.persistence.conflict_key.join(","),
           ignoreDuplicates: true,
-        });
+        },
+      );
       if (insErr) return json({ error: "persist_failed", detail: insErr.message }, 500);
       persisted = true;
       event = await emitMaterialEvent(db, {
