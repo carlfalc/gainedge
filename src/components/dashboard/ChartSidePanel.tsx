@@ -24,6 +24,7 @@ import {
 } from "@/lib/charts-context";
 
 import { askRonContextHref, askRonContextTitle } from "@/lib/ask-ron-context";
+import RonChartAnnotationsPanel from "@/components/dashboard/RonChartAnnotationsPanel";
 
 type RailTab = "ron" | "trade";
 
@@ -66,7 +67,8 @@ export default function ChartSidePanel({
     snapshot?.features,
     snapshot?.timeframe || RON_CONTEXT_TIMEFRAME,
   );
-
+  const hasChartAnnotations = Array.isArray(snapshot?.features?.chart_annotations_v1)
+    && snapshot.features.chart_annotations_v1.length > 0;
 
   return (
     <div className="flex flex-col h-full bg-card border-l border-border overflow-hidden" data-testid="chart-side-rail">
@@ -225,7 +227,9 @@ export default function ChartSidePanel({
 
                 </div>
 
-                {patternCtx.levels.length > 0 && (
+                <RonChartAnnotationsPanel features={snapshot?.features} />
+
+                {!hasChartAnnotations && patternCtx.levels.length > 0 && (
                   <div data-testid="ron-levels">
                     <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
                       Current level context

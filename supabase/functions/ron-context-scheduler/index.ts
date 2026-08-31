@@ -23,8 +23,9 @@
  * It never places an order, never emits a probability and never writes candles.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { assessVenue } from "../_shared/ron-venue-registry-v1.ts";
-import { FORWARD_CONTEXT_INSTRUMENTS } from "../_shared/ron-forward-instrument-binding-v1.ts";
+import { assessVenueV3 } from "../_shared/ron-venue-registry-v3.ts";
+import { RON_SELECTED_WATCH_INSTRUMENTS } from "../_shared/ron-agentic-watch-universe-v1.ts";
+import { buildRonSessionContextV5 } from "../_shared/ron-session-context-v5.ts";
 import { OPPORTUNITY_CONTEXT_RUNTIME_V1 } from "../_shared/ron-opportunity-context-runtime-v1.ts";
 import {
   evaluateCycleCompleteness, type CycleCompleteness, type CycleStatus,
@@ -55,7 +56,7 @@ const SNAPSHOT_GRACE_MS = 25 * 60_000;
 const FEATURE_VERSION = OPPORTUNITY_CONTEXT_RUNTIME_V1.source_contract.feature_version;
 
 /** XAUUSD stays on its own frozen decision-bound scheduler. */
-const SCHEDULED_INSTRUMENTS = FORWARD_CONTEXT_INSTRUMENTS.filter((i) => i !== "XAUUSD");
+const SCHEDULED_INSTRUMENTS = RON_SELECTED_WATCH_INSTRUMENTS.filter((i) => i !== "XAUUSD");
 
 
 function timingSafeEq(a: string, b: string): boolean {
@@ -142,8 +143,9 @@ Deno.serve(async (req) => {
 
   for (const instrument of SCHEDULED_INSTRUMENTS) {
     try {
-      const venue = assessVenue(instrument, nowMs);
-      if (venue.state !== "open" && venue.state !== "closed") {
+      let venue = assessVenueV3(instrument, nowMs);
+      // HK50 venue truth is resolved from the exact completed native candidate below.
+      if (instrument !== "HK50" && venue.state !== "open" && venue.state !== "closed") {
         await blockedCycle(instrument, lastCompletedCloseIso, "blocked_venue",
           "venue_not_authoritative", venue.state, venue.reason ?? null);
         results.push({ instrument, scheduled: false, reason: "venue_not_authoritative", venue_state: venue.state });
@@ -220,6 +222,25 @@ Deno.serve(async (req) => {
       }
 
       const anchorIso = new Date(candidates[0]).toISOString();
+      const candidateBarOpenIso = new Date(candidates[0] - BAR_MS).toISOString();
+      venue = assessVenueV3(instrument, anchorIso, {
+        bar_open: candidateBarOpenIso,
+        timeframe_minutes: 15,
+      });
+      if (venue.state !== "open") {
+        await blockedCycle(instrument, anchorIso, "blocked_market",
+          "candidate_bar_not_proven_open", venue.state, venue.reason ?? null);
+        results.push({
+          instrument, scheduled: false, evaluation_anchor: anchorIso,
+          reason: "candidate_bar_not_proven_open", venue_state: venue.state,
+        });
+        continue;
+      }
+      const sessionContext = buildRonSessionContextV5({
+        instrument,
+        evaluation_anchor: anchorIso,
+        native_completed_bar: { bar_open: candidateBarOpenIso, timeframe_minutes: 15 },
+      });
 
       /**
        * THE REAL RON CHAIN. The seven-specialist orchestration run is attempted FIRST for
@@ -241,6 +262,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
               orchestration_run_version: RON_ORCHESTRATION_RUN_VERSION_V10,
+              session_context_v5: sessionContext,
               trace_id: `ron_sched_v10_${anchorIso}_${instrument}_${TIMEFRAME}`,
               persist: true,
             }),
@@ -270,7 +292,7 @@ Deno.serve(async (req) => {
 
         body: JSON.stringify({
           instrument, timeframe: TIMEFRAME, evaluation_anchor: anchorIso,
-          runtime_version: 2, persist: true,
+          runtime_version: 2, persist: true, session_context_v5: sessionContext,
         }),
       });
       const out = await res.json().catch(() => ({}));
@@ -296,6 +318,7 @@ Deno.serve(async (req) => {
         http_status: res.status,
         persisted: out?.persisted === true,
         venue_state: out?.venue_state ?? venue.state,
+        session_context_v5: sessionContext,
         lifecycle: out?.lifecycle ?? null,
         material_change_type: out?.material_change_type ?? null,
         material_event: out?.material_event ?? null,

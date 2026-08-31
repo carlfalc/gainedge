@@ -57,3 +57,12 @@ jobs:
 
       - name: Deno check post-V4 data readiness
         run: deno check supabase/functions/ron-post-v4-data-readiness/index.ts
+
+      - name: Deno check unattended candle ingestion
+        run: deno check supabase/functions/ingest-candles/index.ts
+
+      - name: Deno check multi-market snapshot worker
+        run: deno check supabase/functions/ron-snapshot/index.ts
+
+      - name: Deno check all-session RON scheduler
+        run: deno check supabase/functions/ron-context-scheduler/index.ts
