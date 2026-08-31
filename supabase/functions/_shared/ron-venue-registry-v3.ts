@@ -6,9 +6,14 @@
  * resolves GER40 through GER40/DAX40/DE40/GER40.i; this module supplies only venue truth.
  *
  * GER40 is treated as a broker index CFD for availability, not as a cash-only Xetra
- * instrument. RON may therefore observe every genuine completed broker bar across the
- * broker's weekly session. European cash-session labels are descriptive context only and
- * never a gate on the agentic watch.
+ * instrument. RON may observe every genuine completed broker bar across Eightcap's
+ * published GER40 session. European cash-session labels remain descriptive context only
+ * and never gate the agentic watch.
+ *
+ * Eightcap publishes GER40 as 03:15–23:00 broker time (GMT+3 during US daylight time,
+ * GMT+2 during US standard time). Expressing the session in America/New_York keeps those
+ * DST shifts aligned: 20:15 previous day through 16:00 New York, Monday–Friday.
+ * Source: https://www.eightcap.com/en-au/traders/trade/ger40/
  */
 import {
   localClock,
@@ -29,7 +34,7 @@ export const GER40_VENUE_SPEC: VenueSpec = Object.freeze({
   timezone: "Europe/Berlin",
   holiday_calendar_available: false,
   sessions: [],
-  note: "Eightcap/MetaApi GER40 CFD. Broker weekly session is used for availability; European cash hours are descriptive context only and never an agentic-watch gate.",
+  note: "Eightcap/MetaApi GER40 CFD. Eightcap's published 03:15–23:00 broker session is used for availability; European cash hours are descriptive context only and never an agentic-watch gate.",
 });
 
 export const VENUE_REGISTRY_V3: Readonly<Record<string, VenueSpec>> = Object.freeze({
@@ -38,27 +43,34 @@ export const VENUE_REGISTRY_V3: Readonly<Record<string, VenueSpec>> = Object.fre
 });
 
 const MIN = 60_000;
+const GER40_OPEN_NY = 20 * 60 + 15;
+const GER40_CLOSE_NY = 16 * 60;
 
-function brokerWeeklyOpen(t: number): boolean {
+/**
+ * Eightcap GER40 session in New York local time.
+ * Sunday 20:15 opens Monday's broker session; Friday 16:00 begins the weekend closure.
+ */
+function eightcapGer40Open(t: number): boolean {
   const c = localClock(t, "America/New_York");
   if (c.dow === 6) return false;
-  if (c.dow === 5 && c.minutes >= 17 * 60) return false;
-  if (c.dow === 0 && c.minutes < 17 * 60) return false;
-  if (c.minutes >= 17 * 60 && c.minutes < 18 * 60) return false;
-  return true;
+  if (c.dow === 0) return c.minutes >= GER40_OPEN_NY;
+  if (c.dow === 5) return c.minutes < GER40_CLOSE_NY;
+  return c.minutes < GER40_CLOSE_NY || c.minutes >= GER40_OPEN_NY;
 }
 
 function brokerClosedReason(t: number): string {
   const c = localClock(t, "America/New_York");
-  if (c.minutes >= 17 * 60 && c.minutes < 18 * 60) return "daily_break_1700_1800_ny";
-  return "weekly_closure_fri1700_sun1700_ny";
+  if (c.dow === 5 && c.minutes >= GER40_CLOSE_NY) return "eightcap_ger40_weekend_close";
+  if (c.dow === 6) return "eightcap_ger40_weekend_close";
+  if (c.dow === 0 && c.minutes < GER40_OPEN_NY) return "eightcap_ger40_weekend_close";
+  return "eightcap_ger40_daily_close_1600_2015_ny";
 }
 
 function nextBrokerOpen(from: number): string | null {
   const start = Math.ceil(from / MIN) * MIN;
   for (let k = 1; k <= 8 * 24 * 60; k++) {
     const t = start + k * MIN;
-    if (brokerWeeklyOpen(t)) return new Date(t).toISOString();
+    if (eightcapGer40Open(t)) return new Date(t).toISOString();
   }
   return null;
 }
@@ -96,13 +108,13 @@ export function assessVenueV3(
     };
   }
 
-  const open = brokerWeeklyOpen(t);
+  const open = eightcapGer40Open(t);
   return {
     instrument,
     venue_class: GER40_VENUE_SPEC.venue_class,
     timezone: GER40_VENUE_SPEC.timezone,
     state: open ? "open" : "closed",
-    reason: open ? "broker_weekly_schedule_open" : brokerClosedReason(t),
+    reason: open ? "eightcap_ger40_published_session_open" : brokerClosedReason(t),
     holiday_calendar_available: false,
     registry_version: RON_VENUE_REGISTRY_VERSION_V3,
     evaluated_at: new Date(t).toISOString(),
@@ -120,7 +132,7 @@ export function venueRegistryV3Payload() {
     "supersedes_version", 2,
     "ger40_registered", true,
     "ger40_provider", "Eightcap/MetaApi",
-    "ger40_availability", "broker_index_cfd_weekly_session",
+    "ger40_availability", "eightcap_ger40_0315_2300_broker_time",
     "cash_session_is_watch_gate", false,
     "hk50_native_completed_bar_exact_slot_proof", true,
   ];
