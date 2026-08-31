@@ -115,6 +115,33 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
 
         <RonOpportunityContextPanel record={ctx} />
 
+        {ctx.specialist_commentary_v1 && ctx.specialist_commentary_v1.length > 0 && (
+          <section
+            className="mt-3 rounded-lg p-3"
+            style={{ background: C.bg2, border: `1px solid ${C.border}` }}
+            data-testid="ron-specialist-historical-commentary"
+          >
+            <p className="text-[11px] uppercase tracking-widest" style={{ color: C.sec }}>
+              Agent historical findings
+            </p>
+            <div className="mt-2 space-y-2">
+              {ctx.specialist_commentary_v1.slice(0, 5).map((item) => (
+                <article key={`${item.source_agent}|${item.setup_id}`}>
+                  <p className="text-[11px] font-semibold" style={{ color: C.jade }}>
+                    {item.source_agent.replace(/_/g, " ")} · {item.setup_id.replace(/_/g, " ")}
+                  </p>
+                  <p className="mt-0.5 text-xs leading-relaxed" style={{ color: C.text }}>
+                    {item.commentary}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <p className="mt-2 text-[10.5px] leading-relaxed" style={{ color: C.muted }}>
+              Historical observed outcomes and potential excursion only — not realised profit or a prediction for this bar.
+            </p>
+          </section>
+        )}
+
         {ctx.limitations && ctx.limitations.length > 0 && (
           <ul className="mt-2 space-y-1" data-testid="ron-opportunity-limitations">
             {ctx.limitations.filter((s) => s?.trim()).slice(0, 4).map((s) => (

@@ -18,9 +18,9 @@
  * It never fabricates a bar, never emits a probability, never proposes an order and
  * never claims predictive edge for any instrument.
  */
-import {
-  RON_PILOT_INSTRUMENTS, VENUE_REGISTRY, type VenueClass,
-} from "./ron-venue-registry-v1.ts";
+import { type VenueClass } from "./ron-venue-registry-v1.ts";
+import { VENUE_REGISTRY_V3 } from "./ron-venue-registry-v3.ts";
+import { RON_SELECTED_WATCH_INSTRUMENTS } from "./ron-agentic-watch-universe-v1.ts";
 
 export const RON_FORWARD_INSTRUMENT_BINDING_VERSION = 1;
 
@@ -45,7 +45,7 @@ const bind = (
   note: string,
 ): InstrumentBinding => ({
   instrument,
-  venue_class: VENUE_REGISTRY[instrument].venue_class,
+  venue_class: VENUE_REGISTRY_V3[instrument].venue_class,
   timeframe_scope: ["15m"],
   calibration_artifact_available,
   orchestration_lineage_available,
@@ -58,22 +58,24 @@ export const FORWARD_INSTRUMENT_BINDINGS: Readonly<Record<string, InstrumentBind
     XAUUSD: bind("XAUUSD", true, true,
       "Accepted lineage instrument. Sealed calibration artifact and the seven-agent "
       + "orchestration lineage both exist; nothing about it changes in this phase."),
-    NAS100: bind("NAS100", false, false,
-      "Descriptive context only. No accepted calibration artifact and no orchestration "
-      + "lineage exist, so no base rate and no sealed-evidence decision may be claimed."),
-    NZDUSD: bind("NZDUSD", false, false,
-      "Descriptive context only. No accepted calibration artifact or orchestration lineage."),
-    USDCAD: bind("USDCAD", false, false,
-      "Descriptive context only. No accepted calibration artifact or orchestration lineage."),
-    HK50: bind("HK50", false, false,
-      "Descriptive context only, and additionally venue-gated: the HKEX holiday calendar "
-      + "is not authoritative in this repo, so in-session instants report "
-      + "calendar_unavailable and RON does not reason at all."),
+    NAS100: bind("NAS100", false, true,
+      "RON Orchestration V10 lineage is available. No accepted calibration artifact exists, "
+      + "so no calibrated base rate may be claimed."),
+    NZDUSD: bind("NZDUSD", false, true,
+      "RON Orchestration V10 lineage is available; no accepted calibration artifact exists."),
+    USDCAD: bind("USDCAD", false, true,
+      "RON Orchestration V10 lineage is available; no accepted calibration artifact exists."),
+    HK50: bind("HK50", false, true,
+      "RON Orchestration V10 lineage is available. Venue truth requires a genuine native "
+      + "completed 15m bar for the exact HKEX analytical slot."),
+    GER40: bind("GER40", false, true,
+      "RON Orchestration V10 lineage is available across genuine Eightcap/MetaApi CFD bars; "
+      + "European cash-session labels are descriptive and never a watch gate."),
   });
 
 /** Instruments a forward context spec may be asked to evaluate. */
 export const FORWARD_CONTEXT_INSTRUMENTS: readonly string[] =
-  RON_PILOT_INSTRUMENTS.filter((i) => !!FORWARD_INSTRUMENT_BINDINGS[i]);
+  RON_SELECTED_WATCH_INSTRUMENTS.filter((i) => !!FORWARD_INSTRUMENT_BINDINGS[i]);
 
 export function instrumentBinding(instrument: string): InstrumentBinding | null {
   return FORWARD_INSTRUMENT_BINDINGS[instrument] ?? null;
@@ -112,6 +114,18 @@ export const CROSS_ASSET_RELATIONSHIPS: readonly CrossAssetRelationship[] = Obje
     reference: "USDCAD",
     purpose: "descriptive USD-leg context between two USD-quoted/based FX pairs",
     accepted_in: null,
+  },
+  {
+    subject: "GER40",
+    reference: "NAS100",
+    purpose: "descriptive co-movement context between European and US technology/risk indices",
+    accepted_in: "orchestration_run_v10",
+  },
+  {
+    subject: "HK50",
+    reference: "NAS100",
+    purpose: "descriptive co-movement context between Hong Kong and US technology/risk indices",
+    accepted_in: "orchestration_run_v10",
   },
 ]);
 

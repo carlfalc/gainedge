@@ -33,6 +33,13 @@ export interface RonOpportunityContextRecord {
   macro_context_state: string;
   ha_states: Record<string, unknown> | null;
   limitations: string[] | null;
+  historical_insights_v1: unknown[] | null;
+  specialist_commentary_v1: Array<{
+    source_agent: string;
+    setup_id: string;
+    finding: string;
+    commentary: string;
+  }> | null;
   created_at: string;
 }
 
@@ -42,7 +49,8 @@ export const OPPORTUNITY_CONTEXT_COLUMNS =
   "id,instrument,timeframe,evaluation_anchor,analytical_bar_open,spec_version,runtime_version," +
   "decision_id,direction_context,direction_authority,setup_family,lifecycle," +
   "material_change_type,data_state,data_blocked,pattern_context_state," +
-  "cross_asset_context_state,macro_context_state,ha_states,limitations,created_at";
+  "cross_asset_context_state,macro_context_state,ha_states,limitations," +
+  "historical_insights_v1,specialist_commentary_v1,created_at";
 
 /** Deterministic map key. Mirrors the stored uniqueness scope. */
 export const contextKey = (instrument: string, timeframe: string) =>

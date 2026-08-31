@@ -13,7 +13,10 @@
  * Safety: no order, no probability, no execution intent, no user-identifiable material,
  * no mutation of any frozen artifact, and ZERO database writes when `persist` is not true.
  */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import {
+  createClient,
+  type SupabaseClient,
+} from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import {
   buildHaPatternContextV1,
 } from "../_shared/ron-ha-pattern-context-spec-v1.ts";
@@ -32,8 +35,16 @@ import {
   assertRuntimeScopeV2, buildPersistRowV2, deriveRunIdsV2, deriveStandaloneTraceId,
   OPPORTUNITY_CONTEXT_RUNTIME_V2,
 } from "../_shared/ron-opportunity-context-runtime-v2.ts";
-import { assessVenue } from "../_shared/ron-venue-registry-v1.ts";
+import { assessVenueV3 } from "../_shared/ron-venue-registry-v3.ts";
 import { buildMaterialEventRow } from "../_shared/ron-material-events-v1.ts";
+import { buildRonSessionContextV5 } from "../_shared/ron-session-context-v5.ts";
+import {
+  buildSpecialistHistoricalCommentariesV1,
+  currentHistoricalSetupsV1,
+  RON_HISTORICAL_SETUP_HORIZON_BARS,
+  type HistoricalSetupObservationV1,
+} from "../_shared/ron-historical-setup-observation-v1.ts";
+import type { RonChartAnnotationV1 } from "../_shared/ron-chart-annotation-v1.ts";
 
 
 const corsHeaders = {
@@ -45,6 +56,8 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status, headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+type RuntimeDbClient = SupabaseClient<any, "public", "public", any, any>;
 
 function timingSafeEq(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -257,7 +270,7 @@ Deno.serve(async (req) => {
  * reported but never invalidates the already-persisted context record.
  * ===================================================================== */
 async function emitMaterialEvent(
-  db: ReturnType<typeof createClient>,
+  db: RuntimeDbClient,
   source: Parameters<typeof buildMaterialEventRow>[0],
 ): Promise<{ emitted: boolean; reason: string | null }> {
   const row = buildMaterialEventRow(source);
@@ -286,7 +299,7 @@ async function emitMaterialEvent(
  * (`spec_version = 2`, `runtime_version = 2`) and never overwrite a V1 row.
  * ===================================================================== */
 async function runV2(
-  db: ReturnType<typeof createClient>,
+  db: RuntimeDbClient,
   instrument: string, timeframe: string, anchorRaw: string, persist: boolean,
 ): Promise<Response> {
   try {
@@ -297,7 +310,9 @@ async function runV2(
     const priorBarIso = new Date(anchorMs - 2 * BAR_MS).toISOString();
 
     // Venue truth for the analytical bar. Non-authoritative venues are refused by spec.
-    const venue = assessVenue(instrument, anchorMs - 1);
+    const venue = assessVenueV3(instrument, anchorIso, instrument === "HK50"
+      ? { bar_open: analyticalIso, timeframe_minutes: 15 }
+      : null);
     if (venue.state !== "open" && venue.state !== "closed") {
       return json({
         ok: false, reason: "venue_state_not_authoritative", detail: venue.state,
@@ -344,7 +359,7 @@ async function runV2(
         .gte("timestamp", windowStartIso).lte("timestamp", analyticalIso)
         .order("timestamp", { ascending: false })
         .limit(OPPORTUNITY_CONTEXT_RUNTIME_V2.ha_bar_window + 4),
-      db.from("ron_market_snapshots").select("bar_time,features,feature_version")
+      db.from("ron_market_snapshots").select("bar_time,features,feature_version,chart_annotations_v1")
         .eq("symbol", instrument).eq("timeframe", timeframe)
         .eq("feature_version", FEATURE_VERSION)
         .in("bar_time", [analyticalIso, priorBarIso]),
@@ -353,10 +368,96 @@ async function runV2(
     if (snapshots.error) return json({ error: "snapshot_read_failed", detail: snapshots.error.message }, 500);
 
     const bars = selectHaSourceBars((candles.data ?? []) as unknown as RawCandleRow[], anchorMs);
+    type SnapshotWithAnnotations = {
+      bar_time: string;
+      features: Record<string, unknown> | null;
+      chart_annotations_v1: unknown;
+    };
+    const snapshotRows =
+      (snapshots.data ?? []) as unknown as SnapshotWithAnnotations[];
     const snapAt = (iso: string) =>
-      (snapshots.data ?? []).find((s) => new Date(String(s.bar_time)).toISOString() === iso) ?? null;
+      snapshotRows.find((s) => new Date(String(s.bar_time)).toISOString() === iso) ?? null;
     const features = pickSnapshotFeatures(snapAt(analyticalIso)?.features);
     const priorFeatures = pickSnapshotFeatures(snapAt(priorBarIso)?.features);
+
+    /* measured historical setup cohorts — strictly cut off at this live anchor */
+    const currentAnnotations = Array.isArray(snapAt(analyticalIso)?.chart_annotations_v1)
+      ? snapAt(analyticalIso)?.chart_annotations_v1 as unknown as RonChartAnnotationV1[]
+      : [];
+    const currentSetups = currentHistoricalSetupsV1(currentAnnotations);
+    const currentSession = buildRonSessionContextV5({
+      instrument,
+      evaluation_anchor: anchorIso,
+      native_completed_bar: instrument === "HK50"
+        ? { bar_open: analyticalIso, timeframe_minutes: 15 }
+        : null,
+    });
+    const lookbackStart = new Date(anchorMs - 90 * 24 * 60 * 60_000).toISOString();
+    let specialistCommentary: ReturnType<typeof buildSpecialistHistoricalCommentariesV1> = [];
+    let historicalReadLimitation: string | null = null;
+    if (currentSetups.length > 0) {
+      const setupIds = [...new Set(currentSetups.map((s) => s.setup_id))];
+      const { data: historicalRows, error: historicalError } = await db
+        .from("ron_historical_setup_observations")
+        .select(
+          "observation_version,symbol,timeframe,bar_time,evaluation_anchor,future_data_cutoff," +
+          "setup_id,source_agent,direction_context,weekday,session,local_time_bucket," +
+          "volatility_regime,horizon_bars,outcome_atr_threshold,outcome_observed," +
+          "favourable_excursion_price,adverse_excursion_price,point_size," +
+          "bars_to_peak_favourable,aligned_ha_candles_15m",
+        )
+        .eq("symbol", instrument).eq("timeframe", timeframe)
+        .eq("observation_version", 1)
+        .eq("horizon_bars", RON_HISTORICAL_SETUP_HORIZON_BARS)
+        .in("setup_id", setupIds)
+        .gte("bar_time", lookbackStart)
+        .lte("future_data_cutoff", anchorIso)
+        .order("bar_time", { ascending: false }).limit(2500);
+      if (historicalError) {
+        historicalReadLimitation = `historical_setup_read_failed:${historicalError.message}`;
+      } else {
+        const typedHistoricalRows =
+          (historicalRows ?? []) as unknown as Array<Record<string, unknown>>;
+        const observations: HistoricalSetupObservationV1[] = typedHistoricalRows.map((r) => ({
+          observation_version: 1,
+          setup_id: String(r.setup_id),
+          source_agent: String(r.source_agent),
+          horizon_bars: Number(r.horizon_bars),
+          outcome_atr_threshold: Number(r.outcome_atr_threshold),
+          instrument: String(r.symbol),
+          timeframe: String(r.timeframe),
+          evaluation_anchor: String(r.evaluation_anchor),
+          future_data_cutoff: String(r.future_data_cutoff),
+          weekday: String(r.weekday),
+          session: String(r.session),
+          local_time_bucket: String(r.local_time_bucket),
+          pattern: String(r.setup_id),
+          direction_context: String(r.direction_context),
+          volatility_regime: String(r.volatility_regime),
+          outcome_observed: r.outcome_observed === true,
+          favourable_excursion_price: r.favourable_excursion_price == null
+            ? null : Number(r.favourable_excursion_price),
+          adverse_excursion_price: r.adverse_excursion_price == null
+            ? null : Number(r.adverse_excursion_price),
+          point_size: r.point_size == null ? null : Number(r.point_size),
+          bars_to_peak_favourable: r.bars_to_peak_favourable == null
+            ? null : Number(r.bars_to_peak_favourable),
+          aligned_ha_candles_15m: r.aligned_ha_candles_15m == null
+            ? null : Number(r.aligned_ha_candles_15m),
+        }));
+        const rawFeatures = snapAt(analyticalIso)?.features as Record<string, unknown> | null;
+        specialistCommentary = buildSpecialistHistoricalCommentariesV1({
+          instrument,
+          timeframe,
+          current_setups: currentSetups,
+          current_session: currentSession,
+          volatility_regime: String(rawFeatures?.volatility_regime ?? rawFeatures?.regime ?? "unknown"),
+          observations,
+          lookback_start: lookbackStart,
+          lookback_end: anchorIso,
+        });
+      }
+    }
 
     /* prior persisted anchor within the V2 lineage only */
     const { data: priorRow } = await db
@@ -391,17 +492,42 @@ async function runV2(
       decision_bound: decisionId !== null,
     });
 
-    const row = buildPersistRowV2(result, ha, decisionId);
+    const row = {
+      ...buildPersistRowV2(result, ha, decisionId),
+      historical_insights_v1: specialistCommentary.map((c) => ({
+        source_agent: c.source_agent,
+        setup_id: c.setup_id,
+        selected_cohort: c.selected_cohort,
+        insight: c.insight,
+        strongest_session: c.strongest_session,
+      })),
+      specialist_commentary_v1: specialistCommentary.map((c) => ({
+        source_agent: c.source_agent,
+        setup_id: c.setup_id,
+        finding: c.finding,
+        commentary: c.commentary,
+      })),
+    };
 
     let persisted = false;
     let event: { emitted: boolean; reason: string | null } = { emitted: false, reason: "not_persisted" };
     if (persist) {
-      const { error: insErr } = await db
-        .from("ron_opportunity_context")
-        .upsert(row, {
+      // This function deploys in the same release as the migration adding the two JSONB
+      // columns. Narrow the post-migration table boundary explicitly until generated Edge
+      // Function database types include those columns.
+      const opportunityContextTable = db.from("ron_opportunity_context") as unknown as {
+        upsert: (
+          values: Record<string, unknown>,
+          options: { onConflict: string; ignoreDuplicates: boolean },
+        ) => Promise<{ error: { message: string } | null }>;
+      };
+      const { error: insErr } = await opportunityContextTable.upsert(
+        row as unknown as Record<string, unknown>,
+        {
           onConflict: OPPORTUNITY_CONTEXT_RUNTIME_V2.persistence.conflict_key.join(","),
           ignoreDuplicates: true,
-        });
+        },
+      );
       if (insErr) return json({ error: "persist_failed", detail: insErr.message }, 500);
       persisted = true;
       event = await emitMaterialEvent(db, {
@@ -451,7 +577,11 @@ async function runV2(
       data_state: result.data_state,
       context_admissibility: result.context_admissibility,
       reason_tokens: result.reason_tokens,
-      limitations: result.limitations,
+      limitations: historicalReadLimitation
+        ? [...result.limitations, historicalReadLimitation]
+        : result.limitations,
+      historical_insights_v1: row.historical_insights_v1,
+      specialist_commentary_v1: row.specialist_commentary_v1,
       material_event: event,
       numeric_probability: null,
       execution_allowed: false,

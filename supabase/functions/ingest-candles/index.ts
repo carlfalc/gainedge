@@ -29,6 +29,7 @@ export const DEFAULT_TARGETS = [
   { symbol: "XAUUSD", timeframe: "15m" },
   { symbol: "NAS100", timeframe: "15m" },
   { symbol: "HK50", timeframe: "15m" },
+  { symbol: "GER40", timeframe: "15m" },
   { symbol: "NZDUSD", timeframe: "15m" },
   { symbol: "USDCAD", timeframe: "15m" },
   { symbol: "USOUSD", timeframe: "15m" },

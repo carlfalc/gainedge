@@ -22,10 +22,14 @@ import {
   buildEligibleSeries, windowAtEligibleIndex,
   RON_CANONICAL_WINDOW, RON_WINDOW_CONTRACT,
 } from "../_shared/ron-window.ts";
+import { RON_DATA_INSTRUMENTS_V2 } from "../_shared/ron-agentic-watch-universe-v1.ts";
 import {
-  RON_DATA_INSTRUMENTS, assessVenue, venueReasoningAllowed,
-} from "../_shared/ron-venue-registry-v1.ts";
+  assessVenueV3, venueReasoningAllowedV3,
+} from "../_shared/ron-venue-registry-v3.ts";
 import type { Candle } from "../_shared/falconer-strategy.ts";
+import {
+  detectRonTechnicalAnnotationsV1,
+} from "../_shared/ron-technical-annotation-detector-v1.ts";
 
 const DEFAULT_SYMBOL = "XAUUSD";
 const DEFAULT_TIMEFRAME = "15m";
@@ -107,16 +111,16 @@ Deno.serve(async (req) => {
   // ── declared subject (GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1) ───────────
   const SYMBOL = String(body.symbol ?? DEFAULT_SYMBOL).toUpperCase();
   const TIMEFRAME = String(body.timeframe ?? DEFAULT_TIMEFRAME);
-  if (!(RON_DATA_INSTRUMENTS as readonly string[]).includes(SYMBOL)) {
+  if (!(RON_DATA_INSTRUMENTS_V2 as readonly string[]).includes(SYMBOL)) {
     return json({ error: "instrument_not_in_venue_registry", symbol: SYMBOL }, 400);
   }
   if (TIMEFRAME !== DEFAULT_TIMEFRAME) {
     return json({ error: "timeframe_not_supported", timeframe: TIMEFRAME }, 400);
   }
-  const venue = assessVenue(SYMBOL, Date.now());
-  // XAUUSD keeps its accepted holiday-aware calendar path unchanged. For every other
-  // instrument a non-authoritative calendar must block reasoning rather than guess.
-  if (SYMBOL !== DEFAULT_SYMBOL && !venueReasoningAllowed(venue)) {
+  const venue = assessVenueV3(SYMBOL, Date.now());
+  // HK50 is resolved later from the exact genuine completed native bar. Every other
+  // subject must already have authoritative open/closed venue truth.
+  if (SYMBOL !== DEFAULT_SYMBOL && SYMBOL !== "HK50" && !venueReasoningAllowedV3(venue)) {
     return json({
       ok: true, mode, symbol: SYMBOL, skipped: "venue_calendar_unavailable",
       venue_state: venue.state, venue_reason: venue.reason,
@@ -189,6 +193,18 @@ Deno.serve(async (req) => {
       if (!latest) return json({ ok: true, mode, skipped: "no_candles" });
 
       const targetIso = new Date(latest.timestamp).toISOString();
+      const targetAnchorIso = new Date(new Date(targetIso).getTime() + BAR_MS).toISOString();
+      const targetVenue = assessVenueV3(SYMBOL, targetAnchorIso, {
+        bar_open: targetIso,
+        timeframe_minutes: BAR_MINUTES,
+      });
+      if (SYMBOL === "HK50" && targetVenue.state !== "open") {
+        return json({
+          ok: true, mode, symbol: SYMBOL, skipped: "venue_not_proven_for_completed_bar",
+          venue_state: targetVenue.state, venue_reason: targetVenue.reason,
+          bar_time: targetIso,
+        });
+      }
       // ── Phase 2C.1 quarantine (central contract) ───────────────────
       // A critically flagged source bar is a provider/ingestion artifact, never a genuine
       // opportunity. The raw candle is left untouched in candle_history; only the RON
@@ -237,15 +253,19 @@ Deno.serve(async (req) => {
         windowContract: RON_WINDOW_CONTRACT,
         eligibleCount: idx + 1,
       });
+      const snapRow = {
+        ...snap,
+        chart_annotations_v1: detectRonTechnicalAnnotationsV1(SYMBOL, TIMEFRAME, candles),
+      };
       // Freshness: only call the feed stale when the market should actually be open.
       const ageMin = (nowMs - new Date(targetIso).getTime()) / 60000;
       // XAUUSD: unchanged legacy schedule. Others: instrument-aware venue registry.
       const isOpen = SYMBOL === DEFAULT_SYMBOL
         ? marketOpen(new Date(nowMs))
-        : assessVenue(SYMBOL, nowMs).state === "open";
+        : assessVenueV3(SYMBOL, nowMs).state === "open";
 
       if (ageMin > 45 && isOpen && snap.data_health === "healthy") snap.data_health = "stale";
-      await upsert([snap]);
+      await upsert([snapRow]);
       return json({
         ok: true, mode, bar_time: targetIso,
         data_health: snap.data_health,
@@ -291,6 +311,7 @@ Deno.serve(async (req) => {
     const snaps: any[] = [];
     let skippedWarmup = 0;
     let skippedQuarantined = 0;
+    let skippedVenue = 0;
     const quarantinedAnchors: { bar_time: string; rule_codes: string[] }[] = [];
     // Phase 1B correction: no arbitrary warmup skip. computeRonSnapshot is proven safe
     // with <30 bars (indicators return null, data_health = "insufficient"), so every
@@ -298,6 +319,14 @@ Deno.serve(async (req) => {
     const minBars = Math.max(1, Number(body.min_bars ?? 1));
     for (const t of targets) {
       const ms = new Date(t.timestamp).getTime();
+      if (SYMBOL === "HK50") {
+        const barOpen = new Date(ms).toISOString();
+        const targetVenue = assessVenueV3(SYMBOL, ms + BAR_MS, {
+          bar_open: barOpen,
+          timeframe_minutes: BAR_MINUTES,
+        });
+        if (targetVenue.state !== "open") { skippedVenue++; continue; }
+      }
       const anchorBar = {
         time: ms,
         created_at: (t as any).created_at ? new Date((t as any).created_at).getTime() : null,
@@ -319,13 +348,17 @@ Deno.serve(async (req) => {
       // NO LOOKAHEAD: the eligible series ends at the target bar (inclusive).
       const window = windowAtEligibleIndex(eligible, idx, CANONICAL_WINDOW);
       if (!window.length) { skippedQuarantined++; continue; }
-      snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, window, {
+      const snap = computeRonSnapshot(SYMBOL, TIMEFRAME, window, {
         source: "candle_history_backfill",
         quarantinedExcluded: excludedAtOrBefore[idx],
         qualityVersion: RON_QUALITY_VERSION,
         windowContract: RON_WINDOW_CONTRACT,
         eligibleCount: idx + 1,
-      }));
+      });
+      snaps.push({
+        ...snap,
+        chart_annotations_v1: detectRonTechnicalAnnotationsV1(SYMBOL, TIMEFRAME, window),
+      });
     }
 
     for (let k = 0; k < snaps.length; k += 200) await upsert(snaps.slice(k, k + 200));
@@ -337,6 +370,7 @@ Deno.serve(async (req) => {
       processed: snaps.length,
       skipped_warmup: skippedWarmup,
       skipped_quarantined: skippedQuarantined,
+      skipped_venue: skippedVenue,
       quarantined_anchors: quarantinedAnchors,
       feature_version: RON_FEATURE_VERSION,
       quality_version: RON_QUALITY_VERSION,
