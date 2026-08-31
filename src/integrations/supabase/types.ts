@@ -1843,6 +1843,7 @@ export type Database = {
       ron_market_snapshots: {
         Row: {
           bar_time: string
+          chart_annotations_v1: Json
           close: number
           computed_at: string
           data_health: string
@@ -1862,6 +1863,7 @@ export type Database = {
         }
         Insert: {
           bar_time: string
+          chart_annotations_v1?: Json
           close: number
           computed_at?: string
           data_health?: string
@@ -1881,6 +1883,7 @@ export type Database = {
         }
         Update: {
           bar_time?: string
+          chart_annotations_v1?: Json
           close?: number
           computed_at?: string
           data_health?: string
