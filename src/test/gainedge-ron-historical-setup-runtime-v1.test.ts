@@ -115,7 +115,7 @@ describe("RON historical setup runtime V1", () => {
     const refresh = readFileSync(`${root}/supabase/functions/ron-historical-setup-refresh/index.ts`, "utf8");
     const scheduler = readFileSync(`${root}/supabase/functions/ron-context-scheduler/index.ts`, "utf8");
     const migration = readFileSync(
-      `${root}/supabase/migrations/20260831091000_ron_historical_setup_commentary_v1.sql`, "utf8",
+      `${root}/supabase/migrations/20260831222846_fc252d9d-c300-4633-85ef-5af79c908efd.sql`, "utf8",
     );
     expect(runtime).toContain("assessVenueV3(instrument");
     expect(runtime).toContain('.from("ron_historical_setup_observations")');
