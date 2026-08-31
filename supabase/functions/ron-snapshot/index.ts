@@ -27,6 +27,9 @@ import {
   assessVenueV3, venueReasoningAllowedV3,
 } from "../_shared/ron-venue-registry-v3.ts";
 import type { Candle } from "../_shared/falconer-strategy.ts";
+import {
+  detectRonTechnicalAnnotationsV1,
+} from "../_shared/ron-technical-annotation-detector-v1.ts";
 
 const DEFAULT_SYMBOL = "XAUUSD";
 const DEFAULT_TIMEFRAME = "15m";
@@ -250,6 +253,10 @@ Deno.serve(async (req) => {
         windowContract: RON_WINDOW_CONTRACT,
         eligibleCount: idx + 1,
       });
+      const snapRow = {
+        ...snap,
+        chart_annotations_v1: detectRonTechnicalAnnotationsV1(SYMBOL, TIMEFRAME, candles),
+      };
       // Freshness: only call the feed stale when the market should actually be open.
       const ageMin = (nowMs - new Date(targetIso).getTime()) / 60000;
       // XAUUSD: unchanged legacy schedule. Others: instrument-aware venue registry.
@@ -258,7 +265,7 @@ Deno.serve(async (req) => {
         : assessVenueV3(SYMBOL, nowMs).state === "open";
 
       if (ageMin > 45 && isOpen && snap.data_health === "healthy") snap.data_health = "stale";
-      await upsert([snap]);
+      await upsert([snapRow]);
       return json({
         ok: true, mode, bar_time: targetIso,
         data_health: snap.data_health,
@@ -341,13 +348,17 @@ Deno.serve(async (req) => {
       // NO LOOKAHEAD: the eligible series ends at the target bar (inclusive).
       const window = windowAtEligibleIndex(eligible, idx, CANONICAL_WINDOW);
       if (!window.length) { skippedQuarantined++; continue; }
-      snaps.push(computeRonSnapshot(SYMBOL, TIMEFRAME, window, {
+      const snap = computeRonSnapshot(SYMBOL, TIMEFRAME, window, {
         source: "candle_history_backfill",
         quarantinedExcluded: excludedAtOrBefore[idx],
         qualityVersion: RON_QUALITY_VERSION,
         windowContract: RON_WINDOW_CONTRACT,
         eligibleCount: idx + 1,
-      }));
+      });
+      snaps.push({
+        ...snap,
+        chart_annotations_v1: detectRonTechnicalAnnotationsV1(SYMBOL, TIMEFRAME, window),
+      });
     }
 
     for (let k = 0; k < snaps.length; k += 200) await upsert(snaps.slice(k, k + 200));

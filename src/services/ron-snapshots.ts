@@ -35,6 +35,7 @@ export interface RonSnapshotRow {
   open: number; high: number; low: number; close: number;
   volume: number | null;
   features: Record<string, any>;
+  chart_annotations_v1: unknown[];
   patterns: any[];
   data_health: "healthy" | "stale" | "insufficient" | "error";
   computed_at: string;
@@ -91,13 +92,20 @@ export function useRonSnapshots() {
   const load = useCallback(async () => {
     const { data: rows } = await supabase
       .from("ron_market_snapshots")
-      .select("symbol, timeframe, bar_time, open, high, low, close, volume, features, patterns, data_health, computed_at")
+      .select("symbol, timeframe, bar_time, open, high, low, close, volume, features, chart_annotations_v1, patterns, data_health, computed_at")
       .eq("feature_version", CURRENT_RON_SNAPSHOT_FEATURE_VERSION)
       .order("bar_time", { ascending: false })
       .limit(200);
     const map = new Map<string, RonSnapshotRow>();
     for (const r of (rows as any[]) ?? []) {
-      if (!map.has(r.symbol)) map.set(r.symbol, r as RonSnapshotRow);
+      if (!map.has(r.symbol)) {
+        const annotations = Array.isArray(r.chart_annotations_v1) ? r.chart_annotations_v1 : [];
+        map.set(r.symbol, {
+          ...r,
+          chart_annotations_v1: annotations,
+          features: { ...(r.features ?? {}), chart_annotations_v1: annotations },
+        } as RonSnapshotRow);
+      }
     }
     setData(map);
     setLoading(false);
