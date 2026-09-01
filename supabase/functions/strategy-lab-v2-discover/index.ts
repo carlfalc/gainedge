@@ -28,22 +28,9 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ENGINE_COMMIT = Deno.env.get("GIT_COMMIT_SHA") ?? "strategy-lab-v2-discovery";
 const MAX_CANDLES = 120_000;
 
-type LooseTable = {
-  Row: Record<string, unknown>;
-  Insert: Record<string, unknown>;
-  Update: Record<string, unknown>;
-  Relationships: [];
-};
-type StrategyLabDatabase = {
-  public: {
-    Tables: Record<string, LooseTable>;
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
-  };
-};
-type DbClient = SupabaseClient<StrategyLabDatabase>;
+// V2 tables are introduced by this feature's migration and therefore are not in the
+// generated application Database type until the next schema-codegen pass.
+type DbClient = SupabaseClient;
 
 interface RequestBody {
   action: "start" | "run_agent" | "finalise" | "status" | "cancel";
@@ -73,7 +60,7 @@ async function authenticatedUser(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;
   const token = authorization.slice("Bearer ".length);
-  const client = createClient<StrategyLabDatabase>(SUPABASE_URL, ANON_KEY, {
+  const client = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: authorization } },
   });
   const { data, error } = await client.auth.getClaims(token);
@@ -134,7 +121,7 @@ Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const userId = await authenticatedUser(request);
   if (!userId) return json({ error: "unauthorized" }, 401);
-  const db = createClient<StrategyLabDatabase>(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
   try {
     const body = await request.json() as RequestBody;
