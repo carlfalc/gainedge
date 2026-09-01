@@ -131,6 +131,10 @@ export default function InstrumentCard({
   const quoteInstant = quote?.broker_time ?? quote?.fetched_at ?? null;
   const quoteSourceLabel = quote?.broker_time ? "broker quote time" : "server fetch time";
 
+  // Today's stored bars, fetched only while the detail disclosure is open.
+  const { rows: dayRows, loading: dayLoading } = useRonSnapshotDay(inst.symbol, snap?.timeframe ?? tf, expanded);
+  const sessionsToday = summariseSessionsToday(dayRows);
+
   const chips = ronEvidenceChips(f);
   const summary = ronSummarySentence(f);
   const empty = ronEmptyState({ hasQuote: !!quote?.bid, hasSignalHistory: hasSignal, symbol: inst.symbol });
