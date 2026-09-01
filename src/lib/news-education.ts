@@ -79,44 +79,35 @@ export function buildHeadlineContext(headline: string, instruments: string[] = [
 
   const lines: string[] = [];
 
-  if (isRates) {
-    const primary = currencies[0] ?? null;
-    const dir = UP.test(headline) ? "up" : DOWN.test(headline) ? "down" : null;
-    if (primary && dir) {
-      const { base, quote } = splitPairs(primary, tags);
-      const strengthens = dir === "up";
-      lines.push(
-        `Education: higher policy rates usually attract capital into a currency, lower rates usually push it away. If ${primary} rates go ${dir}, ${primary} typically ${strengthens ? "strengthens" : "weakens"}.`,
-      );
-      if (base.length) {
-        lines.push(
-          `${base.join(", ")} — ${primary} is the base, so a ${strengthens ? "stronger" : "weaker"} ${primary} tends to push these ${strengthens ? "up" : "down"}.`,
-        );
-      }
-      if (quote.length) {
-        lines.push(
-          `${quote.join(", ")} — ${primary} is the quote, so a ${strengthens ? "stronger" : "weaker"} ${primary} tends to push these ${strengthens ? "down" : "up"}.`,
-        );
-      }
-      if (primary === "USD" || tags.includes("XAUUSD")) {
-        lines.push(
-          strengthens
-            ? "Gold (XAUUSD) is priced in USD and pays no yield, so rising USD rates are usually an adverse backdrop for it."
-            : "Gold (XAUUSD) is priced in USD and pays no yield, so falling USD rates are usually a supportive backdrop for it.",
-        );
-      }
-    } else if (primary) {
-      lines.push(
-        `Education: this is a ${primary} policy/inflation story. Firmer-than-expected data usually supports ${primary}; softer-than-expected data usually weighs on it.`,
-      );
-    }
+  const primary = currencies[0] ?? null;
+  const dir = UP.test(headline) ? "up" : DOWN.test(headline) ? "down" : null;
+  const strengthens = dir === "up";
+
+  if (isRates && primary && dir) {
+    lines.push(
+      `Education: higher policy rates usually attract capital into a currency, lower rates usually push it away. If ${primary} rates go ${dir}, ${primary} typically ${strengthens ? "strengthens" : "weakens"}.`,
+    );
+  } else if (isRates && primary) {
+    lines.push(
+      `Education: this is a ${primary} policy/inflation story. Firmer-than-expected outcomes usually support ${primary}; softer-than-expected outcomes usually weigh on it.`,
+    );
   }
 
-  if (lines.length === 0 && tags.length) {
-    lines.push(`Education: the source tagged ${tags.slice(0, 4).join(", ")}. Relevance is adjacency only — it is not evidence that this headline moved those markets.`);
+  // Explicit effect line for every instrument the source tagged.
+  const effects = tags
+    .map((sym) => effectLine(sym, primary, isRates && dir ? strengthens : null))
+    .filter((l): l is string => Boolean(l));
+  if (effects.length) {
+    lines.push("Likely effect on the tagged instruments:");
+    lines.push(...effects);
+  } else if (tags.length) {
+    lines.push(
+      `Education: the source tagged ${tags.slice(0, 4).join(", ")}. Relevance is adjacency only — it is not evidence that this headline moved those markets.`,
+    );
   }
 
   lines.push("Adjacency is not causality. RON does not attribute price moves to headlines.");
+
 
   return { status, statusLine, lines, currencies };
 }
