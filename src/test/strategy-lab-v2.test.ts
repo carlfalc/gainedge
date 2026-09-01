@@ -34,7 +34,8 @@ describe("Strategy Lab V2 discovery contracts", () => {
     expect(STRATEGY_LAB_V2_EXECUTION_ALLOWED).toBe(false);
     expect(STRATEGY_LAB_V2_SEARCH_AGENTS).toHaveLength(7);
     expect(new Set(STRATEGY_LAB_V2_SEARCH_AGENTS.flatMap(agent => agent.families)).size).toBe(12);
-    expect(STRATEGY_LAB_V2_SEARCH_BUDGETS.maximum.total).toBe(3_584);
+    expect(STRATEGY_LAB_V2_SEARCH_BUDGETS.maximum.per_agent * STRATEGY_LAB_V2_SEARCH_AGENTS.length)
+      .toBe(3_584);
   });
 
   it("is deterministic for a fixed seed and tests the requested independent genomes", () => {
@@ -57,10 +58,10 @@ describe("Strategy Lab V2 discovery contracts", () => {
     const development = source.slice(0, audit.holdout_start_index);
     const output = searchStrategyLabV2Agent(development, "trend_structure", 24, 3, 91);
     const final = finaliseStrategyLabV2(source, audit, output.candidates, DEFAULT_STRATEGY_LAB_V2_COSTS, 60, 91);
-    expect(["VIABLE_PAPER_CANDIDATE", "NO_VIABLE_STRATEGY_FOUND", "INCONCLUSIVE"])
+    expect(["VIABLE_STRATEGY_FOUND", "NO_VIABLE_STRATEGY_FOUND", "INCONCLUSIVE_INSUFFICIENT_DATA"])
       .toContain(final.verdict);
     expect(final.selected).not.toBeNull();
-    expect(final.selected?.holdout_metrics).toBeTruthy();
-    expect(final.selected?.stress_results.length).toBeGreaterThanOrEqual(6);
+    expect(final.holdout_metrics).toBeTruthy();
+    expect(final.stress_metrics.length).toBeGreaterThanOrEqual(6);
   });
 });

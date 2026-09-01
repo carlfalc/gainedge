@@ -640,7 +640,9 @@ export function searchStrategyLabV2Agent(
       generationResults.push(evaluated);
     }
     const elites = [...generationResults].sort((a, b) => b.score - a.score).slice(0, Math.max(4, Math.floor(populationSize * 0.25)));
-    const next: StrategyGenomeV2[] = elites.slice(0, 2).map((elite) => elite.genome);
+    // Elites remain parents, but must not be re-tested as new candidates. Re-evaluating
+    // them would inflate the advertised search count and duplicate candidate hashes.
+    const next: StrategyGenomeV2[] = [];
     let attempts = 0;
     while (next.length < populationSize && results.length + next.length < budget + populationSize && attempts < populationSize * 40) {
       attempts += 1;
