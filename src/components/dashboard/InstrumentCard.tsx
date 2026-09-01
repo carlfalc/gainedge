@@ -23,12 +23,13 @@ import type { LiveMarketRow } from "@/services/broker-data";
 import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
 import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 import {
-  ronStateFrom, ronStateColor, ronBiasFrom, ronBiasColor, ronStateLabel,
+  ronStateFrom, ronStateColor, ronBiasFrom, ronBiasColor, ronStateLabel, useRonSnapshotDay,
   CURRENT_RON_FEATURE_VERSION, CURRENT_RON_LABEL_VERSION, CURRENT_RON_QUALITY_VERSION,
   type RonSnapshotRow, type RonOutcomeStats, type RonDataQuality, type RonRebuildStatus,
 } from "@/services/ron-snapshots";
 import { assessDataHealth } from "@/lib/market-hours";
 import { classifyRonSession } from "@/lib/ron-sessions";
+import { summariseSessionsToday } from "@/lib/ron-session-day";
 import { ronEvidenceChips, ronSummarySentence, ronEmptyState } from "@/lib/dashboard-ron-summary";
 
 const C = { ...CBase, text: "#FFFFFF", sec: "#FFFFFF" };
