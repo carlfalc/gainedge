@@ -8,7 +8,7 @@ import { useTranslation } from "react-i18next";
 
 const C = {
   bg: "#080B12", card: "#111724", border: "rgba(255,255,255,0.06)",
-  jade: "#00CFA5", text: "#E4E9F0", sec: "#8892A4", muted: "#555F73",
+  jade: "#00CFA5", text: "#E4E9F0", sec: "#FFFFFF", muted: "#FFFFFF",
 };
 
 const Login = () => {
