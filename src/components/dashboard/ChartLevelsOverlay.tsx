@@ -76,7 +76,18 @@ export default function ChartLevelsOverlay({ symbol, patterns, features }: Props
                 </div>
               );
             })}
+            {marks.length === 0 && (
+              <p
+                className="text-[10px] leading-snug text-white/70 py-1"
+                data-testid="chart-levels-empty"
+              >
+                RON has no sealed levels for {symbol} yet — it only scans the instruments on
+                your watchlist. Open a covered symbol to see RON-verified support, resistance
+                and pivots.
+              </p>
+            )}
             <p className="text-[9.5px] leading-snug text-white/55 pt-0.5">{LEVEL_OVERLAY_NOTE}</p>
+
           </div>
         )}
       </div>
