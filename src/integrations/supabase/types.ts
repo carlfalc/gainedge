@@ -2851,6 +2851,223 @@ export type Database = {
         }
         Relationships: []
       }
+      strategy_lab_agent_runs: {
+        Row: {
+          agent_id: string
+          agent_version: number
+          created_at: string
+          detail: string
+          id: string
+          output: Json
+          run_id: string
+          status: string
+        }
+        Insert: {
+          agent_id: string
+          agent_version: number
+          created_at?: string
+          detail: string
+          id?: string
+          output?: Json
+          run_id: string
+          status: string
+        }
+        Update: {
+          agent_id?: string
+          agent_version?: number
+          created_at?: string
+          detail?: string
+          id?: string
+          output?: Json
+          run_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_lab_agent_runs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_lab_candidates: {
+        Row: {
+          candidate_key: string
+          candidate_version: number
+          config: Json
+          created_at: string
+          explanation: string
+          family: string
+          holdout_metrics: Json
+          id: string
+          promotion_eligible: boolean
+          promotion_reasons: Json
+          rank: number
+          run_id: string
+          selected: boolean
+          train_metrics: Json
+          validation_metrics: Json
+          validation_score: number
+        }
+        Insert: {
+          candidate_key: string
+          candidate_version?: number
+          config: Json
+          created_at?: string
+          explanation: string
+          family: string
+          holdout_metrics: Json
+          id?: string
+          promotion_eligible?: boolean
+          promotion_reasons?: Json
+          rank: number
+          run_id: string
+          selected?: boolean
+          train_metrics: Json
+          validation_metrics: Json
+          validation_score?: number
+        }
+        Update: {
+          candidate_key?: string
+          candidate_version?: number
+          config?: Json
+          created_at?: string
+          explanation?: string
+          family?: string
+          holdout_metrics?: Json
+          id?: string
+          promotion_eligible?: boolean
+          promotion_reasons?: Json
+          rank?: number
+          run_id?: string
+          selected?: boolean
+          train_metrics?: Json
+          validation_metrics?: Json
+          validation_score?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_lab_candidates_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_lab_promotions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          candidate_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          run_id: string
+          stage: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          candidate_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          run_id: string
+          stage: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          run_id?: string
+          stage?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_lab_promotions_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_lab_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "strategy_lab_promotions_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_lab_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_lab_runs: {
+        Row: {
+          candle_count: number
+          champion_candidate_key: string | null
+          champion_promotion_eligible: boolean
+          completed_at: string | null
+          created_at: string
+          data_audit: Json
+          error_message: string | null
+          execution_allowed: boolean
+          id: string
+          period_end: string
+          period_start: string
+          request_config: Json
+          status: string
+          strategy_lab_version: number
+          symbol: string
+          timeframe: string
+          user_id: string
+        }
+        Insert: {
+          candle_count?: number
+          champion_candidate_key?: string | null
+          champion_promotion_eligible?: boolean
+          completed_at?: string | null
+          created_at?: string
+          data_audit?: Json
+          error_message?: string | null
+          execution_allowed?: boolean
+          id?: string
+          period_end: string
+          period_start: string
+          request_config?: Json
+          status?: string
+          strategy_lab_version?: number
+          symbol: string
+          timeframe: string
+          user_id: string
+        }
+        Update: {
+          candle_count?: number
+          champion_candidate_key?: string | null
+          champion_promotion_eligible?: boolean
+          completed_at?: string | null
+          created_at?: string
+          data_audit?: Json
+          error_message?: string | null
+          execution_allowed?: boolean
+          id?: string
+          period_end?: string
+          period_start?: string
+          request_config?: Json
+          status?: string
+          strategy_lab_version?: number
+          symbol?: string
+          timeframe?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
