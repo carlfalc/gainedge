@@ -114,3 +114,6 @@ verify_jwt = false
 # check in code. The endpoint has no write surface and CI enforces that invariant.
 [functions.ron-post-v4-data-readiness]
 verify_jwt = false
+
+[functions.strategy-lab-v2-discover]
+verify_jwt = true

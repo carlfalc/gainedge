@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import StrategyLabPage from "./StrategyLabPage";
+import StrategyLabV2Page from "./StrategyLabV2Page";
 
 interface BacktestTrade {
   openedAt: number;
@@ -39,7 +40,7 @@ type BacktestRun = {
 };
 
 export default function BacktestingPage() {
-  const [workspace, setWorkspace] = useState<"falconer" | "strategy_lab">("strategy_lab");
+  const [workspace, setWorkspace] = useState<"falconer" | "strategy_lab" | "strategy_lab_v2">("strategy_lab_v2");
   const [symbol, setSymbol] = useState("XAUUSD");
   const [timeframe, setTimeframe] = useState("15m");
   const [start, setStart] = useState("2025-12-01");
@@ -61,6 +62,13 @@ export default function BacktestingPage() {
     setHistory((data as BacktestRun[]) ?? []);
   };
   useEffect(() => { loadHistory(); }, []);
+
+  if (workspace === "strategy_lab_v2") {
+    return <div>
+      <WorkspaceSwitch workspace={workspace} setWorkspace={setWorkspace} />
+      <StrategyLabV2Page />
+    </div>;
+  }
 
   if (workspace === "strategy_lab") {
     return <div>
@@ -208,12 +216,13 @@ function Kpi({ label, value }: { label: string; value: string }) {
 function WorkspaceSwitch({
   workspace, setWorkspace,
 }: {
-  workspace: "falconer" | "strategy_lab";
-  setWorkspace: (workspace: "falconer" | "strategy_lab") => void;
+  workspace: "falconer" | "strategy_lab" | "strategy_lab_v2";
+  setWorkspace: (workspace: "falconer" | "strategy_lab" | "strategy_lab_v2") => void;
 }) {
   return <div style={{ display: "flex", gap: 8, padding: "16px 24px 0" }}>
     {([
-      ["strategy_lab", "Strategy Lab · 8 agents"],
+      ["strategy_lab_v2", "V2 Deep Discovery · 7 agents"],
+      ["strategy_lab", "V1 Baseline · 21 presets"],
       ["falconer", "Legacy Falconer v7"],
     ] as const).map(([value, label]) => (
       <button key={value} onClick={() => setWorkspace(value)} style={{
