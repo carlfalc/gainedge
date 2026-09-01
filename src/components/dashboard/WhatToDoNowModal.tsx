@@ -33,9 +33,13 @@ export default function WhatToDoNowModal({ symbol, timeframe, quoteFresh, market
     setLoading(true);
     setNote(null);
     // 1) Ask the server runtime to evaluate the latest completed bar now (idempotent).
+    // This endpoint is runtime/cron-authorized: a normal user session is expected to be
+    // rejected (401). That is not a failure of this briefing — we simply fall back to the
+    // freshest stored evidence below.
     try {
       await supabase.auth.refreshSession();
-      await supabase.functions.invoke("ron-snapshot", { body: { mode: "live", symbol, timeframe } });
+      const { error } = await supabase.functions.invoke("ron-snapshot", { body: { mode: "live", symbol, timeframe } });
+      if (error) setNote("Live re-evaluation is runtime-scheduled — showing the latest stored evidence.");
     } catch {
       setNote("Live re-evaluation could not run just now — showing the latest stored evidence instead.");
     }
