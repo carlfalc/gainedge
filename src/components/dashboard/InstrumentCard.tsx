@@ -23,12 +23,13 @@ import type { LiveMarketRow } from "@/services/broker-data";
 import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
 import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 import {
-  ronStateFrom, ronStateColor, ronBiasFrom, ronBiasColor, ronStateLabel,
+  ronStateFrom, ronStateColor, ronBiasFrom, ronBiasColor, ronStateLabel, useRonSnapshotDay,
   CURRENT_RON_FEATURE_VERSION, CURRENT_RON_LABEL_VERSION, CURRENT_RON_QUALITY_VERSION,
   type RonSnapshotRow, type RonOutcomeStats, type RonDataQuality, type RonRebuildStatus,
 } from "@/services/ron-snapshots";
 import { assessDataHealth } from "@/lib/market-hours";
 import { classifyRonSession } from "@/lib/ron-sessions";
+import { summariseSessionsToday } from "@/lib/ron-session-day";
 import { ronEvidenceChips, ronSummarySentence, ronEmptyState } from "@/lib/dashboard-ron-summary";
 
 const C = { ...CBase, text: "#FFFFFF", sec: "#FFFFFF" };
@@ -129,6 +130,10 @@ export default function InstrumentCard({
   const quoteFresh = isQuoteFresh(quote);
   const quoteInstant = quote?.broker_time ?? quote?.fetched_at ?? null;
   const quoteSourceLabel = quote?.broker_time ? "broker quote time" : "server fetch time";
+
+  // Today's stored bars, fetched only while the detail disclosure is open.
+  const { rows: dayRows, loading: dayLoading } = useRonSnapshotDay(inst.symbol, snap?.timeframe ?? tf, expanded);
+  const sessionsToday = summariseSessionsToday(dayRows);
 
   const chips = ronEvidenceChips(f);
   const summary = ronSummarySentence(f);
@@ -402,6 +407,33 @@ export default function InstrumentCard({
               </span>
             </div>
           )}
+
+          {/* Sessions so far today — read straight from the stored bars of this UTC day. */}
+          <div style={{ paddingTop: 10, borderTop: `1px solid ${C.border}` }} data-testid={`instrument-sessions-today-${inst.symbol}`}>
+            <div style={sectionLabel}>Sessions today (so far)</div>
+            {dayLoading && sessionsToday.length === 0 ? (
+              <div style={{ fontSize: 10, color: C.text, opacity: 0.7 }}>Loading stored bars for today…</div>
+            ) : sessionsToday.length === 0 ? (
+              <div style={{ fontSize: 10, color: C.text, opacity: 0.7 }}>No stored bars for this UTC day yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {sessionsToday.map((s) => (
+                  <div key={s.session} style={{ fontSize: 10, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                    <span style={{ fontWeight: 700 }}>{s.label}</span>
+                    <span style={{ opacity: 0.7 }}> · {s.bars} bar{s.bars === 1 ? "" : "s"} · </span>
+                    <span style={{
+                      fontWeight: 600,
+                      color: s.structure === "trend_up" ? C.green : s.structure === "trend_down" ? C.red : s.structure === "ranging" ? C.amber : C.text,
+                    }}>
+                      {s.structureLabel}
+                    </span>
+                    <span> · {s.noFormedPatterns ? "No formed patterns" : `Patterns: ${s.patterns.join(", ")}`}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
 
           {/* Patterns — dated, and clearly historical structure, never "current". */}
           <div style={{ paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
