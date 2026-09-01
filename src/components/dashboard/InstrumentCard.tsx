@@ -217,14 +217,20 @@ export default function InstrumentCard({
             onClick={(e) => { e.stopPropagation(); onHide(); }}
             onMouseDown={(e) => e.stopPropagation()}
             draggable={false}
-            style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2, borderRadius: 4, opacity: 0.4, display: "flex" }}
+            style={{
+              background: "transparent", border: `1px solid ${C.text}40`, cursor: "pointer",
+              padding: "2px 8px", borderRadius: 6, opacity: 0.75, display: "flex",
+              alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: C.text,
+              whiteSpace: "nowrap",
+            }}
             onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.4")}
-            title="Hide this card"
-            aria-label={`Hide ${inst.symbol} card`}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.75")}
+            title="Hide this tile — restore it with Unhide All"
+            aria-label={`Hide ${inst.symbol} tile`}
           >
-            <X size={14} color={C.text} />
+            <X size={12} color={C.text} /> Hide tile
           </button>
+
         </div>
       </div>
 

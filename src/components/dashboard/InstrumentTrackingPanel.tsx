@@ -266,16 +266,22 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           </button>
           <button
             onClick={showAllPanes}
+            disabled={hiddenPanes.size === 0}
+            title={hiddenPanes.size > 0
+              ? `Restore ${hiddenPanes.size} hidden tile${hiddenPanes.size === 1 ? "" : "s"}`
+              : "No tiles are hidden"}
             style={{
               display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: C.jade,
               background: hiddenPanes.size > 0 ? C.jade + "15" : "transparent",
               border: hiddenPanes.size > 0 ? `1px solid ${C.jade}30` : "1px solid transparent",
-              borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontWeight: 600,
+              borderRadius: 6, padding: "3px 10px",
+              cursor: hiddenPanes.size > 0 ? "pointer" : "default", fontWeight: 600,
               opacity: hiddenPanes.size > 0 ? 1 : 0.5,
             }}
           >
-            <Eye size={12} /> Show All
+            <Eye size={12} /> Unhide All{hiddenPanes.size > 0 ? ` (${hiddenPanes.size})` : ""}
           </button>
+
           {showPopOutButton && (
             <button
               onClick={() => window.open("/instruments-popout", "_blank", "noopener,width=1400,height=900")}
