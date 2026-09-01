@@ -1,5 +1,4 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import {
   DEFAULT_STRATEGY_LAB_COSTS,
@@ -17,6 +16,30 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MAX_CANDLES = 50_000;
+
+type LooseTable = {
+  Row: Record<string, unknown>;
+  Insert: Record<string, unknown>;
+  Update: Record<string, unknown>;
+  Relationships: [];
+};
+
+type StrategyLabDatabase = {
+  public: {
+    Tables: {
+      candle_history: LooseTable;
+      strategy_lab_runs: LooseTable;
+      strategy_lab_candidates: LooseTable;
+      strategy_lab_agent_runs: LooseTable;
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+};
+
+type StrategyLabClient = SupabaseClient<StrategyLabDatabase>;
 
 interface RequestBody {
   symbol: string;
@@ -47,7 +70,7 @@ function finiteInRange(
 }
 
 async function loadCandles(
-  db: ReturnType<typeof createClient>,
+  db: StrategyLabClient,
   symbol: string,
   timeframe: string,
   periodStart: string,
@@ -94,16 +117,20 @@ Deno.serve(async (request) => {
   }
 
   let runId: string | null = null;
-  let db: ReturnType<typeof createClient> | null = null;
+  let db: StrategyLabClient | null = null;
   try {
     const authorization = request.headers.get("Authorization");
     if (!authorization?.startsWith("Bearer ")) {
       return json({ error: "unauthorized" }, 401);
     }
     const token = authorization.slice("Bearer ".length);
-    const authClient = createClient(SUPABASE_URL, ANON_KEY, {
-      global: { headers: { Authorization: authorization } },
-    });
+    const authClient = createClient<StrategyLabDatabase>(
+      SUPABASE_URL,
+      ANON_KEY,
+      {
+        global: { headers: { Authorization: authorization } },
+      },
+    );
     const { data: claims, error: claimsError } = await authClient.auth
       .getClaims(token);
     const userId = claims?.claims?.sub as string | undefined;
@@ -154,7 +181,7 @@ Deno.serve(async (request) => {
       ),
     };
 
-    db = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    db = createClient<StrategyLabDatabase>(SUPABASE_URL, SERVICE_ROLE_KEY);
     const requestConfig = {
       strategy_lab_version: STRATEGY_LAB_VERSION,
       initial_equity: initialEquity,
