@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: Run functional and current contract tests
-        # These six historical slice-lock tests compare the entire future tree with an old
+        # These historical slice-lock tests compare the entire future tree with an old
         # commit and therefore reject every legitimate later additive file. They remain in
         # the repository for historical replay; current forward contracts cover new work.
         run: >-
@@ -42,6 +42,7 @@ jobs:
           --exclude src/test/gainedge-ask-ron-global-context-bridge-v1.test.ts
           --exclude src/test/ron-v3-v8-regression-guard.test.ts
           --exclude src/test/gainedge-product-ask-ron-global-entry-v1.test.ts
+          --exclude src/test/gainedge-product-ask-ron-identity-v1.test.ts
 
       - name: Typecheck
         run: npx -y -p @typescript/native-preview tsgo --noEmit
@@ -50,6 +51,9 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+
+      - name: Deno check Strategy Lab V1
+        run: deno check supabase/functions/strategy-lab-backtest/index.ts
 
       - name: Deno check post-V4 data readiness
         run: deno check supabase/functions/ron-post-v4-data-readiness/index.ts

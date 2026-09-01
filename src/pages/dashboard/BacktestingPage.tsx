@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import StrategyLabPage from "./StrategyLabPage";
 
 interface BacktestTrade {
   openedAt: number;
@@ -38,6 +39,7 @@ type BacktestRun = {
 };
 
 export default function BacktestingPage() {
+  const [workspace, setWorkspace] = useState<"falconer" | "strategy_lab">("strategy_lab");
   const [symbol, setSymbol] = useState("XAUUSD");
   const [timeframe, setTimeframe] = useState("15m");
   const [start, setStart] = useState("2025-12-01");
@@ -59,6 +61,13 @@ export default function BacktestingPage() {
     setHistory((data as BacktestRun[]) ?? []);
   };
   useEffect(() => { loadHistory(); }, []);
+
+  if (workspace === "strategy_lab") {
+    return <div>
+      <WorkspaceSwitch workspace={workspace} setWorkspace={setWorkspace} />
+      <StrategyLabPage />
+    </div>;
+  }
 
   const run = async () => {
     setRunning(true);
@@ -87,6 +96,7 @@ export default function BacktestingPage() {
 
   return (
     <div style={{ padding: 24, color: C.text, fontFamily: "'DM Sans', sans-serif" }}>
+      <WorkspaceSwitch workspace={workspace} setWorkspace={setWorkspace} />
       <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 16 }}>Falconer v7 TP3 · Backtest</h1>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 16, maxWidth: 1050 }}>
         <Field label="Symbol"><input value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())} style={inp} /></Field>
@@ -192,5 +202,26 @@ function Kpi({ label, value }: { label: string; value: string }) {
   return <div style={{ padding: 12, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 8 }}>
     <div style={{ color: C.sec, fontSize: 11, textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
     <div style={{ color: C.text, fontSize: 18, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
+  </div>;
+}
+
+function WorkspaceSwitch({
+  workspace, setWorkspace,
+}: {
+  workspace: "falconer" | "strategy_lab";
+  setWorkspace: (workspace: "falconer" | "strategy_lab") => void;
+}) {
+  return <div style={{ display: "flex", gap: 8, padding: "16px 24px 0" }}>
+    {([
+      ["strategy_lab", "Strategy Lab · 8 agents"],
+      ["falconer", "Legacy Falconer v7"],
+    ] as const).map(([value, label]) => (
+      <button key={value} onClick={() => setWorkspace(value)} style={{
+        border: `1px solid ${workspace === value ? C.jade : C.border}`,
+        background: workspace === value ? `${C.jade}18` : C.bg2,
+        color: workspace === value ? C.jade : C.sec,
+        borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontWeight: 800,
+      }}>{label}</button>
+    ))}
   </div>;
 }

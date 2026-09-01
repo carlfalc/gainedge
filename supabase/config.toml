@@ -20,6 +20,9 @@ verify_jwt = true
 [functions.falconer-backtest]
 verify_jwt = true
 
+[functions.strategy-lab-backtest]
+verify_jwt = true
+
 [functions.metaapi-candles]
 verify_jwt = false
 
