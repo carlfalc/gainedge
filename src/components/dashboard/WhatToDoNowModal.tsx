@@ -94,7 +94,7 @@ export default function WhatToDoNowModal({ symbol, timeframe, quoteFresh, market
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(620px, 100%)", maxHeight: "86vh", overflowY: "auto",
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18,
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: 18,
           display: "flex", flexDirection: "column", gap: 14,
         }}
       >
