@@ -142,11 +142,16 @@ export default function RonPulse() {
                         display: "grid", gap: 3,
                       }}
                     >
-                      {item.context.map((line, i) => (
-                        <div key={i} style={{ fontSize: 12, color: C.text, opacity: 0.9, lineHeight: 1.5, overflowWrap: "anywhere" }}>
-                          {line}
-                        </div>
-                      ))}
+                      {item.context.map((line, i) => {
+                        const lineBias = ronBiasFromLabel(line) ?? (/\bSHORT\b/.test(line) ? "SHORT" : /\bLONG\b/.test(line) ? "LONG" : null);
+                        const lineColor = ronBiasColor(lineBias);
+                        return (
+                          <div key={i} style={{ fontSize: 12, color: lineColor ?? C.text, fontWeight: lineColor ? 700 : 400, opacity: 0.9, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                            {line}
+                          </div>
+                        );
+                      })}
+
                     </div>
                   )}
 
