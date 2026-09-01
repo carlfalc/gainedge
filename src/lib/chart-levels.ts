@@ -34,7 +34,7 @@ function num(v: unknown): number | null {
 }
 
 /** Max marks rendered per kind so the overlay never covers the chart. */
-export const MAX_LEVEL_MARKS = 8;
+export const MAX_LEVEL_MARKS = 9;
 
 export function buildChartLevelMarks(
   symbol: string,
