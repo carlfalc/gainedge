@@ -34,7 +34,7 @@ function num(v: unknown): number | null {
 }
 
 /** Max marks rendered per kind so the overlay never covers the chart. */
-export const MAX_LEVEL_MARKS = 8;
+export const MAX_LEVEL_MARKS = 9;
 
 export function buildChartLevelMarks(
   symbol: string,
@@ -101,4 +101,4 @@ export function buildChartLevelMarks(
 }
 
 export const LEVEL_OVERLAY_NOTE =
-  "Exact RON prices. Standard pivot lines are drawn on the chart itself by the Pivot Points study.";
+  "Exact RON prices. Pivots are traditional levels from RON's last completed session — no third-party study.";

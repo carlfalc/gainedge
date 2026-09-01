@@ -15,15 +15,15 @@ interface Props {
 const KIND_STYLE: Record<ChartLevelKind, { color: string; border: string; bg: string }> = {
   support: { color: "#00CFA5", border: "rgba(0,207,165,0.45)", bg: "rgba(0,207,165,0.10)" },
   resistance: { color: "#FF4D4D", border: "rgba(255,77,77,0.45)", bg: "rgba(255,77,77,0.10)" },
-  pivot: { color: "#F5B93B", border: "rgba(245,185,59,0.45)", bg: "rgba(245,185,59,0.10)" },
+  pivot: { color: "#FFFFFF", border: "rgba(255,255,255,0.45)", bg: "rgba(255,255,255,0.10)" },
 };
 
 /**
  * Auto-loading level markup over the Charts iframe.
- * Support (jade), Resistance (red) and Pivot (amber) prices from the current RON
+ * Support (jade), Resistance (red) and Pivot (white) prices from the current RON
  * snapshot are shown the moment a chart opens. Because TradingView runs in an iframe
- * we render exact price rows rather than fabricated pixel-aligned lines; genuine pivot
- * lines are drawn inside the chart by the Pivot Points study.
+ * we render exact price rows rather than fabricated pixel-aligned lines. Pivots are
+ * RON's own traditional levels from the last completed session — no third-party study.
  */
 export default function ChartLevelsOverlay({ symbol, patterns, features }: Props) {
   const [open, setOpen] = useState(true);

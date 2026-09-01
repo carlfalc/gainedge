@@ -117,9 +117,9 @@ function TradingViewWidget({ symbol, broker }: TradingViewWidgetProps) {
         details: false,
         hotlist: false,
         calendar: false,
-        // Volume bars already come from style 8. The pivot study draws GENUINE standard
-        // pivot levels (P / R1-R3 / S1-S3) with labels inside the chart on load.
-        studies: ["PivotPointsStandard@tv-basicstudies"],
+        // Volume bars already come from style 8. No third-party pivot study is loaded:
+        // pivots come exclusively from RON's sealed completed-session evidence so every
+        // level on this page is one RON can explain.
         disabled_features: [
           "header_symbol_search",
           "volume_force_overlay",
