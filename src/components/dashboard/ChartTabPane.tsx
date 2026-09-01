@@ -12,6 +12,7 @@ import TradeExecutionPanel, {
 import RonSignalAlert from "./RonSignalAlert";
 import ChartOverlay from "./ChartOverlay";
 import TradeLevelOverlay from "./TradeLevelOverlay";
+import ChartLevelsOverlay from "./ChartLevelsOverlay";
 import LivePnLBar from "./LivePnLBar";
 import type { ChartMode } from "./AddChartTabModal";
 import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
@@ -30,6 +31,8 @@ interface Props {
   accountId: string | null;
   connectionStatus: "disconnected" | "connecting" | "live" | "demo";
   active: boolean;
+  /** Current RON snapshot for this symbol — sole source of level/pivot markup. */
+  snapshot?: { patterns?: unknown; features?: unknown } | null;
   /**
    * Route-level visibility of the Charts tree. The Charts route stays mounted across
    * navigation (session-scoped TradingView persistence), so GainEdge-owned polling is
@@ -57,7 +60,7 @@ interface Props {
  * state is preserved when the user switches tabs.
  */
 export default function ChartTabPane({
-  symbol, mode, broker, userId, accountId, connectionStatus, active, onPaneState,
+  symbol, mode, broker, userId, accountId, connectionStatus, active, onPaneState, snapshot = null,
   chartsVisible = true,
 }: Props) {
   const [positions, setPositions] = useState<Position[]>([]);
@@ -156,6 +159,7 @@ export default function ChartTabPane({
 
       <div className="relative flex-1 min-h-0">
         <TradingViewWidget symbol={symbol} broker={broker} />
+        <ChartLevelsOverlay symbol={symbol} patterns={snapshot?.patterns} features={snapshot?.features} />
         <ChartOverlay symbol={symbol} userId={userId} positions={positions} />
         <TradeLevelOverlay symbol={symbol} positions={positions} />
       </div>
