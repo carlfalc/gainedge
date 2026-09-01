@@ -58,6 +58,69 @@ function splitPairs(ccy: string, instruments: string[]) {
   return { base, quote };
 }
 
+/** Home currency of a tagged index / commodity symbol, for rate transmission. */
+const INDEX_HOME: Record<string, string> = {
+  NAS100: "USD", US30: "USD", SPX500: "USD", US500: "USD", US100: "USD",
+  GER40: "EUR", GER30: "EUR", EU50: "EUR",
+  UK100: "GBP", JP225: "JPY", AUS200: "AUD", HK50: "HKD", CHINA50: "CNH",
+};
+
+/**
+ * Deterministic, mechanics-only statement of how this class of event typically
+ * transmits into one tagged instrument. `strengthens` is null when the headline
+ * gives no rate direction — then both directions are stated.
+ */
+function effectLine(sym: string, primary: string | null, strengthens: boolean | null): string | null {
+  const s = sym.toUpperCase();
+
+  // Metals quoted in USD.
+  if (s === "XAUUSD" || s === "XAGUSD") {
+    const name = s === "XAUUSD" ? "Gold" : "Silver";
+    if (primary === "USD" && strengthens !== null) {
+      return strengthens
+        ? `${s} — ${name} is priced in USD and pays no yield, so higher USD rates and a firmer USD are usually an adverse backdrop: prices tend to fall.`
+        : `${s} — ${name} is priced in USD and pays no yield, so lower USD rates and a softer USD are usually a supportive backdrop: prices tend to rise.`;
+    }
+    if (primary && primary !== "USD" && strengthens !== null) {
+      return `${s} — ${name} is a USD-priced haven. A ${strengthens ? "stronger" : "weaker"} ${primary} mainly matters here through USD: if it drags the USD ${strengthens ? "lower" : "higher"}, ${s} tends to ${strengthens ? "rise" : "fall"}.`;
+    }
+    return `${s} — ${name} is USD-priced and yield-free: firmer USD rates usually weigh on it, softer USD rates usually support it.`;
+  }
+
+  // FX pairs.
+  if (/^[A-Z]{6}$/.test(s)) {
+    const base = s.slice(0, 3);
+    const quote = s.slice(3);
+    if (!primary || (primary !== base && primary !== quote)) {
+      return `${s} — neither leg is the currency in this headline, so any effect is second-hand via broad risk appetite and the USD.`;
+    }
+    const isBase = primary === base;
+    if (strengthens === null) {
+      return `${s} — ${primary} is the ${isBase ? "base" : "quote"}: if ${primary} strengthens this pair tends to ${isBase ? "rise" : "fall"}, if ${primary} weakens it tends to ${isBase ? "fall" : "rise"}.`;
+    }
+    const up = isBase ? strengthens : !strengthens;
+    return `${s} — ${primary} is the ${isBase ? "base" : "quote"}, so a ${strengthens ? "stronger" : "weaker"} ${primary} typically pushes this pair ${up ? "up (adverse for shorts)" : "down (adverse for longs)"}.`;
+  }
+
+  // Equity indices.
+  const home = INDEX_HOME[s];
+  if (home) {
+    if (strengthens === null) {
+      return `${s} — an equity index priced in ${home}: higher rates raise discount rates and usually weigh on it, lower rates usually support it.`;
+    }
+    if (home === primary) {
+      return strengthens
+        ? `${s} — higher ${home} rates raise borrowing and discount rates for its constituents, usually an adverse backdrop: the index tends to fall.`
+        : `${s} — lower ${home} rates ease borrowing and discount rates for its constituents, usually a supportive backdrop: the index tends to rise.`;
+    }
+    return strengthens
+      ? `${s} — priced in ${home}. Tighter ${primary} policy usually tightens global financial conditions and risk appetite, a mildly adverse backdrop.`
+      : `${s} — priced in ${home}. Easier ${primary} policy usually loosens global financial conditions and risk appetite, a mildly supportive backdrop.`;
+  }
+
+  return `${s} — tagged by the source; no standard rate-transmission channel applies, so treat it as adjacency only.`;
+}
+
 export function buildHeadlineContext(headline: string, instruments: string[] = []): HeadlineContext {
   const tags = instruments.filter(Boolean).map((s) => s.toUpperCase());
   const currencies = currenciesFor(headline, tags);
