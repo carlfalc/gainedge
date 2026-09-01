@@ -446,14 +446,24 @@ export default function InstrumentCard({
                 {structureSummary && (
                   <div style={{ fontSize: 12, color: C.amber, marginBottom: 6, overflowWrap: "anywhere" }}>{structureSummary}</div>
                 )}
-                {patternExplanations.map((e, i) => (
+                {patternExplanations.map((e, i) => {
+                  const raw = (snap.patterns as any[] | undefined)?.[i] ?? {};
+                  // Patterns are detected on a completed bar: use the pattern's own
+                  // stored stamp when present, otherwise the snapshot's bar time.
+                  const at: string = raw.detected_at ?? raw.bar_time ?? raw.timestamp ?? snap.bar_time;
+                  const ptf: string = raw.timeframe ?? snap.timeframe;
+                  return (
                   <details key={i} open={i === 0} style={{ marginBottom: 6 }}>
                     <summary style={{ cursor: "pointer", listStyle: "revert" }} title={`Show interpretation for ${e.title}`}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: e.direction === "bullish" ? C.green : e.direction === "bearish" ? C.red : C.text }}>
-                        {e.title}
+                        {e.title} ({ptf}) at {formatPrintedLocal(at)}
                       </span>
                     </summary>
                     <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                      <div style={{ fontSize: 11, opacity: 0.85, fontFamily: "'JetBrains Mono', monospace", marginBottom: 2 }}>
+                        RON read this on the {ptf} timeframe · completed bar {formatPrintedLocal(at)} local · {formatAge(at)}
+                      </div>
+
                       <div>{e.meaning}</div>
                       <div style={{ marginTop: 2 }}><span style={{ color: C.green }}>Stronger if:</span> {e.strengthens}</div>
                       <div style={{ marginTop: 2 }}><span style={{ color: C.red }}>Weaker if:</span> {e.weakens}</div>
