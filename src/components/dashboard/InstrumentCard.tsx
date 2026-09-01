@@ -408,6 +408,33 @@ export default function InstrumentCard({
             </div>
           )}
 
+          {/* Sessions so far today — read straight from the stored bars of this UTC day. */}
+          <div style={{ paddingTop: 10, borderTop: `1px solid ${C.border}` }} data-testid={`instrument-sessions-today-${inst.symbol}`}>
+            <div style={sectionLabel}>Sessions today (so far)</div>
+            {dayLoading && sessionsToday.length === 0 ? (
+              <div style={{ fontSize: 10, color: C.text, opacity: 0.7 }}>Loading stored bars for today…</div>
+            ) : sessionsToday.length === 0 ? (
+              <div style={{ fontSize: 10, color: C.text, opacity: 0.7 }}>No stored bars for this UTC day yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {sessionsToday.map((s) => (
+                  <div key={s.session} style={{ fontSize: 10, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                    <span style={{ fontWeight: 700 }}>{s.label}</span>
+                    <span style={{ opacity: 0.7 }}> · {s.bars} bar{s.bars === 1 ? "" : "s"} · </span>
+                    <span style={{
+                      fontWeight: 600,
+                      color: s.structure === "trend_up" ? C.green : s.structure === "trend_down" ? C.red : s.structure === "ranging" ? C.amber : C.text,
+                    }}>
+                      {s.structureLabel}
+                    </span>
+                    <span> · {s.noFormedPatterns ? "No formed patterns" : `Patterns: ${s.patterns.join(", ")}`}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+
           {/* Patterns — dated, and clearly historical structure, never "current". */}
           <div style={{ paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
             <div style={sectionLabel}>Pattern interpretation</div>
