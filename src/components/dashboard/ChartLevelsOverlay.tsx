@@ -28,7 +28,7 @@ const KIND_STYLE: Record<ChartLevelKind, { color: string; border: string; bg: st
 export default function ChartLevelsOverlay({ symbol, patterns, features }: Props) {
   const [open, setOpen] = useState(true);
   const marks = buildChartLevelMarks(symbol, patterns, features);
-  if (marks.length === 0) return null;
+
 
   return (
     <div className="absolute top-3 left-3 z-[16] pointer-events-none" data-testid="chart-levels-overlay">
@@ -76,7 +76,18 @@ export default function ChartLevelsOverlay({ symbol, patterns, features }: Props
                 </div>
               );
             })}
+            {marks.length === 0 && (
+              <p
+                className="text-[10px] leading-snug text-white/70 py-1"
+                data-testid="chart-levels-empty"
+              >
+                RON has no sealed levels for {symbol} yet — it only scans the instruments on
+                your watchlist. Open a covered symbol to see RON-verified support, resistance
+                and pivots.
+              </p>
+            )}
             <p className="text-[9.5px] leading-snug text-white/55 pt-0.5">{LEVEL_OVERLAY_NOTE}</p>
+
           </div>
         )}
       </div>
