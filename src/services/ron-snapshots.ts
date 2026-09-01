@@ -183,6 +183,44 @@ export interface RonOutcomeStats {
 }
 
 /**
+ * Today's stored snapshots for one symbol/timeframe (UTC day), oldest first.
+ * Read-only: used to describe the sessions that already happened today.
+ */
+export function useRonSnapshotDay(symbol: string, timeframe: string, enabled: boolean) {
+  const [rows, setRows] = useState<{ bar_time: string; features: any; patterns: any[] }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const start = new Date();
+      start.setUTCHours(0, 0, 0, 0);
+      const { data } = await supabase
+        .from("ron_market_snapshots")
+        .select("bar_time, features, patterns")
+        .eq("feature_version", CURRENT_RON_SNAPSHOT_FEATURE_VERSION)
+        .eq("symbol", symbol)
+        .eq("timeframe", timeframe)
+        .gte("bar_time", start.toISOString())
+        .order("bar_time", { ascending: true });
+      if (cancelled) return;
+      setRows(((data as any[]) ?? []).map((r) => ({
+        bar_time: r.bar_time,
+        features: r.features ?? null,
+        patterns: Array.isArray(r.patterns) ? r.patterns : [],
+      })));
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [symbol, timeframe, enabled]);
+
+  return { rows, loading };
+}
+
+
+/**
  * The ONLY canonical outcome label version. v1 and v2 remain in the table for audit and
  * must never be mixed into current-state queries: v2's coverage-cause classifier compared
  * aggregate counts and could report an open-market data hole as a session boundary.
