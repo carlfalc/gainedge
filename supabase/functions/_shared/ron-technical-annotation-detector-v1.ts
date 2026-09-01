@@ -222,10 +222,9 @@ function addPivots(
     ["S3", low - 2 * (high - p)],
   ] as const;
   const tolerance = Math.max(atrNow * 0.12, Math.abs(bar.close) * 0.00002);
-  const nearest = [...candidates]
-    .sort((a, b) => Math.abs(a[1] - bar.close) - Math.abs(b[1] - bar.close))
-    .slice(0, 3);
-  for (const [level, rawPrice] of nearest) {
+  /* Seal the FULL traditional pivot set so the Charts overlay is the single source of
+     truth for pivots; nothing is filtered by proximity to current price. */
+  for (const [level, rawPrice] of candidates) {
     const price = round(rawPrice);
     const touched = bar.high >= price - tolerance && bar.low <= price + tolerance;
     const direction: RonChartAnnotationDirection = level.startsWith("S")
