@@ -45,18 +45,6 @@ function currenciesFor(headline: string, instruments: string[]): string[] {
   return [...out];
 }
 
-/** Pairs from the tagged instruments where `ccy` is the base / the quote. */
-function splitPairs(ccy: string, instruments: string[]) {
-  const base: string[] = [];
-  const quote: string[] = [];
-  for (const sym of instruments) {
-    const s = sym.toUpperCase();
-    if (!/^[A-Z]{6}$/.test(s)) continue;
-    if (s.slice(0, 3) === ccy) base.push(s);
-    else if (s.slice(3) === ccy) quote.push(s);
-  }
-  return { base, quote };
-}
 
 /** Home currency of a tagged index / commodity symbol, for rate transmission. */
 const INDEX_HOME: Record<string, string> = {
