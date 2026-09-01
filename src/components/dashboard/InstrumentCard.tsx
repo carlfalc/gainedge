@@ -9,7 +9,9 @@
  *   - one calm empty state instead of repeated warning lines
  *   - an "Ask RON" deep link carrying the exact stored {symbol, timeframe} pair
  */
-import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, ExternalLink, LineChart, MessageSquare, GripVertical } from "lucide-react";
+import { useState } from "react";
+import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, ExternalLink, LineChart, MessageSquare, GripVertical, HelpCircle } from "lucide-react";
+import WhatToDoNowModal from "@/components/dashboard/WhatToDoNowModal";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { C as CBase } from "@/lib/mock-data";
 import { formatAge, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
@@ -99,6 +101,8 @@ export default function InstrumentCard({
   expanded, onToggleExpanded, onHide, onOpenChart, onOpenRonRecord, onAskRon,
   isDragOver = false, isDragging = false, dragHandlers,
 }: InstrumentCardProps) {
+  const [whatToDoOpen, setWhatToDoOpen] = useState(false);
+
   // ── Falconer signal history — explicitly NOT RON analysis. ──
   const sig = deriveFalconerSignalState(
     { direction: inst.direction, opened_at: inst.scanned_at, status: inst.status, closed_at: inst.closed_at },
@@ -358,6 +362,34 @@ export default function InstrumentCard({
           {countdown === -1 ? `Closed · opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan ${formatCountdown(countdown)}`}
         </span>
       </div>
+
+      {/* ── On-demand plain-English briefing ── */}
+      <div>
+        <button
+          onClick={(e) => { e.stopPropagation(); setWhatToDoOpen(true); }}
+          onMouseDown={(e) => e.stopPropagation()} draggable={false}
+          data-testid={`what-to-do-now-${inst.symbol}`}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 5, fontSize: 14, fontWeight: 700,
+            color: C.jade, background: "transparent", border: `1px solid ${C.jade}55`,
+            borderRadius: 7, padding: "5px 12px", cursor: "pointer",
+          }}
+          title={`Run RON now and get a plain-English briefing for ${inst.symbol} ${tf}`}
+        >
+          <HelpCircle size={14} /> What to do now?
+        </button>
+      </div>
+
+      {whatToDoOpen && (
+        <WhatToDoNowModal
+          symbol={inst.symbol}
+          timeframe={tf}
+          quoteFresh={quote ? isQuoteFresh(quote) : undefined}
+          marketOpen={countdown !== -1}
+          onClose={() => setWhatToDoOpen(false)}
+        />
+      )}
+
 
       {/* ── Full evidence (disclosure) ── */}
       {expanded && (
