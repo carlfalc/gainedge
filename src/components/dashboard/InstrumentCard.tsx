@@ -474,7 +474,8 @@ export default function InstrumentCard({
                       )}
                     </div>
                   </details>
-                ))}
+                  );
+                })}
                 <div style={{ fontSize: 11, color: C.text, opacity: 0.85, marginTop: 4, overflowWrap: "anywhere" }}>
                   Educational context on detected chart structure — not a trade recommendation, and not a RON opportunity.
                 </div>
