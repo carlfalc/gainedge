@@ -64,7 +64,7 @@ async function authenticatedUser(request: Request) {
     global: { headers: { Authorization: authorization } },
   });
   const { data, error } = await client.auth.getClaims(token);
-  return error ? null : data.claims?.sub as string | undefined ?? null;
+  return error ? null : data?.claims?.sub as string | undefined ?? null;
 }
 
 async function loadCandles(
