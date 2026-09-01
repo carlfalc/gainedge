@@ -9,7 +9,7 @@
  *   - one calm empty state instead of repeated warning lines
  *   - an "Ask RON" deep link carrying the exact stored {symbol, timeframe} pair
  */
-import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, ExternalLink, LineChart, MessageSquare } from "lucide-react";
+import { Clock, ArrowUp, ArrowDown, Circle, X, Eye, ExternalLink, LineChart, MessageSquare, GripVertical } from "lucide-react";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { C as CBase } from "@/lib/mock-data";
 import { formatAge, nextScanSeconds, formatCountdown, secondsUntilMarketOpen } from "@/lib/expiry";
@@ -141,8 +141,9 @@ export default function InstrumentCard({
 
   return (
     <div
-      draggable
-      {...(dragHandlers ?? {})}
+      onDragOver={dragHandlers?.onDragOver}
+      onDrop={dragHandlers?.onDrop}
+      onDragEnd={dragHandlers?.onDragEnd}
       data-testid={`instrument-card-${inst.symbol}`}
       style={{
         background: C.card,
@@ -150,7 +151,6 @@ export default function InstrumentCard({
         borderRadius: 14, padding: 16,
         opacity: isDragging ? 0.5 : 1,
         transition: "opacity .3s, border-color .2s",
-        cursor: "grab",
         display: "flex", flexDirection: "column", gap: 10,
       }}
     >
@@ -174,8 +174,28 @@ export default function InstrumentCard({
               title={quoteFresh ? "Live broker quote streaming" : "No fresh broker quote"}
             />
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenChart(); }}
+            draggable={false}
+            style={iconBtn}
+            title={`Open the GainEdge chart for ${inst.symbol}`}
+            aria-label={`Open ${inst.symbol} chart`}
+            data-testid={`instrument-card-chart-top-${inst.symbol}`}
+          >
+            <LineChart size={10} /> Chart ↗
+          </button>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            draggable={!!dragHandlers}
+            onDragStart={dragHandlers?.onDragStart}
+            data-testid={`instrument-card-drag-${inst.symbol}`}
+            title="Drag here to move this tile"
+            aria-label={`Move ${inst.symbol} card`}
+            style={{ display: "flex", alignItems: "center", cursor: dragHandlers ? "grab" : "default", opacity: 0.5, padding: 2 }}
+          >
+            <GripVertical size={14} color={C.text} />
+          </span>
           <div
             style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: badgeColor + "20", color: badgeColor }}
             title={hasSignal
