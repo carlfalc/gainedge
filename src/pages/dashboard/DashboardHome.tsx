@@ -323,7 +323,7 @@ export default function DashboardHome() {
       <RonPulse />
 
       {/* K. KPI row — explicitly labelled as simulated paper-trading history. */}
-      <div style={{ fontSize: 10, color: C.sec, letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>
+      <div style={{ fontSize: 12, color: C.sec, letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>
         Paper trading performance · simulated, not broker-settled
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginBottom: 20 }}>
@@ -353,7 +353,7 @@ export default function DashboardHome() {
           boxShadow: `0 0 30px ${C.jade}10`,
         }}>
           <div>
-            <div style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>LATEST LIVE SETUP</div>
+            <div style={{ fontSize: 12, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>LATEST LIVE SETUP</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
               {best.symbol} {best.direction} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> Entry {best.entry_price ?? "N/A"} → TP {best.take_profit ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> SL {best.stop_loss ?? "N/A"} <span style={{ color: C.sec, fontWeight: 400 }}>|</span> R:R {best.risk_reward ?? "N/A"}
             </div>
@@ -361,7 +361,7 @@ export default function DashboardHome() {
           <div style={{
             padding: "8px 12px", borderRadius: 12, background: C.jade + "18",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: C.jade,
+            fontSize: 13, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: C.jade,
           }}>
             {best.verdict || "OPEN"}
           </div>
@@ -373,7 +373,7 @@ export default function DashboardHome() {
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <div>
-              <div style={{ fontSize: 11, color: C.sec, fontWeight: 500 }}>Equity Curve</div>
+              <div style={{ fontSize: 13, color: C.sec, fontWeight: 500 }}>Equity Curve</div>
               <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: stats.netPnl >= 0 ? C.green : C.red }}>
                 {stats.netPnl >= 0 ? "+" : ""}${stats.netPnl.toLocaleString()}
               </div>

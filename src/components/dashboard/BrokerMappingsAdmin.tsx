@@ -75,48 +75,48 @@ export default function BrokerMappingsAdmin() {
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
         <Database size={16} color={C.blue} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Broker Symbol Mappings</span>
-        <span style={{ fontSize: 11, color: C.sec, marginLeft: "auto" }}>{mappings.length} mappings</span>
+        <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>Broker Symbol Mappings</span>
+        <span style={{ fontSize: 13, color: C.sec, marginLeft: "auto" }}>{mappings.length} mappings</span>
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
         <select value={filterBroker} onChange={e => setFilterBroker(e.target.value)}
-          style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}>
+          style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 14 }}>
           <option value="all">All Brokers</option>
           {BROKERS.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
         <button onClick={() => setShowAdd(!showAdd)}
-          style={{ padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, background: C.jade + "20", color: C.jade, display: "flex", alignItems: "center", gap: 4 }}>
+          style={{ padding: "6px 12px", borderRadius: 6, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: C.jade + "20", color: C.jade, display: "flex", alignItems: "center", gap: 4 }}>
           <Plus size={12} /> Add Mapping
         </button>
       </div>
 
       {showAdd && (
-        <div style={{ background: C.bg, borderRadius: 8, padding: 12, border: `1px solid ${C.border}`, marginBottom: 12, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, fontSize: 11 }}>
+        <div style={{ background: C.bg, borderRadius: 8, padding: 12, border: `1px solid ${C.border}`, marginBottom: 12, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, fontSize: 13 }}>
           <div>
             <div style={{ color: C.sec, marginBottom: 2 }}>Broker</div>
             <select value={newRow.broker} onChange={e => setNewRow({ ...newRow, broker: e.target.value })}
-              style={{ width: "100%", padding: 6, borderRadius: 4, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 11 }}>
+              style={{ width: "100%", padding: 6, borderRadius: 4, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }}>
               {BROKERS.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
           </div>
           <div>
             <div style={{ color: C.sec, marginBottom: 2 }}>Canonical Symbol</div>
             <input value={newRow.canonical_symbol} onChange={e => setNewRow({ ...newRow, canonical_symbol: e.target.value })} placeholder="XAUUSD"
-              style={{ width: "100%", padding: 6, borderRadius: 4, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 11 }} />
+              style={{ width: "100%", padding: 6, borderRadius: 4, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
           </div>
           <div>
             <div style={{ color: C.sec, marginBottom: 2 }}>Broker Symbol</div>
             <input value={newRow.broker_symbol} onChange={e => setNewRow({ ...newRow, broker_symbol: e.target.value })} placeholder="XAUUSD.a"
-              style={{ width: "100%", padding: 6, borderRadius: 4, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 11 }} />
+              style={{ width: "100%", padding: 6, borderRadius: 4, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
           </div>
           <div style={{ display: "flex", alignItems: "end", gap: 6 }}>
             <button onClick={handleAdd} disabled={saving}
-              style={{ padding: "6px 12px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, fontWeight: 600, background: C.jade, color: "#fff" }}>
+              style={{ padding: "6px 12px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600, background: C.jade, color: "#fff" }}>
               {saving ? <Loader2 size={10} className="animate-spin" /> : "Save"}
             </button>
             <button onClick={() => setShowAdd(false)}
-              style={{ padding: "6px 8px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11, background: C.muted + "30", color: C.sec }}>
+              style={{ padding: "6px 8px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 13, background: C.muted + "30", color: C.sec }}>
               Cancel
             </button>
           </div>
@@ -127,11 +127,11 @@ export default function BrokerMappingsAdmin() {
         <div style={{ textAlign: "center", padding: 20 }}><Loader2 size={16} className="animate-spin" style={{ color: C.sec }} /></div>
       ) : (
         <div style={{ maxHeight: 400, overflowY: "auto" }}>
-          <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                 {["Broker", "Canonical", "Broker Symbol", "Contract", "Pip", "Min Lot", "Available", ""].map(h => (
-                  <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: C.sec, fontWeight: 600, fontSize: 10 }}>{h}</th>
+                  <th key={h} style={{ padding: "6px 8px", textAlign: "left", color: C.sec, fontWeight: 600, fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
             </thead>

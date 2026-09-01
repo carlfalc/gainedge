@@ -26,14 +26,14 @@ export default function EventReviewTab() {
   return (
     <section className="space-y-3" data-testid="event-review-tab">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs leading-relaxed" style={{ color: C.sec }}>
+        <p className="text-sm leading-relaxed" style={{ color: C.sec }}>
           Every material RON event recorded while you were away, with what price did afterwards.
           Observations only — no probability, no trade result, no order.
         </p>
         <div className="flex items-center gap-2">
           <span
             data-testid="event-review-unread"
-            className="rounded-md px-2 py-1 text-[11px] uppercase tracking-widest"
+            className="rounded-md px-2 py-1 text-[13px] uppercase tracking-widest"
             style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
           >
             {unreadCount} unread
@@ -41,7 +41,7 @@ export default function EventReviewTab() {
           <button
             type="button"
             onClick={() => void markAllRead()}
-            className="rounded-md px-2 py-1 text-[11px] uppercase tracking-widest"
+            className="rounded-md px-2 py-1 text-[13px] uppercase tracking-widest"
             style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
           >
             Mark all read
@@ -49,7 +49,7 @@ export default function EventReviewTab() {
           <button
             type="button"
             onClick={() => void reload()}
-            className="rounded-md px-2 py-1 text-[11px] uppercase tracking-widest"
+            className="rounded-md px-2 py-1 text-[13px] uppercase tracking-widest"
             style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
           >
             Refresh
@@ -57,10 +57,10 @@ export default function EventReviewTab() {
         </div>
       </div>
 
-      {loading && <p className="text-xs" style={{ color: C.sec }}>Loading recorded events…</p>}
-      {error && <p className="text-xs" style={{ color: C.sec }}>Event history unavailable: {error}</p>}
+      {loading && <p className="text-sm" style={{ color: C.sec }}>Loading recorded events…</p>}
+      {error && <p className="text-sm" style={{ color: C.sec }}>Event history unavailable: {error}</p>}
       {!loading && !error && items.length === 0 && (
-        <p className="text-xs" style={{ color: C.sec }}>
+        <p className="text-sm" style={{ color: C.sec }}>
           No material RON events have been recorded yet. RON stays quiet when nothing materially changed.
         </p>
       )}
@@ -81,35 +81,35 @@ export default function EventReviewTab() {
                 <span className="text-sm font-semibold" style={{ color: C.text }}>
                   {event.instrument}
                 </span>
-                <span className="text-[11px] uppercase tracking-widest" style={{ color: C.sec }}>
+                <span className="text-[13px] uppercase tracking-widest" style={{ color: C.sec }}>
                   {event.timeframe} · {changeLabel(event.material_change_type)}
                 </span>
                 {unread && (
-                  <span className="text-[10px] uppercase tracking-widest" style={{ color: C.jade }}>
+                  <span className="text-[12px] uppercase tracking-widest" style={{ color: C.jade }}>
                     new
                   </span>
                 )}
               </div>
               <span
-                className="text-[11px]"
+                className="text-[13px]"
                 style={{ color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}
               >
                 {fmt(event.evaluation_anchor)}
               </span>
             </div>
 
-            <p className="mt-1 text-[11px]" style={{ color: C.sec }}>
+            <p className="mt-1 text-[13px]" style={{ color: C.sec }}>
               Recorded at the anchor: lifecycle {event.lifecycle} · direction {event.direction_context}
               {" "}({event.direction_authority}) · setup {event.setup_family} · data {event.data_state}
               {event.venue_state ? ` · venue ${event.venue_state}` : ""}
             </p>
 
             <div className="mt-2">
-              <p className="text-[10px] uppercase tracking-widest" style={{ color: C.sec }}>
+              <p className="text-[12px] uppercase tracking-widest" style={{ color: C.sec }}>
                 What happened afterwards
               </p>
               {outcomes.length === 0 ? (
-                <p className="text-[11px]" style={{ color: C.sec }}>
+                <p className="text-[13px]" style={{ color: C.sec }}>
                   Still being observed — no horizon has fully completed yet.
                 </p>
               ) : (
@@ -117,7 +117,7 @@ export default function EventReviewTab() {
                   {outcomes.map((o) => (
                     <li
                       key={`${o.event_id}-${o.horizon_bars}`}
-                      className="text-[11px]"
+                      className="text-[13px]"
                       style={{ color: C.text, fontFamily: "'JetBrains Mono', monospace" }}
                     >
                       +{o.horizon_bars} bars · {followThroughLabel(o.follow_through)} · move{" "}
@@ -130,7 +130,7 @@ export default function EventReviewTab() {
             </div>
 
             {lesson && (
-              <p className="mt-2 text-[11px]" style={{ color: C.sec }}>
+              <p className="mt-2 text-[13px]" style={{ color: C.sec }}>
                 Reviewed {fmt(lesson.reviewed_at)} (data cutoff {fmt(lesson.future_data_cutoff)}): {lesson.note}
               </p>
             )}

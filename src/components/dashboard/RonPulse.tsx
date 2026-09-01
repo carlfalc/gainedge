@@ -96,20 +96,20 @@ export default function RonPulse() {
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <span style={{ fontSize: 12, color: C.jade, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase" }}>
+          <span style={{ fontSize: 14, color: C.jade, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase" }}>
             {PULSE_TITLE}
           </span>
-          <span style={{ fontSize: 11, color: C.sec, marginLeft: 8 }}>{PULSE_SUBTITLE}</span>
+          <span style={{ fontSize: 13, color: C.sec, marginLeft: 8 }}>{PULSE_SUBTITLE}</span>
         </div>
-        <span style={{ fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+        <span style={{ fontSize: 12, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
           {latest ? `Newest source instant ${formatPrintedLocal(latest)} local · ${formatAge(latest)}` : "No dated source yet"}
         </span>
       </div>
 
       {loading && items.length === 0 ? (
-        <div style={{ marginTop: 10, fontSize: 12, color: C.sec }}>Loading stored records…</div>
+        <div style={{ marginTop: 10, fontSize: 14, color: C.sec }}>Loading stored records…</div>
       ) : items.length === 0 ? (
-        <div style={{ marginTop: 10, fontSize: 12, color: C.sec }} data-testid="ron-pulse-empty">{PULSE_EMPTY_TEXT}</div>
+        <div style={{ marginTop: 10, fontSize: 14, color: C.sec }} data-testid="ron-pulse-empty">{PULSE_EMPTY_TEXT}</div>
       ) : (
         <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
           {items.map((item) => {
@@ -131,9 +131,9 @@ export default function RonPulse() {
               >
                 <Icon size={14} color={tone} style={{ marginTop: 2, flexShrink: 0 }} />
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: ronBiasColor(ronBiasFromLabel(item.title)) ?? tone }}>{item.title}</div>
-                  <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>{item.detail}</div>
-                  <div style={{ fontSize: 9, color: C.sec, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: ronBiasColor(ronBiasFromLabel(item.title)) ?? tone }}>{item.title}</div>
+                  <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>{item.detail}</div>
+                  <div style={{ fontSize: 11, color: C.sec, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                     {item.timestamp
                       ? `${item.timestampLabel} ${formatPrintedLocal(item.timestamp)} local · ${formatAge(item.timestamp)}`
                       : `${item.timestampLabel} — no source instant`}

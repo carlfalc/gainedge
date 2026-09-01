@@ -20,7 +20,7 @@ import type { FalconerRecord } from "@/services/signals-data";
 function Chip({ text, tone, testId }: { text: string; tone: "neutral" | "active"; testId?: string }) {
   return (
     <span
-      className="rounded-md px-2 py-0.5 text-[11px]"
+      className="rounded-md px-2 py-0.5 text-[13px]"
       style={{
         background: tone === "active" ? `${C.jade}14` : `${C.muted}1F`,
         color: tone === "active" ? C.jade : C.sec,
@@ -57,18 +57,18 @@ function RecordRow({ r, modeLabel }: { r: FalconerRecord; modeLabel: string }) {
           ? <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: C.sec }} />
           : <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: C.sec }} />}
         <span className="text-sm font-semibold" style={{ color: C.text }}>{r.symbol}</span>
-        <span className="text-xs" style={{ color: C.sec }}>{r.timeframe}</span>
-        <span className="text-xs" style={{ color: C.sec }}>{direction || "—"}</span>
+        <span className="text-sm" style={{ color: C.sec }}>{r.timeframe}</span>
+        <span className="text-sm" style={{ color: C.sec }}>{direction || "—"}</span>
         <Chip text={modeLabel} tone="neutral" testId={`falconer-mode-${r.id}`} />
         <Chip text={status.label} tone={managed ? "active" : "neutral"} testId={`falconer-status-${r.id}`} />
         <Chip text={trigger.label} tone="neutral" />
-        <span className="ml-auto text-[11px]" style={{ color: C.muted }}>
+        <span className="ml-auto text-[13px]" style={{ color: C.muted }}>
           {formatLocalDateTime(r.opened_at)} · {relativeAge(r.opened_at)}
         </span>
       </button>
 
       {open && (
-        <div className="space-y-3 border-t px-3 py-3 text-xs" style={{ borderColor: C.border }}>
+        <div className="space-y-3 border-t px-3 py-3 text-sm" style={{ borderColor: C.border }}>
           {trigger.detail && (
             <p className="leading-relaxed" style={{ color: C.sec }}>{trigger.detail}</p>
           )}
@@ -104,18 +104,18 @@ function RecordRow({ r, modeLabel }: { r: FalconerRecord; modeLabel: string }) {
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => navigate(chartsHref(r.symbol))}
-              className="rounded-lg px-2.5 py-1.5 text-xs"
+              className="rounded-lg px-2.5 py-1.5 text-sm"
               style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}>
               View chart
             </button>
             <button type="button" onClick={() => navigate(ronDecisionRecordHref(r.symbol, r.timeframe))}
-              className="rounded-lg px-2.5 py-1.5 text-xs"
+              className="rounded-lg px-2.5 py-1.5 text-sm"
               style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
               data-testid={`falconer-decision-link-${r.id}`}>
               RON decision record
             </button>
             <button type="button" onClick={() => navigate(askRonContextHref(r.symbol, r.timeframe))}
-              className="rounded-lg px-2.5 py-1.5 text-xs"
+              className="rounded-lg px-2.5 py-1.5 text-sm"
               style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}>
               Ask RON
             </button>

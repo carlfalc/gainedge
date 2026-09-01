@@ -118,7 +118,7 @@ export default function RonDecisionPage() {
             data-testid="ron-instrument-select"
             value={selectedKey}
             onChange={(e) => onSelect(e.target.value)}
-            className="rounded-lg px-3 py-2 text-xs"
+            className="rounded-lg px-3 py-2 text-sm"
             style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.text }}
           >
             {options.map((p) => (
@@ -128,7 +128,7 @@ export default function RonDecisionPage() {
           <button
           onClick={() => void load()}
           disabled={loading}
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs uppercase tracking-widest disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm uppercase tracking-widest disabled:opacity-50"
           style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
@@ -138,7 +138,7 @@ export default function RonDecisionPage() {
       </header>
 
       {trackedWarning && (
-        <p className="text-xs" data-testid="ron-tracked-warning" style={{ color: C.amber }}>
+        <p className="text-sm" data-testid="ron-tracked-warning" style={{ color: C.amber }}>
           {trackedWarning}
         </p>
       )}
@@ -159,7 +159,7 @@ export default function RonDecisionPage() {
           </div>
           <button
             onClick={() => void load()}
-            className="mt-3 rounded-lg px-3 py-2 text-xs uppercase tracking-widest"
+            className="mt-3 rounded-lg px-3 py-2 text-sm uppercase tracking-widest"
             style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
           >
             Try again
@@ -169,7 +169,7 @@ export default function RonDecisionPage() {
 
       {!error && !loading && !view && (
         <section className="rounded-xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-          <h2 className="mb-2 text-xs uppercase tracking-widest" style={{ color: C.sec }}>No decision record</h2>
+          <h2 className="mb-2 text-sm uppercase tracking-widest" style={{ color: C.sec }}>No decision record</h2>
           <p className="text-sm leading-relaxed" style={{ color: C.muted }} data-testid="ron-empty-state">
             There is no stored RON decision for {selected.symbol} {selected.timeframe} yet. Nothing is inferred in its absence —
             this page will show a record as soon as one has been evaluated and stored.
@@ -185,7 +185,7 @@ export default function RonDecisionPage() {
               onClick={() => navigate(askRonContextHref(selected.symbol, selected.timeframe))}
               aria-label={askRonContextTitle(selected.symbol, selected.timeframe)}
               title={askRonContextTitle(selected.symbol, selected.timeframe)}
-              className="rounded-lg px-3 py-2 text-xs"
+              className="rounded-lg px-3 py-2 text-sm"
               style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
             >
               Ask RON about this record ↗

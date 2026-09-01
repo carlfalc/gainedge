@@ -12,7 +12,7 @@ interface Props {
 }
 export default function AutoTradeStatus({ symbol, openPositionsForSymbol, totalOpenPositions }: Props) {
   return (
-    <div className="rounded border border-white/10 bg-white/[0.02] px-3 py-2 text-[10px] text-white/50 font-mono">
+    <div className="rounded border border-white/10 bg-white/[0.02] px-3 py-2 text-[12px] text-white/50 font-mono">
       Open on {symbol}: <span className="text-white">{openPositionsForSymbol}</span>
       <span className="mx-2 text-white/20">·</span>
       Total open: <span className="text-white">{totalOpenPositions}</span>

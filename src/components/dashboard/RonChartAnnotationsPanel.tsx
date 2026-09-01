@@ -31,7 +31,7 @@ export default function RonChartAnnotationsPanel({ features, currentPrice = null
     <section data-testid="ron-chart-annotations">
       <div className="flex items-center gap-1.5 mb-1.5">
         <MapPin size={12} className="text-muted-foreground/80" aria-hidden />
-        <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+        <div className="text-[13px] uppercase tracking-wider text-muted-foreground">
           RON levels & zones
         </div>
       </div>

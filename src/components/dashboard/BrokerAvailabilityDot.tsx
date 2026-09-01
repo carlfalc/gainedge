@@ -40,7 +40,7 @@ export default function BrokerAvailabilityDot({ status, brokerName, symbol }: Br
             }}
           />
         </TooltipTrigger>
-        <TooltipContent side="right" className="max-w-[240px] text-xs">
+        <TooltipContent side="right" className="max-w-[240px] text-sm">
           {tooltip}
         </TooltipContent>
       </Tooltip>

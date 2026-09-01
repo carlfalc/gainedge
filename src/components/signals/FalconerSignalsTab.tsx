@@ -32,7 +32,7 @@ export default function FalconerSignalsTab(
 
   return (
     <div className="space-y-3" data-testid="signals-tab-falconer">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2 text-xs"
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2 text-sm"
         style={{ background: `${C.amber}0F`, border: `1px solid ${C.border}`, color: C.amber }}
         data-testid="falconer-record-banner">
         {FALCONER_RECORD_BANNER}
@@ -40,7 +40,7 @@ export default function FalconerSignalsTab(
       </div>
 
       {feed.error && (
-        <div role="alert" className="rounded-lg px-3 py-2 text-xs"
+        <div role="alert" className="rounded-lg px-3 py-2 text-sm"
           style={{ background: `${C.red}12`, border: `1px solid ${C.red}55`, color: C.red }}>
           Couldn’t load Falconer records. <span style={{ color: C.sec }}>{feed.error}</span>
         </div>
@@ -53,7 +53,7 @@ export default function FalconerSignalsTab(
       )}
 
       {feed.loading && (
-        <div className="flex items-center gap-2 rounded-lg p-3 text-xs"
+        <div className="flex items-center gap-2 rounded-lg p-3 text-sm"
           style={{ background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading live Falconer records…
         </div>
@@ -63,18 +63,18 @@ export default function FalconerSignalsTab(
         <section className="rounded-xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}
           data-testid="falconer-empty">
           <p className="text-sm" style={{ color: C.text }}>No live Falconer records yet.</p>
-          <p className="mt-1 text-xs leading-relaxed" style={{ color: C.muted }}>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: C.muted }}>
             Live records are written only when the Falconer engine fires on a completed candle in live
             mode. Historical and simulated records are kept separately under History.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => navigate("/dashboard/strategy")}
-              className="rounded-lg px-2.5 py-1.5 text-xs"
+              className="rounded-lg px-2.5 py-1.5 text-sm"
               style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.jade }}>
               Open Strategy settings
             </button>
             <button type="button" onClick={() => navigate("/dashboard/charts")}
-              className="rounded-lg px-2.5 py-1.5 text-xs"
+              className="rounded-lg px-2.5 py-1.5 text-sm"
               style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}>
               Go to Charts
             </button>
@@ -92,7 +92,7 @@ export default function FalconerSignalsTab(
             triggers={filterOptions(feed.records.map((r) => r.trigger_type))}
             statusLabel={(t) => presentFalconerStatus(t).label}
           />
-          <p className="text-[11px]" style={{ color: C.muted }} data-testid="falconer-count">
+          <p className="text-[13px]" style={{ color: C.muted }} data-testid="falconer-count">
             Showing {rows.length} of {feed.records.length} live records
           </p>
           <FalconerRecordList records={rows} modeLabel="Live" />

@@ -91,8 +91,8 @@ function Badge({
     <div
       className={`px-2 py-1 rounded backdrop-blur-md border ${borderClass} ${bgClass} ${dotted ? "border-dashed" : ""}`}
     >
-      <div className={`text-[8px] uppercase tracking-wider font-semibold ${textClass}`}>{label}</div>
-      <div className={`text-[11px] font-mono font-bold ${textClass}`}>{price}</div>
+      <div className={`text-[10px] uppercase tracking-wider font-semibold ${textClass}`}>{label}</div>
+      <div className={`text-[13px] font-mono font-bold ${textClass}`}>{price}</div>
     </div>
   );
 }

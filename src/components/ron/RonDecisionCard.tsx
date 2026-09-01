@@ -39,7 +39,7 @@ export default function RonDecisionCard({ view, now }: { view: RonDecisionView; 
         >
           {state.label}
         </span>
-        <span className="text-xs uppercase tracking-widest" style={{ color: C.muted }}>
+        <span className="text-sm uppercase tracking-widest" style={{ color: C.muted }}>
           stored record
         </span>
         <CalibrationScopeBadge
@@ -49,14 +49,14 @@ export default function RonDecisionCard({ view, now }: { view: RonDecisionView; 
         />
       </div>
 
-      <h2 className="mt-4 text-xs uppercase tracking-widest" style={{ color: C.sec }}>
+      <h2 className="mt-4 text-sm uppercase tracking-widest" style={{ color: C.sec }}>
         What RON is saying
       </h2>
       <p className="mt-1.5 text-sm leading-relaxed" style={{ color: C.text }} data-testid="ron-summary">
         {summary.text}
       </p>
       {summary.source === "state_glossary" && (
-        <p className="mt-1 text-xs" style={{ color: C.muted }}>
+        <p className="mt-1 text-sm" style={{ color: C.muted }}>
           No stored rationale text — showing what this state means, not an analysis of the market.
         </p>
       )}
@@ -66,17 +66,17 @@ export default function RonDecisionCard({ view, now }: { view: RonDecisionView; 
           <p className="text-sm" style={{ color: C.text }} data-testid="ron-probability-line">
             {PROBABILITY_LINE}
           </p>
-          <p className="mt-1 text-xs leading-relaxed" style={{ color: C.muted }}>{PROBABILITY_NOTE}</p>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: C.muted }}>{PROBABILITY_NOTE}</p>
         </div>
         <div className="rounded-lg p-3" style={{ background: C.bg2, border: `1px solid ${C.border}` }}>
           <p className="flex items-center gap-1.5 text-sm" style={{ color: C.jade }} data-testid="ron-execution-line">
             <ShieldCheck className="h-3.5 w-3.5" /> {EXECUTION_LINE}
           </p>
-          <p className="mt-1 text-xs leading-relaxed" style={{ color: C.muted }}>{EXECUTION_NOTE}</p>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: C.muted }}>{EXECUTION_NOTE}</p>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-xs" style={{ color: C.sec }}>
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 text-sm" style={{ color: C.sec }}>
         <span data-testid="ron-decision-time">
           Evaluated {formatPrintedLocal(asOf)} local · {formatAge(asOf, now)}
         </span>
@@ -84,7 +84,7 @@ export default function RonDecisionCard({ view, now }: { view: RonDecisionView; 
         <span>Recorded recommendation: {titleCaseToken(view.decision.recommendation ?? "") || "—"}</span>
       </div>
       {state.unknown && (
-        <p className="mt-2 text-xs font-mono" style={{ color: C.muted }}>
+        <p className="mt-2 text-sm font-mono" style={{ color: C.muted }}>
           raw state token: {view.decision.state}
         </p>
       )}

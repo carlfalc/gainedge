@@ -67,7 +67,7 @@ export default function JournalPage() {
         <BookOpen size={24} style={{ color: C.jade }} />
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>Falconer Journal</h1>
       </div>
-      <p style={{ color: C.sec, fontSize: 13, marginBottom: 18 }}>Every live, dry-run and backtest trade in one reviewable record.</p>
+      <p style={{ color: C.sec, fontSize: 15, marginBottom: 18 }}>Every live, dry-run and backtest trade in one reviewable record.</p>
 
       <div style={{ display: "flex", gap: 7, marginBottom: 14 }}>
         {["all", "live", "dry_run", "backtest"].map(value => (
@@ -83,7 +83,7 @@ export default function JournalPage() {
         <div style={card}>
           {filtered.length === 0 ? <div style={{ color: C.sec }}>No Falconer trades yet.</div> : (
             <div style={{ overflowX: "auto", maxHeight: 670, overflowY: "auto" }}>
-              <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+              <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
                 <thead><tr>
                   <th style={th}>Opened</th><th style={th}>Symbol</th><th style={th}>Mode</th>
                   <th style={th}>Trigger</th><th style={th}>Score</th><th style={th}>Status</th><th style={th}>P&L</th>
@@ -110,10 +110,10 @@ export default function JournalPage() {
         </div>
 
         <div style={card}>
-          <h2 style={{ color: C.jade, fontSize: 13, fontWeight: 800, marginBottom: 12 }}>Trade review</h2>
-          {!selected ? <p style={{ color: C.sec, fontSize: 12 }}>Select a trade to add notes and tags.</p> : (
+          <h2 style={{ color: C.jade, fontSize: 15, fontWeight: 800, marginBottom: 12 }}>Trade review</h2>
+          {!selected ? <p style={{ color: C.sec, fontSize: 14 }}>Select a trade to add notes and tags.</p> : (
             <>
-              <div style={{ fontSize: 12, lineHeight: 1.7, marginBottom: 12 }}>
+              <div style={{ fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
                 <strong>{selected.symbol}</strong> · {selected.trigger_type}<br />
                 Entry {selected.entry_price} · Exit {selected.exit_price ?? "open"}<br />
                 {new Date(selected.opened_at).toLocaleString()}
@@ -137,7 +137,7 @@ export default function JournalPage() {
 const card: React.CSSProperties = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 };
 const th: React.CSSProperties = { textAlign: "left", padding: 9, color: C.sec, position: "sticky", top: 0, background: C.card };
 const td: React.CSSProperties = { padding: 9 };
-const filterButton: React.CSSProperties = { padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 11, cursor: "pointer", textTransform: "capitalize" };
-const label: React.CSSProperties = { display: "block", color: C.sec, fontSize: 10, textTransform: "uppercase", margin: "10px 0 5px" };
+const filterButton: React.CSSProperties = { padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 13, cursor: "pointer", textTransform: "capitalize" };
+const label: React.CSSProperties = { display: "block", color: C.sec, fontSize: 12, textTransform: "uppercase", margin: "10px 0 5px" };
 const input: React.CSSProperties = { width: "100%", padding: 9, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 7, color: C.text, resize: "vertical" };
 const saveButton: React.CSSProperties = { display: "flex", alignItems: "center", gap: 6, marginTop: 12, padding: "8px 12px", border: "none", borderRadius: 7, background: C.jade, color: "#020617", fontWeight: 800, cursor: "pointer" };

@@ -58,7 +58,7 @@ export default function SignalsSummary({ metrics, now }: { metrics: SummaryMetri
   return (
     <div className="space-y-3" data-testid="signals-summary">
       <div
-        className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2 text-xs"
+        className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2 text-sm"
         style={{ background: C.bg2, border: `1px solid ${C.border}` }}
         data-testid="signals-market-strip"
       >
@@ -87,9 +87,9 @@ export default function SignalsSummary({ metrics, now }: { metrics: SummaryMetri
               style={{ background: C.card, border: `1px solid ${C.border}` }}
               data-testid={`signals-metric-${m.label.toLowerCase().replace(/\s+/g, "-")}`}
             >
-              <p className="text-[11px] uppercase tracking-widest" style={{ color: C.sec }}>{m.label}</p>
+              <p className="text-[13px] uppercase tracking-widest" style={{ color: C.sec }}>{m.label}</p>
               <p className="mt-1 text-lg font-semibold" style={{ color: C.text }}>{m.value}</p>
-              {m.hint && <p className="mt-0.5 text-[11px]" style={{ color: C.muted }}>{m.hint}</p>}
+              {m.hint && <p className="mt-0.5 text-[13px]" style={{ color: C.muted }}>{m.hint}</p>}
             </div>
           ))}
         </div>

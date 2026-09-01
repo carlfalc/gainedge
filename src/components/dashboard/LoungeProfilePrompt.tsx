@@ -54,7 +54,7 @@ export default function LoungeProfilePrompt({ open, onComplete }: Props) {
             style={{
               margin: "12px 0 0",
               color: "hsl(0 0% 100% / 0.72)",
-              fontSize: 14,
+              fontSize: 16,
               lineHeight: 1.6,
             }}
           >
@@ -71,7 +71,7 @@ export default function LoungeProfilePrompt({ open, onComplete }: Props) {
             border: "1px solid hsl(32 52% 64% / 0.38)",
             background: "hsl(32 52% 64% / 0.16)",
             color: "hsl(32 52% 64%)",
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: 700,
             letterSpacing: 0.3,
             cursor: "pointer",

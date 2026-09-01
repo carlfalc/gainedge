@@ -37,7 +37,7 @@ function LinkRow({ symbol, timeframe }: { symbol: string; timeframe: string }) {
       <button
         type="button"
         onClick={() => navigate(chartsHref(symbol))}
-        className="rounded-lg px-2.5 py-1.5 text-xs"
+        className="rounded-lg px-2.5 py-1.5 text-sm"
         style={btn}
         data-testid={`signals-link-chart-${symbol}-${timeframe}`}
       >
@@ -46,7 +46,7 @@ function LinkRow({ symbol, timeframe }: { symbol: string; timeframe: string }) {
       <button
         type="button"
         onClick={() => navigate(ronDecisionRecordHref(symbol, timeframe))}
-        className="rounded-lg px-2.5 py-1.5 text-xs"
+        className="rounded-lg px-2.5 py-1.5 text-sm"
         style={btn}
         data-testid={`signals-link-decision-${symbol}-${timeframe}`}
       >
@@ -55,7 +55,7 @@ function LinkRow({ symbol, timeframe }: { symbol: string; timeframe: string }) {
       <button
         type="button"
         onClick={() => navigate(askRonContextHref(symbol, timeframe))}
-        className="rounded-lg px-2.5 py-1.5 text-xs"
+        className="rounded-lg px-2.5 py-1.5 text-sm"
         style={btn}
         data-testid={`signals-link-ask-${symbol}-${timeframe}`}
       >
@@ -87,25 +87,25 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
             {ctx.instrument} · {ctx.timeframe}
           </span>
           <span
-            className="rounded-md px-2 py-0.5 text-xs"
+            className="rounded-md px-2 py-0.5 text-sm"
             style={{ background: `${ctxTone}1A`, color: ctxTone }}
             data-testid="ron-opportunity-lifecycle"
           >
             {lifecycle.label}
           </span>
           <span
-            className="rounded-md px-2 py-0.5 text-xs"
+            className="rounded-md px-2 py-0.5 text-sm"
             style={{ background: `${C.muted}22`, color: C.sec }}
             data-testid="ron-opportunity-direction"
           >
             {direction.label}
           </span>
-          <span className="text-[11px] uppercase tracking-widest" style={{ color: C.muted }}>
+          <span className="text-[13px] uppercase tracking-widest" style={{ color: C.muted }}>
             {OPPORTUNITY_SOURCE_LINE}
           </span>
         </div>
 
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]" style={{ color: C.sec }}>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: C.sec }}>
           <span data-testid="ron-opportunity-context-asof">
             Evaluated as of {formatLocalDateTime(ctx.evaluation_anchor)} · {formatAge(ctx.evaluation_anchor, now)}
           </span>
@@ -121,16 +121,16 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
             style={{ background: C.bg2, border: `1px solid ${C.border}` }}
             data-testid="ron-specialist-historical-commentary"
           >
-            <p className="text-[11px] uppercase tracking-widest" style={{ color: C.sec }}>
+            <p className="text-[13px] uppercase tracking-widest" style={{ color: C.sec }}>
               Agent historical findings
             </p>
             <div className="mt-2 space-y-2">
               {ctx.specialist_commentary_v1.slice(0, 5).map((item) => (
                 <article key={`${item.source_agent}|${item.setup_id}`}>
-                  <p className="text-[11px] font-semibold" style={{ color: C.jade }}>
+                  <p className="text-[13px] font-semibold" style={{ color: C.jade }}>
                     {item.source_agent.replace(/_/g, " ")} · {item.setup_id.replace(/_/g, " ")}
                   </p>
-                  <p className="mt-0.5 text-xs leading-relaxed" style={{ color: C.text }}>
+                  <p className="mt-0.5 text-sm leading-relaxed" style={{ color: C.text }}>
                     {item.commentary}
                   </p>
                 </article>
@@ -145,13 +145,13 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
         {ctx.limitations && ctx.limitations.length > 0 && (
           <ul className="mt-2 space-y-1" data-testid="ron-opportunity-limitations">
             {ctx.limitations.filter((s) => s?.trim()).slice(0, 4).map((s) => (
-              <li key={s} className="break-words text-[11px] leading-relaxed" style={{ color: C.muted }}>— {s}</li>
+              <li key={s} className="break-words text-[13px] leading-relaxed" style={{ color: C.muted }}>— {s}</li>
             ))}
           </ul>
         )}
 
         {view && (
-          <p className="mt-3 text-[11px]" style={{ color: C.muted }} data-testid="ron-opportunity-audit-note">
+          <p className="mt-3 text-[13px]" style={{ color: C.muted }} data-testid="ron-opportunity-audit-note">
             Audit detail only — the separate readiness/calibration record for this pair is
             “{presentState(view.decision.state).label}”, evaluated {formatLocalDateTime(view.decision.as_of)}.
             It is not the opportunity state shown above.
@@ -175,11 +175,11 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
           <span className="text-sm font-semibold" style={{ color: C.text }}>
             {pair.symbol} · {pair.timeframe}
           </span>
-          <span className="rounded-md px-2 py-0.5 text-xs" style={{ background: `${C.muted}22`, color: C.sec }}>
+          <span className="rounded-md px-2 py-0.5 text-sm" style={{ background: `${C.muted}22`, color: C.sec }}>
             No stored RON decision yet
           </span>
         </div>
-        <p className="mt-2 text-xs leading-relaxed" style={{ color: C.muted }}>
+        <p className="mt-2 text-sm leading-relaxed" style={{ color: C.muted }}>
           {item.error
             ? item.error
             : "Nothing is inferred in the absence of a record. A card will appear here as soon as an evaluation has been stored for this pair."}
@@ -208,25 +208,25 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
           {view.decision.instrument} · {view.decision.timeframe}
         </span>
         <span
-          className="rounded-md px-2 py-0.5 text-xs"
+          className="rounded-md px-2 py-0.5 text-sm"
           style={{ background: `${tone}1A`, color: tone }}
           data-testid="ron-opportunity-state"
         >
           {state.label}
         </span>
-        <span className="text-[11px] uppercase tracking-widest" style={{ color: C.muted }}>
+        <span className="text-[13px] uppercase tracking-widest" style={{ color: C.muted }}>
           RON stored decision
         </span>
       </div>
 
       <p className="mt-2 text-sm leading-relaxed" style={{ color: C.text }}>{summary.text}</p>
       {summary.source === "state_glossary" && (
-        <p className="mt-1 text-[11px]" style={{ color: C.muted }}>
+        <p className="mt-1 text-[13px]" style={{ color: C.muted }}>
           No stored rationale text — this describes what the stored state means, not the market.
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px]" style={{ color: C.sec }}>
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px]" style={{ color: C.sec }}>
         <span data-testid="ron-opportunity-asof">
           Evaluated as of {formatLocalDateTime(asOf)} · {formatAge(asOf, now)}
         </span>
@@ -238,24 +238,24 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {changes.length > 0 && (
             <div className="rounded-lg p-2.5" style={{ background: C.bg2, border: `1px solid ${C.border}` }}>
-              <p className="text-[11px] uppercase tracking-widest" style={{ color: C.sec }}>
+              <p className="text-[13px] uppercase tracking-widest" style={{ color: C.sec }}>
                 What would change it
               </p>
               <ul className="mt-1 space-y-1">
                 {changes.slice(0, 3).map((s) => (
-                  <li key={s} className="break-words text-xs leading-relaxed" style={{ color: C.text }}>— {s}</li>
+                  <li key={s} className="break-words text-sm leading-relaxed" style={{ color: C.text }}>— {s}</li>
                 ))}
               </ul>
             </div>
           )}
           {missing.length > 0 && (
             <div className="rounded-lg p-2.5" style={{ background: C.bg2, border: `1px solid ${C.border}` }}>
-              <p className="text-[11px] uppercase tracking-widest" style={{ color: C.sec }}>
+              <p className="text-[13px] uppercase tracking-widest" style={{ color: C.sec }}>
                 Missing or conflicting
               </p>
               <ul className="mt-1 space-y-1">
                 {missing.slice(0, 3).map((s) => (
-                  <li key={s} className="break-words text-xs leading-relaxed" style={{ color: C.text }}>— {s}</li>
+                  <li key={s} className="break-words text-sm leading-relaxed" style={{ color: C.text }}>— {s}</li>
                 ))}
               </ul>
             </div>
@@ -263,7 +263,7 @@ export default function RonOpportunityCard({ item, now }: { item: RonOpportunity
         </div>
       )}
 
-      <p className="mt-3 text-[11px]" style={{ color: C.muted }}>
+      <p className="mt-3 text-[13px]" style={{ color: C.muted }}>
         {view.evidence_count} specialist evidence records stored · open the decision record for full evidence.
       </p>
 

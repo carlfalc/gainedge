@@ -95,7 +95,7 @@ export default function SettingsPage() {
   return (
     <div style={{ padding: 24, color: C.text, fontFamily: "'DM Sans', sans-serif", maxWidth: 900 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>Settings</h1>
-      <p style={{ color: C.sec, fontSize: 13, marginBottom: 20 }}>Broker connection and notification delivery.</p>
+      <p style={{ color: C.sec, fontSize: 15, marginBottom: 20 }}>Broker connection and notification delivery.</p>
 
       <Section title="MetaApi broker" icon={Plug}>
         {connection ? (
@@ -103,13 +103,13 @@ export default function SettingsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
               <div>
                 <strong style={{ color: C.jade }}>{connection.broker_name}</strong>
-                <div style={{ color: C.sec, fontSize: 11, marginTop: 5 }}>
+                <div style={{ color: C.sec, fontSize: 13, marginTop: 5 }}>
                   {connection.account_type.toUpperCase()} · {connection.status} · {connection.metaapi_account_id}
                 </div>
-                <div style={{ fontSize: 12, marginTop: 8 }}>
+                <div style={{ fontSize: 14, marginTop: 8 }}>
                   Balance ${Number(connection.balance ?? 0).toFixed(2)} · Equity ${Number(connection.equity ?? 0).toFixed(2)}
                 </div>
-                {connection.last_error && <div style={{ color: C.red, fontSize: 11, marginTop: 7 }}>{connection.last_error}</div>}
+                {connection.last_error && <div style={{ color: C.red, fontSize: 13, marginTop: 7 }}>{connection.last_error}</div>}
               </div>
               <div style={{ display: "flex", gap: 7, alignItems: "flex-start" }}>
                 <button onClick={test} disabled={working} style={ghostButton}><RefreshCw size={13} /> Test</button>
@@ -119,7 +119,7 @@ export default function SettingsPage() {
           </div>
         ) : (
           <>
-            <p style={{ color: C.sec, fontSize: 12, marginBottom: 12 }}>
+            <p style={{ color: C.sec, fontSize: 14, marginBottom: 12 }}>
               Enter the deployed account ID from your MetaApi dashboard. Broker passwords are not stored in GainEdge.
             </p>
             <Field label="Broker name"><input value={brokerName} onChange={event => setBrokerName(event.target.value)} style={input} /></Field>
@@ -142,7 +142,7 @@ export default function SettingsPage() {
         <button onClick={saveNotifications} style={{ ...primaryButton, marginTop: 12 }}>Save notifications</button>
       </Section>
 
-      <p style={{ color: C.sec, fontSize: 12 }}>
+      <p style={{ color: C.sec, fontSize: 14 }}>
         Falconer execution, symbols and risk controls are managed on the{" "}
         <a href="/dashboard/strategy" style={{ color: C.jade }}>Strategy page</a>.
       </p>
@@ -152,16 +152,16 @@ export default function SettingsPage() {
 
 function Section({ title, icon: Icon, children }: { title: string; icon: import("lucide-react").LucideIcon; children: React.ReactNode }) {
   return <section style={{ padding: 16, background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16 }}>
-    <h2 style={{ display: "flex", alignItems: "center", gap: 7, color: C.jade, fontSize: 13, marginBottom: 13 }}><Icon size={15} />{title}</h2>
+    <h2 style={{ display: "flex", alignItems: "center", gap: 7, color: C.jade, fontSize: 15, marginBottom: 13 }}><Icon size={15} />{title}</h2>
     {children}
   </section>;
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, alignItems: "center", marginBottom: 9 }}>
-    <span style={{ color: C.sec, fontSize: 11 }}>{label}</span>{children}
+    <span style={{ color: C.sec, fontSize: 13 }}>{label}</span>{children}
   </label>;
 }
 const input: React.CSSProperties = { padding: "8px 10px", borderRadius: 7, background: C.bg2, border: `1px solid ${C.border}`, color: C.text, width: "100%" };
-const toggle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, color: C.text, fontSize: 12, marginBottom: 10 };
+const toggle: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, color: C.text, fontSize: 14, marginBottom: 10 };
 const primaryButton: React.CSSProperties = { padding: "9px 13px", borderRadius: 7, border: "none", background: C.jade, color: "#020617", fontWeight: 800, cursor: "pointer" };
-const ghostButton: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5, padding: "7px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.sec, cursor: "pointer", fontSize: 11 };
+const ghostButton: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5, padding: "7px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.sec, cursor: "pointer", fontSize: 13 };

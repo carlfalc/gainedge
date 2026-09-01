@@ -77,7 +77,7 @@ export default function ChartSidePanel({
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 px-2 py-1.5 rounded text-[12px] font-semibold tracking-wide transition-colors ${
+            className={`flex-1 px-2 py-1.5 rounded text-[14px] font-semibold tracking-wide transition-colors ${
               tab === t.id
                 ? "bg-foreground/10 text-foreground"
                 : "text-muted-foreground hover:text-foreground"
@@ -86,7 +86,7 @@ export default function ChartSidePanel({
           >
             {t.label}
             {t.id === "trade" && filtered.length > 0 && (
-              <span className="ml-1 text-[10px] text-muted-foreground">({filtered.length})</span>
+              <span className="ml-1 text-[12px] text-muted-foreground">({filtered.length})</span>
             )}
           </button>
         ))}
@@ -104,14 +104,14 @@ export default function ChartSidePanel({
                 <div>
                   <div className="flex items-center gap-2">
                     <span
-                      className="px-2.5 py-1 rounded text-[12px] font-extrabold tracking-wide"
+                      className="px-2.5 py-1 rounded text-[14px] font-extrabold tracking-wide"
                       style={{ background: `${ronStateColor(ron.state)}22`, color: ronStateColor(ron.state) }}
                       data-testid="rail-ron-status"
                     >
                       {ronPlainStatus(ron.state)}
 
                     </span>
-                    <span className="text-[11px] text-muted-foreground">RON context {ron.timeframe}</span>
+                    <span className="text-[13px] text-muted-foreground">RON context {ron.timeframe}</span>
                   </div>
                   <p className="mt-2 text-[11.5px] text-muted-foreground" data-testid="ron-evaluated">
                     {ron.evaluatedLabel}
@@ -121,14 +121,14 @@ export default function ChartSidePanel({
 
                 {ron.regime && (
                   <div>
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Market regime</div>
-                    <div className="text-[13px] text-foreground">{ron.regime}</div>
+                    <div className="text-[13px] uppercase tracking-wider text-muted-foreground mb-1">Market regime</div>
+                    <div className="text-[15px] text-foreground">{ron.regime}</div>
                   </div>
                 )}
 
                 {ron.chips.length > 0 && (
                   <div>
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Current evidence</div>
+                    <div className="text-[13px] uppercase tracking-wider text-muted-foreground mb-1.5">Current evidence</div>
                     <div className="flex flex-wrap gap-1.5">
                       {ron.chips.map(c => (
                         <span key={c.label} className="px-2 py-1 rounded bg-background/60 border border-border text-[11.5px]">
@@ -142,10 +142,10 @@ export default function ChartSidePanel({
 
                 <div data-testid="ron-patterns">
                   <div className="flex items-center gap-1.5 mb-1.5">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Pattern context</div>
+                    <div className="text-[13px] uppercase tracking-wider text-muted-foreground">Pattern context</div>
                     <Info size={12} className="text-muted-foreground/70 shrink-0" aria-hidden />
                   </div>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground/80 mb-2" data-testid="pattern-context-note">
+                  <p className="text-[13px] leading-relaxed text-muted-foreground/80 mb-2" data-testid="pattern-context-note">
                     {PATTERN_CONTEXT_NOTE}
                   </p>
                   {!patternCtx.latest ? (
@@ -160,7 +160,7 @@ export default function ChartSidePanel({
                           <span className="text-[12.5px] text-foreground">{patternCtx.latest.label}</span>
                           {patternCtx.latest.barsAgoLabel && (
                             <span
-                              className="font-mono text-[11px] text-muted-foreground whitespace-nowrap"
+                              className="font-mono text-[13px] text-muted-foreground whitespace-nowrap"
                               title={patternCtx.latest.approxSpanLabel ?? undefined}
                             >
                               {patternCtx.latest.barsAgoLabel}
@@ -171,7 +171,7 @@ export default function ChartSidePanel({
                           <button
                             onClick={() => onShowPattern?.(patternCtx.latest!)}
                             disabled={!canPreview}
-                            className="mt-1.5 px-2.5 py-1 rounded text-[11px] font-semibold border border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/10 transition-colors disabled:opacity-40"
+                            className="mt-1.5 px-2.5 py-1 rounded text-[13px] font-semibold border border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/10 transition-colors disabled:opacity-40"
                             data-testid="show-pattern-latest"
                           >
                             Show pattern
@@ -197,10 +197,10 @@ export default function ChartSidePanel({
                               {patternCtx.earlier.map(p => (
                                 <div key={p.key} className="px-2 py-1 rounded bg-background/40 border border-border">
                                   <div className="flex items-baseline justify-between gap-2">
-                                    <span className="text-[12px] text-muted-foreground">{p.label}</span>
+                                    <span className="text-[14px] text-muted-foreground">{p.label}</span>
                                     {p.barsAgoLabel && (
                                       <span
-                                        className="font-mono text-[11px] text-muted-foreground/80 whitespace-nowrap"
+                                        className="font-mono text-[13px] text-muted-foreground/80 whitespace-nowrap"
                                         title={p.approxSpanLabel ?? undefined}
                                       >
                                         {p.barsAgoLabel}
@@ -231,14 +231,14 @@ export default function ChartSidePanel({
 
                 {!hasChartAnnotations && patternCtx.levels.length > 0 && (
                   <div data-testid="ron-levels">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                    <div className="text-[13px] uppercase tracking-wider text-muted-foreground mb-1.5">
                       Current level context
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {patternCtx.levels.map((l, i) => (
                         <span
                           key={`${l.kind}-${l.price}-${i}`}
-                          className="px-2 py-1 rounded bg-background/60 border border-border text-[12px]"
+                          className="px-2 py-1 rounded bg-background/60 border border-border text-[14px]"
                         >
                           <span className="text-muted-foreground">{l.kind} </span>
                           <span className="font-mono text-foreground">{l.price}</span>
@@ -250,7 +250,7 @@ export default function ChartSidePanel({
 
 
                 <div>
-                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">What would change this</div>
+                  <div className="text-[13px] uppercase tracking-wider text-muted-foreground mb-1">What would change this</div>
                   <p className="text-[12.5px] leading-relaxed text-muted-foreground">{ron.next}</p>
                 </div>
               </>
@@ -263,13 +263,13 @@ export default function ChartSidePanel({
             <a
               href={askRonContextHref(symbol, RON_CONTEXT_TIMEFRAME)}
               title={askRonContextTitle(symbol, RON_CONTEXT_TIMEFRAME)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] font-semibold border border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/10 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[14px] font-semibold border border-[#00CFA5]/40 text-[#00CFA5] hover:bg-[#00CFA5]/10 transition-colors"
               data-testid="ask-ron-link"
             >
               <MessageSquare size={13} /> Ask RON about {symbol}
             </a>
 
-            <p className="text-[11px] text-muted-foreground/80 border-t border-border pt-3">
+            <p className="text-[13px] text-muted-foreground/80 border-t border-border pt-3">
               Falconer v7 • Strategy context only. Controls live on the{" "}
               <a href="/dashboard/strategy" className="text-[#00CFA5] hover:underline">Strategy page</a>.
             </p>
@@ -279,7 +279,7 @@ export default function ChartSidePanel({
         {tab === "trade" && (
           <div className="p-4 space-y-4" data-testid="rail-trade">
             <section data-testid="rail-open-positions">
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+              <div className="text-[13px] uppercase tracking-wider text-muted-foreground mb-2">
                 Open positions{filtered.length > 0 ? ` (${filtered.length})` : ""}
               </div>
               {!tradingConnected ? (
@@ -337,13 +337,13 @@ export default function ChartSidePanel({
                   })}
                 </div>
               )}
-              <p className="mt-3 text-[11px] text-muted-foreground/80">
+              <p className="mt-3 text-[13px] text-muted-foreground/80">
                 Manual trading uses live broker funds. Verify every order before you send it.
               </p>
             </section>
 
             <section className="border-t border-border pt-3 space-y-2" data-testid="rail-pending-orders">
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Pending orders</div>
+              <div className="text-[13px] uppercase tracking-wider text-muted-foreground">Pending orders</div>
               <div className="flex items-start gap-2">
                 <Info size={14} className="mt-0.5 shrink-0 text-muted-foreground" />
                 <p className="text-[12.5px] leading-relaxed text-muted-foreground" data-testid="orders-not-synced">
@@ -356,7 +356,7 @@ export default function ChartSidePanel({
                   <div className="text-[12.5px] font-mono text-foreground">{orderDraftLabel}</div>
                 </div>
               )}
-              <p className="text-[11px] text-muted-foreground/80">
+              <p className="text-[13px] text-muted-foreground/80">
                 Live pending-order retrieval, modify and cancel arrive with Charts Trading V2.
               </p>
             </section>

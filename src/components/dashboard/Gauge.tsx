@@ -11,7 +11,7 @@ export function Gauge({ value, max = 10, color, size = 44 }: { value: number; ma
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={3}
           strokeDasharray={`${circ * pct} ${circ * (1 - pct)}`} strokeLinecap="round" />
       </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color }}>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color }}>
         {value}
       </div>
     </div>

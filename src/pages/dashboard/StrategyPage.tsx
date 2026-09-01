@@ -200,7 +200,7 @@ export default function StrategyPage() {
   return (
     <div style={{ padding: 24, color: C.text, fontFamily: "'DM Sans', sans-serif", maxWidth: 1200 }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>Falconer V7 TP3</h1>
-      <p style={{ color: C.sec, fontSize: 13, marginBottom: 20 }}>
+      <p style={{ color: C.sec, fontSize: 15, marginBottom: 20 }}>
         Long-only · 33/33/34 at 1.5R/3R/5R · breakeven at 1R · HA-flip exit after BE.
       </p>
 
@@ -231,7 +231,7 @@ export default function StrategyPage() {
             </select>
           </Field>
           <Field label="Broker">
-            <div style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 35, color: accountId ? C.jade : C.amber, fontSize: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 35, color: accountId ? C.jade : C.amber, fontSize: 14 }}>
               <Wifi size={14} /> {accountId ? `${accountType ?? "broker"} connected` : "Connect a default broker in Settings"}
             </div>
           </Field>
@@ -316,7 +316,7 @@ export default function StrategyPage() {
           <NumberField label="Maximum open positions" value={settings.max_open_positions}
             onChange={max_open_positions => setSettings({ ...settings, max_open_positions })} />
           <div style={{ padding: 12, borderRadius: 8, background: C.bg2, border: `1px solid ${C.amber}35` }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", color: C.amber, fontWeight: 700, fontSize: 12 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", color: C.amber, fontWeight: 700, fontSize: 14 }}>
               <Shield size={15} /> Live execution confirmation
             </div>
             <label style={{ ...toggleLabel, marginTop: 10 }}>
@@ -324,7 +324,7 @@ export default function StrategyPage() {
                 onChange={event => setSettings({ ...settings, allow_live_execution: event.target.checked })} />
               Permit MetaApi orders on the connected account
             </label>
-            <p style={{ color: C.muted, fontSize: 10, marginTop: 8 }}>
+            <p style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
               Leave off while validating in signal-only or demo mode.
             </p>
           </div>
@@ -351,9 +351,9 @@ export default function StrategyPage() {
       </button>
 
       <Section title="Live trades and alert payloads">
-        {trades.length === 0 ? <p style={{ color: C.sec, fontSize: 12 }}>No Falconer live signals yet.</p> : (
+        {trades.length === 0 ? <p style={{ color: C.sec, fontSize: 14 }}>No Falconer live signals yet.</p> : (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
               <thead><tr>
                 <th style={th}>Opened</th><th style={th}>Symbol</th><th style={th}>Score</th>
                 <th style={th}>Path</th><th style={th}>Status</th><th style={th}>Entry / SL / TP3</th><th style={th}>Payload</th>
@@ -380,13 +380,13 @@ export default function StrategyPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return <div style={{ ...card, marginBottom: 16 }}>
-    <h2 style={{ fontSize: 12, color: C.jade, textTransform: "uppercase", letterSpacing: 1, marginBottom: 14 }}>{title}</h2>
+    <h2 style={{ fontSize: 14, color: C.jade, textTransform: "uppercase", letterSpacing: 1, marginBottom: 14 }}>{title}</h2>
     {children}
   </div>;
 }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 10, alignItems: "center", marginBottom: 9 }}>
-    <span style={{ fontSize: 11, color: C.sec }}>{label}</span>{children}
+    <span style={{ fontSize: 13, color: C.sec }}>{label}</span>{children}
   </label>;
 }
 function NumberField({ label, value, step = 1, onChange }: { label: string; value: number; step?: number; onChange: (value: number) => void }) {
@@ -395,10 +395,10 @@ function NumberField({ label, value, step = 1, onChange }: { label: string; valu
 }
 
 const card: React.CSSProperties = { padding: 16, border: `1px solid ${C.border}`, borderRadius: 10, background: C.card };
-const input: React.CSSProperties = { padding: "8px 10px", borderRadius: 7, background: C.bg2, border: `1px solid ${C.border}`, color: C.text, fontSize: 12, width: "100%" };
-const toggleLabel: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: C.text };
-const chip: React.CSSProperties = { padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 10, cursor: "pointer" };
-const readinessRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "100px 1fr 1fr 140px 70px", alignItems: "center", gap: 8, padding: 9, borderRadius: 7, background: C.bg2, fontSize: 11 };
+const input: React.CSSProperties = { padding: "8px 10px", borderRadius: 7, background: C.bg2, border: `1px solid ${C.border}`, color: C.text, fontSize: 14, width: "100%" };
+const toggleLabel: React.CSSProperties = { display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: C.text };
+const chip: React.CSSProperties = { padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 12, cursor: "pointer" };
+const readinessRow: React.CSSProperties = { display: "grid", gridTemplateColumns: "100px 1fr 1fr 140px 70px", alignItems: "center", gap: 8, padding: 9, borderRadius: 7, background: C.bg2, fontSize: 13 };
 const saveButton: React.CSSProperties = { padding: "11px 20px", marginBottom: 20, borderRadius: 8, border: "none", background: C.jade, color: "#020617", fontWeight: 800, cursor: "pointer" };
 const th: React.CSSProperties = { padding: 9, textAlign: "left", color: C.sec };
 const td: React.CSSProperties = { padding: 9, verticalAlign: "top" };

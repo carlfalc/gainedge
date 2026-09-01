@@ -53,7 +53,7 @@ export default function WhiskyCigarLoungePage() {
               display: "flex", alignItems: "center", gap: 6,
               padding: "6px 14px", borderRadius: 8,
               background: "#111724", border: "1px solid rgba(255,255,255,0.1)",
-              color: "#D4A574", fontSize: 12, fontWeight: 600,
+              color: "#D4A574", fontSize: 14, fontWeight: 600,
               cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
               transition: "all 0.2s",
             }}
@@ -87,7 +87,7 @@ export default function WhiskyCigarLoungePage() {
               display: "flex", alignItems: "center", gap: 8,
               padding: "10px 18px", borderRadius: 10,
               background: "rgba(0,0,0,0.7)", border: "1px solid rgba(212,165,116,0.4)",
-              color: "#D4A574", fontSize: 13, fontWeight: 600,
+              color: "#D4A574", fontSize: 15, fontWeight: 600,
               cursor: "pointer", backdropFilter: "blur(8px)",
               transition: "all 0.2s",
             }}

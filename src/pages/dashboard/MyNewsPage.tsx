@@ -93,7 +93,7 @@ export default function MyNewsPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 4 }}>My News Feed</h1>
-          <p style={{ fontSize: 12, color: C.sec }}>
+          <p style={{ fontSize: 14, color: C.sec }}>
             Filtered by your preferences • Last updated: {lastUpdated.toLocaleTimeString()}
           </p>
         </div>
@@ -103,7 +103,7 @@ export default function MyNewsPage() {
           style={{
             display: "flex", alignItems: "center", gap: 6, padding: "8px 16px",
             borderRadius: 10, background: C.card, border: `1px solid ${C.border}`,
-            color: C.text, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            color: C.text, fontSize: 14, fontWeight: 600, cursor: "pointer",
             fontFamily: "'DM Sans', sans-serif",
           }}
         >
@@ -120,7 +120,7 @@ export default function MyNewsPage() {
             onClick={() => setFilter(tab.key)}
             style={{
               padding: "6px 14px", borderRadius: 20, border: "none", cursor: "pointer",
-              fontSize: 11, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+              fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
               background: filter === tab.key ? C.jade : C.card,
               color: filter === tab.key ? "#fff" : C.sec,
               transition: "0.2s",
@@ -134,7 +134,7 @@ export default function MyNewsPage() {
       {/* News Cards */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {filtered.length === 0 && (
-          <div style={{ padding: 40, textAlign: "center", color: C.sec, fontSize: 13 }}>
+          <div style={{ padding: 40, textAlign: "center", color: C.sec, fontSize: 15 }}>
             No news matching your current filter. Try "All" or refresh.
           </div>
         )}
@@ -158,20 +158,20 @@ export default function MyNewsPage() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+                    <span style={{ fontSize: 12, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
                       {formatTime(item.published_at)}
                     </span>
                     {item.source && (
-                      <span style={{ fontSize: 10, color: C.muted }}>• {item.source}</span>
+                      <span style={{ fontSize: 12, color: C.muted }}>• {item.source}</span>
                     )}
                     {freshness === "fresh" && (
-                      <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: C.jade + "20", color: C.jade }}>NEW</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: C.jade + "20", color: C.jade }}>NEW</span>
                     )}
                     {isOld && (
-                      <span style={{ fontSize: 9, fontWeight: 600, color: C.muted }}>12+ hours ago</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>12+ hours ago</span>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6, lineHeight: 1.4 }}>
                     {item.headline}
                   </div>
 
@@ -180,7 +180,7 @@ export default function MyNewsPage() {
                       <span
                         key={inst}
                         style={{
-                          fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+                          fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
                           background: userInstruments.includes(inst) ? C.jade + "20" : C.muted + "20",
                           color: userInstruments.includes(inst) ? C.jade : C.sec,
                           fontFamily: "'JetBrains Mono', monospace",
@@ -193,7 +193,7 @@ export default function MyNewsPage() {
                 </div>
 
                 <span style={{
-                  fontSize: 9, fontWeight: 700, padding: "3px 10px", borderRadius: 4,
+                  fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 4,
                   background: badge.bg, color: badge.color,
                   textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0,
                 }}>
@@ -212,7 +212,7 @@ export default function MyNewsPage() {
           style={{
             width: "100%", padding: "12px 0", borderRadius: 10, marginTop: 12,
             background: C.card, border: `1px solid ${C.border}`,
-            color: C.sec, fontSize: 12, fontWeight: 600, cursor: "pointer",
+            color: C.sec, fontSize: 14, fontWeight: 600, cursor: "pointer",
             fontFamily: "'DM Sans', sans-serif",
           }}
         >

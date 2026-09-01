@@ -83,7 +83,7 @@ export default function ActiveTradeInfo({ symbol, accountId }: ActiveTradeInfoPr
         return (
           <div
             key={pos.ticket}
-            className="flex items-center gap-3 px-3 py-1.5 bg-card border border-border rounded-lg text-[11px]"
+            className="flex items-center gap-3 px-3 py-1.5 bg-card border border-border rounded-lg text-[13px]"
           >
             {isBuy ? (
               <TrendingUp size={12} style={{ color: "#22C55E" }} />

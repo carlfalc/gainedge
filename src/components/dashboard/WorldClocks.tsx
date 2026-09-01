@@ -159,7 +159,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
               transition: "border-color 0.3s",
             }}
           >
-            <span className="text-white" style={{ fontSize: 9, color: C.muted, fontWeight: 600, letterSpacing: 0.5, lineHeight: 1 }}>
+            <span className="text-white" style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 0.5, lineHeight: 1 }}>
               {clock.abbr}
             </span>
             <span
@@ -180,7 +180,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
                   position: "absolute",
                   top: -6,
                   right: -4,
-                  fontSize: 7,
+                  fontSize: 9,
                   fontWeight: 700,
                   color: C.bg,
                   background: C.amber,
@@ -207,7 +207,7 @@ export default function WorldClocks({ clocks, onSessionChange }: WorldClocksProp
           background: C.card,
           border: `1px solid ${C.border}`,
           color: C.muted,
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: 700,
           letterSpacing: 0.5,
           fontFamily: "'JetBrains Mono', monospace",

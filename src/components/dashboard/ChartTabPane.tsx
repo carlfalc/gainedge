@@ -132,9 +132,9 @@ export default function ChartTabPane({
     <div className={`flex flex-col h-full ${active ? "" : "hidden"}`}>
       {/* Optional active-mode pill + live price for this tab */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 border-b border-white/[0.05] shrink-0">
-        <span className="text-[11px] font-bold tracking-wide text-white">{symbol}</span>
+        <span className="text-[13px] font-bold tracking-wide text-white">{symbol}</span>
         <span
-          className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+          className={`px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${
             mode === "auto"
               ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
               : "bg-blue-500/15 border-blue-500/40 text-blue-400"
@@ -143,7 +143,7 @@ export default function ChartTabPane({
           {mode}
         </span>
         {livePrice != null && (
-          <span className="font-mono text-[11px] font-bold text-white ml-2">
+          <span className="font-mono text-[13px] font-bold text-white ml-2">
             {livePrice.toFixed(symbol.includes("JPY") ? 3 : ["XAUUSD", "US30", "NAS100", "SPX500"].some(s => symbol.includes(s)) ? 2 : 5)}
           </span>
         )}

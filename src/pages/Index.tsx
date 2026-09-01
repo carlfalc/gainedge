@@ -74,9 +74,9 @@ function SpinCard({ front, back, color, delay = 0 }: {
           padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "center",
           borderTop: `2px solid ${color}`,
         }}>
-          <div style={{ fontSize: 10, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{front.label}</div>
+          <div style={{ fontSize: 12, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{front.label}</div>
           <div style={{ fontSize: 20, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: C.text, marginTop: 2 }}>{front.value}</div>
-          {front.sub && <div style={{ fontSize: 10, color, fontWeight: 600, marginTop: 1 }}>{front.sub}</div>}
+          {front.sub && <div style={{ fontSize: 12, color, fontWeight: 600, marginTop: 1 }}>{front.sub}</div>}
         </div>
         {/* BACK */}
         <div style={{
@@ -86,8 +86,8 @@ function SpinCard({ front, back, color, delay = 0 }: {
           padding: "10px 14px", display: "flex", flexDirection: "column", justifyContent: "center",
           borderTop: `2px solid ${color}`,
         }}>
-          <div style={{ fontSize: 10, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{back.label}</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginTop: 4, lineHeight: 1.4 }}>{back.value}</div>
+          <div style={{ fontSize: 12, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{back.label}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: C.text, marginTop: 4, lineHeight: 1.4 }}>{back.value}</div>
         </div>
       </div>
     </div>
@@ -138,12 +138,12 @@ function PremiumDash() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, animation: "pulse-dot 2s infinite" }} />
-          <span style={{ color: C.green, fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>LIVE</span>
-          <span style={{ color: C.muted, fontSize: 11 }}>London Session • EMA 4/17 • 15m</span>
+          <span style={{ color: C.green, fontSize: 13, fontWeight: 700, letterSpacing: 1 }}>LIVE</span>
+          <span style={{ color: C.muted, fontSize: 13 }}>London Session • EMA 4/17 • 15m</span>
         </div>
         <div style={{ display: "flex", gap: 4 }}>
           {["1D", "1W", "1M", "ALL"].map((t, i) => (
-            <span key={t} style={{ fontSize: 10, padding: "3px 8px", borderRadius: 6, background: i === 0 ? C.jade + "20" : "transparent", color: i === 0 ? C.jade : C.muted, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{t}</span>
+            <span key={t} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, background: i === 0 ? C.jade + "20" : "transparent", color: i === 0 ? C.jade : C.muted, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace" }}>{t}</span>
           ))}
         </div>
       </div>
@@ -160,7 +160,7 @@ function PremiumDash() {
       <div style={{ background: C.bg2, borderRadius: 12, padding: "12px 16px", marginBottom: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <div>
-            <div style={{ fontSize: 10, color: C.sec, fontWeight: 500 }}>Equity Curve — April 2026</div>
+            <div style={{ fontSize: 12, color: C.sec, fontWeight: 500 }}>Equity Curve — April 2026</div>
             <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: C.green }}>+$5,160</div>
           </div>
           <Sparkline data={equityCurve} color={C.green} w={160} h={40} />
@@ -170,8 +170,8 @@ function PremiumDash() {
       {/* Best signal banner */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: `linear-gradient(90deg, ${C.jade}15, transparent)`, border: `1px solid ${C.jade}30`, borderRadius: 12, padding: "10px 16px", marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 2, color: C.jade, textTransform: "uppercase" }}>HIGHEST CONVICTION</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginTop: 2 }}>NAS100 BUY • Entry 24,059 → TP 24,277</div>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: C.jade, textTransform: "uppercase" }}>HIGHEST CONVICTION</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginTop: 2 }}>NAS100 BUY • Entry 24,059 → TP 24,277</div>
         </div>
         <div style={{ width: 40, height: 40, borderRadius: 10, background: C.jade + "20", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 18, color: C.jade }}>6</div>
       </div>
@@ -183,13 +183,13 @@ function PremiumDash() {
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 100 }}>
               <Gauge value={r.c} color={r.col} size={30} />
               <div>
-                <div style={{ fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{r.s}</div>
-                <div style={{ fontSize: 9, color: C.muted }}>15m HA</div>
+                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{r.s}</div>
+                <div style={{ fontSize: 11, color: C.muted }}>15m HA</div>
               </div>
             </div>
             <Sparkline data={r.spark} color={r.col} w={80} h={24} />
-            <div style={{ fontSize: 12, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: r.pnl.startsWith("+") ? C.green : C.red, minWidth: 60, textAlign: "right" }}>{r.pnl}</div>
-            <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: r.col + "18", color: r.col }}>{r.d}</span>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color: r.pnl.startsWith("+") ? C.green : C.red, minWidth: 60, textAlign: "right" }}>{r.pnl}</div>
+            <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: r.col + "18", color: r.col }}>{r.d}</span>
           </div>
         ))}
       </div>
@@ -214,12 +214,12 @@ function StratMock() {
 
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         {["Win rate", "P&L", "Trades"].map((t, i) => (
-          <button key={t} style={{ padding: "5px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 600, background: i === 1 ? C.jade + "20" : "transparent", color: i === 1 ? C.jade : C.muted }}>{t}</button>
+          <button key={t} style={{ padding: "5px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, background: i === 1 ? C.jade + "20" : "transparent", color: i === 1 ? C.jade : C.muted }}>{t}</button>
         ))}
       </div>
 
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9, fontFamily: "'JetBrains Mono', monospace" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
           <thead>
             <tr>
               <th style={{ padding: 4, textAlign: "left", color: C.sec, fontWeight: 600 }}>Year</th>
@@ -233,7 +233,7 @@ function StratMock() {
                 {data.map((v, i) => (
                   <td key={i} style={{ padding: 4, textAlign: "center" }}>
                     {v !== null ? (
-                      <span style={{ background: v > 0 ? C.green + "20" : C.red + "20", color: v > 0 ? C.green : C.red, borderRadius: 4, padding: "3px 5px", fontSize: 8, fontWeight: 700 }}>
+                      <span style={{ background: v > 0 ? C.green + "20" : C.red + "20", color: v > 0 ? C.green : C.red, borderRadius: 4, padding: "3px 5px", fontSize: 10, fontWeight: 700 }}>
                         {v > 0 ? "+" : "-"}${Math.abs(v / 1000).toFixed(0)}K
                       </span>
                     ) : <span style={{ color: C.muted }}>—</span>}
@@ -246,7 +246,7 @@ function StratMock() {
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 10, color: C.sec, marginBottom: 6 }}>Cumulative Performance</div>
+        <div style={{ fontSize: 12, color: C.sec, marginBottom: 6 }}>Cumulative Performance</div>
         <Sparkline data={[0, 400, 600, 1100, 1500, 1200, 2200, 3000, 2800, 3500, 4200, 5160]} color={C.jade} w={400} h={50} />
       </div>
     </div>
@@ -373,25 +373,25 @@ export default function Index() {
           <div onClick={e => e.stopPropagation()} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 20, padding: 36, width: 380, maxWidth: "90vw", position: "relative" }}>
             <button onClick={() => setAuth(null)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: C.muted }}><X size={18} /></button>
             <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>{auth === "login" ? "Welcome back" : "Get started free"}</h2>
-            <p style={{ fontSize: 13, color: C.sec, marginBottom: 24 }}>{auth === "login" ? "Log in to your dashboard" : "14-day free trial. No card required."}</p>
+            <p style={{ fontSize: 15, color: C.sec, marginBottom: 24 }}>{auth === "login" ? "Log in to your dashboard" : "14-day free trial. No card required."}</p>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Email</label>
+              <label style={{ fontSize: 14, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Email</label>
               <input type="email" placeholder="you@example.com" value={authEmail} onChange={e => setAuthEmail(e.target.value)}
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
                 onFocus={e => (e.target.style.borderColor = C.jade + "60")} onBlur={e => (e.target.style.borderColor = C.border)} />
             </div>
             {auth === "signup" && (
               <div style={{ marginBottom: 14 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Full Name</label>
+                <label style={{ fontSize: 14, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Full Name</label>
                 <input type="text" placeholder="Your name" value={authName} onChange={e => setAuthName(e.target.value)}
-                  style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+                  style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
                   onFocus={e => (e.target.style.borderColor = C.jade + "60")} onBlur={e => (e.target.style.borderColor = C.border)} />
               </div>
             )}
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Password</label>
+              <label style={{ fontSize: 14, fontWeight: 600, color: C.sec, display: "block", marginBottom: 5 }}>Password</label>
               <input type="password" placeholder="••••••••" value={authPassword} onChange={e => setAuthPassword(e.target.value)}
-                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
+                style={{ width: "100%", padding: "11px 14px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none" }}
                 onFocus={e => (e.target.style.borderColor = C.jade + "60")} onBlur={e => (e.target.style.borderColor = C.border)}
                 onKeyDown={e => e.key === "Enter" && handleAuth()} />
             </div>
@@ -401,7 +401,7 @@ export default function Index() {
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 0 12px" }}>
               <div style={{ flex: 1, height: 1, background: C.border }} />
-              <span style={{ fontSize: 12, color: C.muted }}>or continue with</span>
+              <span style={{ fontSize: 14, color: C.muted }}>or continue with</span>
               <div style={{ flex: 1, height: 1, background: C.border }} />
             </div>
 
@@ -413,7 +413,7 @@ export default function Index() {
             }} style={{
               width: "100%", padding: "11px 0", borderRadius: 10, cursor: "pointer",
               background: "transparent", border: `1px solid ${C.border}`, color: C.text,
-              fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+              fontSize: 16, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24">
@@ -425,7 +425,7 @@ export default function Index() {
               Google
             </button>
 
-            <p style={{ textAlign: "center", fontSize: 13, color: C.sec, marginTop: 16 }}>
+            <p style={{ textAlign: "center", fontSize: 15, color: C.sec, marginTop: 16 }}>
               {auth === "login" ? "New here? " : "Already have an account? "}
               <span onClick={() => setAuth(auth === "login" ? "signup" : "login")} style={{ color: C.jade, cursor: "pointer", fontWeight: 600 }}>{auth === "login" ? "Create account" : "Log in"}</span>
             </p>
@@ -445,7 +445,7 @@ export default function Index() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button className="ni" onClick={() => setAuth("login")}>Log In</button>
-          <button className="bp" onClick={() => setAuth("signup")} style={{ padding: "8px 20px", fontSize: 13 }}>Get Started →</button>
+          <button className="bp" onClick={() => setAuth("signup")} style={{ padding: "8px 20px", fontSize: 15 }}>Get Started →</button>
         </div>
       </nav>
 
@@ -455,7 +455,7 @@ export default function Index() {
           <div style={{ flex: 1, minWidth: 340 }}>
             <div className="fu" style={{ display: "inline-flex", alignItems: "center", gap: 8, background: C.jade + "12", border: `1px solid ${C.jade}25`, borderRadius: 100, padding: "8px 18px", marginBottom: 24 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, animation: "pulse-dot 2s infinite" }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: C.jade, letterSpacing: 1 }}>Artificial Intelligence • Connected Live</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: C.jade, letterSpacing: 1 }}>Artificial Intelligence • Connected Live</span>
             </div>
             <h1 className="fu d1 ttl" style={{ fontSize: 44, maxWidth: 540 }}>
               The connection between artificial intelligence and the markets — finally made.
@@ -471,7 +471,7 @@ export default function Index() {
               {[["50,000+", "Traders"], ["$2.1B+", "Analysed"]].map(([v, l]) => (
                 <div key={l}>
                   <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>{v}</div>
-                  <div style={{ fontSize: 13, color: C.sec }}>{l}</div>
+                  <div style={{ fontSize: 15, color: C.sec }}>{l}</div>
                 </div>
               ))}
             </div>
@@ -488,7 +488,7 @@ export default function Index() {
           {[...Array(2)].flatMap(() => [["50+", "Metrics"], ["5", "Instruments"], ["<60s", "Full Scan"], ["24/7", "Monitoring"], ["81", "AI Tools"], ["15m", "Refresh"]]).map(([v, l], i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, whiteSpace: "nowrap" }}>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: 18, color: C.jade }}>{v}</span>
-              <span style={{ color: C.sec, fontSize: 14 }}>{l}</span>
+              <span style={{ color: C.sec, fontSize: 16 }}>{l}</span>
               <span style={{ color: C.muted }}>•</span>
             </div>
           ))}
@@ -519,7 +519,7 @@ export default function Index() {
           <div style={{ display: "flex", gap: 48, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 320 }}>
               <h3 style={{ fontSize: 26, fontWeight: 800, marginBottom: 12, lineHeight: 1.2 }}>{td.t}</h3>
-              <p style={{ fontSize: 14, color: C.sec, lineHeight: 1.7, marginBottom: 24 }}>{td.d}</p>
+              <p style={{ fontSize: 16, color: C.sec, lineHeight: 1.7, marginBottom: 24 }}>{td.d}</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px", marginBottom: 28 }}>
                 {td.ch.map(c => (
                   <div key={c} className="ci">
@@ -559,7 +559,7 @@ export default function Index() {
                   <IconBox type={i.icon} color={i.color} />
                   <div>
                     <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{i.t}</div>
-                    <div style={{ fontSize: 13, color: C.sec, lineHeight: 1.6 }}>{i.d}</div>
+                    <div style={{ fontSize: 15, color: C.sec, lineHeight: 1.6 }}>{i.d}</div>
                   </div>
                 </div>
               ))}
@@ -580,7 +580,7 @@ export default function Index() {
               <div key={h.t} className="cd" style={{ padding: 28 }}>
                 <IconBox type={h.icon} color={h.color} />
                 <h3 style={{ fontSize: 17, fontWeight: 700, margin: "14px 0 8px" }}>{h.t}</h3>
-                <p style={{ fontSize: 13, color: C.sec, lineHeight: 1.7 }}>{h.d}</p>
+                <p style={{ fontSize: 15, color: C.sec, lineHeight: 1.7 }}>{h.d}</p>
               </div>
             ))}
           </div>
@@ -615,9 +615,9 @@ export default function Index() {
             <p className="sub" style={{ margin: "10px auto 0" }}>14-day free trial. Cancel anytime.</p>
             <div style={{ display: "inline-flex", background: C.card, borderRadius: 10, padding: 4, marginTop: 20, border: `1px solid ${C.border}` }}>
               {[false, true].map(y => (
-                <button key={String(y)} onClick={() => setYr(y)} style={{ padding: "7px 20px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, background: yr === y ? C.jade : "transparent", color: yr === y ? C.bg : C.muted, transition: "all .2s", display: "flex", alignItems: "center", gap: 6 }}>
+                <button key={String(y)} onClick={() => setYr(y)} style={{ padding: "7px 20px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 15, fontWeight: 600, background: yr === y ? C.jade : "transparent", color: yr === y ? C.bg : C.muted, transition: "all .2s", display: "flex", alignItems: "center", gap: 6 }}>
                   {y ? "Yearly" : "Monthly"}
-                  {y && <span style={{ fontSize: 10, background: C.jade + "30", color: C.jade, padding: "2px 6px", borderRadius: 4, fontWeight: 700 }}>Save 20%</span>}
+                  {y && <span style={{ fontSize: 12, background: C.jade + "30", color: C.jade, padding: "2px 6px", borderRadius: 4, fontWeight: 700 }}>Save 20%</span>}
                 </button>
               ))}
             </div>
@@ -625,15 +625,15 @@ export default function Index() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20, maxWidth: 1000, margin: "0 auto" }}>
             {PR.map(t => (
               <div key={t.n} className="cd" style={{ padding: 32, position: "relative", borderColor: t.pop ? C.jade + "40" : C.border }}>
-                {t.pop && <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: C.jade, color: C.bg, fontSize: 11, fontWeight: 700, padding: "4px 14px", borderRadius: 100, letterSpacing: 1 }}>POPULAR</div>}
-                <div style={{ fontSize: 13, color: C.sec, fontWeight: 600, marginBottom: 4 }}>{t.n}</div>
-                <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>{t.d}</div>
+                {t.pop && <div style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: C.jade, color: C.bg, fontSize: 13, fontWeight: 700, padding: "4px 14px", borderRadius: 100, letterSpacing: 1 }}>POPULAR</div>}
+                <div style={{ fontSize: 15, color: C.sec, fontWeight: 600, marginBottom: 4 }}>{t.n}</div>
+                <div style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>{t.d}</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 4 }}>
                   <span style={{ fontSize: 40, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>${yr ? t.yp : t.p}</span>
-                  <span style={{ color: C.muted, fontSize: 14 }}>/mo</span>
+                  <span style={{ color: C.muted, fontSize: 16 }}>/mo</span>
                 </div>
-                {yr && <div style={{ fontSize: 11, color: C.sec, marginBottom: 8 }}>billed ${t.yp * 12}/yr</div>}
-                <div style={{ fontSize: 12, color: C.sec, marginBottom: 20 }}>{t.inst === 999 ? "Unlimited" : `Up to ${t.inst}`} instruments</div>
+                {yr && <div style={{ fontSize: 13, color: C.sec, marginBottom: 8 }}>billed ${t.yp * 12}/yr</div>}
+                <div style={{ fontSize: 14, color: C.sec, marginBottom: 20 }}>{t.inst === 999 ? "Unlimited" : `Up to ${t.inst}`} instruments</div>
                 <button className="bp" onClick={() => setAuth("signup")} style={{ width: "100%", justifyContent: "center", marginBottom: 18 }}>{t.cta}</button>
                 {t.f.map(f => (
                   <div key={f} className="ci" style={{ padding: "4px 0" }}>
@@ -685,7 +685,7 @@ export default function Index() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <img src="/gainedge-logo.png" alt="GAINEDGE" style={{ height: 24 }} />
               </div>
-              <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>Artificial intelligence powered trading platform.</p>
+              <p style={{ fontSize: 15, color: C.muted, lineHeight: 1.7 }}>Artificial intelligence powered trading platform.</p>
             </div>
             {[
               { t: "Product", l: ["Features", "Pricing", "Dashboard", "API"] },
@@ -693,9 +693,9 @@ export default function Index() {
               { t: "Legal", l: ["Privacy", "Terms", "Disclaimer"] },
             ].map(c => (
               <div key={c.t}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: C.text }}>{c.t}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14, color: C.text }}>{c.t}</div>
                 {c.l.map(l => (
-                  <div key={l} style={{ fontSize: 13, color: C.muted, padding: "4px 0", cursor: "pointer", transition: "color .2s" }}
+                  <div key={l} style={{ fontSize: 15, color: C.muted, padding: "4px 0", cursor: "pointer", transition: "color .2s" }}
                     onMouseEnter={e => (e.currentTarget.style.color = C.text)}
                     onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
                     {l}
@@ -705,8 +705,8 @@ export default function Index() {
             ))}
           </div>
           <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-            <span style={{ fontSize: 12, color: C.muted }}>© 2026 GAINEDGE. All rights reserved.</span>
-            <span style={{ fontSize: 11, color: C.muted }}>Not financial advice. Past performance is not indicative of future results.</span>
+            <span style={{ fontSize: 14, color: C.muted }}>© 2026 GAINEDGE. All rights reserved.</span>
+            <span style={{ fontSize: 13, color: C.muted }}>Not financial advice. Past performance is not indicative of future results.</span>
           </div>
         </div>
       </footer>

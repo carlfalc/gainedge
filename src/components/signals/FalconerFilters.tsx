@@ -34,14 +34,14 @@ export default function FalconerFilters({
         onChange={(e) => onChange({ ...value, search: e.target.value })}
         placeholder="Search symbol or token"
         aria-label="Search records"
-        className="rounded-lg px-3 py-1.5 text-xs"
+        className="rounded-lg px-3 py-1.5 text-sm"
         style={selectStyle}
       />
       <select
         aria-label="Filter by symbol"
         value={value.symbol}
         onChange={(e) => onChange({ ...value, symbol: e.target.value })}
-        className="rounded-lg px-2.5 py-1.5 text-xs"
+        className="rounded-lg px-2.5 py-1.5 text-sm"
         style={selectStyle}
       >
         <option value="">All symbols</option>
@@ -51,7 +51,7 @@ export default function FalconerFilters({
         aria-label="Filter by status"
         value={value.status}
         onChange={(e) => onChange({ ...value, status: e.target.value })}
-        className="rounded-lg px-2.5 py-1.5 text-xs"
+        className="rounded-lg px-2.5 py-1.5 text-sm"
         style={selectStyle}
       >
         <option value="">All statuses</option>
@@ -61,7 +61,7 @@ export default function FalconerFilters({
         aria-label="Filter by trigger"
         value={value.trigger}
         onChange={(e) => onChange({ ...value, trigger: e.target.value })}
-        className="rounded-lg px-2.5 py-1.5 text-xs"
+        className="rounded-lg px-2.5 py-1.5 text-sm"
         style={selectStyle}
       >
         <option value="">All triggers</option>

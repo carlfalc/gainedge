@@ -101,7 +101,7 @@ export default function GainEdgeAIPage() {
           </button>
         )}
       </div>
-      <p style={{ color: C.sec, fontSize: 13, marginBottom: 20 }}>
+      <p style={{ color: C.sec, fontSize: 15, marginBottom: 20 }}>
         RON is GainEdge's interactive assistant. Answers are based only on the evidence stored and available in your account.
       </p>
 
@@ -131,7 +131,7 @@ export default function GainEdgeAIPage() {
 
       {pair && (
         <div data-testid="ask-ron-context-prompts" style={{ marginBottom: 16 }}>
-          <div style={{ color: C.sec, fontSize: 11, marginBottom: 8 }}>Ask about this stored context</div>
+          <div style={{ color: C.sec, fontSize: 13, marginBottom: 8 }}>Ask about this stored context</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {contextPrompts.map(prompt => (
               <button
@@ -185,16 +185,16 @@ export default function GainEdgeAIPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {history.map(item => (
           <div key={item.id} style={card}>
-            <div style={{ color: C.jade, fontWeight: 700, fontSize: 13, marginBottom: 10 }}>{item.question}</div>
-            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, fontSize: 13 }}>{item.answer}</div>
-            <div style={{ color: C.muted, fontSize: 10, marginTop: 12 }}>
+            <div style={{ color: C.jade, fontWeight: 700, fontSize: 15, marginBottom: 10 }}>{item.question}</div>
+            <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, fontSize: 15 }}>{item.answer}</div>
+            <div style={{ color: C.muted, fontSize: 12, marginTop: 12 }}>
               {new Date(item.created_at).toLocaleString()}
             </div>
           </div>
         ))}
       </div>
 
-      <p style={{ color: C.muted, fontSize: 11, marginTop: 18 }}>
+      <p style={{ color: C.muted, fontSize: 13, marginTop: 18 }}>
         Decision support only. Broker order placement is not enabled here.
       </p>
     </div>
@@ -215,7 +215,7 @@ const sendButton: React.CSSProperties = {
 };
 const promptButton: React.CSSProperties = {
   padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`,
-  background: C.bg2, color: C.sec, fontSize: 11, cursor: "pointer",
+  background: C.bg2, color: C.sec, fontSize: 13, cursor: "pointer",
 };
 const ghostButton: React.CSSProperties = {
   display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", borderRadius: 8,
@@ -224,8 +224,8 @@ const ghostButton: React.CSSProperties = {
 const contextChip: React.CSSProperties = {
   display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
   padding: "8px 12px", borderRadius: 10, marginBottom: 16,
-  background: C.bg2, border: `1px solid ${C.border}`, color: C.sec, fontSize: 12,
+  background: C.bg2, border: `1px solid ${C.border}`, color: C.sec, fontSize: 14,
 };
 const contextHistoryNote: React.CSSProperties = {
-  color: C.muted, fontSize: 11, marginTop: -8, marginBottom: 16, lineHeight: 1.5,
+  color: C.muted, fontSize: 13, marginTop: -8, marginBottom: 16, lineHeight: 1.5,
 };

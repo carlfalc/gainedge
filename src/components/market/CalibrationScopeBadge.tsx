@@ -19,7 +19,7 @@ export default function CalibrationScopeBadge({ symbol, timeframe, compact = fal
 
   return (
     <span
-      className="inline-flex max-w-full flex-col items-start gap-0.5 rounded-md px-1.5 py-0.5 text-[9px] leading-tight break-words"
+      className="inline-flex max-w-full flex-col items-start gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] leading-tight break-words"
       style={{ background: `${tone}14`, color: tone }}
       data-testid="calibration-scope-badge"
       title={`${scope.label} — ${scope.secondary}`}

@@ -74,7 +74,7 @@ function MultiSelect({
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <label style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8, display: "block" }}>
+      <label style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8, display: "block" }}>
         {label}
       </label>
       <button
@@ -82,7 +82,7 @@ function MultiSelect({
         style={{
           width: "100%", padding: "10px 14px", borderRadius: 10,
           background: C.bg, border: `1px solid ${C.border}`,
-          color: C.sec, fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+          color: C.sec, fontSize: 15, fontFamily: "'DM Sans', sans-serif",
           cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
         }}
       >
@@ -99,7 +99,7 @@ function MultiSelect({
               key={opt}
               style={{
                 display: "flex", alignItems: "center", gap: 8, padding: "6px 8px",
-                borderRadius: 6, cursor: "pointer", fontSize: 12, color: C.text,
+                borderRadius: 6, cursor: "pointer", fontSize: 14, color: C.text,
               }}
               onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
@@ -119,14 +119,14 @@ function MultiSelect({
                 onKeyDown={e => e.key === "Enter" && addCustom()}
                 placeholder="Add custom..."
                 style={{
-                  flex: 1, padding: "4px 8px", borderRadius: 6, fontSize: 12,
+                  flex: 1, padding: "4px 8px", borderRadius: 6, fontSize: 14,
                   background: C.bg, border: `1px solid ${C.border}`, color: C.text,
                   fontFamily: "'DM Sans', sans-serif",
                 }}
               />
               <button onClick={addCustom} style={{
                 padding: "4px 10px", borderRadius: 6, background: C.jade, color: "#fff",
-                border: "none", fontSize: 11, cursor: "pointer", fontWeight: 600,
+                border: "none", fontSize: 13, cursor: "pointer", fontWeight: 600,
               }}>Add</button>
             </div>
           )}
@@ -148,7 +148,7 @@ function InstrumentMultiSelect({
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <label style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8, display: "block" }}>
+      <label style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8, display: "block" }}>
         Instruments & Assets
       </label>
       <button
@@ -156,7 +156,7 @@ function InstrumentMultiSelect({
         style={{
           width: "100%", padding: "10px 14px", borderRadius: 10,
           background: C.bg, border: `1px solid ${C.border}`,
-          color: C.sec, fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+          color: C.sec, fontSize: 15, fontFamily: "'DM Sans', sans-serif",
           cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
         }}
       >
@@ -170,7 +170,7 @@ function InstrumentMultiSelect({
         }}>
           {Object.entries(INSTRUMENT_GROUPS).map(([group, instruments]) => (
             <div key={group}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.jade, letterSpacing: 1, textTransform: "uppercase", padding: "8px 8px 4px" }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.jade, letterSpacing: 1, textTransform: "uppercase", padding: "8px 8px 4px" }}>
                 {group}
               </div>
               {instruments.map(inst => (
@@ -178,7 +178,7 @@ function InstrumentMultiSelect({
                   key={inst}
                   style={{
                     display: "flex", alignItems: "center", gap: 8, padding: "5px 8px 5px 16px",
-                    borderRadius: 6, cursor: "pointer", fontSize: 12, color: C.text,
+                    borderRadius: 6, cursor: "pointer", fontSize: 14, color: C.text,
                   }}
                   onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
                   onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
@@ -236,11 +236,11 @@ export default function NewsSettingsPage() {
   return (
     <div style={{ width: "100%" }}>
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.jade, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.jade, letterSpacing: 2, textTransform: "uppercase", marginBottom: 4 }}>
           GAIN MORE EDGE
         </div>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 6 }}>Your News, Your Way</h1>
-        <p style={{ fontSize: 13, color: C.sec, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 15, color: C.sec, lineHeight: 1.6 }}>
           Customise the news feed below to see only what matters to you. Select countries, political figures, instruments, and topics — we'll filter the noise and deliver what moves your markets.
         </p>
       </div>
@@ -253,7 +253,7 @@ export default function NewsSettingsPage() {
       {/* Current Selections */}
       {allPills.length > 0 && (
         <div style={{ marginBottom: 20 }}>
-          <label style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 8, display: "block" }}>
+          <label style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8, display: "block" }}>
             Current Selections
           </label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -264,7 +264,7 @@ export default function NewsSettingsPage() {
                   key={`${pill.category}-${pill.label}`}
                   style={{
                     display: "inline-flex", alignItems: "center", gap: 4,
-                    padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+                    padding: "3px 10px", borderRadius: 20, fontSize: 13, fontWeight: 600,
                     background: col.bg, border: `1px solid ${col.border}`, color: col.border,
                   }}
                 >
@@ -289,8 +289,8 @@ export default function NewsSettingsPage() {
         marginBottom: 10,
       }}>
         <div>
-          <div style={{ fontSize: 12, color: C.text, fontWeight: 600 }}>Push high-impact alerts to dashboard</div>
-          <div style={{ fontSize: 11, color: C.sec }}>News is scanned every 5 minutes for your selected topics</div>
+          <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>Push high-impact alerts to dashboard</div>
+          <div style={{ fontSize: 13, color: C.sec }}>News is scanned every 5 minutes for your selected topics</div>
         </div>
         <button
           onClick={() => setPrefs({ ...prefs, pushHighImpact: !prefs.pushHighImpact })}
@@ -313,7 +313,7 @@ export default function NewsSettingsPage() {
         disabled={saving}
         style={{
           width: "100%", padding: "12px 0", borderRadius: 10, border: "none",
-          background: C.jade, color: "#fff", fontSize: 14, fontWeight: 700,
+          background: C.jade, color: "#fff", fontSize: 16, fontWeight: 700,
           cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
           opacity: saving ? 0.6 : 1, marginTop: 10,
         }}
