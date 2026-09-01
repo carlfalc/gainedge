@@ -28,7 +28,7 @@ const KIND_STYLE: Record<ChartLevelKind, { color: string; border: string; bg: st
 export default function ChartLevelsOverlay({ symbol, patterns, features }: Props) {
   const [open, setOpen] = useState(true);
   const marks = buildChartLevelMarks(symbol, patterns, features);
-  if (marks.length === 0) return null;
+
 
   return (
     <div className="absolute top-3 left-3 z-[16] pointer-events-none" data-testid="chart-levels-overlay">
