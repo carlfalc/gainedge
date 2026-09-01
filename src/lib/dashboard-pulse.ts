@@ -13,6 +13,11 @@
  */
 import { ronSummarySentence } from "@/lib/dashboard-ron-summary";
 import { ronStateLabel } from "@/services/ron-snapshots";
+import { buildHeadlineContext } from "@/lib/news-education";
+import {
+  venueStatuses, venueBoardLine, bestOpportunitiesThisSession, sessionOpportunityLines,
+} from "@/lib/session-opportunities";
+
 
 export const PULSE_TITLE = "RON Pulse";
 export const PULSE_SUBTITLE = "Latest market update";
@@ -31,7 +36,10 @@ export interface PulseItem {
   /** Human label for what the timestamp means. */
   timestampLabel: string;
   tone: PulseTone;
+  /** Optional educational / contextual lines rendered under the detail. */
+  context?: string[];
 }
+
 
 export interface PulseSnapshot {
   symbol: string;
@@ -115,6 +123,7 @@ export function buildPulseItems(input: PulseInput, max = 4): PulseItem[] {
   )[0];
   if (newest) {
     const tags = newest.instruments.filter(Boolean);
+    const edu = buildHeadlineContext(newest.headline, tags);
     items.push({
       id: "news",
       kind: "news",
@@ -125,11 +134,16 @@ export function buildPulseItems(input: PulseInput, max = 4): PulseItem[] {
       timestamp: newest.published_at,
       timestampLabel: "published",
       tone: "neutral",
+      context: [edu.statusLine, ...edu.lines],
     });
   }
 
-  // 4. Session context.
+  // 4. Session context + observed best opportunities so far this session.
   if (input.sessionLabel) {
+    const now = input.sessionInstant ? new Date(input.sessionInstant) : new Date();
+    const statuses = venueStatuses(now);
+    const anyOpen = statuses.some((s) => s.open);
+    const opps = bestOpportunitiesThisSession(input.snapshots, now);
     items.push({
       id: "session",
       kind: "session",
@@ -140,8 +154,10 @@ export function buildPulseItems(input: PulseInput, max = 4): PulseItem[] {
       timestamp: input.sessionInstant,
       timestampLabel: "evaluated",
       tone: input.marketOpen ? "neutral" : "amber",
+      context: [venueBoardLine(statuses), ...sessionOpportunityLines(opps, anyOpen)],
     });
   }
+
 
   return items.slice(0, max);
 }

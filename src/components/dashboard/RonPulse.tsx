@@ -133,6 +133,23 @@ export default function RonPulse() {
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: ronBiasColor(ronBiasFromLabel(item.title)) ?? tone }}>{item.title}</div>
                   <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>{item.detail}</div>
+                  {item.context && item.context.length > 0 && (
+                    <div
+                      data-testid={`pulse-context-${item.kind}`}
+                      style={{
+                        marginTop: 6, paddingLeft: 10,
+                        borderLeft: `2px solid ${C.jade}40`,
+                        display: "grid", gap: 3,
+                      }}
+                    >
+                      {item.context.map((line, i) => (
+                        <div key={i} style={{ fontSize: 12, color: C.text, opacity: 0.9, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <div style={{ fontSize: 11, color: C.sec, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                     {item.timestamp
                       ? `${item.timestampLabel} ${formatPrintedLocal(item.timestamp)} local · ${formatAge(item.timestamp)}`
