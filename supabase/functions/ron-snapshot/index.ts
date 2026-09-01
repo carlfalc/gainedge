@@ -102,11 +102,20 @@ Deno.serve(async (req) => {
     if (verr) console.error("ron_verify_cron_token failed", verr.message);
     authorized = ok === true;
   }
+  // On-demand path: a VERIFIED end-user session may request a live evaluation of the
+  // latest completed bar. The work is idempotent and writes no user-scoped data.
+  let userRequested = false;
+  if (!authorized && token) {
+    const { data: userData } = await supabase.auth.getUser(token);
+    if (userData?.user?.id) { authorized = true; userRequested = true; }
+  }
   if (!authorized) return json({ error: "Unauthorized" }, 401);
+
 
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body == live tick */ }
-  const mode = body.mode === "backfill" ? "backfill" : "live";
+  // End-user requests are restricted to the live latest-completed-bar path.
+  const mode = !userRequested && body.mode === "backfill" ? "backfill" : "live";
 
   // ── declared subject (GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1) ───────────
   const SYMBOL = String(body.symbol ?? DEFAULT_SYMBOL).toUpperCase();
