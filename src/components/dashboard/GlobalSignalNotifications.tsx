@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { askRonContextHref } from "@/lib/ask-ron-context";
 import {
-  NOTIFICATION_AUTO_DISMISS_MS, NOTIFICATION_SOURCE_QUALIFIER, applyBaseline,
+  NOTIFICATION_SOURCE_QUALIFIER, applyBaseline,
   createSignalNotificationState, deriveNotification, pushVisible,
   resetSignalNotificationState, viewSignalHref,
   applyOpportunityBaseline, bufferOpportunityRow, createOpportunityNotificationState,
@@ -178,21 +178,8 @@ export default function GlobalSignalNotifications() {
     return () => { cancelled = true; void supabase.removeChannel(channel); };
   }, [userId]);
 
-  // Auto-dismiss. Dedupe history is kept in stateRef, so ageing out never re-alerts.
-  useEffect(() => {
-    if (notes.length === 0) return;
-    const timers = notes.map((n) =>
-      setTimeout(() => dismiss(n.key), Math.max(0, n.createdAt + NOTIFICATION_AUTO_DISMISS_MS - Date.now())));
-    return () => { timers.forEach(clearTimeout); };
-  }, [notes, dismiss]);
-
-  // Auto-dismiss for opportunity popups, on the same interval.
-  useEffect(() => {
-    if (oppNotes.length === 0) return;
-    const timers = oppNotes.map((n) =>
-      setTimeout(() => dismissOpp(n.key), Math.max(0, n.createdAt + NOTIFICATION_AUTO_DISMISS_MS - Date.now())));
-    return () => { timers.forEach(clearTimeout); };
-  }, [oppNotes, dismissOpp]);
+  // Popups are persistent by design: they stay on screen until the user closes
+  // them (X, or one of the action buttons). No auto-dismiss timers.
 
   if (notes.length === 0 && oppNotes.length === 0) return null;
 
