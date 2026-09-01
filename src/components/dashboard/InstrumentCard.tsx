@@ -371,7 +371,7 @@ export default function InstrumentCard({
           data-testid={`what-to-do-now-${inst.symbol}`}
           style={{
             display: "inline-flex", alignItems: "center", gap: 5, fontSize: 14, fontWeight: 700,
-            color: C.jade, background: "transparent", border: `1px solid ${C.jade}55`,
+            color: "#FFFFFF", background: "transparent", border: `2px solid #FFFFFF`,
             borderRadius: 7, padding: "5px 12px", cursor: "pointer",
           }}
           title={`Run RON now and get a plain-English briefing for ${inst.symbol} ${tf}`}
