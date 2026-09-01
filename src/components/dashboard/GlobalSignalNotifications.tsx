@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
 import { askRonContextHref } from "@/lib/ask-ron-context";
 import {
-  NOTIFICATION_AUTO_DISMISS_MS, NOTIFICATION_SOURCE_QUALIFIER, applyBaseline,
+  NOTIFICATION_SOURCE_QUALIFIER, applyBaseline,
   createSignalNotificationState, deriveNotification, pushVisible,
   resetSignalNotificationState, viewSignalHref,
   applyOpportunityBaseline, bufferOpportunityRow, createOpportunityNotificationState,
