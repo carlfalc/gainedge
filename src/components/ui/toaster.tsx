@@ -5,7 +5,7 @@ export function Toaster() {
   const { toasts } = useToast();
 
   return (
-    {/* Persistent by product rule: toasts stay until the user closes them. */}
+    // Persistent by product rule: toasts stay until the user closes them.
     <ToastProvider duration={Infinity}>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
