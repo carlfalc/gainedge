@@ -1,60 +1,33 @@
 /**
- * GAINEDGE_DASHBOARD_UI_V1 — "RON Pulse": what matters now, at the top of the dashboard.
+ * Compact stored-decision summary for the top of the dashboard.
  *
  * Honesty constraints:
- * - There is no persisted last-login marker, so this is "Latest market update",
- *   never "since you were last here".
+ * - There is no persisted last-login marker, so this is the latest stored
+ *   evaluation, never "since you were last here".
  * - No Opportunity Context lifecycle is persisted yet, so no forming/confirmed
  *   opportunity language appears. The RON row is watch context only.
  * - Every row shows the source instant it is about and its age.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, AlertTriangle, Newspaper, Clock } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight } from "lucide-react";
 import { C } from "@/lib/mock-data";
-import { supabase } from "@/integrations/supabase/client";
 import { formatAge } from "@/lib/expiry";
 import { formatPrintedLocal } from "@/lib/signal-time";
 import { classifyRonSession } from "@/lib/ron-sessions";
 import { ronDecisionRecordHref } from "@/lib/ron-decision-explorer";
 import { useRonSnapshots, ronStateFrom, ronBiasFrom, ronBiasColor, ronBiasFromLabel } from "@/services/ron-snapshots";
 import {
-  buildPulseItems, pulseLatestTimestamp, PULSE_TITLE, PULSE_SUBTITLE, PULSE_EMPTY_TEXT,
-  type PulseItem, type PulseNews, type PulseSnapshot,
+  buildPulseItems, pulseLatestTimestamp, PULSE_EMPTY_TEXT,
+  type PulseItem, type PulseSnapshot,
 } from "@/lib/dashboard-pulse";
 
 const TONE: Record<string, string> = { jade: C.jade, amber: C.amber, red: C.red, neutral: C.sec };
 
-const ICON = {
-  ron_state: Activity,
-  data_health: AlertTriangle,
-  news: Newspaper,
-  session: Clock,
-} as const;
-
 export default function RonPulse() {
   const navigate = useNavigate();
   const { snapshots, loading } = useRonSnapshots();
-  const [news, setNews] = useState<PulseNews[]>([]);
   const [, setTick] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    supabase
-      .from("news_items")
-      .select("headline, published_at, instruments_affected")
-      .order("published_at", { ascending: false })
-      .limit(5)
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        setNews((data as any[]).map((n) => ({
-          headline: n.headline,
-          published_at: n.published_at,
-          instruments: n.instruments_affected ?? [],
-        })));
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   // Minute tick so ages stay honest without hammering the network.
   useEffect(() => {
@@ -76,44 +49,60 @@ export default function RonPulse() {
     }));
     return buildPulseItems({
       snapshots: snaps,
-      news,
+      news: [],
       sessionLabel: sess.label,
       sessionInstant: now.toISOString(),
       marketOpen: sess.market_open,
     });
-  }, [snapshots, news]);
+  }, [snapshots]);
 
-  const latest = pulseLatestTimestamp(items);
+  // The dashboard hero is for stored decision context only. News and session
+  // context have dedicated surfaces and must not crowd this record summary.
+  const visibleItems = items.filter((item) => item.kind === "ron_state" || item.kind === "data_health").slice(0, 1);
+  const latest = pulseLatestTimestamp(visibleItems);
 
   return (
     <section
       data-testid="ron-pulse"
       style={{
         background: C.card, border: `1px solid ${C.jade}25`, borderRadius: 14,
-        padding: "16px 20px", marginBottom: 20,
+        padding: "14px 16px", marginBottom: 20,
         boxShadow: `0 0 30px ${C.jade}08`,
       }}
     >
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <span style={{ fontSize: 12, color: C.jade, fontWeight: 700, letterSpacing: 1.6, textTransform: "uppercase" }}>
-            {PULSE_TITLE}
+            Latest stored evaluation
           </span>
-          <span style={{ fontSize: 11, color: C.sec, marginLeft: 8 }}>{PULSE_SUBTITLE}</span>
+          <span style={{ fontSize: 11, color: C.sec, marginLeft: 8 }}>Completed 15-minute evidence</span>
         </div>
-        <span style={{ fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
-          {latest ? `Newest source instant ${formatPrintedLocal(latest)} local · ${formatAge(latest)}` : "No dated source yet"}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 10, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+            {latest ? `${formatPrintedLocal(latest)} local · ${formatAge(latest)}` : "No dated record yet"}
+          </span>
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard/ron-decision")}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 9px",
+              borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg2,
+              color: C.sec, cursor: "pointer", fontSize: 10, fontWeight: 700,
+            }}
+          >
+            View records <ArrowRight size={12} />
+          </button>
+        </div>
       </div>
 
-      {loading && items.length === 0 ? (
+      {loading && visibleItems.length === 0 ? (
         <div style={{ marginTop: 10, fontSize: 12, color: C.sec }}>Loading stored records…</div>
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <div style={{ marginTop: 10, fontSize: 12, color: C.sec }} data-testid="ron-pulse-empty">{PULSE_EMPTY_TEXT}</div>
       ) : (
-        <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
-          {items.map((item) => {
-            const Icon = ICON[item.kind];
+        <div style={{ marginTop: 10 }}>
+          {visibleItems.map((item) => {
+            const Icon = item.kind === "data_health" ? AlertTriangle : Activity;
             const tone = TONE[item.tone] ?? C.sec;
             const clickable = item.kind === "ron_state" || item.kind === "data_health";
             const symbol = item.id.startsWith("ron-state-") ? item.id.replace("ron-state-", "") : null;
@@ -124,7 +113,7 @@ export default function RonPulse() {
                 onClick={symbol ? () => navigate(ronDecisionRecordHref(symbol, "15m")) : undefined}
                 style={{
                   display: "flex", gap: 10, alignItems: "flex-start",
-                  padding: "8px 10px", borderRadius: 10,
+                  padding: "10px 12px", borderRadius: 10,
                   background: C.bg2, border: `1px solid ${C.border}`,
                   cursor: clickable && symbol ? "pointer" : "default",
                 }}

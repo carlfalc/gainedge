@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { SpinCard } from "@/components/dashboard/SpinCard";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { Gauge } from "@/components/dashboard/Gauge";
 import { C } from "@/lib/mock-data";
-import { AlertTriangle, Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move } from "lucide-react";
+import { AlertTriangle, Clock, ArrowUp, ArrowDown, Circle, X, Eye, Move, ArrowRight, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatAge, isDynamicallyExpired, nextScanSeconds, formatCountdown, isMarketClosed, secondsUntilMarketOpen } from "@/lib/expiry";
 // LiveTradeAlert removed with legacy auto-trade engine
-import { BreakingNewsTicker } from "@/components/dashboard/BreakingNewsTicker";
-import { NewsSentimentPanel } from "@/components/dashboard/NewsSentimentPanel";
 import MarketScannersWidget from "@/components/dashboard/MarketScannersWidget";
 import RonPulse from "@/components/dashboard/RonPulse";
 
 import InstrumentTrackingPanel from "@/components/dashboard/InstrumentTrackingPanel";
-import { MostVolumeBar } from "@/components/dashboard/MostVolumeBar";
-import { VolumeHistoryInline } from "@/components/dashboard/VolumeHistoryInline";
 import { useLiveMarketData, triggerMarketDataCompute, type LiveMarketRow } from "@/services/broker-data";
 
 const adxLabel = (v: number) =>
@@ -47,6 +44,7 @@ const directionColor = (dir: string) => {
 };
 
 export default function DashboardHome() {
+  const navigate = useNavigate();
   const [scans, setScans] = useState<ScanResult[]>([]);
   const [instrumentTfs, setInstrumentTfs] = useState<Map<string, string>>(new Map());
   const [stats, setStats] = useState({ netPnl: 0, wins: 0, losses: 0, profitFactor: 0, avgRR: 0, currentStreak: 0, bestSession: "—", worstSession: "—" });
@@ -318,31 +316,66 @@ export default function DashboardHome() {
   };
 
   return (
-    <div style={{ width: "100%" }}>
-      {/* A. What matters now — top of the cockpit. */}
+    <div style={{ width: "100%", maxWidth: 1480, margin: "0 auto" }}>
+      <header style={{
+        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+        gap: 16, marginBottom: 16, flexWrap: "wrap",
+      }}>
+        <div>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, color: C.jade,
+            fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase",
+          }}>
+            <ShieldCheck size={15} /> RON intelligence
+          </div>
+          <h1 style={{ color: C.text, fontSize: 22, fontWeight: 700, margin: "5px 0 2px" }}>
+            Stored decision records
+          </h1>
+          <p style={{ color: C.sec, fontSize: 12, margin: 0 }}>
+            Latest completed-bar evaluations for your tracked markets.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard/ron-decision")}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 7,
+            padding: "9px 13px", borderRadius: 9, cursor: "pointer",
+            border: `1px solid ${C.jade}55`, background: `${C.jade}12`, color: C.jade,
+            fontSize: 11, fontWeight: 700,
+          }}
+        >
+          Open decision explorer <ArrowRight size={14} />
+        </button>
+      </header>
+
+      {/* What matters now — one compact stored-decision summary. */}
       <RonPulse />
 
-      {/* K. KPI row — explicitly labelled as simulated paper-trading history. */}
-      <div style={{ fontSize: 10, color: C.sec, letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>
-        Paper trading performance · simulated, not broker-settled
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <SpinCard front={{ label: "Net P&L", value: `$${stats.netPnl.toLocaleString()}`, sub: "Simulated P&L (paper trading)" }} back={{ label: "P&L Breakdown", value: `${totalTrades} closed trade${totalTrades === 1 ? "" : "s"} | ${stats.wins} win / ${stats.losses} loss | simulated, not broker-settled` }} color={stats.netPnl >= 0 ? C.green : C.red} />
-        <SpinCard front={{ label: "Win Rate", value: `${winRate}%`, sub: `${stats.wins}/${totalTrades} trades` }} back={{ label: "Session Detail", value: `${stats.currentStreak > 0 ? `🔥 ${stats.currentStreak} consecutive win${stats.currentStreak !== 1 ? "s" : ""}` : "No active streak"} | Best: ${stats.bestSession} | Worst: ${stats.worstSession} | ${stats.wins}/${totalTrades} trades (${winRate}%)` }} color={C.jade} />
-        <SpinCard front={{ label: "Profit Factor", value: String(stats.profitFactor) }} back={{ label: "Win/Loss Detail", value: `Gross win / gross loss across ${totalTrades} closed trade${totalTrades === 1 ? "" : "s"} | Target: >1.5` }} color={C.blue} />
-        <SpinCard front={{ label: "Avg R:R", value: `${stats.avgRR}:1` }} back={{ label: "R:R Detail", value: `Average planned reward-to-risk across ${totalTrades} closed trade${totalTrades === 1 ? "" : "s"}` }} color={C.purple} />
-      </div>
-      {/* LiveTradeAlert removed with legacy engine */}
-      <BreakingNewsTicker />
-      <NewsSentimentPanel />
+      {/* Paper statistics are useful only after a real sample exists. Empty zero cards are noise. */}
+      {totalTrades > 0 && (
+        <section aria-label="Paper trading performance" style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 10, color: C.sec, letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700, marginBottom: 6 }}>
+            Paper trading performance · simulated, not broker-settled
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
+            <SpinCard front={{ label: "Net P&L", value: `$${stats.netPnl.toLocaleString()}`, sub: "Simulated P&L (paper trading)" }} back={{ label: "P&L Breakdown", value: `${totalTrades} closed trade${totalTrades === 1 ? "" : "s"} | ${stats.wins} win / ${stats.losses} loss | simulated, not broker-settled` }} color={stats.netPnl >= 0 ? C.green : C.red} />
+            <SpinCard front={{ label: "Win Rate", value: `${winRate}%`, sub: `${stats.wins}/${totalTrades} trades` }} back={{ label: "Session Detail", value: `${stats.currentStreak > 0 ? `${stats.currentStreak} consecutive win${stats.currentStreak !== 1 ? "s" : ""}` : "No active streak"} | Best: ${stats.bestSession} | Worst: ${stats.worstSession} | ${stats.wins}/${totalTrades} trades (${winRate}%)` }} color={C.jade} />
+            <SpinCard front={{ label: "Profit Factor", value: String(stats.profitFactor) }} back={{ label: "Win/Loss Detail", value: `Gross win / gross loss across ${totalTrades} closed trade${totalTrades === 1 ? "" : "s"} | Target: >1.5` }} color={C.blue} />
+            <SpinCard front={{ label: "Avg R:R", value: `${stats.avgRR}:1` }} back={{ label: "R:R Detail", value: `Average planned reward-to-risk across ${totalTrades} closed trade${totalTrades === 1 ? "" : "s"}` }} color={C.purple} />
+          </div>
+        </section>
+      )}
 
-      {/* C. Scanners — real tracked-market rows, replacing the fabricated movers list. */}
+      <div style={{
+        fontSize: 10, color: C.sec, letterSpacing: 1.4, textTransform: "uppercase",
+        fontWeight: 700, margin: "4px 0 8px",
+      }}>
+        Tracked market review
+      </div>
       <MarketScannersWidget />
 
       <InstrumentTrackingPanel />
-
-      <MostVolumeBar />
-      <VolumeHistoryInline />
 
 
       {best ? (
