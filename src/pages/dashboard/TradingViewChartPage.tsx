@@ -399,6 +399,7 @@ export default function TradingViewChartPage({ chartsVisible = true }: TradingVi
                 active={tab.id === activeId}
                 onPaneState={handlePaneState}
                 chartsVisible={chartsVisible}
+                snapshot={snapshots.get(tab.symbol) ?? null}
               />
             </div>
           ))}

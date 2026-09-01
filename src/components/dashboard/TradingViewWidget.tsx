@@ -117,8 +117,9 @@ function TradingViewWidget({ symbol, broker }: TradingViewWidgetProps) {
         details: false,
         hotlist: false,
         calendar: false,
-        // Remove default volume study to avoid duplicate — volume bars already shown via style 8
-        studies: [],
+        // Volume bars already come from style 8. The pivot study draws GENUINE standard
+        // pivot levels (P / R1-R3 / S1-S3) with labels inside the chart on load.
+        studies: ["PivotPointsStandard@tv-basicstudies"],
         disabled_features: [
           "header_symbol_search",
           "volume_force_overlay",
