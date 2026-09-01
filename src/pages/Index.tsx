@@ -13,7 +13,7 @@ import {
 const C = {
   bg: "#080B12", bg2: "#0D1117", card: "#111724", cardH: "#161D2B",
   border: "rgba(255,255,255,0.06)", borderH: "rgba(255,255,255,0.14)", nav: "rgba(8,11,18,0.88)",
-  jade: "#00CFA5", teal: "#06B6D4", text: "#E4E9F0", sec: "#8892A4", muted: "#555F73",
+  jade: "#00CFA5", teal: "#06B6D4", text: "#E4E9F0", sec: "#FFFFFF", muted: "#FFFFFF",
   green: "#22C55E", red: "#EF4444", amber: "#F59E0B", pink: "#F472B6", purple: "#A78BFA",
   blue: "#60A5FA", orange: "#FB923C", cyan: "#22D3EE", lime: "#84CC16",
 };

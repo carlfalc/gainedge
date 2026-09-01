@@ -10,7 +10,7 @@ const COLORS: Record<string, string> = {
   available: "#22C55E",
   unavailable: "#EF4444",
   unverified: "#EAB308",
-  no_broker: "#6B7280",
+  no_broker: "#FFFFFF",
 };
 
 const TOOLTIPS: Record<string, (sym: string, broker?: string | null) => string> = {

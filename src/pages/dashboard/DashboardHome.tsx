@@ -43,7 +43,7 @@ const directionColor = (dir: string) => {
   if (dir === "BUY") return "#22C55E";
   if (dir === "SELL") return "#EF4444";
   if (dir === "WAIT") return "#F59E0B";
-  return "#555F73";
+  return "#FFFFFF";
 };
 
 export default function DashboardHome() {

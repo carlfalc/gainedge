@@ -100,7 +100,7 @@ export default function LiveQuotesTicker() {
                 <span style={{ color: C.jade, fontSize: 6, marginRight: 8 }}>●</span>
               )}
               <span style={{
-                color: "#94A3B8", fontSize: 12, fontWeight: 600,
+                color: "#FFFFFF", fontSize: 12, fontWeight: 600,
                 fontFamily: "'DM Sans', sans-serif",
               }}>
                 {q.symbol}
