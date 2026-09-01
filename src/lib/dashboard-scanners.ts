@@ -17,6 +17,8 @@ export interface ScannerSnapshotInput {
   data_health: string;
   /** Client watch heuristic label produced by ronStateFrom, or null. */
   state: string | null;
+  /** Directional side of the stored evidence ("LONG" | "SHORT"), or null. */
+  bias?: string | null;
 }
 
 export interface MoverRow {
@@ -33,6 +35,8 @@ export interface WatchRow {
   timeframe: string;
   bar_time: string;
   state: string;
+  /** Directional side of the stored evidence, or null when not explicit. */
+  bias: string | null;
 }
 
 export interface HealthRow {
@@ -82,7 +86,10 @@ export function ronWatchList(rows: ScannerSnapshotInput[], limit = SCANNER_LIMIT
       return new Date(b.bar_time).getTime() - new Date(a.bar_time).getTime();
     })
     .slice(0, limit)
-    .map((r) => ({ symbol: r.symbol, timeframe: r.timeframe, bar_time: r.bar_time, state: r.state }));
+    .map((r) => ({
+      symbol: r.symbol, timeframe: r.timeframe, bar_time: r.bar_time,
+      state: r.state, bias: r.bias ?? null,
+    }));
 }
 
 /** Tracked markets whose stored snapshot reports non-healthy source data. */

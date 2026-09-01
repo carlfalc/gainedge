@@ -84,6 +84,28 @@ export function ronStateFrom(features: Record<string, any> | null | undefined): 
 export const ronStateColor = (s: RonState) =>
   s === "SETUP FORMING" ? "#00CFA5" : s === "WATCH" ? "#F59E0B" : "#555F73";
 
+export type RonBias = "LONG" | "SHORT";
+
+/**
+ * Directional side of the stored evidence, presentation only.
+ * Derived from the same stored features the state label uses; null when the
+ * stored evidence is not directionally explicit.
+ */
+export function ronBiasFrom(features: Record<string, any> | null | undefined): RonBias | null {
+  if (!features) return null;
+  const regime = String(features.regime ?? "");
+  if (regime === "trending_up") return "LONG";
+  if (regime === "trending_down") return "SHORT";
+  const stack = String(features.ema_stack ?? "");
+  if (stack === "up") return "LONG";
+  if (stack === "down") return "SHORT";
+  const macd = String(features.macd_state ?? "");
+  if (macd.startsWith("bullish")) return "LONG";
+  if (macd.startsWith("bearish")) return "SHORT";
+  return null;
+}
+
+
 /** Latest RON snapshot per symbol, keyed by symbol. Live-updates via Realtime. */
 export function useRonSnapshots() {
   const [data, setData] = useState<Map<string, RonSnapshotRow>>(new Map());
