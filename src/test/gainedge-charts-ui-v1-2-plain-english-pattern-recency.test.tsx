@@ -81,7 +81,7 @@ describe("A. plain-English RON status", () => {
     const s = buildInstrumentStrip("XAUUSD", snapshot({
       features: { ...FEATURES, regime: "ranging", adx14: 27, ema_stack: "up" },
     }));
-    expect(s.statusLabel).toBe("RON: WATCHING");
+    expect(s.statusLabel).toBe("RON: WATCHING LONG");
     expect(s.contextLabel).toBeNull();
   });
 
@@ -91,7 +91,7 @@ describe("A. plain-English RON status", () => {
       features: { ...FEATURES, regime: "trending_up", adx14: 31, ema_stack: "up", macd_state: "bullish" },
     }));
     expect(s.contextLabel).toBe("Bullish context");
-    expect(s.statusLabel).toBe("RON: SETUP FORMING");
+    expect(s.statusLabel).toBe("RON: SETUP FORMING LONG");
   });
 });
 
