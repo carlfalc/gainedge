@@ -55,5 +55,8 @@ jobs:
       - name: Deno check Strategy Lab V1
         run: deno check supabase/functions/strategy-lab-backtest/index.ts
 
+      - name: Deno check Strategy Lab V2
+        run: deno check supabase/functions/strategy-lab-v2-discover/index.ts
+
       - name: Deno check post-V4 data readiness
         run: deno check supabase/functions/ron-post-v4-data-readiness/index.ts
