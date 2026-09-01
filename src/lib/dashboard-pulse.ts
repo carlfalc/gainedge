@@ -13,6 +13,11 @@
  */
 import { ronSummarySentence } from "@/lib/dashboard-ron-summary";
 import { ronStateLabel } from "@/services/ron-snapshots";
+import { buildHeadlineContext } from "@/lib/news-education";
+import {
+  venueStatuses, venueBoardLine, bestOpportunitiesThisSession, sessionOpportunityLines,
+} from "@/lib/session-opportunities";
+
 
 export const PULSE_TITLE = "RON Pulse";
 export const PULSE_SUBTITLE = "Latest market update";
