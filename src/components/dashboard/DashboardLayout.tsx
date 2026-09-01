@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useTranslation } from "react-i18next";
 import {
-  LayoutDashboard, LogOut, User, DollarSign, Sun, Moon, Mic,
+  LogOut, User, DollarSign, Sun, Moon, Mic,
 } from "lucide-react";
 import { C } from "@/lib/mock-data";
 import { NAV_GROUPS } from "@/lib/dashboard-nav";
@@ -284,21 +284,8 @@ export default function DashboardLayout() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", marginLeft: "auto" }}>
-            <button
-              onClick={() => navigate("/dashboard")}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "#FFFFFF", fontSize: 13, fontWeight: 600,
-                fontFamily: "'DM Sans', sans-serif",
-                display: "flex", alignItems: "center", gap: 6,
-                padding: "6px 12px", borderRadius: 8,
-                transition: "opacity 0.2s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              <LayoutDashboard size={15} /> {t("nav.dashboard")}
-            </button>
+            {/* Dashboard entry lives in the side menu only — it crowded the header row. */}
+
             <LanguageSelector />
             {/* Light/Dark background toggle */}
             <button
