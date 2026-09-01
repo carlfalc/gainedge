@@ -126,7 +126,11 @@ export function ronBiasFromLabel(label: string | null | undefined): string | nul
 }
 
 export function ronStateLabel(state: string, bias: string | null | undefined): string {
-  return bias ? `${state} ${bias}` : state;
+  if (!bias) return state;
+  // "WAIT" alone reads as an instruction; with a side it means RON is waiting on a
+  // likely direction, so say that in plain English.
+  if (state === "WAIT") return `WAITING LIKELY ${bias}`;
+  return `${state} ${bias}`;
 }
 
 /** Latest RON snapshot per symbol, keyed by symbol. Live-updates via Realtime. */
