@@ -31,7 +31,10 @@ export interface PulseItem {
   /** Human label for what the timestamp means. */
   timestampLabel: string;
   tone: PulseTone;
+  /** Optional educational / contextual lines rendered under the detail. */
+  context?: string[];
 }
+
 
 export interface PulseSnapshot {
   symbol: string;
