@@ -114,7 +114,8 @@ Deno.serve(async (req) => {
 
   let body: any = {};
   try { body = await req.json(); } catch { /* empty body == live tick */ }
-  const mode = body.mode === "backfill" ? "backfill" : "live";
+  // End-user requests are restricted to the live latest-completed-bar path.
+  const mode = !userRequested && body.mode === "backfill" ? "backfill" : "live";
 
   // ── declared subject (GAINEDGE_RON_ALWAYS_ON_AGENTIC_V1) ───────────
   const SYMBOL = String(body.symbol ?? DEFAULT_SYMBOL).toUpperCase();
