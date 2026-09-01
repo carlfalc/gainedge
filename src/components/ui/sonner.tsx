@@ -10,6 +10,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      closeButton
+      // Persistent by product rule: stays until the user dismisses it.
+      duration={Infinity}
       toastOptions={{
         classNames: {
           toast:
