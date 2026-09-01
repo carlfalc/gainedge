@@ -101,4 +101,4 @@ export function buildChartLevelMarks(
 }
 
 export const LEVEL_OVERLAY_NOTE =
-  "Exact RON prices. Standard pivot lines are drawn on the chart itself by the Pivot Points study.";
+  "Exact RON prices. Pivots are traditional levels from RON's last completed session — no third-party study.";
