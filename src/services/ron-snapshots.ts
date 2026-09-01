@@ -82,7 +82,7 @@ export function ronStateFrom(features: Record<string, any> | null | undefined): 
 }
 
 export const ronStateColor = (s: RonState) =>
-  s === "SETUP FORMING" ? "#00CFA5" : s === "WATCH" ? "#F59E0B" : "#555F73";
+  s === "SETUP FORMING" ? "#00CFA5" : s === "WATCH" ? "#F59E0B" : "#FFFFFF";
 
 export type RonBias = "LONG" | "SHORT";
 
