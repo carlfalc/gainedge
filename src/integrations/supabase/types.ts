@@ -3068,6 +3068,347 @@ export type Database = {
         }
         Relationships: []
       }
+      strategy_lab_v2_agent_runs: {
+        Row: {
+          agent_id: string
+          agent_version: number
+          artifact: Json
+          best_candidate_hash: string | null
+          budget: number
+          completed_at: string | null
+          created_at: string
+          generated: number
+          generations: number
+          id: string
+          rejected: number
+          run_id: string
+          seed: number
+          started_at: string | null
+          status: string
+          tested: number
+        }
+        Insert: {
+          agent_id: string
+          agent_version?: number
+          artifact?: Json
+          best_candidate_hash?: string | null
+          budget: number
+          completed_at?: string | null
+          created_at?: string
+          generated?: number
+          generations?: number
+          id?: string
+          rejected?: number
+          run_id: string
+          seed: number
+          started_at?: string | null
+          status: string
+          tested?: number
+        }
+        Update: {
+          agent_id?: string
+          agent_version?: number
+          artifact?: Json
+          best_candidate_hash?: string | null
+          budget?: number
+          completed_at?: string | null
+          created_at?: string
+          generated?: number
+          generations?: number
+          id?: string
+          rejected?: number
+          run_id?: string
+          seed?: number
+          started_at?: string | null
+          status?: string
+          tested?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_lab_v2_agent_runs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_lab_v2_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_lab_v2_candidates: {
+        Row: {
+          agent_id: string
+          candidate_hash: string
+          created_at: string
+          development_metrics: Json
+          disqualification_reasons: Json
+          disqualified: boolean
+          family: string
+          fold_metrics: Json
+          generation: number
+          genome: Json
+          id: string
+          parent_hashes: Json
+          positive_fold_ratio: number
+          run_id: string
+          score: number
+          selected_finalist: boolean
+        }
+        Insert: {
+          agent_id: string
+          candidate_hash: string
+          created_at?: string
+          development_metrics: Json
+          disqualification_reasons?: Json
+          disqualified?: boolean
+          family: string
+          fold_metrics: Json
+          generation: number
+          genome: Json
+          id?: string
+          parent_hashes?: Json
+          positive_fold_ratio: number
+          run_id: string
+          score: number
+          selected_finalist?: boolean
+        }
+        Update: {
+          agent_id?: string
+          candidate_hash?: string
+          created_at?: string
+          development_metrics?: Json
+          disqualification_reasons?: Json
+          disqualified?: boolean
+          family?: string
+          fold_metrics?: Json
+          generation?: number
+          genome?: Json
+          id?: string
+          parent_hashes?: Json
+          positive_fold_ratio?: number
+          run_id?: string
+          score?: number
+          selected_finalist?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_lab_v2_candidates_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_lab_v2_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_lab_v2_holdout_ledger: {
+        Row: {
+          candidate_hash: string
+          created_at: string
+          holdout_end: string
+          holdout_start: string
+          id: string
+          opened_at: string
+          result_hash: string | null
+          reused: boolean
+          run_id: string
+        }
+        Insert: {
+          candidate_hash: string
+          created_at?: string
+          holdout_end: string
+          holdout_start: string
+          id?: string
+          opened_at?: string
+          result_hash?: string | null
+          reused?: boolean
+          run_id: string
+        }
+        Update: {
+          candidate_hash?: string
+          created_at?: string
+          holdout_end?: string
+          holdout_start?: string
+          id?: string
+          opened_at?: string
+          result_hash?: string | null
+          reused?: boolean
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_lab_v2_holdout_ledger_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "strategy_lab_v2_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      strategy_lab_v2_runs: {
+        Row: {
+          cancellation_requested: boolean
+          candidates_generated: number
+          candidates_rejected: number
+          candidates_tested: number
+          candle_count: number
+          completed_at: string | null
+          created_at: string
+          dataset_audit: Json
+          engine_commit: string | null
+          engine_version: number
+          error_message: string | null
+          execution_allowed: boolean
+          final_result: Json | null
+          finalist_hash: string | null
+          grammar_version: string
+          id: string
+          period_end: string
+          period_start: string
+          progress: Json
+          random_seed: number
+          request_config: Json
+          search_depth: string
+          started_at: string | null
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+          user_id: string
+          verdict: string | null
+        }
+        Insert: {
+          cancellation_requested?: boolean
+          candidates_generated?: number
+          candidates_rejected?: number
+          candidates_tested?: number
+          candle_count?: number
+          completed_at?: string | null
+          created_at?: string
+          dataset_audit?: Json
+          engine_commit?: string | null
+          engine_version?: number
+          error_message?: string | null
+          execution_allowed?: boolean
+          final_result?: Json | null
+          finalist_hash?: string | null
+          grammar_version?: string
+          id?: string
+          period_end: string
+          period_start: string
+          progress?: Json
+          random_seed: number
+          request_config?: Json
+          search_depth: string
+          started_at?: string | null
+          status?: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+          user_id: string
+          verdict?: string | null
+        }
+        Update: {
+          cancellation_requested?: boolean
+          candidates_generated?: number
+          candidates_rejected?: number
+          candidates_tested?: number
+          candle_count?: number
+          completed_at?: string | null
+          created_at?: string
+          dataset_audit?: Json
+          engine_commit?: string | null
+          engine_version?: number
+          error_message?: string | null
+          execution_allowed?: boolean
+          final_result?: Json | null
+          finalist_hash?: string | null
+          grammar_version?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          progress?: Json
+          random_seed?: number
+          request_config?: Json
+          search_depth?: string
+          started_at?: string | null
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+          user_id?: string
+          verdict?: string | null
+        }
+        Relationships: []
+      }
+      strategy_lab_v2_trades: {
+        Row: {
+          candidate_hash: string
+          closed_at: string
+          cost_r: number
+          created_at: string
+          direction: string
+          entry: number
+          exit: number
+          exit_reason: string
+          gross_r: number
+          id: number
+          net_r: number
+          opened_at: string
+          run_id: string
+          segment: string
+          signal_time: string
+          stop: number
+          target: number
+          trade_index: number
+        }
+        Insert: {
+          candidate_hash: string
+          closed_at: string
+          cost_r: number
+          created_at?: string
+          direction: string
+          entry: number
+          exit: number
+          exit_reason: string
+          gross_r: number
+          id?: number
+          net_r: number
+          opened_at: string
+          run_id: string
+          segment: string
+          signal_time: string
+          stop: number
+          target: number
+          trade_index: number
+        }
+        Update: {
+          candidate_hash?: string
+          closed_at?: string
+          cost_r?: number
+          created_at?: string
+          direction?: string
+          entry?: number
+          exit?: number
+          exit_reason?: string
+          gross_r?: number
+          id?: number
+          net_r?: number
+          opened_at?: string
+          run_id?: string
+          segment?: string
+          signal_time?: string
+          stop?: number
+          target?: number
+          trade_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_lab_v2_trades_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_lab_v2_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
