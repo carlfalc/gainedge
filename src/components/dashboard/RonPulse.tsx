@@ -17,7 +17,7 @@ import { formatAge } from "@/lib/expiry";
 import { formatPrintedLocal } from "@/lib/signal-time";
 import { classifyRonSession } from "@/lib/ron-sessions";
 import { ronDecisionRecordHref } from "@/lib/ron-decision-explorer";
-import { useRonSnapshots, ronStateFrom, ronBiasFrom } from "@/services/ron-snapshots";
+import { useRonSnapshots, ronStateFrom, ronBiasFrom, ronBiasColor, ronBiasFromLabel } from "@/services/ron-snapshots";
 import {
   buildPulseItems, pulseLatestTimestamp, PULSE_TITLE, PULSE_SUBTITLE, PULSE_EMPTY_TEXT,
   type PulseItem, type PulseNews, type PulseSnapshot,
@@ -131,7 +131,7 @@ export default function RonPulse() {
               >
                 <Icon size={14} color={tone} style={{ marginTop: 2, flexShrink: 0 }} />
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: tone }}>{item.title}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: ronBiasColor(ronBiasFromLabel(item.title)) ?? tone }}>{item.title}</div>
                   <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>{item.detail}</div>
                   <div style={{ fontSize: 9, color: C.sec, fontFamily: "'JetBrains Mono', monospace", marginTop: 2 }}>
                     {item.timestamp
