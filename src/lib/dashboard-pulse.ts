@@ -12,6 +12,7 @@
  * - When nothing qualifies, callers render the calm empty state.
  */
 import { ronSummarySentence } from "@/lib/dashboard-ron-summary";
+import { ronStateLabel } from "@/services/ron-snapshots";
 
 export const PULSE_TITLE = "RON Pulse";
 export const PULSE_SUBTITLE = "Latest market update";
@@ -40,6 +41,8 @@ export interface PulseSnapshot {
   features: Record<string, unknown> | null;
   /** Client watch heuristic label, e.g. "WATCH" — never a qualified opportunity. */
   state: string | null;
+  /** Directional side of the stored evidence ("LONG" | "SHORT"), or null. */
+  bias?: string | null;
 }
 
 export interface PulseNews {
@@ -80,7 +83,7 @@ export function buildPulseItems(input: PulseInput, max = 4): PulseItem[] {
     items.push({
       id: `ron-state-${top.symbol}`,
       kind: "ron_state",
-      title: `${top.symbol} ${top.timeframe} · ${top.state}`,
+      title: `${top.symbol} ${top.timeframe} · ${ronStateLabel(top.state, top.bias)}`,
       detail: ronSummarySentence(top.features) ?? "Stored snapshot has no readable feature fields.",
       timestamp: top.bar_time,
       timestampLabel: `completed ${top.timeframe} close`,

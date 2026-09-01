@@ -17,7 +17,7 @@ import { formatAge } from "@/lib/expiry";
 import { formatPrintedLocal } from "@/lib/signal-time";
 import { classifyRonSession } from "@/lib/ron-sessions";
 import { ronDecisionRecordHref } from "@/lib/ron-decision-explorer";
-import { useRonSnapshots, ronStateFrom } from "@/services/ron-snapshots";
+import { useRonSnapshots, ronStateFrom, ronBiasFrom } from "@/services/ron-snapshots";
 import {
   buildPulseItems, pulseLatestTimestamp, PULSE_TITLE, PULSE_SUBTITLE, PULSE_EMPTY_TEXT,
   type PulseItem, type PulseNews, type PulseSnapshot,
@@ -72,6 +72,7 @@ export default function RonPulse() {
       data_health: s.data_health,
       features: s.features,
       state: ronStateFrom(s.features)?.state ?? null,
+      bias: ronBiasFrom(s.features),
     }));
     return buildPulseItems({
       snapshots: snaps,

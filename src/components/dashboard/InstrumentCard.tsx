@@ -23,7 +23,7 @@ import type { LiveMarketRow } from "@/services/broker-data";
 import PriceProvenanceBadge from "@/components/market/PriceProvenanceBadge";
 import CalibrationScopeBadge from "@/components/market/CalibrationScopeBadge";
 import {
-  ronStateFrom, ronStateColor,
+  ronStateFrom, ronStateColor, ronBiasFrom, ronStateLabel,
   CURRENT_RON_FEATURE_VERSION, CURRENT_RON_LABEL_VERSION, CURRENT_RON_QUALITY_VERSION,
   type RonSnapshotRow, type RonOutcomeStats, type RonDataQuality, type RonRebuildStatus,
 } from "@/services/ron-snapshots";
@@ -134,7 +134,9 @@ export default function InstrumentCard({
   const summary = ronSummarySentence(f);
   const empty = ronEmptyState({ hasQuote: !!quote?.bid, hasSignalHistory: hasSignal, symbol: inst.symbol });
 
-  const stateText = quarantined ? "NO TRADABLE SETUP" : ron ? ron.state : "DATA BUILDING";
+  const stateText = quarantined
+    ? "NO TRADABLE SETUP"
+    : ron ? ronStateLabel(ron.state, ronBiasFrom(f)) : "DATA BUILDING";
   const stateColor = quarantined ? C.amber : ron ? ronStateColor(ron.state) : C.muted;
 
   return (

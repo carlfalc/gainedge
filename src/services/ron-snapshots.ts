@@ -106,6 +106,14 @@ export function ronBiasFrom(features: Record<string, any> | null | undefined): R
 }
 
 
+/**
+ * Presentation label combining the deterministic state with its directional side.
+ * Falls back to the bare state when the stored evidence is not directionally explicit.
+ */
+export function ronStateLabel(state: string, bias: string | null | undefined): string {
+  return bias ? `${state} ${bias}` : state;
+}
+
 /** Latest RON snapshot per symbol, keyed by symbol. Live-updates via Realtime. */
 export function useRonSnapshots() {
   const [data, setData] = useState<Map<string, RonSnapshotRow>>(new Map());

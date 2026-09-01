@@ -13,7 +13,7 @@
  *    every RON label states the RON evidence timeframe (15m), not the chart interval.
  */
 import { formatAgeShort } from "@/lib/market-provenance-presentation";
-import { ronStateFrom, type RonSnapshotRow, type RonState } from "@/services/ron-snapshots";
+import { ronStateFrom, ronBiasFrom, ronStateLabel, type RonSnapshotRow, type RonState } from "@/services/ron-snapshots";
 
 /** RON evidence timeframe for the charts rail. Not the TradingView chart interval. */
 export const RON_CONTEXT_TIMEFRAME = "15m";
@@ -195,8 +195,8 @@ export const RON_STATE_PLAIN: Record<RonState, string> = {
   "SETUP FORMING": "RON: SETUP FORMING",
 };
 
-export function ronPlainStatus(state: RonState): string {
-  return RON_STATE_PLAIN[state];
+export function ronPlainStatus(state: RonState, bias?: string | null): string {
+  return ronStateLabel(RON_STATE_PLAIN[state], bias);
 }
 
 /**
@@ -547,7 +547,7 @@ export function buildInstrumentStrip(
     symbol,
     available: true,
     state: ctx.state,
-    statusLabel: ronPlainStatus(ctx.state),
+    statusLabel: ronPlainStatus(ctx.state, ronBiasFrom(snapshot?.features)),
     contextLabel,
     freshnessLabel,
     message: null,
