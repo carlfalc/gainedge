@@ -216,14 +216,14 @@ export default function GlobalSignalNotifications() {
           </button>
 
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, paddingRight: 18 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{n.symbol}</span>
-            <span style={{ fontSize: 11, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{n.symbol}</span>
+            <span style={{ fontSize: 13, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
               {n.timeframe}
             </span>
           </div>
 
-          <div style={{ marginTop: 4, fontSize: 12, color: C.text }}>{n.changeLabel}</div>
-          <div style={{ marginTop: 2, fontSize: 11, color: C.sec }}>
+          <div style={{ marginTop: 4, fontSize: 14, color: C.text }}>{n.changeLabel}</div>
+          <div style={{ marginTop: 2, fontSize: 13, color: C.sec }}>
             {n.lifecycleLabel} · {n.directionLabel}
             <span style={{ color: C.muted }}> · evaluated {n.ageLabel}</span>
           </div>
@@ -234,7 +234,7 @@ export default function GlobalSignalNotifications() {
               onClick={() => { dismissOpp(n.key); navigate(viewOpportunityHref(n.symbol)); }}
               style={{
                 background: C.cardH, border: `1px solid ${C.border}`, color: C.jade,
-                borderRadius: 8, padding: "4px 9px", fontSize: 11, cursor: "pointer",
+                borderRadius: 8, padding: "4px 9px", fontSize: 13, cursor: "pointer",
               }}
             >
               View context
@@ -244,14 +244,14 @@ export default function GlobalSignalNotifications() {
               onClick={() => { dismissOpp(n.key); navigate(askRonContextHref(n.symbol, n.timeframe)); }}
               style={{
                 background: "transparent", border: `1px solid ${C.border}`, color: C.sec,
-                borderRadius: 8, padding: "4px 9px", fontSize: 11, cursor: "pointer",
+                borderRadius: 8, padding: "4px 9px", fontSize: 13, cursor: "pointer",
               }}
             >
               Ask RON
             </button>
           </div>
 
-          <div style={{ marginTop: 7, fontSize: 9.5, color: C.muted }}>
+          <div style={{ marginTop: 7, fontSize: 11.5, color: C.muted }}>
             {OPPORTUNITY_NOTIFICATION_QUALIFIER}
           </div>
         </article>
@@ -281,19 +281,19 @@ export default function GlobalSignalNotifications() {
           </button>
 
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, paddingRight: 18 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{n.symbol}</span>
-            <span style={{ fontSize: 11, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{n.symbol}</span>
+            <span style={{ fontSize: 13, color: C.sec, fontFamily: "'JetBrains Mono', monospace" }}>
               {n.timeframe}
             </span>
             {n.direction && (
-              <span style={{ fontSize: 10, color: C.muted, letterSpacing: 0.6 }}>{n.direction}</span>
+              <span style={{ fontSize: 12, color: C.muted, letterSpacing: 0.6 }}>{n.direction}</span>
             )}
           </div>
 
-          <div style={{ marginTop: 4, fontSize: 12, color: C.text }}>
+          <div style={{ marginTop: 4, fontSize: 14, color: C.text }}>
             {n.kind === "new" ? "New record · " : "Status update · "}{n.statusLabel}
           </div>
-          <div style={{ marginTop: 2, fontSize: 11, color: C.sec }}>
+          <div style={{ marginTop: 2, fontSize: 13, color: C.sec }}>
             {n.triggerLabel}
             {n.openedAt ? <span style={{ color: C.muted }}> · opened {n.ageLabel}</span> : null}
           </div>
@@ -304,7 +304,7 @@ export default function GlobalSignalNotifications() {
               onClick={() => { dismiss(n.key); navigate(viewSignalHref(n.symbol)); }}
               style={{
                 background: C.cardH, border: `1px solid ${C.border}`, color: C.jade,
-                borderRadius: 8, padding: "4px 9px", fontSize: 11, cursor: "pointer",
+                borderRadius: 8, padding: "4px 9px", fontSize: 13, cursor: "pointer",
               }}
             >
               View signal
@@ -314,14 +314,14 @@ export default function GlobalSignalNotifications() {
               onClick={() => { dismiss(n.key); navigate(askRonContextHref(n.symbol, n.timeframe)); }}
               style={{
                 background: "transparent", border: `1px solid ${C.border}`, color: C.sec,
-                borderRadius: 8, padding: "4px 9px", fontSize: 11, cursor: "pointer",
+                borderRadius: 8, padding: "4px 9px", fontSize: 13, cursor: "pointer",
               }}
             >
               Ask RON
             </button>
           </div>
 
-          <div style={{ marginTop: 7, fontSize: 9.5, color: C.muted }}>
+          <div style={{ marginTop: 7, fontSize: 11.5, color: C.muted }}>
             {NOTIFICATION_SOURCE_QUALIFIER}
           </div>
         </article>

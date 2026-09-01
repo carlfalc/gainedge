@@ -105,7 +105,7 @@ export default function BacktestingPage() {
       </div>
       <button onClick={run} disabled={running} style={{
         padding: "10px 20px", borderRadius: 8, border: "none", cursor: running ? "wait" : "pointer",
-        background: C.jade, color: "#000", fontWeight: 700, fontSize: 13,
+        background: C.jade, color: "#000", fontWeight: 700, fontSize: 15,
       }}>{running ? "Running…" : "Run Backtest"}</button>
 
       {result?.error && <div style={{ marginTop: 20, color: C.red }}>{result.error}</div>}
@@ -126,14 +126,14 @@ export default function BacktestingPage() {
                 equity: point.equity,
               }))}>
                 <XAxis dataKey="time" hide />
-                <YAxis domain={["auto", "auto"]} tick={{ fill: C.sec, fontSize: 10 }} width={65} />
-                <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, fontSize: 11 }} />
+                <YAxis domain={["auto", "auto"]} tick={{ fill: C.sec, fontSize: 12 }} width={65} />
+                <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, fontSize: 13 }} />
                 <Line type="monotone" dataKey="equity" stroke={C.jade} dot={false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
           <div style={{ overflowX: "auto", marginTop: 14, maxHeight: 360, overflowY: "auto" }}>
-            <table style={{ width: "100%", fontSize: 11 }}>
+            <table style={{ width: "100%", fontSize: 13 }}>
               <thead><tr><th style={th}>Opened</th><th style={th}>Trigger</th><th style={th}>Entry</th><th style={th}>Exit</th><th style={th}>Reason</th><th style={th}>P&L</th></tr></thead>
               <tbody>{(result.trades ?? []).map((trade, index) => (
                 <tr key={`${trade.openedAt}-${index}`} style={{ borderTop: `1px solid ${C.border}` }}>
@@ -151,7 +151,7 @@ export default function BacktestingPage() {
 
       <h2 style={{ fontSize: 16, fontWeight: 700, marginTop: 32, marginBottom: 12 }}>Recent Runs</h2>
       <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
-        <table style={{ width: "100%", fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
+        <table style={{ width: "100%", fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }}>
           <thead style={{ background: C.bg2, color: C.sec }}>
             <tr>
               <th style={th}>Created</th><th style={th}>Symbol</th><th style={th}>Period</th>
@@ -178,19 +178,19 @@ export default function BacktestingPage() {
   );
 }
 
-const inp: React.CSSProperties = { padding: "8px 10px", borderRadius: 6, background: "#0F172A", border: "1px solid #1E293B", color: "#E2E8F0", fontSize: 12, width: "100%" };
-const th: React.CSSProperties = { padding: "10px 12px", textAlign: "left", fontWeight: 600, fontSize: 11 };
+const inp: React.CSSProperties = { padding: "8px 10px", borderRadius: 6, background: "#0F172A", border: "1px solid #1E293B", color: "#E2E8F0", fontSize: 14, width: "100%" };
+const th: React.CSSProperties = { padding: "10px 12px", textAlign: "left", fontWeight: 600, fontSize: 13 };
 const td: React.CSSProperties = { padding: "10px 12px", color: "#E2E8F0" };
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-    <span style={{ fontSize: 10, color: C.sec, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
+    <span style={{ fontSize: 12, color: C.sec, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
     {children}
   </label>;
 }
 
 function Kpi({ label, value }: { label: string; value: string }) {
   return <div style={{ padding: 12, background: C.bg2, border: `1px solid ${C.border}`, borderRadius: 8 }}>
-    <div style={{ color: C.sec, fontSize: 9, textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
+    <div style={{ color: C.sec, fontSize: 11, textTransform: "uppercase", marginBottom: 5 }}>{label}</div>
     <div style={{ color: C.text, fontSize: 18, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>{value}</div>
   </div>;
 }

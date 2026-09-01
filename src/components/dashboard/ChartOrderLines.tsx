@@ -109,7 +109,7 @@ export default function ChartOrderLines({
             />
             {/* Price label */}
             <div
-              className="absolute right-1 -top-3 flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold select-none whitespace-nowrap"
+              className="absolute right-1 -top-3 flex items-center gap-1 px-1.5 py-0.5 rounded text-[12px] font-mono font-bold select-none whitespace-nowrap"
               style={{
                 backgroundColor: `${cfg.color}20`,
                 color: cfg.color,

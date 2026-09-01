@@ -45,7 +45,7 @@ export default function UnsubscribePage() {
            status === "error" ? "Something went wrong" :
            "Email Preferences"}
         </h1>
-        <p style={{ fontSize: 14, color: "#8b8fa3", marginBottom: 24 }}>
+        <p style={{ fontSize: 16, color: "#8b8fa3", marginBottom: 24 }}>
           {status === "loading" && "Verifying your request..."}
           {status === "valid" && "Click below to unsubscribe from GainEdge email notifications."}
           {status === "success" && "You will no longer receive email notifications from GainEdge."}
@@ -56,7 +56,7 @@ export default function UnsubscribePage() {
         {status === "valid" && (
           <button
             onClick={handleUnsubscribe}
-            style={{ background: "#00CFA5", color: "#080B12", border: "none", borderRadius: 8, padding: "12px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+            style={{ background: "#00CFA5", color: "#080B12", border: "none", borderRadius: 8, padding: "12px 32px", fontSize: 16, fontWeight: 700, cursor: "pointer" }}
           >
             Confirm Unsubscribe
           </button>

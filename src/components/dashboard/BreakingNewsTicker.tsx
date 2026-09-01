@@ -69,12 +69,12 @@ export function BreakingNewsTicker() {
       <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.red }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.text, whiteSpace: "nowrap", letterSpacing: 0.5 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text, whiteSpace: "nowrap", letterSpacing: 0.5 }}>
             Breaking News
           </span>
         </div>
         <span style={{
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: 600,
           color: C.text,
           whiteSpace: "nowrap",
@@ -92,7 +92,7 @@ export function BreakingNewsTicker() {
             whiteSpace: "nowrap",
             animation: `tickerScroll ${Math.max(news.length * 8, 30)}s linear infinite`,
             animationPlayState: paused ? "paused" : "running",
-            fontSize: 12,
+            fontSize: 14,
             fontFamily: "'DM Sans', sans-serif",
           }}
         >

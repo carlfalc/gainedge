@@ -465,7 +465,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className="flex items-center justify-center gap-2 py-1.5 rounded-lg border border-white/[0.06] bg-[#111724] text-white/40 text-xs hover:text-white/60 transition-all w-full"
+        className="flex items-center justify-center gap-2 py-1.5 rounded-lg border border-white/[0.06] bg-[#111724] text-white/40 text-sm hover:text-white/60 transition-all w-full"
       >
         <ChevronUp className="w-3 h-3" /> Trade Panel <ChevronUp className="w-3 h-3" />
       </button>
@@ -492,9 +492,9 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
       <div className="rounded-lg border border-white/[0.06] bg-[#0D1117] overflow-hidden" style={{ minHeight: 120 }}>
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-1.5 bg-[#111724] border-b border-white/[0.06]">
-          <span className="text-[11px] font-semibold text-white/70">Trade Panel</span>
+          <span className="text-[13px] font-semibold text-white/70">Trade Panel</span>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[10px] text-white/40 cursor-pointer select-none">
+            <label className="flex items-center gap-1.5 text-[12px] text-white/40 cursor-pointer select-none">
               <input
                 type="checkbox" checked={confirmEnabled}
                 onChange={e => setConfirmEnabled(e.target.checked)}
@@ -527,7 +527,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
               />
 
               <div>
-                <div className="text-[11px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( RON ) is:</div>
+                <div className="text-[13px] font-semibold text-[#00CFA5] mb-1.5">Intelligent Trader ( RON ) is:</div>
                 <div className="flex items-center gap-4 flex-wrap">
                   <button
                     onClick={() => {
@@ -539,7 +539,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                     }}
                     disabled={!autoTradeEnabled && !isLive}
                     title={!isLive ? "Link your broker in Settings to enable auto-trade" : undefined}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-medium transition-all border ${
                       autoTradeEnabled
                         ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
                         : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
@@ -551,14 +551,14 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
 
                   {autoTradeEnabled && (
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] text-white/40">Lot:</span>
+                      <span className="text-[11px] text-white/40">Lot:</span>
                       <input
                         type="number"
                         value={autoLotSize}
                         onChange={e => setAutoLotSizeForSymbol(e.target.value)}
                         step="0.01"
                         min="0.01"
-                        className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
+                        className="w-16 bg-[#080B12] border border-white/10 rounded px-1.5 py-0.5 text-[12px] text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
                       />
                     </div>
                   )}
@@ -567,7 +567,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
 
                   <button
                     onClick={() => setMyTradesEnabled(!myTradesEnabled)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-medium transition-all border ${
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-[12px] font-medium transition-all border ${
                       myTradesEnabled
                         ? "bg-blue-500/15 border-blue-500/40 text-blue-400"
                         : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white/70"
@@ -579,7 +579,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
 
                   <Link
                     to="/dashboard/auto-trade"
-                    className="ml-auto flex items-center gap-1 text-[10px] text-[#00CFA5]/80 hover:text-[#00CFA5] hover:underline"
+                    className="ml-auto flex items-center gap-1 text-[12px] text-[#00CFA5]/80 hover:text-[#00CFA5] hover:underline"
                     title="Open the central Auto-Trade Control Center — toggles sync in real-time"
                   >
                     Manage all in Auto-Trade Control
@@ -587,12 +587,12 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                   </Link>
                 </div>
 
-                <div className="mt-1.5 text-[10px]">
+                <div className="mt-1.5 text-[12px]">
                   {autoTradeEnabled ? (
                     <span className="text-amber-400">
                       ⚡ RON will execute trades when high-confidence signals fire (confidence ≥ 7)
                       <br />
-                      <span className="text-[9px] text-white/30">Safety: max 1 trade per instrument · per-instrument loss pause (3 consecutive) · 5% daily loss limit</span>
+                      <span className="text-[11px] text-white/30">Safety: max 1 trade per instrument · per-instrument loss pause (3 consecutive) · 5% daily loss limit</span>
                     </span>
                   ) : (
                     <span className="text-white/40">
@@ -606,7 +606,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
 
           {/* ─── MANUAL MODE: short banner ─── */}
           {mode === "manual" && (
-            <div className="rounded border border-blue-500/20 bg-blue-500/[0.05] px-3 py-1.5 text-[11px] text-blue-300 flex items-center gap-2">
+            <div className="rounded border border-blue-500/20 bg-blue-500/[0.05] px-3 py-1.5 text-[13px] text-blue-300 flex items-center gap-2">
               <User className="w-3.5 h-3.5" />
               <span>Manual trading mode — you control all entries on {symbol}.</span>
             </div>
@@ -619,7 +619,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                 <button
                   key={mode}
                   onClick={() => setOrderMode(mode)}
-                  className={`px-3 py-1 rounded text-[10px] font-semibold uppercase tracking-wider transition-all border ${
+                  className={`px-3 py-1 rounded text-[12px] font-semibold uppercase tracking-wider transition-all border ${
                     orderMode === mode
                       ? mode === "market"
                         ? "bg-[#00CFA5]/15 border-[#00CFA5]/40 text-[#00CFA5]"
@@ -635,7 +635,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
             </div>
 
             {/* Warning banner */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-400 mb-2">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded bg-amber-500/10 border border-amber-500/30 text-[13px] text-amber-400 mb-2">
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
               <span>Live trading — real money at risk. Trades execute on your broker account.</span>
             </div>
@@ -646,14 +646,14 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                 {/* Bid/Ask */}
                 <div className="flex items-center gap-2 font-mono text-sm">
                   <div className="text-center">
-                    <div className="text-[9px] text-sky-400 uppercase">Bid</div>
+                    <div className="text-[11px] text-sky-400 uppercase">Bid</div>
                     <div className="text-white font-bold">{bid !== null ? bid.toFixed(priceDec) : "—"}</div>
                   </div>
-                  <div className="text-[10px] text-white px-1">
+                  <div className="text-[12px] text-white px-1">
                     Spread: {spread !== null ? spread.toFixed(priceDec > 3 ? 1 : priceDec) : "—"}
                   </div>
                   <div className="text-center">
-                    <div className="text-[9px] text-red-500 uppercase">Ask</div>
+                    <div className="text-[11px] text-red-500 uppercase">Ask</div>
                     <div className="text-white font-bold">{ask !== null ? ask.toFixed(priceDec) : "—"}</div>
                   </div>
                 </div>
@@ -661,32 +661,32 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                 <div className="w-px h-8 bg-white/10" />
 
                 <div>
-                  <div className="text-[9px] text-white mb-0.5">Volume</div>
+                  <div className="text-[11px] text-white mb-0.5">Volume</div>
                   <input
                     type="number"
                     value={lotSize}
                     onChange={e => handleLotSizeChange(e.target.value)}
                     step="0.01"
                     min="0.01"
-                    className="w-20 bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
+                    className="w-20 bg-[#080B12] border border-white/10 rounded px-2 py-1 text-sm text-white font-mono outline-none focus:border-[#00CFA5]/40"
                   />
                 </div>
 
                 <div>
-                  <div className="text-[9px] text-white mb-0.5">Stop Loss</div>
+                  <div className="text-[11px] text-white mb-0.5">Stop Loss</div>
                   <input
                     type="number" value={sl} onChange={e => setSl(e.target.value)}
                     placeholder="Optional"
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-red-400/40 placeholder:text-white/50"
+                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-sm text-white font-mono w-24 outline-none focus:border-red-400/40 placeholder:text-white/50"
                   />
                 </div>
 
                 <div>
-                  <div className="text-[9px] text-white mb-0.5">Take Profit</div>
+                  <div className="text-[11px] text-white mb-0.5">Take Profit</div>
                   <input
                     type="number" value={tp} onChange={e => setTp(e.target.value)}
                     placeholder="Optional"
-                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-green-400/40 placeholder:text-white/50"
+                    className="bg-[#080B12] border border-white/10 rounded px-2 py-1 text-sm text-white font-mono w-24 outline-none focus:border-green-400/40 placeholder:text-white/50"
                   />
                 </div>
 
@@ -699,19 +699,19 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                     title={!isLive ? "Connect broker account to enable trading" : undefined}
                     className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#EF4444] border border-red-500/40 text-white font-bold text-sm hover:bg-[#DC2626] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
                   >
-                    <span className="text-[9px] text-white/70 uppercase">Sell</span>
+                    <span className="text-[11px] text-white/70 uppercase">Sell</span>
                     <span className="font-mono text-white">{bid !== null ? bid.toFixed(priceDec) : "—"}</span>
                   </button>
 
                   <div className="flex flex-col items-center">
-                    <div className="text-[8px] text-white/40 uppercase">Vol</div>
+                    <div className="text-[10px] text-white/40 uppercase">Vol</div>
                     <input
                       type="number"
                       value={lotSize}
                       onChange={e => handleLotSizeChange(e.target.value)}
                       step="0.01"
                       min="0.01"
-                      className="w-14 bg-[#080B12] border border-white/10 rounded px-1.5 py-1 text-xs text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
+                      className="w-14 bg-[#080B12] border border-white/10 rounded px-1.5 py-1 text-sm text-white font-mono text-center outline-none focus:border-[#00CFA5]/40"
                     />
                   </div>
 
@@ -721,7 +721,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                     title={!isLive ? "Connect broker account to enable trading" : undefined}
                     className="flex flex-col items-center px-5 py-2 rounded-lg bg-[#22C55E] border border-green-500/40 text-white font-bold text-sm hover:bg-[#16A34A] transition-all disabled:opacity-30 disabled:cursor-not-allowed min-w-[90px]"
                   >
-                    <span className="text-[9px] text-white/70 uppercase">Buy</span>
+                    <span className="text-[11px] text-white/70 uppercase">Buy</span>
                     <span className="font-mono text-white">{ask !== null ? ask.toFixed(priceDec) : "—"}</span>
                   </button>
                 </div>
@@ -734,7 +734,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                 <div className="flex items-center gap-3 flex-wrap">
                   {/* Entry price */}
                   <div>
-                    <div className="text-[9px] text-white mb-0.5">
+                    <div className="text-[11px] text-white mb-0.5">
                       {orderMode === "limit" ? "Limit Price" : "Stop Price"}
                     </div>
                     <input
@@ -742,7 +742,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                       value={limitEntry}
                       onChange={e => setLimitEntry(e.target.value)}
                       placeholder={chartPrice?.toFixed(priceDec) ?? "Entry price"}
-                      className="bg-[#080B12] border border-white/20 rounded px-2 py-1 text-xs text-white font-mono w-28 outline-none focus:border-white/50 placeholder:text-white/30"
+                      className="bg-[#080B12] border border-white/20 rounded px-2 py-1 text-sm text-white font-mono w-28 outline-none focus:border-white/50 placeholder:text-white/30"
                     />
                   </div>
 
@@ -756,7 +756,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                         onChange={e => setSlEnabled(e.target.checked)}
                         className="w-3 h-3 rounded accent-red-500"
                       />
-                      <span className="text-[9px] text-red-400">SL</span>
+                      <span className="text-[11px] text-red-400">SL</span>
                     </label>
                     <input
                       type="number"
@@ -764,7 +764,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                       onChange={e => setLimitSl(e.target.value)}
                       disabled={!slEnabled}
                       placeholder="Stop Loss"
-                      className="bg-[#080B12] border border-red-500/20 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-red-400/50 placeholder:text-white/30 disabled:opacity-30"
+                      className="bg-[#080B12] border border-red-500/20 rounded px-2 py-1 text-sm text-white font-mono w-24 outline-none focus:border-red-400/50 placeholder:text-white/30 disabled:opacity-30"
                     />
                   </div>
 
@@ -776,7 +776,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                         onChange={e => setTpEnabled(e.target.checked)}
                         className="w-3 h-3 rounded accent-green-500"
                       />
-                      <span className="text-[9px] text-green-400">TP</span>
+                      <span className="text-[11px] text-green-400">TP</span>
                     </label>
                     <input
                       type="number"
@@ -784,7 +784,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                       onChange={e => setLimitTp(e.target.value)}
                       disabled={!tpEnabled}
                       placeholder="Take Profit"
-                      className="bg-[#080B12] border border-green-500/20 rounded px-2 py-1 text-xs text-white font-mono w-24 outline-none focus:border-green-400/50 placeholder:text-white/30 disabled:opacity-30"
+                      className="bg-[#080B12] border border-green-500/20 rounded px-2 py-1 text-sm text-white font-mono w-24 outline-none focus:border-green-400/50 placeholder:text-white/30 disabled:opacity-30"
                     />
                   </div>
 
@@ -792,14 +792,14 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
 
                   {/* Volume */}
                   <div>
-                    <div className="text-[9px] text-white mb-0.5">Volume</div>
+                    <div className="text-[11px] text-white mb-0.5">Volume</div>
                     <input
                       type="number"
                       value={lotSize}
                       onChange={e => handleLotSizeChange(e.target.value)}
                       step="0.01"
                       min="0.01"
-                      className="w-20 bg-[#080B12] border border-white/10 rounded px-2 py-1 text-xs text-white font-mono outline-none focus:border-[#00CFA5]/40"
+                      className="w-20 bg-[#080B12] border border-white/10 rounded px-2 py-1 text-sm text-white font-mono outline-none focus:border-[#00CFA5]/40"
                     />
                   </div>
 
@@ -821,7 +821,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
 
                 {/* R:R and pip info */}
                 {entryVal > 0 && (
-                  <div className="flex items-center gap-4 text-[10px] font-mono px-1">
+                  <div className="flex items-center gap-4 text-[12px] font-mono px-1">
                     {slEnabled && slVal > 0 && (
                       <span className="text-red-400">
                         SL: {calcPips(entryVal, slVal).toFixed(1)} pips
@@ -851,7 +851,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
             )}
 
             {!isLive && (
-              <div className="text-[10px] text-white/30 text-center mt-1">
+              <div className="text-[12px] text-white/30 text-center mt-1">
                 Connect your broker account to enable live trading
               </div>
             )}
@@ -864,7 +864,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
           <div className="border-t border-white/[0.06] pt-2">
             <button
               onClick={() => setShowActivity(!showActivity)}
-              className="flex items-center gap-1 text-[10px] text-white/40 hover:text-white/60 uppercase tracking-wider transition-colors"
+              className="flex items-center gap-1 text-[12px] text-white/40 hover:text-white/60 uppercase tracking-wider transition-colors"
               data-testid="account-activity-toggle"
             >
               {showActivity ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -876,14 +876,14 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
           <>
           {/* ─── 3. OPEN POSITIONS (always visible) ─── */}
           <div className="border-t border-white/[0.06] pt-2">
-            <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Open Positions</div>
+            <div className="text-[12px] text-white/40 uppercase tracking-wider mb-1">Open Positions</div>
             {!isLive ? (
-              <div className="text-[11px] text-white/30 py-2">Connect broker to view positions</div>
+              <div className="text-[13px] text-white/30 py-2">Connect broker to view positions</div>
             ) : positions.length === 0 ? (
-              <div className="text-[11px] text-white/30 py-2">No open positions</div>
+              <div className="text-[13px] text-white/30 py-2">No open positions</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-[11px] font-mono">
+                <table className="w-full text-[13px] font-mono">
                   <thead>
                     <tr className="text-white/30 text-left border-b border-white/5">
                       <th className="py-1 px-2">Ticket</th>
@@ -931,7 +931,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
           <div className="border-t border-white/[0.06] pt-1">
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="flex items-center gap-1 text-[10px] text-white/40 hover:text-white/60 transition-colors"
+              className="flex items-center gap-1 text-[12px] text-white/40 hover:text-white/60 transition-colors"
             >
               {showHistory ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               {showHistory ? "Hide History" : "Show History"}
@@ -940,16 +940,16 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
             {showHistory && (
               <div className="mt-1.5 overflow-x-auto">
                 {!isLive ? (
-                  <div className="text-[11px] text-white/30 py-2">Connect broker to view history</div>
+                  <div className="text-[13px] text-white/30 py-2">Connect broker to view history</div>
                 ) : loadingHistory ? (
-                  <div className="flex items-center gap-2 text-white/30 text-[11px] py-2">
+                  <div className="flex items-center gap-2 text-white/30 text-[13px] py-2">
                     <Loader2 className="w-3 h-3 animate-spin" /> Loading...
                   </div>
                 ) : deals.length === 0 ? (
-                  <div className="text-[11px] text-white/30 py-2">No trades today</div>
+                  <div className="text-[13px] text-white/30 py-2">No trades today</div>
                 ) : (
                   <>
-                    <table className="w-full text-[11px] font-mono">
+                    <table className="w-full text-[13px] font-mono">
                       <thead>
                         <tr className="text-white/30 text-left border-b border-white/5">
                           <th className="py-1 px-2">Ticket</th>
@@ -979,7 +979,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
                         ))}
                       </tbody>
                     </table>
-                    <div className="mt-1.5 px-2 py-1 rounded bg-white/[0.03] text-[11px] font-mono flex items-center gap-4">
+                    <div className="mt-1.5 px-2 py-1 rounded bg-white/[0.03] text-[13px] font-mono flex items-center gap-4">
                       <span className="text-white/40">Today:</span>
                       <span className={`font-bold ${historyTotals.pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
                         {historyTotals.pnl >= 0 ? "+" : ""}${historyTotals.pnl.toFixed(2)}
@@ -1016,7 +1016,7 @@ const TradeExecutionPanel = forwardRef<TradeExecutionPanelRef, TradeExecutionPan
               {pendingOrder?.orderMode !== "market" && tpEnabled && limitTp && <><br />Take Profit: {limitTp}</>}
               {rr && pendingOrder?.orderMode !== "market" && <><br />Risk:Reward 1:{rr}</>}
               <br /><br />
-              <span className="text-amber-400 text-xs">
+              <span className="text-amber-400 text-sm">
                 {pendingOrder?.orderMode === "market"
                   ? "This will execute a real trade on your broker account."
                   : `This will place a pending ${pendingOrder?.orderMode} order on your broker account.`}

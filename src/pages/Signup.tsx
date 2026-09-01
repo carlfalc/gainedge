@@ -58,7 +58,7 @@ const Signup = () => {
   const inputStyle: React.CSSProperties = {
     width: "100%", padding: "11px 14px 11px 42px", borderRadius: 10,
     border: `1px solid ${C.border}`, background: C.bg, color: C.text,
-    fontSize: 14, fontFamily: "'DM Sans', sans-serif", outline: "none",
+    fontSize: 16, fontFamily: "'DM Sans', sans-serif", outline: "none",
   };
 
   return (
@@ -73,7 +73,7 @@ const Signup = () => {
         </Link>
 
         <h1 style={{ fontSize: 22, fontWeight: 800, color: C.text, textAlign: "center", marginBottom: 4 }}>{t("auth.getStarted")}</h1>
-        <p style={{ fontSize: 13, color: C.sec, textAlign: "center", marginBottom: 24 }}>{t("auth.signupSubtitle")}</p>
+        <p style={{ fontSize: 15, color: C.sec, textAlign: "center", marginBottom: 24 }}>{t("auth.signupSubtitle")}</p>
 
         <form onSubmit={handleSignup} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ position: "relative" }}>
@@ -94,7 +94,7 @@ const Signup = () => {
 
           <button type="submit" disabled={loading} style={{
             width: "100%", padding: "12px 0", borderRadius: 10, border: "none", cursor: "pointer",
-            background: C.jade, color: "#080B12", fontSize: 14, fontWeight: 700,
+            background: C.jade, color: "#080B12", fontSize: 16, fontWeight: 700,
             fontFamily: "'DM Sans', sans-serif", opacity: loading ? 0.7 : 1,
           }}>
             {loading ? t("auth.creatingAccount") : t("auth.startTrial")}
@@ -102,14 +102,14 @@ const Signup = () => {
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0" }}>
             <div style={{ flex: 1, height: 1, background: C.border }} />
-            <span style={{ fontSize: 12, color: C.muted }}>{t("auth.orContinueWith")}</span>
+            <span style={{ fontSize: 14, color: C.muted }}>{t("auth.orContinueWith")}</span>
             <div style={{ flex: 1, height: 1, background: C.border }} />
           </div>
 
           <button type="button" onClick={handleGoogleSignup} style={{
             width: "100%", padding: "11px 0", borderRadius: 10, cursor: "pointer",
             background: "transparent", border: `1px solid ${C.border}`, color: C.text,
-            fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+            fontSize: 16, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
           }}>
             <svg width="16" height="16" viewBox="0 0 24 24">
@@ -122,7 +122,7 @@ const Signup = () => {
           </button>
         </form>
 
-        <p style={{ textAlign: "center", fontSize: 13, color: C.sec, marginTop: 20 }}>
+        <p style={{ textAlign: "center", fontSize: 15, color: C.sec, marginTop: 20 }}>
           {t("auth.hasAccount")}{" "}
           <Link to="/login" style={{ color: C.jade, fontWeight: 600, textDecoration: "none" }}>{t("auth.signIn")}</Link>
         </p>

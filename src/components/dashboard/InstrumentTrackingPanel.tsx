@@ -246,17 +246,17 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={{ fontSize: 10, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
+          <span style={{ fontSize: 12, color: C.jade, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>
             CURRENT INSTRUMENT TRACKING
           </span>
-          <span style={{ color: C.text, fontWeight: 400, fontSize: 10 }}>
+          <span style={{ color: C.text, fontWeight: 400, fontSize: 12 }}>
             {visibleScans.length}/{scans.length} visible
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             style={{
-              display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.text,
+              display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: C.text,
               background: "transparent", border: "none", cursor: "grab",
               fontWeight: 500, opacity: 0.7,
             }}
@@ -267,7 +267,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
           <button
             onClick={showAllPanes}
             style={{
-              display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.jade,
+              display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: C.jade,
               background: hiddenPanes.size > 0 ? C.jade + "15" : "transparent",
               border: hiddenPanes.size > 0 ? `1px solid ${C.jade}30` : "1px solid transparent",
               borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontWeight: 600,
@@ -280,7 +280,7 @@ export default function InstrumentTrackingPanel({ showPopOutButton = true }: Ins
             <button
               onClick={() => window.open("/instruments-popout", "_blank", "noopener,width=1400,height=900")}
               style={{
-                display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.jade,
+                display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: C.jade,
                 background: "transparent", border: `1px solid ${C.jade}30`,
                 borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontWeight: 600,
               }}

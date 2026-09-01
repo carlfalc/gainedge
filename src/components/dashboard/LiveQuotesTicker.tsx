@@ -58,7 +58,7 @@ export default function LiveQuotesTicker() {
         borderBottom: `1px solid ${C.border}`,
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        <span style={{ color: C.muted, fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
+        <span style={{ color: C.muted, fontSize: 13, fontFamily: "'DM Sans', sans-serif" }}>
           Loading live quotes…
         </span>
       </div>
@@ -97,24 +97,24 @@ export default function LiveQuotesTicker() {
               flexShrink: 0,
             }}>
               {i > 0 && (
-                <span style={{ color: C.jade, fontSize: 6, marginRight: 8 }}>●</span>
+                <span style={{ color: C.jade, fontSize: 8, marginRight: 8 }}>●</span>
               )}
               <span style={{
-                color: "#FFFFFF", fontSize: 12, fontWeight: 600,
+                color: "#FFFFFF", fontSize: 14, fontWeight: 600,
                 fontFamily: "'DM Sans', sans-serif",
               }}>
                 {q.symbol}
               </span>
-              <span style={{ color, fontSize: 11, fontWeight: 700 }}>{arrow}</span>
+              <span style={{ color, fontSize: 13, fontWeight: 700 }}>{arrow}</span>
               <span style={{
-                color: flashColor || "#E2E8F0", fontSize: 12, fontWeight: 700,
+                color: flashColor || "#E2E8F0", fontSize: 14, fontWeight: 700,
                 fontFamily: "'JetBrains Mono', monospace",
                 transition: "color 0.3s ease",
               }}>
                 {q.price.toFixed(decimals)}
               </span>
               <span style={{
-                color, fontSize: 10, fontWeight: 600,
+                color, fontSize: 12, fontWeight: 600,
                 fontFamily: "'JetBrains Mono', monospace",
               }}>
                 ({q.changePercent !== 0

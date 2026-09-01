@@ -49,7 +49,7 @@ const inputStyle: React.CSSProperties = {
   background: "hsl(0 0% 100% / 0.05)",
   color: "hsl(0 0% 100%)",
   padding: "11px 14px",
-  fontSize: 14,
+  fontSize: 16,
   outline: "none",
   fontFamily: "'DM Sans', sans-serif",
 };
@@ -57,7 +57,7 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: "block",
   marginBottom: 6,
-  fontSize: 12,
+  fontSize: 14,
   fontWeight: 600,
   color: "hsl(0 0% 100% / 0.66)",
 };
@@ -114,7 +114,7 @@ export default function LoungeProfileDialog({
       onClick={onChange}
       style={{
         display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
-        fontSize: 13, color: checked ? "hsl(0 0% 100%)" : dimText,
+        fontSize: 15, color: checked ? "hsl(0 0% 100%)" : dimText,
         padding: "4px 0", userSelect: "none",
       }}
     >
@@ -123,7 +123,7 @@ export default function LoungeProfileDialog({
         border: `1px solid ${checked ? gold : "hsl(0 0% 100% / 0.2)"}`,
         background: checked ? "hsl(32 52% 64% / 0.2)" : "transparent",
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 12, color: gold,
+        fontSize: 14, color: gold,
       }}>
         {checked && "✓"}
       </span>
@@ -157,7 +157,7 @@ export default function LoungeProfileDialog({
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 20 }}>
           <div>
             <h2 style={{ margin: 0, color: gold, fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>MY PROFILE</h2>
-            <p style={{ margin: "6px 0 0", color: dimText, fontSize: 13 }}>Your identity in the lounge.</p>
+            <p style={{ margin: "6px 0 0", color: dimText, fontSize: 15 }}>Your identity in the lounge.</p>
           </div>
           <button onClick={onClose} style={{
             width: 34, height: 34, borderRadius: 999,
@@ -190,7 +190,7 @@ export default function LoungeProfileDialog({
                   onClick={() => setShowNickname(opt.val)}
                   disabled={opt.val && !nickname.trim()}
                   style={{
-                    flex: 1, padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+                    flex: 1, padding: "10px 14px", borderRadius: 10, fontSize: 15, fontWeight: 600,
                     border: `1px solid ${showNickname === opt.val ? gold : "hsl(0 0% 100% / 0.12)"}`,
                     background: showNickname === opt.val ? "hsl(32 52% 64% / 0.16)" : "hsl(0 0% 100% / 0.04)",
                     color: showNickname === opt.val ? gold : dimText,
@@ -274,7 +274,7 @@ export default function LoungeProfileDialog({
               border: `1px solid hsl(32 52% 64% / 0.38)`,
               background: canSave ? "hsl(32 52% 64% / 0.16)" : "hsl(0 0% 100% / 0.04)",
               color: canSave ? gold : "hsl(0 0% 100% / 0.32)",
-              fontSize: 14, fontWeight: 700, letterSpacing: 0.3,
+              fontSize: 16, fontWeight: 700, letterSpacing: 0.3,
               cursor: canSave && !saving ? "pointer" : "default",
               fontFamily: "'DM Sans', sans-serif",
             }}

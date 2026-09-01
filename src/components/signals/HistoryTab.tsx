@@ -50,7 +50,7 @@ export default function HistoryTab({ liveFeed, backtestFeed }: {
             onClick={() => { setMode(m); setFilter(EMPTY_FILTER); }}
             aria-pressed={mode === m}
             data-testid={`history-mode-${m}`}
-            className="rounded-lg px-2.5 py-1.5 text-xs"
+            className="rounded-lg px-2.5 py-1.5 text-sm"
             style={switchBtn(mode === m)}
           >
             {HISTORY_MODE_LABELS[m]}
@@ -58,19 +58,19 @@ export default function HistoryTab({ liveFeed, backtestFeed }: {
         ))}
       </div>
 
-      <p className="text-xs leading-relaxed" style={{ color: C.sec }} data-testid="history-mode-note">
+      <p className="text-sm leading-relaxed" style={{ color: C.sec }} data-testid="history-mode-note">
         {HISTORY_MODE_NOTES[mode]} {STORED_PNL_NOTE}
       </p>
 
       {feed.error && (
-        <div role="alert" className="rounded-lg px-3 py-2 text-xs"
+        <div role="alert" className="rounded-lg px-3 py-2 text-sm"
           style={{ background: `${C.red}12`, border: `1px solid ${C.red}55`, color: C.red }}>
           Couldn’t load history records. <span style={{ color: C.sec }}>{feed.error}</span>
         </div>
       )}
 
       {feed.loading && (
-        <div className="flex items-center gap-2 rounded-lg p-3 text-xs"
+        <div className="flex items-center gap-2 rounded-lg p-3 text-sm"
           style={{ background: C.card, border: `1px solid ${C.border}`, color: C.sec }}>
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading {HISTORY_MODE_LABELS[mode].toLowerCase()} records…
         </div>
@@ -82,7 +82,7 @@ export default function HistoryTab({ liveFeed, backtestFeed }: {
           <p className="text-sm" style={{ color: C.text }}>
             No {HISTORY_MODE_LABELS[mode].toLowerCase()} records stored for your account.
           </p>
-          <p className="mt-1 text-xs leading-relaxed" style={{ color: C.muted }}>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: C.muted }}>
             {mode === "backtest"
               ? "Backtest records appear here after a Falconer backtest run has been stored."
               : "Finished live records appear here once the engine has closed a live signal."}
@@ -100,7 +100,7 @@ export default function HistoryTab({ liveFeed, backtestFeed }: {
             triggers={filterOptions(source.map((r) => r.trigger_type))}
             statusLabel={(t) => presentFalconerStatus(t).label}
           />
-          <p className="text-[11px]" style={{ color: C.muted }} data-testid="history-count">
+          <p className="text-[13px]" style={{ color: C.muted }} data-testid="history-count">
             Showing {rows.length} of {source.length} {HISTORY_MODE_LABELS[mode].toLowerCase()} records
           </p>
           <FalconerRecordList records={rows} modeLabel={HISTORY_MODE_LABELS[mode]} />

@@ -24,7 +24,7 @@ export default function PriceProvenanceBadge(
 
   return (
     <span
-      className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-semibold leading-tight break-words"
+      className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-tight break-words"
       style={{ background: `${tone}1A`, color: tone }}
       data-testid="price-provenance-badge"
       title={p.detail}

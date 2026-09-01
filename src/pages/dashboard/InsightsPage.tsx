@@ -99,7 +99,7 @@ export default function InsightsPage() {
         <Brain size={25} style={{ color: C.jade }} />
         <h1 style={{ fontSize: 24, fontWeight: 800 }}>Falconer Intelligence</h1>
       </div>
-      <p style={{ color: C.sec, fontSize: 13, marginBottom: 20 }}>
+      <p style={{ color: C.sec, fontSize: 15, marginBottom: 20 }}>
         Calculated from your completed Falconer trades. No demo win rates or invented recommendations.
       </p>
 
@@ -108,11 +108,11 @@ export default function InsightsPage() {
       ) : (
         <>
           <div style={{ ...card, marginBottom: 16, borderColor: trades.length < 30 ? `${C.amber}55` : `${C.jade}55` }}>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", color: trades.length < 30 ? C.amber : C.jade, fontWeight: 800, fontSize: 13 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", color: trades.length < 30 ? C.amber : C.jade, fontWeight: 800, fontSize: 15 }}>
               {trades.length < 30 ? <AlertTriangle size={16} /> : <Target size={16} />}
               {trades.length} completed trades
             </div>
-            <p style={{ color: C.sec, fontSize: 12, marginTop: 7 }}>
+            <p style={{ color: C.sec, fontSize: 14, marginTop: 7 }}>
               {trades.length < 30
                 ? "Results are preliminary. GainEdge will avoid treating small samples as a proven edge."
                 : "The sample is large enough for initial comparisons, but walk-forward validation is still required."}
@@ -130,8 +130,8 @@ export default function InsightsPage() {
 
       <h2 style={{ fontSize: 15, fontWeight: 800, margin: "24px 0 10px" }}>Engine observations</h2>
       <div style={{ ...card, display: "flex", flexDirection: "column", gap: 8 }}>
-        {events.length === 0 ? <span style={{ color: C.sec, fontSize: 12 }}>No engine observations yet.</span> : events.map(event => (
-          <div key={event.id} style={{ padding: 9, borderRadius: 7, background: C.bg2, fontSize: 12 }}>
+        {events.length === 0 ? <span style={{ color: C.sec, fontSize: 14 }}>No engine observations yet.</span> : events.map(event => (
+          <div key={event.id} style={{ padding: 9, borderRadius: 7, background: C.bg2, fontSize: 14 }}>
             <span style={{ color: event.severity === "error" ? C.red : event.severity === "warning" ? C.amber : C.jade, fontWeight: 700 }}>
               {event.symbol ? `${event.symbol} · ` : ""}{event.event_type}
             </span>
@@ -146,17 +146,17 @@ export default function InsightsPage() {
 function Breakdown({ title, icon: Icon, rows }: { title: string; icon: import("lucide-react").LucideIcon; rows: Bucket[] }) {
   return <div style={card}>
     <div style={{ display: "flex", gap: 7, alignItems: "center", marginBottom: 12 }}>
-      <Icon size={15} style={{ color: C.jade }} /><strong style={{ fontSize: 13 }}>{title}</strong>
+      <Icon size={15} style={{ color: C.jade }} /><strong style={{ fontSize: 15 }}>{title}</strong>
     </div>
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
       {rows.map(row => {
         const winRate = row.trades ? row.wins / row.trades * 100 : 0;
         return <div key={row.key} style={{ padding: 9, borderRadius: 7, background: C.bg2 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
             <strong>{row.key}</strong>
             <span style={{ color: C.sec }}>{row.trades} trades · {winRate.toFixed(0)}% wins</span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, marginTop: 5 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginTop: 5 }}>
             <span style={{ color: row.pnl >= 0 ? C.green : C.red }}>${row.pnl.toFixed(2)}</span>
             <span style={{ color: C.muted }}>{row.avgScore == null ? "No setup score" : `Avg score ${row.avgScore.toFixed(0)}`}</span>
           </div>

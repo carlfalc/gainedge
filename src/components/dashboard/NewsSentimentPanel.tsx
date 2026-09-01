@@ -136,13 +136,13 @@ export function NewsSentimentPanel() {
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <Activity size={16} color={C.jade} />
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.jade, letterSpacing: 1.5, textTransform: "uppercase" }}>
+        <span style={{ fontSize: 14, fontWeight: 700, color: C.jade, letterSpacing: 1.5, textTransform: "uppercase" }}>
           Market Sentiment
         </span>
       </div>
 
       {display.length === 0 ? (
-        <div style={{ fontSize: 12, color: C.sec, padding: "8px 0" }}>
+        <div style={{ fontSize: 14, color: C.sec, padding: "8px 0" }}>
           No recent market-moving events in the last 12 hours.
         </div>
       ) : (
@@ -168,7 +168,7 @@ export function NewsSentimentPanel() {
                   onClick={() => item.aiReason && setExpandedIdx(isExpanded ? null : i)}
                 >
                   <span style={{
-                    fontSize: 10,
+                    fontSize: 12,
                     color: C.sec,
                     fontFamily: "'JetBrains Mono', monospace",
                     minWidth: 68,
@@ -179,7 +179,7 @@ export function NewsSentimentPanel() {
 
                   {/* Headline */}
                   <span style={{
-                    fontSize: 11,
+                    fontSize: 13,
                     color: C.text,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -194,7 +194,7 @@ export function NewsSentimentPanel() {
                   {/* AI Reason - middle section */}
                   {item.aiReason && (
                     <span style={{
-                      fontSize: 10,
+                      fontSize: 12,
                       color: C.sec,
                       fontStyle: "italic",
                       flex: 1,
@@ -213,7 +213,7 @@ export function NewsSentimentPanel() {
 
                   {freshness === "fresh" && (
                     <span style={{
-                      fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
+                      fontSize: 11, fontWeight: 700, padding: "2px 6px", borderRadius: 4,
                       background: C.jade + "20", color: C.jade, flexShrink: 0,
                     }}>NEW</span>
                   )}
@@ -224,7 +224,7 @@ export function NewsSentimentPanel() {
                       <span
                         key={j}
                         style={{
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: 700,
                           padding: "2px 5px",
                           borderRadius: 4,
@@ -238,7 +238,7 @@ export function NewsSentimentPanel() {
                       </span>
                     ))}
                     {item.impacts.length > 4 && (
-                      <span style={{ fontSize: 9, color: C.sec, padding: "2px 4px" }}>
+                      <span style={{ fontSize: 11, color: C.sec, padding: "2px 4px" }}>
                         +{item.impacts.length - 4}
                       </span>
                     )}
@@ -246,7 +246,7 @@ export function NewsSentimentPanel() {
 
                   {/* Impact badge */}
                   <span style={{
-                    fontSize: 9,
+                    fontSize: 11,
                     fontWeight: 700,
                     padding: "2px 7px",
                     borderRadius: 4,
@@ -278,18 +278,18 @@ export function NewsSentimentPanel() {
                     background: C.bg + "80",
                     border: `1px solid ${C.border}`,
                   }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: C.jade, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.jade, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>
                       Why this matters
                     </div>
-                    <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
                       {item.aiReason}
                     </div>
                     {item.impacts.length > 0 && item.impacts[0].symbol !== "MARKET" && (
                       <div style={{ marginTop: 6 }}>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: C.sec, marginBottom: 3 }}>Instrument effects:</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.sec, marginBottom: 3 }}>Instrument effects:</div>
                         {item.impacts.map((imp, j) => (
                           <div key={j} style={{
-                            fontSize: 10,
+                            fontSize: 12,
                             color: imp.dir === "↑" ? C.green : imp.dir === "↓" ? C.red : C.sec,
                             paddingLeft: 8,
                             lineHeight: 1.6,

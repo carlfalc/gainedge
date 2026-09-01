@@ -60,7 +60,7 @@ export default function MarketScannersWidget() {
   };
 
   const emptyLine = (text: string) => (
-    <div style={{ padding: "14px 20px", fontSize: 11, color: C.sec, fontStyle: "italic" }}>{text}</div>
+    <div style={{ padding: "14px 20px", fontSize: 13, color: C.sec, fontStyle: "italic" }}>{text}</div>
   );
 
   return (
@@ -68,10 +68,10 @@ export default function MarketScannersWidget() {
          data-testid="market-scanners">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <span style={{ color: C.jade, fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase" }}>
+          <span style={{ color: C.jade, fontSize: 14, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase" }}>
             Market scanners
           </span>
-          <div style={{ fontSize: 10, color: C.sec, marginTop: 2 }}>
+          <div style={{ fontSize: 12, color: C.sec, marginTop: 2 }}>
             Top {SCANNER_LIMIT} from your tracked markets · measured on the last completed bar, not a live tick
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function MarketScannersWidget() {
                 aria-pressed={activeTab}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 4,
-                  fontSize: 10, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
+                  fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 6,
                   color: activeTab ? C.jade : C.sec,
                   background: activeTab ? C.jade + "18" : "transparent",
                   border: `1px solid ${activeTab ? C.jade + "40" : C.border}`,
@@ -106,11 +106,11 @@ export default function MarketScannersWidget() {
           : (tab === "gainers" ? gainers : losers).map((m) => (
             <button key={m.symbol} style={rowStyle} onClick={() => open(m.symbol, m.timeframe)}
                     title={`Open the stored ${m.symbol} ${m.timeframe} RON record`}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{m.symbol}</span>
-              <span style={{ fontSize: 10, color: C.sec, fontFamily: mono }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{m.symbol}</span>
+              <span style={{ fontSize: 12, color: C.sec, fontFamily: mono }}>
                 {m.timeframe} bar · {formatAge(m.bar_time)}
               </span>
-              <span style={{ fontSize: 12, fontWeight: 700, fontFamily: mono, color: m.changePct >= 0 ? C.green : C.red }}>
+              <span style={{ fontSize: 14, fontWeight: 700, fontFamily: mono, color: m.changePct >= 0 ? C.green : C.red }}>
                 {m.changePct >= 0 ? "+" : ""}{m.changePct.toFixed(2)}%
               </span>
             </button>
@@ -123,11 +123,11 @@ export default function MarketScannersWidget() {
           : watch.map((w) => (
             <button key={w.symbol} style={rowStyle} onClick={() => open(w.symbol, w.timeframe)}
                     title={`Open the stored ${w.symbol} ${w.timeframe} RON record`}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{w.symbol}</span>
-              <span style={{ fontSize: 10, color: C.sec, fontFamily: mono }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{w.symbol}</span>
+              <span style={{ fontSize: 12, color: C.sec, fontFamily: mono }}>
                 {w.timeframe} bar · {formatAge(w.bar_time)}
               </span>
-              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: mono, color: ronBiasColor(w.bias) ?? ronStateColor(w.state as RonState) }}>
+              <span style={{ fontSize: 13, fontWeight: 700, fontFamily: mono, color: ronBiasColor(w.bias) ?? ronStateColor(w.state as RonState) }}>
                 {w.state}{w.bias ? ` ${w.bias}` : ""}
               </span>
             </button>
@@ -140,11 +140,11 @@ export default function MarketScannersWidget() {
           : health.map((h) => (
             <button key={h.symbol} style={rowStyle} onClick={() => open(h.symbol, h.timeframe)}
                     title={`Open the stored ${h.symbol} ${h.timeframe} RON record`}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{h.symbol}</span>
-              <span style={{ fontSize: 10, color: C.sec, fontFamily: mono }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{h.symbol}</span>
+              <span style={{ fontSize: 12, color: C.sec, fontFamily: mono }}>
                 {h.timeframe} bar · {formatAge(h.bar_time)}
               </span>
-              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: mono, color: C.amber }}>{h.data_health}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, fontFamily: mono, color: C.amber }}>{h.data_health}</span>
             </button>
           ))
       )}

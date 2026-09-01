@@ -23,7 +23,7 @@ export default function ActiveTradeBar({ symbol, positions, onClosePosition, clo
         const isBuy = pos.type?.toLowerCase().includes("buy");
         const pnlColor = pos.profit >= 0 ? "#22C55E" : "#EF4444";
         return (
-          <div key={pos.id} className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card text-[11px]">
+          <div key={pos.id} className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-card text-[13px]">
             {isBuy ? <TrendingUp size={11} style={{ color: "#22C55E" }} /> : <TrendingDown size={11} style={{ color: "#EF4444" }} />}
             <span className="font-bold" style={{ color: isBuy ? "#22C55E" : "#EF4444" }}>
               {isBuy ? "BUY" : "SELL"} {pos.volume}
@@ -37,7 +37,7 @@ export default function ActiveTradeBar({ symbol, positions, onClosePosition, clo
             <button
               onClick={() => onClosePosition(pos.id)}
               disabled={closingId === pos.id}
-              className="ml-1 px-2 py-0.5 rounded text-[9px] font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
+              className="ml-1 px-2 py-0.5 rounded text-[11px] font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 transition-colors disabled:opacity-50"
             >
               {closingId === pos.id ? <Loader2 size={10} className="animate-spin" /> : "CLOSE"}
             </button>

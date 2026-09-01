@@ -74,7 +74,7 @@ export default function SignalsPage() {
         <button
           type="button"
           onClick={refreshAll}
-          className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs uppercase tracking-widest"
+          className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm uppercase tracking-widest"
           style={{ background: C.cardH, border: `1px solid ${C.border}`, color: C.sec }}
         >
           <RefreshCw className="h-3.5 w-3.5" /> Refresh
@@ -91,7 +91,7 @@ export default function SignalsPage() {
             aria-selected={tab === t.id}
             data-testid={`signals-tab-btn-${t.id}`}
             onClick={() => setTab(t.id)}
-            className="rounded-lg px-3 py-1.5 text-xs"
+            className="rounded-lg px-3 py-1.5 text-sm"
             style={{
               background: tab === t.id ? C.cardH : "transparent",
               border: `1px solid ${C.border}`,

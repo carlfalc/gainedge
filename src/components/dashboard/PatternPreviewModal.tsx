@@ -195,7 +195,7 @@ export default function PatternPreviewModal({ symbol, timeframe, barTime, detect
       <div className="relative w-full max-w-3xl max-h-full overflow-y-auto rounded-xl border border-border bg-card shadow-2xl">
         <div className="flex items-start justify-between gap-3 p-4 border-b border-border">
           <div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">RON Pattern Preview</div>
+            <div className="text-[13px] uppercase tracking-wider text-muted-foreground">RON Pattern Preview</div>
             <div className="text-[15px] font-bold text-foreground" data-testid="pattern-preview-title">
               {symbol} · {geometry.name}{geometry.direction ? ` · ${geometry.direction}` : ""}
             </div>
@@ -221,7 +221,7 @@ export default function PatternPreviewModal({ symbol, timeframe, barTime, detect
         </div>
 
         <div className="p-4 space-y-3">
-          <p className="text-[12px] leading-relaxed text-muted-foreground" data-testid="pattern-preview-disclaimer">
+          <p className="text-[14px] leading-relaxed text-muted-foreground" data-testid="pattern-preview-disclaimer">
             {PREVIEW_WINDOW_NOTE} {PREVIEW_EDUCATIONAL_NOTE}
           </p>
 
@@ -237,7 +237,7 @@ export default function PatternPreviewModal({ symbol, timeframe, barTime, detect
           ) : (
             <>
               <div ref={containerRef} className="h-[320px] w-full" data-testid="pattern-preview-chart" />
-              <div className="text-[11px] text-muted-foreground" data-testid="pattern-preview-window-note">
+              <div className="text-[13px] text-muted-foreground" data-testid="pattern-preview-window-note">
                 {view.length} completed {timeframe} candles shown, ending at the evaluated bar{" "}
                 {new Date(barTime).toISOString().replace("T", " ").slice(0, 16)} UTC
                 {state ? ` · ${state.excluded} quarantined bar${state.excluded === 1 ? "" : "s"} excluded (quality v${state.qualityVersion})` : ""}
@@ -246,7 +246,7 @@ export default function PatternPreviewModal({ symbol, timeframe, barTime, detect
           )}
 
           <section data-testid="pattern-preview-geometry" className="border-t border-border pt-3">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5">Stored geometry</div>
+            <div className="text-[13px] uppercase tracking-wider text-muted-foreground mb-1.5">Stored geometry</div>
             {geometry.lines.length === 0 && geometry.levels.length === 0 ? (
               <p className="text-[12.5px] text-muted-foreground">
                 The detector stored no price geometry for this detection — only the candle span is shown.
@@ -267,7 +267,7 @@ export default function PatternPreviewModal({ symbol, timeframe, barTime, detect
                 ))}
               </div>
             )}
-            <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/80" data-testid="pattern-preview-geometry-note">
+            <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground/80" data-testid="pattern-preview-geometry-note">
               {geometry.hasExactGeometry ? EXACT_GEOMETRY_NOTE : ""}
               {geometry.hasExactGeometry && geometry.hasPriceOnlyPivots ? " " : ""}
               {geometry.hasPriceOnlyPivots ? PRICE_ONLY_GEOMETRY_NOTE : ""}
@@ -276,7 +276,7 @@ export default function PatternPreviewModal({ symbol, timeframe, barTime, detect
 
           {glossary && (
             <section data-testid="pattern-preview-glossary" className="border-t border-border pt-3 space-y-1.5">
-              <div className="text-[11px] uppercase tracking-wider text-muted-foreground">What traders look for</div>
+              <div className="text-[13px] uppercase tracking-wider text-muted-foreground">What traders look for</div>
               <p className="text-[12.5px] leading-relaxed text-muted-foreground">{glossary.what}</p>
               <p className="text-[12.5px] leading-relaxed text-muted-foreground">{glossary.reading}</p>
               <p className="text-[12.5px] leading-relaxed text-muted-foreground">{glossary.measured}</p>
@@ -287,7 +287,7 @@ export default function PatternPreviewModal({ symbol, timeframe, barTime, detect
             <button
               onClick={onClose}
               data-testid="pattern-preview-return"
-              className="px-3 py-1.5 rounded text-[12px] font-semibold border border-border text-foreground hover:bg-foreground/10 transition-colors"
+              className="px-3 py-1.5 rounded text-[14px] font-semibold border border-border text-foreground hover:bg-foreground/10 transition-colors"
             >
               Return to chart
             </button>

@@ -38,8 +38,8 @@ export default function LivePnLBar({ symbol, positions, currentPrice, onClose, c
   return (
     <div className="border-t border-white/10 bg-[#0a0e16]">
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-white/[0.04]">
-        <span className="text-[10px] uppercase tracking-wider font-bold text-white/50">Open Positions · {symbol}</span>
-        <span className="text-[10px] text-white/30">({filtered.length})</span>
+        <span className="text-[12px] uppercase tracking-wider font-bold text-white/50">Open Positions · {symbol}</span>
+        <span className="text-[12px] text-white/30">({filtered.length})</span>
       </div>
       <div className="flex flex-wrap gap-2 p-2">
         {filtered.map((pos) => {
@@ -54,7 +54,7 @@ export default function LivePnLBar({ symbol, positions, currentPrice, onClose, c
           return (
             <div
               key={pos.id}
-              className="flex items-center gap-3 px-3 py-2 rounded-md border bg-[#0D1117] text-[11px]"
+              className="flex items-center gap-3 px-3 py-2 rounded-md border bg-[#0D1117] text-[13px]"
               style={{ borderColor: positive ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)" }}
             >
               <div className="flex items-center gap-1.5">
@@ -75,7 +75,7 @@ export default function LivePnLBar({ symbol, positions, currentPrice, onClose, c
               {pos.takeProfit ? <Field label="TP" value={pos.takeProfit.toFixed(dec)} color="#22C55E" /> : null}
 
               <div className="flex flex-col items-end leading-tight">
-                <span className="text-[8px] uppercase text-white/40">P&amp;L</span>
+                <span className="text-[10px] uppercase text-white/40">P&amp;L</span>
                 <span className="font-mono font-bold" style={{ color }}>
                   {positive ? "+" : ""}
                   {pips.toFixed(1)}p
@@ -88,7 +88,7 @@ export default function LivePnLBar({ symbol, positions, currentPrice, onClose, c
               <button
                 onClick={() => onClose(pos.id)}
                 disabled={closingId === pos.id}
-                className="ml-1 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 transition disabled:opacity-50"
+                className="ml-1 flex items-center gap-1 px-2 py-1 rounded text-[12px] font-bold bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500/25 transition disabled:opacity-50"
               >
                 {closingId === pos.id ? (
                   <Loader2 size={11} className="animate-spin" />
@@ -109,7 +109,7 @@ export default function LivePnLBar({ symbol, positions, currentPrice, onClose, c
 function Field({ label, value, color, mono }: { label: string; value: string; color?: string; mono?: boolean }) {
   return (
     <div className="flex flex-col items-start leading-tight">
-      <span className="text-[8px] uppercase text-white/40">{label}</span>
+      <span className="text-[10px] uppercase text-white/40">{label}</span>
       <span className={`font-mono ${mono ? "font-bold" : ""} text-white`} style={color ? { color } : undefined}>
         {value}
       </span>

@@ -24,16 +24,16 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
         {open ? <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: C.sec }} />
           : <ChevronRight className="h-3.5 w-3.5 shrink-0" style={{ color: C.sec }} />}
         <span className="text-sm font-medium" style={{ color: C.text }}>{s.label}</span>
-        {s.status && <span className="text-xs" style={{ color: C.sec }}>{s.status}</span>}
-        {s.direction && <span className="text-xs" style={{ color: C.sec }}>{s.direction}</span>}
-        {s.recommendation && <span className="text-xs" style={{ color: C.sec }}>{s.recommendation}</span>}
+        {s.status && <span className="text-sm" style={{ color: C.sec }}>{s.status}</span>}
+        {s.direction && <span className="text-sm" style={{ color: C.sec }}>{s.direction}</span>}
+        {s.recommendation && <span className="text-sm" style={{ color: C.sec }}>{s.recommendation}</span>}
         {s.freshnessAtDecision && (
-          <span className="text-xs" style={{ color: C.muted }}>
+          <span className="text-sm" style={{ color: C.muted }}>
             source freshness {s.freshnessAtDecision}
           </span>
         )}
         {s.health !== "healthy" && (
-          <span className="flex items-center gap-1 text-xs" style={{ color: C.amber }}>
+          <span className="flex items-center gap-1 text-sm" style={{ color: C.amber }}>
             <AlertTriangle className="h-3 w-3" /> needs attention
           </span>
         )}
@@ -41,7 +41,7 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
 
       {s.attentionSummary && (
         <p
-          className="px-3 pb-3 text-xs"
+          className="px-3 pb-3 text-sm"
           style={{ color: s.health === "healthy" ? C.sec : C.amber }}
           data-testid={`ron-attention-${s.agent_id}`}
         >
@@ -53,12 +53,12 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
         <div className="space-y-3 border-t px-3 py-3" style={{ borderColor: C.border }}>
           {s.hasWarnings && (
             <div className="space-y-1.5" data-testid={`ron-caveats-${s.agent_id}`}>
-              <p className="text-xs uppercase tracking-widest" style={{ color: C.sec }}>
+              <p className="text-sm uppercase tracking-widest" style={{ color: C.sec }}>
                 Warnings &amp; caveats
               </p>
               <ul className="space-y-1">
                 {[...s.issues, ...s.conflicts, ...s.limitations].map((w, i) => (
-                  <li key={`${s.evidence_hash}-w-${i}`} className="break-words text-xs leading-relaxed"
+                  <li key={`${s.evidence_hash}-w-${i}`} className="break-words text-sm leading-relaxed"
                     style={{ color: C.text }}>• {w}</li>
                 ))}
               </ul>
@@ -68,7 +68,7 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
             type="button"
             onClick={() => setTechnical((v) => !v)}
             aria-expanded={technical}
-            className="text-xs uppercase tracking-widest"
+            className="text-sm uppercase tracking-widest"
             style={{ color: C.sec }}
           >
             Technical details
@@ -77,7 +77,7 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
             <div className="space-y-2" data-testid={`ron-technical-${s.agent_id}`}>
               <div className="flex flex-wrap gap-x-4 gap-y-1">
                 {(evidence.observations ?? []).map((o) => (
-                  <span key={`${s.evidence_hash}-${o.key}`} className="break-all font-mono text-xs"
+                  <span key={`${s.evidence_hash}-${o.key}`} className="break-all font-mono text-sm"
                     style={{ color: C.sec }}>
                     {o.key}: <span style={{ color: C.text }}>
                       {o.value_num ?? o.value_text ?? "—"}{o.unit ? ` ${o.unit}` : ""}
@@ -88,11 +88,11 @@ function EvidenceRow({ evidence }: { evidence: RonEvidenceView }) {
               {(evidence.provenance_refs ?? []).length > 0 && (
                 <div className="space-y-1">
                   {evidence.provenance_refs.map((p) => (
-                    <p key={p} className="break-all font-mono text-[11px]" style={{ color: C.muted }}>{p}</p>
+                    <p key={p} className="break-all font-mono text-[13px]" style={{ color: C.muted }}>{p}</p>
                   ))}
                 </div>
               )}
-              <p className="break-all font-mono text-[11px]" style={{ color: C.muted }}>
+              <p className="break-all font-mono text-[13px]" style={{ color: C.muted }}>
                 evidence {s.evidence_hash}
               </p>
             </div>
@@ -129,11 +129,11 @@ export default function RonEvidenceList({ evidence }: { evidence: RonEvidenceVie
   return (
     <section className="rounded-xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="text-xs uppercase tracking-widest" style={{ color: C.sec }}>
+        <h2 className="text-sm uppercase tracking-widest" style={{ color: C.sec }}>
           Specialist evidence ({evidence.length} stored)
         </h2>
         {mode === "attention" && (
-          <span className="text-xs" style={{ color: C.muted }} data-testid="ron-evidence-showing">
+          <span className="text-sm" style={{ color: C.muted }} data-testid="ron-evidence-showing">
             Showing {rows.length}
           </span>
         )}
@@ -143,7 +143,7 @@ export default function RonEvidenceList({ evidence }: { evidence: RonEvidenceVie
             onClick={() => setMode("all")}
             aria-pressed={mode === "all"}
             data-testid="ron-evidence-filter-all"
-            className="rounded-lg px-2.5 py-1 text-xs"
+            className="rounded-lg px-2.5 py-1 text-sm"
             style={btn(mode === "all")}
           >
             All ({evidence.length})
@@ -153,7 +153,7 @@ export default function RonEvidenceList({ evidence }: { evidence: RonEvidenceVie
             onClick={() => setMode("attention")}
             aria-pressed={mode === "attention"}
             data-testid="ron-evidence-filter-attention"
-            className="rounded-lg px-2.5 py-1 text-xs"
+            className="rounded-lg px-2.5 py-1 text-sm"
             style={btn(mode === "attention")}
           >
             Needs attention ({attention.length})
@@ -161,7 +161,7 @@ export default function RonEvidenceList({ evidence }: { evidence: RonEvidenceVie
         </div>
       </div>
       {mode === "attention" && rows.length === 0 && (
-        <p className="text-xs leading-relaxed" style={{ color: C.muted }} data-testid="ron-evidence-attention-empty">
+        <p className="text-sm leading-relaxed" style={{ color: C.muted }} data-testid="ron-evidence-attention-empty">
           No specialist evidence in this stored record needs attention.
         </p>
       )}

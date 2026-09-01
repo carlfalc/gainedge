@@ -29,9 +29,9 @@ export function SpinCard({ front, back, color }: SpinCardProps) {
           padding: "14px 18px", display: "flex", flexDirection: "column", justifyContent: "center",
           borderTop: `2px solid ${color}`,
         }}>
-          <div style={{ fontSize: 11, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{front.label}</div>
+          <div style={{ fontSize: 13, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{front.label}</div>
           <div style={{ fontSize: 24, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: C.text, marginTop: 4 }}>{front.value}</div>
-          {front.sub && <div style={{ fontSize: 11, color, fontWeight: 600, marginTop: 2 }}>{front.sub}</div>}
+          {front.sub && <div style={{ fontSize: 13, color, fontWeight: 600, marginTop: 2 }}>{front.sub}</div>}
         </div>
         <div style={{
           position: "absolute", inset: 0, backfaceVisibility: "hidden",
@@ -40,8 +40,8 @@ export function SpinCard({ front, back, color }: SpinCardProps) {
           padding: "14px 18px", display: "flex", flexDirection: "column", justifyContent: "center",
           borderTop: `2px solid ${color}`,
         }}>
-          <div style={{ fontSize: 11, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{back.label}</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginTop: 6, lineHeight: 1.5 }}>{back.value}</div>
+          <div style={{ fontSize: 13, color: C.sec, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>{back.label}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginTop: 6, lineHeight: 1.5 }}>{back.value}</div>
         </div>
       </div>
     </div>

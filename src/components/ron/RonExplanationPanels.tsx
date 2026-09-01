@@ -10,7 +10,7 @@ function Panel({ title, items, empty, testId }: {
   return (
     <section className="rounded-xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}
       data-testid={testId}>
-      <h2 className="mb-3 text-xs uppercase tracking-widest" style={{ color: C.sec }}>{title}</h2>
+      <h2 className="mb-3 text-sm uppercase tracking-widest" style={{ color: C.sec }}>{title}</h2>
       {rows.length === 0
         ? <p className="text-sm leading-relaxed" style={{ color: C.muted }}>{empty}</p>
         : (

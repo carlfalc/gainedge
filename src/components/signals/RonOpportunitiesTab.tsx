@@ -25,10 +25,10 @@ export default function RonOpportunitiesTab({ feed, now }: { feed: RonOpportunit
 
   return (
     <div className="space-y-3" data-testid="signals-tab-ron">
-      <p className="text-xs leading-relaxed" style={{ color: C.sec }}>{RON_LANE_NOTE}</p>
+      <p className="text-sm leading-relaxed" style={{ color: C.sec }}>{RON_LANE_NOTE}</p>
 
       {feed.trackedWarning && (
-        <p className="text-xs" style={{ color: C.amber }} data-testid="ron-tracked-warning">
+        <p className="text-sm" style={{ color: C.amber }} data-testid="ron-tracked-warning">
           {feed.trackedWarning}
         </p>
       )}
@@ -38,7 +38,7 @@ export default function RonOpportunitiesTab({ feed, now }: { feed: RonOpportunit
           {[0, 1].map((i) => (
             <div key={i} className="animate-pulse rounded-xl p-4"
               style={{ background: C.card, border: `1px solid ${C.border}`, minHeight: 148 }}>
-              <div className="flex items-center gap-2 text-xs" style={{ color: C.sec }}>
+              <div className="flex items-center gap-2 text-sm" style={{ color: C.sec }}>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading stored RON records…
               </div>
             </div>
@@ -50,7 +50,7 @@ export default function RonOpportunitiesTab({ feed, now }: { feed: RonOpportunit
         <section className="rounded-xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}
           data-testid="ron-lane-empty">
           <p className="text-sm" style={{ color: C.text }}>{NO_ACTIVE_OPPORTUNITY_LINE}</p>
-          <p className="mt-1 text-xs" style={{ color: C.muted }}>
+          <p className="mt-1 text-sm" style={{ color: C.muted }}>
             Nothing is inferred in the absence of a stored contextual record. A card appears here
             as soon as an opportunity context is stored for one of your tracked instruments.
           </p>

@@ -19,8 +19,8 @@ const TONE_COLOR = {
 function Row({ label, value, unknown }: { label: string; value: string; unknown?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-[11px]" style={{ color: C.muted }}>{label}</span>
-      <span className="text-right text-[11px]" style={{ color: unknown ? C.amber : C.text }}>
+      <span className="text-[13px]" style={{ color: C.muted }}>{label}</span>
+      <span className="text-right text-[13px]" style={{ color: unknown ? C.amber : C.text }}>
         {value}{unknown ? " (unrecognised stored value)" : ""}
       </span>
     </div>
@@ -45,20 +45,20 @@ export default function RonOpportunityContextPanel(
       data-testid={`ron-opportunity-context-${record.instrument}-${record.timeframe}`}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="text-[11px] uppercase tracking-widest" style={{ color: C.muted }}>
+        <span className="text-[13px] uppercase tracking-widest" style={{ color: C.muted }}>
           Opportunity context
         </span>
         <span
-          className="rounded-md px-2 py-0.5 text-xs"
+          className="rounded-md px-2 py-0.5 text-sm"
           style={{ background: `${tone}1A`, color: tone }}
           data-testid="ron-opportunity-context-lifecycle"
         >
           {lifecycle.label}
         </span>
-        <span className="text-[11px]" style={{ color: C.sec }}>{change.label}</span>
+        <span className="text-[13px]" style={{ color: C.sec }}>{change.label}</span>
       </div>
 
-      <p className="mt-2 text-xs leading-relaxed" style={{ color: C.text }}>
+      <p className="mt-2 text-sm leading-relaxed" style={{ color: C.text }}>
         {opportunitySummary(record)}
       </p>
 
@@ -74,12 +74,12 @@ export default function RonOpportunityContextPanel(
       </div>
 
       {record.data_blocked && (
-        <p className="mt-2 text-[11px]" style={{ color: C.amber }}>
+        <p className="mt-2 text-[13px]" style={{ color: C.amber }}>
           This is a data condition, not a market invalidation.
         </p>
       )}
 
-      <p className="mt-2 text-[10px] leading-relaxed" style={{ color: C.muted }}>
+      <p className="mt-2 text-[12px] leading-relaxed" style={{ color: C.muted }}>
         {OPPORTUNITY_CONTEXT_QUALIFIER} {OPPORTUNITY_CONTEXT_ANCHOR_NOTE}
       </p>
     </div>

@@ -43,7 +43,7 @@ export default function ClockSettingsPage() {
   return (
     <div style={{ width: "100%" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, marginBottom: 8 }}>World Clock Preferences</h1>
-      <p style={{ fontSize: 13, color: C.sec, marginBottom: 24 }}>Customize the 6 world market clocks shown in your dashboard header.</p>
+      <p style={{ fontSize: 15, color: C.sec, marginBottom: 24 }}>Customize the 6 world market clocks shown in your dashboard header.</p>
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
         {clockSlots.map((slot, i) => {
@@ -55,14 +55,14 @@ export default function ClockSettingsPage() {
               display: "flex", alignItems: "center", gap: 16, padding: "12px 0",
               borderBottom: i < 5 ? `1px solid ${C.border}` : "none",
             }}>
-              <div style={{ width: 70, fontSize: 12, fontWeight: 700, color: C.muted }}>Clock {i + 1}</div>
+              <div style={{ width: 70, fontSize: 14, fontWeight: 700, color: C.muted }}>Clock {i + 1}</div>
               <select
                 value={slot.timezone}
                 onChange={e => updateSlot(i, e.target.value)}
                 style={{
                   flex: 1, padding: "9px 12px", borderRadius: 8,
                   border: `1px solid ${C.border}`, background: C.bg, color: C.text,
-                  fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none",
+                  fontSize: 15, fontFamily: "'DM Sans', sans-serif", outline: "none",
                 }}
               >
                 {AVAILABLE_CITIES.map(c => (
@@ -70,7 +70,7 @@ export default function ClockSettingsPage() {
                 ))}
               </select>
               <div style={{
-                width: 90, textAlign: "center", fontSize: 13,
+                width: 90, textAlign: "center", fontSize: 15,
                 fontFamily: "'JetBrains Mono', monospace", color: C.jade, fontWeight: 600,
               }}>
                 {timeStr}
@@ -84,7 +84,7 @@ export default function ClockSettingsPage() {
         onClick={handleSave}
         style={{
           padding: "12px 32px", borderRadius: 8, border: "none", cursor: "pointer",
-          fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+          fontSize: 16, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
           background: `linear-gradient(135deg, ${C.jade}, ${C.teal})`, color: C.bg,
         }}
       >

@@ -54,14 +54,14 @@ export default function ChartPopout() {
       {/* Banner */}
       <div className="h-9 flex items-center justify-between px-4 bg-[#111724] border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-bold">
+          <span className="text-[15px] font-bold">
             <span className="text-white">G</span>
             <span className="text-[#00CFA5]">AI</span>
             <span className="text-white">NEDGE</span>
           </span>
-          <span className="text-white/40 text-[12px]">—</span>
-          <span className="text-white text-[12px] font-medium">{symbol} {type === "tradingview" ? "TradingView" : "RON"} Chart</span>
-          <span className="text-white/30 text-[11px] ml-2">Drag this tab to another screen</span>
+          <span className="text-white/40 text-[14px]">—</span>
+          <span className="text-white text-[14px] font-medium">{symbol} {type === "tradingview" ? "TradingView" : "RON"} Chart</span>
+          <span className="text-white/30 text-[13px] ml-2">Drag this tab to another screen</span>
         </div>
         <button
           onClick={() => window.close()}

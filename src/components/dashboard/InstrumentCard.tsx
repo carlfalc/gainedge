@@ -59,13 +59,13 @@ const macdLabel = (s: unknown) => (!s ? "—" : String(s).replace(/_/g, " "));
 const chipColor = (tone: string) => (tone === "up" ? C.green : tone === "down" ? C.red : C.text);
 
 const iconBtn = {
-  display: "inline-flex", alignItems: "center", gap: 3, fontSize: 9, fontWeight: 600,
+  display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, fontWeight: 600,
   color: C.jade, background: "transparent", border: `1px solid ${C.jade}30`,
   borderRadius: 5, padding: "1px 6px", cursor: "pointer",
 } as const;
 
 const sectionLabel = {
-  fontSize: 9, color: C.text, letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 4,
+  fontSize: 11, color: C.text, letterSpacing: 1, textTransform: "uppercase" as const, marginBottom: 4,
 };
 
 export interface InstrumentCardProps {
@@ -170,7 +170,7 @@ export default function InstrumentCard({
             <Circle size={16} color={C.muted} fill={C.muted} />
           )}
           <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{inst.symbol}</span>
-          <span style={{ fontSize: 9, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: C.jade, background: C.jade + "18", padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace" }}>
             {tf}
           </span>
           {quote && (
@@ -202,7 +202,7 @@ export default function InstrumentCard({
             <GripVertical size={14} color={C.text} />
           </span>
           <div
-            style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: badgeColor + "20", color: badgeColor }}
+            style={{ fontSize: 12, fontWeight: 700, padding: "3px 8px", borderRadius: 6, background: badgeColor + "20", color: badgeColor }}
             title={hasSignal
               ? `Falconer signal history (not RON analysis) · printed ${formatPrintedLocal(inst.scanned_at!)} local time`
               : "No Falconer signal has been printed for this instrument"}
@@ -238,14 +238,14 @@ export default function InstrumentCard({
               >
                 {quote.bid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 5 })}
               </div>
-              <div style={{ fontSize: 9, marginTop: 2, color: quoteFresh ? C.text : C.amber, fontFamily: "'JetBrains Mono', monospace" }}>
+              <div style={{ fontSize: 11, marginTop: 2, color: quoteFresh ? C.text : C.amber, fontFamily: "'JetBrains Mono', monospace" }}>
                 {quoteFresh
                   ? `Live broker bid · ask ${quote.ask ?? "—"} · ${formatAge(quoteInstant!)}`
                   : `Market closed / feed idle · last quote ${formatAge(quoteInstant!)}`}
               </div>
             </>
           ) : (
-            <div style={{ fontSize: 11, color: C.amber, fontStyle: "italic" }}>No live price feed</div>
+            <div style={{ fontSize: 13, color: C.amber, fontStyle: "italic" }}>No live price feed</div>
           )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
             <PriceProvenanceBadge kind="live_quote" timestamp={quoteInstant} />
@@ -256,13 +256,13 @@ export default function InstrumentCard({
           <div style={sectionLabel}>RON state</div>
           <div
             data-testid={`ron-state-${inst.symbol}`}
-            style={{ fontSize: 13, fontWeight: 700, color: stateColor, fontFamily: "'JetBrains Mono', monospace" }}
+            style={{ fontSize: 15, fontWeight: 700, color: stateColor, fontFamily: "'JetBrains Mono', monospace" }}
           >
             {stateText}
           </div>
           <div
             style={{
-              fontSize: 9, marginTop: 2, fontWeight: 600,
+              fontSize: 11, marginTop: 2, fontWeight: 600,
               color: health.label === "LIVE" ? C.jade : health.label === "STALE / FEED BEHIND" ? C.red : C.amber,
             }}
             title={health.detail}
@@ -270,7 +270,7 @@ export default function InstrumentCard({
             {health.label}{snap ? ` · ${formatAge(snap.bar_time)}` : ""}
           </div>
           {snap && (
-            <div style={{ fontSize: 9, color: snap.data_health === "healthy" ? C.text : C.amber, fontFamily: "'JetBrains Mono', monospace" }}>
+            <div style={{ fontSize: 11, color: snap.data_health === "healthy" ? C.text : C.amber, fontFamily: "'JetBrains Mono', monospace" }}>
               {snap.timeframe} bar {new Date(snap.bar_time).toISOString().slice(5, 16).replace("T", " ")}Z
               {snap.data_health !== "healthy" ? ` · ${snap.data_health}` : ""}
             </div>
@@ -280,11 +280,11 @@ export default function InstrumentCard({
 
       {/* ── One-line analyst summary, or one calm empty state ── */}
       {snap && f ? (
-        <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }} data-testid={`ron-summary-${inst.symbol}`}>
+        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }} data-testid={`ron-summary-${inst.symbol}`}>
           <span style={{ color: C.jade, fontWeight: 600 }}>RON: </span>{summary}
         </div>
       ) : (
-        <div style={{ fontSize: 10, color: C.amber, lineHeight: 1.5 }} data-testid={`ron-empty-${inst.symbol}`}>
+        <div style={{ fontSize: 12, color: C.amber, lineHeight: 1.5 }} data-testid={`ron-empty-${inst.symbol}`}>
           <span style={{ fontWeight: 700 }}>{empty.headline}</span> — {empty.note}
           <div style={{ color: C.text, opacity: 0.85, marginTop: 2 }}>
             Available: {empty.available.length ? empty.available.join(", ") : "nothing yet"} · Not available: {empty.unavailable.join(", ")}
@@ -300,7 +300,7 @@ export default function InstrumentCard({
               key={c.label}
               title={c.title}
               style={{
-                fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 5,
+                fontSize: 11, fontWeight: 600, padding: "2px 6px", borderRadius: 5,
                 border: `1px solid ${C.border}`, color: chipColor(c.tone),
                 fontFamily: "'JetBrains Mono', monospace", whiteSpace: "nowrap",
               }}
@@ -308,13 +308,13 @@ export default function InstrumentCard({
               {c.label} {c.value}
             </span>
           )) : (
-            <span style={{ fontSize: 9, color: C.text, opacity: 0.7, fontStyle: "italic" }}>No stored indicator evidence</span>
+            <span style={{ fontSize: 11, color: C.text, opacity: 0.7, fontStyle: "italic" }}>No stored indicator evidence</span>
           )}
         </div>
         {sparkData ? (
           <Sparkline data={sparkData} color={sparkColor} w={96} h={28} />
         ) : (
-          <span style={{ fontSize: 9, color: C.text, opacity: 0.6, fontStyle: "italic", whiteSpace: "nowrap" }}
+          <span style={{ fontSize: 11, color: C.text, opacity: 0.6, fontStyle: "italic", whiteSpace: "nowrap" }}
                 title="No genuine intraday series available; nothing is synthesised.">
             no series
           </span>
@@ -353,7 +353,7 @@ export default function InstrumentCard({
         >
           <ExternalLink size={10} /> {expanded ? "Less detail" : "More detail"}
         </button>
-        <span style={{ marginLeft: "auto", fontSize: 9, color: countdown === -1 ? C.amber : C.text, fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3 }}>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: countdown === -1 ? C.amber : C.text, fontFamily: "'JetBrains Mono', monospace", display: "flex", alignItems: "center", gap: 3 }}>
           <Clock size={9} />
           {countdown === -1 ? `Closed · opens in ${formatCountdown(secondsUntilMarketOpen())}` : `Next scan ${formatCountdown(countdown)}`}
         </span>
@@ -362,15 +362,15 @@ export default function InstrumentCard({
       {/* ── Full evidence (disclosure) ── */}
       {expanded && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }} data-testid={`instrument-detail-${inst.symbol}`}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-            <span>ADX <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{num(liveAdx)}</span>{liveAdx != null && <span style={{ fontSize: 10 }}> - {adxLabel(Number(liveAdx))}</span>}</span>
-            <span>RSI <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{num(liveRsi)}</span>{liveRsi != null && <span style={{ fontSize: 10 }}> - {rsiLabel(Number(liveRsi))}</span>}</span>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 13, color: C.text, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+            <span>ADX <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{num(liveAdx)}</span>{liveAdx != null && <span style={{ fontSize: 12 }}> - {adxLabel(Number(liveAdx))}</span>}</span>
+            <span>RSI <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{num(liveRsi)}</span>{liveRsi != null && <span style={{ fontSize: 12 }}> - {rsiLabel(Number(liveRsi))}</span>}</span>
             <span>MACD <span style={{ color: String(liveMacd).startsWith("bullish") ? C.green : String(liveMacd).startsWith("bearish") ? C.red : C.text, fontWeight: 600 }}>{macdLabel(liveMacd)}</span></span>
-            <span>StochRSI <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ fontSize: 10 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
+            <span>StochRSI <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{num(liveStoch)}</span>{liveStoch != null && <span style={{ fontSize: 12 }}> - {stochLabel(Number(liveStoch))}</span>}</span>
           </div>
 
           {snap && f && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 13, color: C.text, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
               <span>Completed {snap.timeframe} close <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{snap.close}</span></span>
               <span style={{ display: "inline-flex", alignItems: "center" }}>
                 <PriceProvenanceBadge kind="completed_bar" timestamp={snap.bar_time} timeframe={snap.timeframe} />
@@ -380,7 +380,7 @@ export default function InstrumentCard({
               <span>
                 Context <span style={{ color: sess?.overlap ? C.jade : C.text, fontWeight: sess?.overlap ? 700 : 400 }}>{sess ? sess.label : "—"}</span>
               </span>
-              <span style={{ gridColumn: "1 / -1", fontSize: 10 }}>
+              <span style={{ gridColumn: "1 / -1", fontSize: 12 }}>
                 {sess
                   ? `${sess.active.length ? sess.active.join(" + ") : "no cash session"}` +
                     `${sess.minutes_into_session != null ? ` · ${sess.minutes_into_session}m in` : ""}` +
@@ -389,16 +389,16 @@ export default function InstrumentCard({
               </span>
               {inst.symbol === "XAUUSD" && dataQuality && (
                 <span
-                  style={{ gridColumn: "1 / -1", fontSize: 10, color: quarantined ? C.amber : C.text }}
+                  style={{ gridColumn: "1 / -1", fontSize: 12, color: quarantined ? C.amber : C.text }}
                   title={`Deterministic source-data quality v${CURRENT_RON_QUALITY_VERSION} for source anchor ${dataQuality.currentBar ?? "unavailable"}. Historical detail: ${dataQuality.critical} critical, ${dataQuality.warning} warning flags across all stored history. Raw candle history is never modified.`}
                 >
                   Current source: {!dataQuality.currentBar ? "Unavailable" : quarantined ? "Quarantined" : "Healthy"}
                 </span>
               )}
-              <span style={{ gridColumn: "1 / -1", fontSize: 10 }}>
+              <span style={{ gridColumn: "1 / -1", fontSize: 12 }}>
                 Probability: {ron ? "Not calibrated yet · building evidence" : "Not calibrated yet"} · completed bar close, not a live tick quote.
               </span>
-              <span style={{ gridColumn: "1 / -1", fontSize: 10 }}>
+              <span style={{ gridColumn: "1 / -1", fontSize: 12 }}>
                 {rebuild && !rebuild.complete
                   ? `Historical evidence: rebuilding (clean lineage quality v${CURRENT_RON_QUALITY_VERSION} · feature v${CURRENT_RON_FEATURE_VERSION} · label v${CURRENT_RON_LABEL_VERSION}). Nothing on this dashboard is derived from it.`
                   : `Outcome labels (research only, label v${CURRENT_RON_LABEL_VERSION}, feature v${CURRENT_RON_FEATURE_VERSION}, XAUUSD 15m): ${outcomeStats
@@ -412,13 +412,13 @@ export default function InstrumentCard({
           <div style={{ paddingTop: 10, borderTop: `1px solid ${C.border}` }} data-testid={`instrument-sessions-today-${inst.symbol}`}>
             <div style={sectionLabel}>Sessions today (so far)</div>
             {dayLoading && sessionsToday.length === 0 ? (
-              <div style={{ fontSize: 10, color: C.text, opacity: 0.7 }}>Loading stored bars for today…</div>
+              <div style={{ fontSize: 12, color: C.text, opacity: 0.7 }}>Loading stored bars for today…</div>
             ) : sessionsToday.length === 0 ? (
-              <div style={{ fontSize: 10, color: C.text, opacity: 0.7 }}>No stored bars for this UTC day yet.</div>
+              <div style={{ fontSize: 12, color: C.text, opacity: 0.7 }}>No stored bars for this UTC day yet.</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {sessionsToday.map((s) => (
-                  <div key={s.session} style={{ fontSize: 10, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                  <div key={s.session} style={{ fontSize: 12, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
                     <span style={{ fontWeight: 700 }}>{s.label}</span>
                     <span style={{ opacity: 0.7 }}> · {s.bars} bar{s.bars === 1 ? "" : "s"} · </span>
                     <span style={{
@@ -440,20 +440,20 @@ export default function InstrumentCard({
             <div style={sectionLabel}>Pattern interpretation</div>
             {snap && patternExplanations.length > 0 ? (
               <>
-                <div style={{ fontSize: 9, color: C.text, opacity: 0.85, marginBottom: 4, fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: 11, color: C.text, opacity: 0.85, marginBottom: 4, fontFamily: "'JetBrains Mono', monospace" }}>
                   Detected on the completed {snap.timeframe} bar {formatPrintedLocal(snap.bar_time)} local · {formatAge(snap.bar_time)}
                 </div>
                 {structureSummary && (
-                  <div style={{ fontSize: 10, color: C.amber, marginBottom: 6, overflowWrap: "anywhere" }}>{structureSummary}</div>
+                  <div style={{ fontSize: 12, color: C.amber, marginBottom: 6, overflowWrap: "anywhere" }}>{structureSummary}</div>
                 )}
                 {patternExplanations.map((e, i) => (
                   <details key={i} open={i === 0} style={{ marginBottom: 6 }}>
                     <summary style={{ cursor: "pointer", listStyle: "revert" }} title={`Show interpretation for ${e.title}`}>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: e.direction === "bullish" ? C.green : e.direction === "bearish" ? C.red : C.text }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: e.direction === "bullish" ? C.green : e.direction === "bearish" ? C.red : C.text }}>
                         {e.title}
                       </span>
                     </summary>
-                    <div style={{ fontSize: 10, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                    <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>
                       <div>{e.meaning}</div>
                       <div style={{ marginTop: 2 }}><span style={{ color: C.green }}>Stronger if:</span> {e.strengthens}</div>
                       <div style={{ marginTop: 2 }}><span style={{ color: C.red }}>Weaker if:</span> {e.weakens}</div>
@@ -465,12 +465,12 @@ export default function InstrumentCard({
                     </div>
                   </details>
                 ))}
-                <div style={{ fontSize: 9, color: C.text, opacity: 0.85, marginTop: 4, overflowWrap: "anywhere" }}>
+                <div style={{ fontSize: 11, color: C.text, opacity: 0.85, marginTop: 4, overflowWrap: "anywhere" }}>
                   Educational context on detected chart structure — not a trade recommendation, and not a RON opportunity.
                 </div>
               </>
             ) : (
-              <div style={{ fontSize: 10, color: C.text, opacity: 0.85 }}>
+              <div style={{ fontSize: 12, color: C.text, opacity: 0.85 }}>
                 No pattern detected on the latest stored bar.
               </div>
             )}
@@ -479,8 +479,8 @@ export default function InstrumentCard({
           {/* RON opportunity — truthful placeholder until calibration exists. */}
           <div style={{ paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
             <div style={{ ...sectionLabel, color: C.jade }}>RON opportunity</div>
-            <div style={{ fontSize: 11, color: C.text, marginBottom: 4 }}>No qualified RON opportunity yet</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 11, color: C.text }}>
+            <div style={{ fontSize: 13, color: C.text, marginBottom: 4 }}>No qualified RON opportunity yet</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, fontSize: 13, color: C.text }}>
               <div>Probability: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>Not calibrated yet</span></div>
               <div>Entry: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
               <div>Stop: <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>—</span></div>
@@ -494,12 +494,12 @@ export default function InstrumentCard({
             <div style={sectionLabel}>Signal history</div>
             {hasSignal ? (
               <details>
-                <summary style={{ cursor: "pointer", fontSize: 10, color: C.text, overflowWrap: "anywhere" }}
+                <summary style={{ cursor: "pointer", fontSize: 12, color: C.text, overflowWrap: "anywhere" }}
                          title="Historical Falconer signal — separate from RON analysis">
                   Falconer {sigDir} · printed {formatPrintedLocal(inst.scanned_at!)} · {formatAge(inst.scanned_at!)}
                   {!active ? (sig.isOpenFalconerSignal ? " · Expired / historical" : " · Closed") : ""}
                 </summary>
-                <div style={{ fontSize: 10, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: C.text, marginTop: 4, lineHeight: 1.5 }}>
                   {!active && (
                     <div style={{ color: C.amber, fontWeight: 600, marginBottom: 2 }}>
                       {sig.isOpenFalconerSignal ? "Expired / historical — not a current signal." : "Closed trade — not a current signal."}
@@ -513,12 +513,12 @@ export default function InstrumentCard({
                 </div>
               </details>
             ) : (
-              <div style={{ fontSize: 10, color: C.text, fontStyle: "italic" }}>No signal history</div>
+              <div style={{ fontSize: 12, color: C.text, fontStyle: "italic" }}>No signal history</div>
             )}
           </div>
 
           {/* Full stored reasoning line. */}
-          <div style={{ fontSize: 11, color: C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
             <span style={{ color: C.jade, fontWeight: 600 }}>Stored evidence: </span>
             {ron ? (
               <>

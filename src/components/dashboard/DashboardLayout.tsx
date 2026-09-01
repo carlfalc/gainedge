@@ -163,7 +163,7 @@ export default function DashboardLayout() {
                 <div
                   style={{
                     padding: gi === 0 ? "2px 12px 4px" : "12px 12px 4px",
-                    fontSize: 10, fontWeight: 700, letterSpacing: 1,
+                    fontSize: 12, fontWeight: 700, letterSpacing: 1,
                     textTransform: "uppercase", color: C.muted,
                     fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
                     borderTop: gi === 0 ? "none" : `1px solid ${C.border}`,
@@ -191,7 +191,7 @@ export default function DashboardLayout() {
                   borderRadius: 10, border: "none", cursor: "pointer",
                   background: isActive(item.path) ? activeColor + "14" : "transparent",
                   color: isActive(item.path) ? activeColor : defaultColor,
-                  fontSize: 13, fontWeight: isActive(item.path) || gold || white ? 600 : 500,
+                  fontSize: 15, fontWeight: isActive(item.path) || gold || white ? 600 : 500,
                   fontFamily: "'DM Sans', sans-serif",
                   transition: "all 0.2s",
                   borderLeft: isActive(item.path) ? `2px solid ${activeColor}` : "2px solid transparent",
@@ -221,7 +221,7 @@ export default function DashboardLayout() {
               borderRadius: 10, border: "none", cursor: "pointer",
               background: "transparent",
               color: "#F59E0B",
-              fontSize: 13, fontWeight: 600,
+              fontSize: 15, fontWeight: 600,
               fontFamily: "'DM Sans', sans-serif",
               transition: "all 0.2s",
               borderLeft: "2px solid transparent",
@@ -246,8 +246,8 @@ export default function DashboardLayout() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, animation: "pulse-dot 2s infinite" }} />
-            <span style={{ color: C.green, fontSize: 12, fontWeight: 700 }}>{sessionLabel}</span>
-            <span style={{ color: C.muted, fontSize: 12 }}>•</span>
+            <span style={{ color: C.green, fontSize: 14, fontWeight: 700 }}>{sessionLabel}</span>
+            <span style={{ color: C.muted, fontSize: 14 }}>•</span>
             <button
               onClick={() => openRonPopout({
                 page: location.pathname,
@@ -257,7 +257,7 @@ export default function DashboardLayout() {
                 display: "flex", alignItems: "center", gap: 6,
                 padding: "4px 12px", borderRadius: 20, border: "none", cursor: "pointer",
                 background: "linear-gradient(135deg, #00CFA5 0%, #0EA5E9 100%)",
-                color: "#fff", fontSize: 11, fontWeight: 700,
+                color: "#fff", fontSize: 13, fontWeight: 700,
                 fontFamily: "'DM Sans', sans-serif",
                 boxShadow: "0 0 12px rgba(0,207,165,0.3)",
                 transition: "all 0.3s ease",
@@ -271,8 +271,8 @@ export default function DashboardLayout() {
             </button>
             {(userNickname || userName) && (
               <>
-                <span style={{ color: C.muted, fontSize: 12 }}>•</span>
-                <span style={{ color: "#FFFFFF", fontSize: 12, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
+                <span style={{ color: C.muted, fontSize: 14 }}>•</span>
+                <span style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>
                   {userNickname || userName}
                 </span>
               </>
@@ -312,7 +312,7 @@ export default function DashboardLayout() {
                 display: "flex", alignItems: "center", gap: 8,
                 padding: "6px 12px", borderRadius: 10, cursor: "pointer",
                 background: C.card, border: `1px solid ${C.border}`,
-                color: C.sec, fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+                color: C.sec, fontSize: 15, fontFamily: "'DM Sans', sans-serif",
               }}
             >
               <User size={16} />
@@ -329,7 +329,7 @@ export default function DashboardLayout() {
                   style={{
                     display: "flex", alignItems: "center", gap: 8, width: "100%",
                     padding: "10px 14px", borderRadius: 8, border: "none", cursor: "pointer",
-                    background: "none", color: C.red, fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+                    background: "none", color: C.red, fontSize: 15, fontFamily: "'DM Sans', sans-serif",
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.04)"}
                   onMouseLeave={e => e.currentTarget.style.background = "none"}

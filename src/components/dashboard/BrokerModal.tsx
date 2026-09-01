@@ -66,7 +66,7 @@ export default function BrokerModal({ open, onClose, userId, onBrokerChange }: B
         </button>
 
         <h2 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>Select Your Broker</h2>
-        <p style={{ fontSize: 13, color: C.sec, marginBottom: 20 }}>Your broker determines chart data and symbol mapping</p>
+        <p style={{ fontSize: 15, color: C.sec, marginBottom: 20 }}>Your broker determines chart data and symbol mapping</p>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {BROKERS.map(name => {
@@ -81,7 +81,7 @@ export default function BrokerModal({ open, onClose, userId, onBrokerChange }: B
                   background: active ? C.jade + "14" : C.bg,
                   border: `1.5px solid ${active ? C.jade : C.border}`,
                   color: active ? C.jade : C.text,
-                  fontSize: 13, fontWeight: active ? 700 : 500,
+                  fontSize: 15, fontWeight: active ? 700 : 500,
                   fontFamily: "'DM Sans', sans-serif",
                   transition: "all 0.15s",
                 }}

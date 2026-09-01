@@ -85,7 +85,7 @@ export default function LanguageSelector() {
           display: "flex", alignItems: "center", gap: 6,
           padding: "6px 10px", borderRadius: 10, cursor: "pointer",
           background: C.card, border: `1px solid ${C.border}`,
-          color: C.sec, fontSize: 12, fontWeight: 600,
+          color: C.sec, fontSize: 14, fontWeight: 600,
           fontFamily: "'DM Sans', sans-serif",
           transition: "all 0.2s",
         }}
@@ -94,7 +94,7 @@ export default function LanguageSelector() {
       >
         <Globe size={14} />
         <span>{currentLanguage.flag}</span>
-        <span style={{ fontSize: 11 }}>{currentLanguage.code.toUpperCase()}</span>
+        <span style={{ fontSize: 13 }}>{currentLanguage.code.toUpperCase()}</span>
       </button>
 
       {open && (
@@ -114,7 +114,7 @@ export default function LanguageSelector() {
                 padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer",
                 background: language === lang.code ? C.jade + "18" : "none",
                 color: language === lang.code ? C.jade : C.text,
-                fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+                fontSize: 15, fontFamily: "'DM Sans', sans-serif",
                 fontWeight: language === lang.code ? 700 : 500,
                 transition: "background 0.15s",
               }}
@@ -123,7 +123,7 @@ export default function LanguageSelector() {
             >
               <span style={{ fontSize: 18 }}>{lang.flag}</span>
               <span>{lang.label}</span>
-              {language === lang.code && <span style={{ marginLeft: "auto", fontSize: 11, color: C.jade }}>✓</span>}
+              {language === lang.code && <span style={{ marginLeft: "auto", fontSize: 13, color: C.jade }}>✓</span>}
             </button>
           ))}
         </div>

@@ -177,12 +177,12 @@ export default function LoungeChat() {
           padding: "12px 16px", borderBottom: "1px solid hsl(0 0% 100% / 0.08)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <span style={{ color: "hsl(32 52% 64%)", fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
+          <span style={{ color: "hsl(32 52% 64%)", fontSize: 15, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>
             Lounge Chat
           </span>
           <button onClick={() => setShowProfileDialog(true)} style={{
             background: "none", border: "none", color: "hsl(32 52% 64% / 0.74)",
-            fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+            fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
             padding: "2px 6px", borderRadius: 4,
           }}>My Profile</button>
         </div>
@@ -192,7 +192,7 @@ export default function LoungeChat() {
           <div style={{
             padding: "7px 16px", borderBottom: "1px solid hsl(0 0% 100% / 0.06)",
             background: "hsl(32 52% 64% / 0.07)", display: "flex", alignItems: "center", gap: 7,
-            fontSize: 11, color: "hsl(0 0% 100% / 0.78)",
+            fontSize: 13, color: "hsl(0 0% 100% / 0.78)",
           }}>
             <span style={{ color: "hsl(32 52% 64%)", fontWeight: 700, flexShrink: 0 }}>📰 NEWS</span>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{latestNews}</span>
@@ -205,21 +205,21 @@ export default function LoungeChat() {
             const isOwn = msg.userId === userId;
             return (
               <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: isOwn ? "flex-end" : "flex-start" }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: isOwn ? "hsl(32 52% 64%)" : "hsl(0 0% 100% / 0.6)", marginBottom: 2 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: isOwn ? "hsl(32 52% 64%)" : "hsl(0 0% 100% / 0.6)", marginBottom: 2 }}>
                   {msg.sender}
                 </span>
                 <div style={{
-                  maxWidth: "85%", padding: "8px 12px", borderRadius: 10, fontSize: 13, lineHeight: 1.45,
+                  maxWidth: "85%", padding: "8px 12px", borderRadius: 10, fontSize: 15, lineHeight: 1.45,
                   color: "hsl(0 0% 100%)",
                   background: isOwn ? "hsl(32 52% 64% / 0.2)" : "hsl(0 0% 100% / 0.08)",
                   border: isOwn ? "1px solid hsl(32 52% 64% / 0.25)" : "1px solid hsl(0 0% 100% / 0.06)",
                 }}>{msg.text}</div>
-                <span style={{ fontSize: 10, color: "hsl(0 0% 100% / 0.35)", marginTop: 2 }}>{formatTime(msg.timestamp)}</span>
+                <span style={{ fontSize: 12, color: "hsl(0 0% 100% / 0.35)", marginTop: 2 }}>{formatTime(msg.timestamp)}</span>
               </div>
             );
           })}
           {messages.length === 0 && (
-            <div style={{ color: "hsl(0 0% 100% / 0.4)", fontSize: 12, textAlign: "center", marginTop: 24 }}>
+            <div style={{ color: "hsl(0 0% 100% / 0.4)", fontSize: 14, textAlign: "center", marginTop: 24 }}>
               No messages yet — start the conversation 🥃
             </div>
           )}
@@ -234,7 +234,7 @@ export default function LoungeChat() {
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer", zIndex: 2, borderTop: "1px solid hsl(32 52% 64% / 0.2)",
             }}>
-              <span style={{ color: "hsl(32 52% 64%)", fontSize: 12, fontWeight: 600 }}>Complete your profile to start chatting</span>
+              <span style={{ color: "hsl(32 52% 64%)", fontSize: 14, fontWeight: 600 }}>Complete your profile to start chatting</span>
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -243,7 +243,7 @@ export default function LoungeChat() {
               placeholder="Type a message…" disabled={isChatLocked}
               style={{
                 flex: 1, background: "hsl(0 0% 100% / 0.06)", border: "1px solid hsl(0 0% 100% / 0.1)",
-                borderRadius: 8, padding: "9px 14px", color: "hsl(0 0% 100%)", fontSize: 13,
+                borderRadius: 8, padding: "9px 14px", color: "hsl(0 0% 100%)", fontSize: 15,
                 outline: "none", fontFamily: "'DM Sans', sans-serif",
               }}
             />

@@ -19,13 +19,13 @@ export default function ChartOverlay({ symbol, positions }: Props) {
           borderRadius: 8, padding: "8px 12px",
         }}
       >
-        <div className="flex items-center gap-2 text-[11px]">
+        <div className="flex items-center gap-2 text-[13px]">
           <span>{active.profit >= 0 ? "🟢" : "🔴"}</span>
           <span className="font-bold text-foreground">
             {active.type?.toLowerCase().includes("buy") ? "BUY" : "SELL"} {symbol}
           </span>
         </div>
-        <div className="text-[11px] font-mono font-bold mt-0.5" style={{ color: active.profit >= 0 ? "#22C55E" : "#EF4444" }}>
+        <div className="text-[13px] font-mono font-bold mt-0.5" style={{ color: active.profit >= 0 ? "#22C55E" : "#EF4444" }}>
           {active.profit >= 0 ? "+" : ""}${active.profit.toFixed(2)}
         </div>
       </div>

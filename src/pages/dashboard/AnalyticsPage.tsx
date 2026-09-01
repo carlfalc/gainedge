@@ -21,7 +21,7 @@ const cardStyle: React.CSSProperties = {
   background: C.card, borderRadius: 16, border: `1px solid ${C.border}`, padding: 20,
 };
 const labelStyle: React.CSSProperties = {
-  color: C.text, fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
+  color: C.text, fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8,
 };
 
 // A Falconer trade is long-only: a win is an exit above entry. Fall back to pnl sign.
@@ -99,15 +99,15 @@ export default function AnalyticsPage() {
       <div style={cardStyle}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <Icon size={16} style={{ color: C.jade }} />
-          <span style={{ fontWeight: 700, fontSize: 14 }}>{title}</span>
+          <span style={{ fontWeight: 700, fontSize: 16 }}>{title}</span>
         </div>
         {rows.length === 0 ? (
-          <div style={{ color: C.sec, fontSize: 13 }}>No closed trades yet.</div>
+          <div style={{ color: C.sec, fontSize: 15 }}>No closed trades yet.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {rows.map(r => (
               <div key={r.key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
                   <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>{r.key}</span>
                   <span style={{ color: C.sec }}>{r.n} trades · <span style={{ color: r.rate >= 0.5 ? C.green : C.red }}>{pct(r.w, r.n)} win</span></span>
                 </div>
@@ -128,16 +128,16 @@ export default function AnalyticsPage() {
         <BarChart3 size={26} style={{ color: C.jade }} />
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 800 }}>Analytics</h1>
-          <p style={{ color: C.sec, fontSize: 13 }}>Performance across your closed Falconer trades</p>
+          <p style={{ color: C.sec, fontSize: 15 }}>Performance across your closed Falconer trades</p>
         </div>
       </div>
 
       {loading ? (
-        <div style={{ color: C.sec, fontSize: 13 }}>Loading…</div>
+        <div style={{ color: C.sec, fontSize: 15 }}>Loading…</div>
       ) : stats.total === 0 ? (
         <div style={{ ...cardStyle, textAlign: "center", padding: 40 }}>
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No closed trades yet</div>
-          <div style={{ color: C.sec, fontSize: 13 }}>Analytics populate automatically as the Falconer strategy closes trades.</div>
+          <div style={{ color: C.sec, fontSize: 15 }}>Analytics populate automatically as the Falconer strategy closes trades.</div>
         </div>
       ) : (
         <>

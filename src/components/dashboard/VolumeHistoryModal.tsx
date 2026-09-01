@@ -166,13 +166,13 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
 
         {/* Period selector */}
         <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-          <span style={{ fontSize: 11, color: C.muted, lineHeight: "26px" }}>Period:</span>
+          <span style={{ fontSize: 13, color: C.muted, lineHeight: "26px" }}>Period:</span>
           {HISTORY_PERIOD_OPTIONS.map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
               style={{
-                padding: "3px 12px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                padding: "3px 12px", borderRadius: 6, fontSize: 13, fontWeight: 700, cursor: "pointer",
                 border: period === p ? "1.5px solid #34D399" : `1px solid ${C.border}`,
                 background: period === p ? "#34D39920" : "transparent",
                 color: period === p ? "#34D399" : C.sec,
@@ -188,7 +188,7 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
         ) : error ? (
           <div style={{ textAlign: "center", padding: 40, color: "#EF4444" }}>
             {error}
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
+            <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>
               Make sure your broker account is connected in Settings.
             </div>
           </div>
@@ -198,18 +198,18 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
             {analytics.map(inst => (
               <div key={inst.symbol} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: C.text, marginBottom: 12, fontFamily: "'JetBrains Mono', monospace" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: C.text, marginBottom: 12, fontFamily: "'JetBrains Mono', monospace" }}>
                   INSTRUMENT: {inst.symbol}
                 </div>
 
                 {inst.sessions.map(sp => (
                   <div key={sp.session.key} style={{ marginBottom: 14, paddingLeft: 12, borderLeft: `3px solid ${sp.session.color}` }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: sp.session.color, marginBottom: 6 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: sp.session.color, marginBottom: 6 }}>
                       {sp.session.label} Session
                     </div>
 
                     {sp.dataPoints === 0 ? (
-                      <div style={{ fontSize: 11, color: C.muted, fontStyle: "italic" }}>No candle data for this session in the selected period</div>
+                      <div style={{ fontSize: 13, color: C.muted, fontStyle: "italic" }}>No candle data for this session in the selected period</div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                         {sp.peakHourUtc !== null && (
@@ -218,13 +218,13 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
                         {sp.lowestHourUtc !== null && sp.lowestAvgVolume > 0 && (
                           <Row label="Lowest volume hour" value={`${formatLocalHour(sp.lowestHourUtc)} – ${formatLocalHour((sp.lowestHourUtc + 1) % 24)}`} sub={`${sp.lowestAvgVolume.toLocaleString()} avg vol`} />
                         )}
-                        <div style={{ fontSize: 11, color: C.sec, display: "flex", gap: 8, alignItems: "center" }}>
+                        <div style={{ fontSize: 13, color: C.sec, display: "flex", gap: 8, alignItems: "center" }}>
                           <span>Direction bias:</span>
                           <span style={{ color: "#22C55E", fontWeight: 700 }}>BUY {sp.buyPct}%</span>
                           <span style={{ color: C.muted }}>|</span>
                           <span style={{ color: "#EF4444", fontWeight: 700 }}>SELL {sp.sellPct}%</span>
                         </div>
-                        <div style={{ fontSize: 10, color: C.muted, fontStyle: "italic", display: "flex", alignItems: "center", gap: 4 }}>
+                        <div style={{ fontSize: 12, color: C.muted, fontStyle: "italic", display: "flex", alignItems: "center", gap: 4 }}>
                           <Info size={9} /> {sp.tip}
                         </div>
                       </div>
@@ -232,10 +232,10 @@ export function VolumeHistoryModal({ open, onClose }: Props) {
                   </div>
                 ))}
 
-                <div style={{ fontSize: 11, color: "#34D399", fontWeight: 600, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 13, color: "#34D399", fontWeight: 600, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
                   {inst.overallNote}
                 </div>
-                <div style={{ fontSize: 9, color: C.muted, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
                   <Clock size={8} /> Based on {inst.totalDays} day{inst.totalDays !== 1 ? "s" : ""} of data — patterns improve with more history
                 </div>
               </div>
@@ -267,7 +267,7 @@ function LoadingState({ period }: { period: number }) {
         animation: "spin 1s linear infinite",
       }} />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{ color: C.muted, fontSize: 13 }}>{message}</div>
+      <div style={{ color: C.muted, fontSize: 15 }}>{message}</div>
       {/* Pulsing dots */}
       <div style={{ display: "flex", gap: 6 }}>
         {[0, 1, 2].map(i => (
@@ -279,7 +279,7 @@ function LoadingState({ period }: { period: number }) {
       </div>
       <style>{`@keyframes pulse-dot { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }`}</style>
       {elapsed > 0 && (
-        <div style={{ color: C.muted, fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>
+        <div style={{ color: C.muted, fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
           {elapsed}s elapsed
         </div>
       )}
@@ -289,10 +289,10 @@ function LoadingState({ period }: { period: number }) {
 
 function Row({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div style={{ fontSize: 11, color: C.sec, display: "flex", gap: 6, alignItems: "baseline" }}>
+    <div style={{ fontSize: 13, color: C.sec, display: "flex", gap: 6, alignItems: "baseline" }}>
       <span style={{ color: C.muted, minWidth: 120 }}>{label}:</span>
       <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{value}</span>
-      <span style={{ color: C.muted, fontSize: 10 }}>| {sub}</span>
+      <span style={{ color: C.muted, fontSize: 12 }}>| {sub}</span>
     </div>
   );
 }

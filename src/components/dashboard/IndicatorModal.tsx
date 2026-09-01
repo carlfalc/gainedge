@@ -63,7 +63,7 @@ export default function IndicatorModal({ open, onClose, active, onToggle, onRemo
         <div className="flex items-center justify-between p-4 border-b border-white/5">
           <div>
             <span className="text-sm font-bold text-white">Indicators</span>
-            <span className="text-[10px] text-white/30 ml-2">{totalCount} available</span>
+            <span className="text-[12px] text-white/30 ml-2">{totalCount} available</span>
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white">
             <X className="w-4 h-4" />
@@ -78,7 +78,7 @@ export default function IndicatorModal({ open, onClose, active, onToggle, onRemo
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search 446 indicators..."
-              className="w-full bg-[#080B12] border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder:text-white/30 outline-none focus:border-[#00CFA5]/40"
+              className="w-full bg-[#080B12] border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-[#00CFA5]/40"
             />
           </div>
         </div>
@@ -86,13 +86,13 @@ export default function IndicatorModal({ open, onClose, active, onToggle, onRemo
         {/* Active indicators */}
         {active.filter(a => a.enabled).length > 0 && (
           <div className="px-4 py-2 border-b border-white/5">
-            <span className="text-[10px] text-[#00CFA5] font-semibold uppercase tracking-wider">Active</span>
+            <span className="text-[12px] text-[#00CFA5] font-semibold uppercase tracking-wider">Active</span>
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {active.filter(a => a.enabled).map((a) => (
                 <button
                   key={a.id}
                   onClick={() => onRemove(a.id)}
-                  className="px-2 py-1 rounded-md text-[10px] bg-[#00CFA5]/10 text-[#00CFA5] border border-[#00CFA5]/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all flex items-center gap-1"
+                  className="px-2 py-1 rounded-md text-[12px] bg-[#00CFA5]/10 text-[#00CFA5] border border-[#00CFA5]/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-all flex items-center gap-1"
                 >
                   {a.meta.shortName} <X className="w-2.5 h-2.5" />
                 </button>
@@ -112,8 +112,8 @@ export default function IndicatorModal({ open, onClose, active, onToggle, onRemo
               >
                 {expandedCat === "Featured" ? <ChevronDown className="w-3 h-3 text-amber-400" /> : <ChevronRight className="w-3 h-3 text-amber-400" />}
                 <Star className="w-3 h-3 text-amber-400" />
-                <span className="text-xs font-semibold text-amber-400">Featured</span>
-                <span className="text-[10px] text-white/20 ml-auto">{featured.length}</span>
+                <span className="text-sm font-semibold text-amber-400">Featured</span>
+                <span className="text-[12px] text-white/20 ml-auto">{featured.length}</span>
               </button>
               {expandedCat === "Featured" && (
                 <div className="grid grid-cols-2 gap-1 px-2">
@@ -141,8 +141,8 @@ export default function IndicatorModal({ open, onClose, active, onToggle, onRemo
                   className="flex items-center gap-2 px-2 py-1.5 w-full text-left"
                 >
                   {expandedCat === cat ? <ChevronDown className="w-3 h-3 text-white/40" /> : <ChevronRight className="w-3 h-3 text-white/40" />}
-                  <span className="text-xs font-semibold text-white/70">{cat}</span>
-                  <span className="text-[10px] text-white/20 ml-auto">{items.length}</span>
+                  <span className="text-sm font-semibold text-white/70">{cat}</span>
+                  <span className="text-[12px] text-white/20 ml-auto">{items.length}</span>
                 </button>
                 {(expandedCat === cat || search) && (
                   <div className="grid grid-cols-2 gap-1 px-2 max-h-[300px] overflow-y-auto">
@@ -166,20 +166,20 @@ export default function IndicatorModal({ open, onClose, active, onToggle, onRemo
         {selectedIndicator && (
           <div className="border-t border-white/5 p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-white">{selectedIndicator.name}</span>
+              <span className="text-sm font-bold text-white">{selectedIndicator.name}</span>
               <button onClick={() => setSelectedIndicator(null)} className="text-white/40 hover:text-white">
                 <X className="w-3 h-3" />
               </button>
             </div>
-            <div className="flex flex-wrap gap-2 text-[10px] text-white/40 mb-2">
+            <div className="flex flex-wrap gap-2 text-[12px] text-white/40 mb-2">
               <span className="px-1.5 py-0.5 rounded bg-white/5">{selectedIndicator.category}</span>
               <span className="px-1.5 py-0.5 rounded bg-white/5">{selectedIndicator.overlay ? "Overlay" : "Oscillator"}</span>
               <span className="px-1.5 py-0.5 rounded bg-white/5">{selectedIndicator.group}</span>
             </div>
             {selectedIndicator.inputConfig.filter(i => i.type === "int" || i.type === "float").slice(0, 4).map((input) => (
               <div key={input.id} className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] text-white/50 w-20">{input.title}</span>
-                <span className="text-[10px] text-white/70">{input.defval}</span>
+                <span className="text-[12px] text-white/50 w-20">{input.title}</span>
+                <span className="text-[12px] text-white/70">{input.defval}</span>
               </div>
             ))}
             <button
@@ -187,7 +187,7 @@ export default function IndicatorModal({ open, onClose, active, onToggle, onRemo
                 onToggle(selectedIndicator);
                 setSelectedIndicator(null);
               }}
-              className={`mt-2 w-full py-2 rounded-lg text-xs font-semibold transition-all ${
+              className={`mt-2 w-full py-2 rounded-lg text-sm font-semibold transition-all ${
                 activeIds.has(selectedIndicator.id)
                   ? "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
                   : "bg-[#00CFA5]/10 text-[#00CFA5] border border-[#00CFA5]/30 hover:bg-[#00CFA5]/20"
@@ -215,7 +215,7 @@ function IndicatorRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between px-2 py-1.5 rounded text-[11px] transition-all cursor-pointer group ${
+      className={`flex items-center justify-between px-2 py-1.5 rounded text-[13px] transition-all cursor-pointer group ${
         isActive
           ? "bg-[#00CFA5]/10 text-[#00CFA5] border border-[#00CFA5]/20"
           : "text-white/50 hover:bg-white/5 border border-transparent"
@@ -224,7 +224,7 @@ function IndicatorRow({
       onContextMenu={(e) => { e.preventDefault(); onSelect(ind); }}
     >
       <span className="font-medium truncate flex-1">{ind.shortName}</span>
-      <span className="text-[9px] opacity-50 group-hover:opacity-100 ml-1">
+      <span className="text-[11px] opacity-50 group-hover:opacity-100 ml-1">
         {isActive ? "✓" : ind.overlay ? "overlay" : "pane"}
       </span>
     </div>

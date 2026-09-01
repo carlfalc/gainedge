@@ -175,7 +175,7 @@ export default function DrawingToolbar({ activeTool, onSelectTool, onClearAll, d
               className="absolute left-full top-0 ml-1 bg-[#111724] border border-white/10 rounded-lg p-1.5 z-50 min-w-[160px] shadow-xl"
               onMouseLeave={() => setExpandedCat(null)}
             >
-              <div className="text-[10px] text-white/30 font-semibold uppercase tracking-wider px-2 py-1">
+              <div className="text-[12px] text-white/30 font-semibold uppercase tracking-wider px-2 py-1">
                 {cat.label}
               </div>
               {cat.tools.map((tool) => (
@@ -185,7 +185,7 @@ export default function DrawingToolbar({ activeTool, onSelectTool, onClearAll, d
                     onSelectTool(tool.id);
                     setExpandedCat(null);
                   }}
-                  className={`w-full text-left px-2 py-1.5 rounded text-[11px] transition-all ${
+                  className={`w-full text-left px-2 py-1.5 rounded text-[13px] transition-all ${
                     activeTool === tool.id
                       ? "bg-[#00CFA5]/10 text-[#00CFA5]"
                       : "text-white/50 hover:bg-white/5 hover:text-white"

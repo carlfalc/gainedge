@@ -15,11 +15,11 @@ export default function InstrumentsPopout() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <img src="/gainedge-logo.png" alt="GAINEDGE" style={{ height: 24 }} />
-          <span style={{ fontSize: 11, color: C.sec, fontWeight: 500 }}>
+          <span style={{ fontSize: 13, color: C.sec, fontWeight: 500 }}>
             Instrument Tracking — Popout Window
           </span>
         </div>
-        <span style={{ fontSize: 10, color: C.muted }}>
+        <span style={{ fontSize: 12, color: C.muted }}>
           Synced live with main dashboard · drag, hide & show all available
         </span>
       </div>

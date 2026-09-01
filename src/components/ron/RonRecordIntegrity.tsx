@@ -7,8 +7,8 @@ import type { RonDecisionView } from "@/services/ron-decisions";
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs" style={{ color: C.sec }}>{label}</span>
-      <span className="min-w-0 break-all font-mono text-[11px]" style={{ color: C.text }}>{value}</span>
+      <span className="text-sm" style={{ color: C.sec }}>{label}</span>
+      <span className="min-w-0 break-all font-mono text-[13px]" style={{ color: C.text }}>{value}</span>
       <button
         type="button"
         aria-label={`Copy ${label}`}
@@ -33,7 +33,7 @@ export default function RonRecordIntegrity(
   const ttlPolicy = storedString(view, "ttl_policy_version");
   return (
     <details className="rounded-xl p-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-      <summary className="cursor-pointer text-xs uppercase tracking-widest" style={{ color: C.sec }}>
+      <summary className="cursor-pointer text-sm uppercase tracking-widest" style={{ color: C.sec }}>
         Record integrity & reproducibility
       </summary>
       <div className="mt-3 space-y-2">
@@ -46,13 +46,13 @@ export default function RonRecordIntegrity(
           <Row label="Decision id" value={view.decision.decision_id} />
         )}
         {orchestrator && (
-          <p className="text-xs" style={{ color: C.sec }} data-testid="ron-orchestrator-version">
+          <p className="text-sm" style={{ color: C.sec }} data-testid="ron-orchestrator-version">
             Orchestrator version {orchestrator}
           </p>
         )}
         {registryHash && <Row label="Registry hash" value={registryHash} />}
         {(decisionSchema || evidenceSchema || ttlPolicy) && (
-          <p className="text-xs" style={{ color: C.sec }} data-testid="ron-schema-versions">
+          <p className="text-sm" style={{ color: C.sec }} data-testid="ron-schema-versions">
             {[
               decisionSchema && `Decision schema ${decisionSchema}`,
               evidenceSchema && `Evidence schema ${evidenceSchema}`,
@@ -60,7 +60,7 @@ export default function RonRecordIntegrity(
             ].filter(Boolean).join(" · ")}
           </p>
         )}
-        <p className="text-xs" style={{ color: C.muted }}>
+        <p className="text-sm" style={{ color: C.muted }}>
           {view.evidence_count} evidence records linked · reconstructable:{" "}
           {view.reconstructable ? "yes" : "no"}
         </p>

@@ -111,7 +111,7 @@ export default function AddInstrumentModal({ open, onClose, userId, currentInstr
               autoFocus
               style={{
                 flex: 1, background: "none", border: "none", outline: "none",
-                color: C.text, fontSize: 13, fontFamily: "'DM Sans', sans-serif",
+                color: C.text, fontSize: 15, fontFamily: "'DM Sans', sans-serif",
               }}
             />
           </div>
@@ -122,7 +122,7 @@ export default function AddInstrumentModal({ open, onClose, userId, currentInstr
           {CATEGORY_ORDER.filter(cat => grouped[cat]).map(cat => (
             <div key={cat} style={{ marginBottom: 16 }}>
               <div style={{
-                fontSize: 10, fontWeight: 700, color: C.jade, textTransform: "uppercase",
+                fontSize: 12, fontWeight: 700, color: C.jade, textTransform: "uppercase",
                 letterSpacing: 1.5, marginBottom: 8, paddingTop: 8,
               }}>
                 {CATEGORY_LABELS[cat] || cat}
@@ -140,13 +140,13 @@ export default function AddInstrumentModal({ open, onClose, userId, currentInstr
                     }}
                   >
                     <div>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
+                      <span style={{ fontSize: 15, fontWeight: 600, color: C.text, fontFamily: "'JetBrains Mono', monospace" }}>
                         {inst.symbol}
                       </span>
-                      <span style={{ fontSize: 11, color: C.sec, marginLeft: 8 }}>{inst.display_name}</span>
+                      <span style={{ fontSize: 13, color: C.sec, marginLeft: 8 }}>{inst.display_name}</span>
                       {inst.is_popular && (
                         <span style={{
-                          fontSize: 9, fontWeight: 600, color: C.amber, marginLeft: 6,
+                          fontSize: 11, fontWeight: 600, color: C.amber, marginLeft: 6,
                           background: C.amber + "15", padding: "1px 5px", borderRadius: 4,
                         }}>
                           POPULAR
@@ -154,7 +154,7 @@ export default function AddInstrumentModal({ open, onClose, userId, currentInstr
                       )}
                     </div>
                     {already ? (
-                      <span style={{ fontSize: 10, color: C.jade, display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 12, color: C.jade, display: "flex", alignItems: "center", gap: 4 }}>
                         <Check size={12} /> Added
                       </span>
                     ) : (
@@ -164,7 +164,7 @@ export default function AddInstrumentModal({ open, onClose, userId, currentInstr
                         style={{
                           background: C.jade + "15", border: `1px solid ${C.jade}30`,
                           borderRadius: 6, padding: "4px 10px", cursor: "pointer",
-                          fontSize: 11, fontWeight: 600, color: C.jade,
+                          fontSize: 13, fontWeight: 600, color: C.jade,
                           display: "flex", alignItems: "center", gap: 4,
                         }}
                       >
@@ -177,7 +177,7 @@ export default function AddInstrumentModal({ open, onClose, userId, currentInstr
             </div>
           ))}
           {filtered.length === 0 && (
-            <div style={{ fontSize: 12, color: C.sec, textAlign: "center", padding: 20 }}>
+            <div style={{ fontSize: 14, color: C.sec, textAlign: "center", padding: 20 }}>
               No instruments found matching "{search}"
             </div>
           )}
