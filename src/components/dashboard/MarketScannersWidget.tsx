@@ -11,7 +11,7 @@ import { TrendingUp, TrendingDown, Activity, AlertTriangle } from "lucide-react"
 import { C } from "@/lib/mock-data";
 import { formatAge } from "@/lib/expiry";
 import { ronDecisionRecordHref } from "@/lib/ron-decision-explorer";
-import { useRonSnapshots, ronStateFrom, ronStateColor, ronBiasFrom, type RonState } from "@/services/ron-snapshots";
+import { useRonSnapshots, ronStateFrom, ronStateColor, ronBiasFrom, ronBiasColor, type RonState } from "@/services/ron-snapshots";
 import {
   topMovers, ronWatchList, dataHealthIssues, SCANNER_LIMIT, type ScannerSnapshotInput,
 } from "@/lib/dashboard-scanners";
@@ -127,7 +127,7 @@ export default function MarketScannersWidget() {
               <span style={{ fontSize: 10, color: C.sec, fontFamily: mono }}>
                 {w.timeframe} bar · {formatAge(w.bar_time)}
               </span>
-              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: mono, color: ronStateColor(w.state as RonState) }}>
+              <span style={{ fontSize: 11, fontWeight: 700, fontFamily: mono, color: ronBiasColor(w.bias) ?? ronStateColor(w.state as RonState) }}>
                 {w.state}{w.bias ? ` ${w.bias}` : ""}
               </span>
             </button>

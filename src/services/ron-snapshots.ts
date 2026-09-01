@@ -110,6 +110,21 @@ export function ronBiasFrom(features: Record<string, any> | null | undefined): R
  * Presentation label combining the deterministic state with its directional side.
  * Falls back to the bare state when the stored evidence is not directionally explicit.
  */
+/** Presentation colour for a directional side: green long, red short. */
+export function ronBiasColor(bias: string | null | undefined): string | null {
+  if (bias === "LONG") return "#00CFA5";
+  if (bias === "SHORT") return "#FF4D4D";
+  return null;
+}
+
+/** Directional side implied by a rendered label ending in LONG/SHORT, if any. */
+export function ronBiasFromLabel(label: string | null | undefined): string | null {
+  if (!label) return null;
+  if (/\bLONG$/.test(label)) return "LONG";
+  if (/\bSHORT$/.test(label)) return "SHORT";
+  return null;
+}
+
 export function ronStateLabel(state: string, bias: string | null | undefined): string {
   return bias ? `${state} ${bias}` : state;
 }
