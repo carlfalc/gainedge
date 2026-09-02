@@ -44,6 +44,15 @@ const Login = () => {
     if (!result.redirected && !result.error) navigate("/dashboard");
   };
 
+  const handleForgotPassword = async () => {
+    if (!email.trim()) { toast.error("Enter your email address first"); return; }
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) toast.error(error.message);
+    else toast.success("Password link sent — check your inbox");
+  };
+
   const inputStyle: React.CSSProperties = {
     width: "100%", padding: "11px 14px 11px 42px", borderRadius: 10,
     border: `1px solid ${C.border}`, background: C.bg, color: C.text,
@@ -83,6 +92,14 @@ const Login = () => {
           }}>
             {loading ? t("auth.signingIn") : t("auth.login")}
           </button>
+
+          <button type="button" onClick={handleForgotPassword} style={{
+            background: "none", border: "none", color: C.jade, fontSize: 14,
+            fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: 0, textAlign: "center",
+          }}>
+            Forgot / set password
+          </button>
+
 
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0" }}>
             <div style={{ flex: 1, height: 1, background: C.border }} />

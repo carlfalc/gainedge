@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import Login from "./pages/Login.tsx";
 import Signup from "./pages/Signup.tsx";
+import ResetPassword from "./pages/ResetPassword.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import ChartPopout from "./pages/ChartPopout.tsx";
 import LoungePopout from "./pages/LoungePopout.tsx";
@@ -42,6 +43,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/chart-popout" element={<ChartPopout />} />
           <Route path="/lounge-popout" element={<LoungePopout />} />
           <Route path="/instruments-popout" element={<InstrumentsPopout />} />
