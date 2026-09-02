@@ -209,20 +209,41 @@ function indicators(candles: StrategyLabV2Candle[], genome: StrategyGenomeV2): I
   };
 }
 
-function priorExtreme(
-  candles: StrategyLabV2Candle[],
-  index: number,
-  lookback: number,
-  field: "high" | "low",
-): number {
-  let value = field === "high" ? -Infinity : Infinity;
-  for (let i = Math.max(0, index - lookback); i < index; i += 1) {
-    value = field === "high"
-      ? Math.max(value, candles[i].high)
-      : Math.min(value, candles[i].low);
+/**
+ * `output[i]` is the extreme of `values[max(0, i - lookback) .. i - 1]`, i.e. the strictly
+ * prior window, and ±Infinity when that window is empty. A monotonic deque produces the
+ * same values as rescanning the window per bar, in O(n) instead of O(n * lookback).
+ */
+function trailingExtremes(values: number[], lookback: number, mode: "max" | "min"): number[] {
+  const length = values.length;
+  const output = new Array<number>(length);
+  const empty = mode === "max" ? -Infinity : Infinity;
+  if (!length) return output;
+  const window = Math.max(1, Math.floor(lookback));
+  const deque = new Int32Array(length);
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < length; i += 1) {
+    while (head < tail && deque[head] < i - window) head += 1;
+    output[i] = head < tail ? values[deque[head]] : empty;
+    const value = values[i];
+    while (head < tail && (mode === "max" ? values[deque[tail - 1]] <= value : values[deque[tail - 1]] >= value)) {
+      tail -= 1;
+    }
+    deque[tail] = i;
+    tail += 1;
   }
-  return value;
+  return output;
 }
+
+function prepareGenomeContext(candles: StrategyLabV2Candle[], genome: StrategyGenomeV2): GenomeContextV2 {
+  return {
+    set: indicators(candles, genome),
+    priorHigh: trailingExtremes(candles.map((bar) => bar.high), genome.lookback, "max"),
+    priorLow: trailingExtremes(candles.map((bar) => bar.low), genome.lookback, "min"),
+  };
+}
+
 
 function directionAllowed(genome: StrategyGenomeV2, direction: "long" | "short") {
   return genome.direction === "both" || genome.direction === direction;
