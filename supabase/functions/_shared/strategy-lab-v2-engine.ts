@@ -698,22 +698,25 @@ export function createStrategyLabV2Checkpoint(options: {
   tested?: number;
   generated?: number;
   rejected?: number;
+  completedGenerations?: number;
   best?: StrategyLabV2AgentBest | null;
 }): StrategyLabV2AgentCheckpoint {
   agentFamilies(options.agentId);
   const budget = Math.max(1, Math.floor(options.budget));
   const chunkSize = strategyLabV2ChunkSize(budget, options.generations);
+  const planned = strategyLabV2PlannedGenerations(budget, options.generations);
   const seen = [...new Set(options.seen ?? [])];
   return {
     checkpoint_version: STRATEGY_LAB_V2_CHECKPOINT_VERSION,
     agent_id: options.agentId,
     seed: Math.abs(Math.trunc(options.seed)) >>> 0,
     budget,
-    planned_generations: strategyLabV2PlannedGenerations(budget, options.generations),
+    planned_generations: planned,
     chunk_size: chunkSize,
-    completed_generations: 0,
+    completed_generations: Math.max(0, Math.min(planned, Math.floor(options.completedGenerations ?? 0))),
     generated: options.generated ?? seen.length,
     tested: options.tested ?? seen.length,
+
     rejected: options.rejected ?? 0,
     seen,
     elites: (options.elites ?? []).slice(0, strategyLabV2EliteCount(chunkSize)),
