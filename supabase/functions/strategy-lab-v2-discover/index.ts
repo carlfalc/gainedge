@@ -44,6 +44,12 @@ const CANDIDATE_PERSIST_BATCH = 250;
 type DbClient = SupabaseClient;
 type RunRow = Record<string, unknown>;
 type AgentRow = Record<string, unknown>;
+type ProgressTotals = {
+  generated: number;
+  tested: number;
+  rejected: number;
+  budget: number;
+};
 
 interface RequestBody {
   action: "start" | "run_agent" | "finalise" | "status" | "cancel";
@@ -482,7 +488,7 @@ async function persistRunProgress(db: DbClient, run: RunRow, currentAgent: Strat
     .select("agent_id,status,generated,tested,rejected,generations,budget").eq("run_id", run.id);
   if (error) throw new Error(`progress_read_failed:${error.message}`);
   const agents = (data ?? []) as AgentRow[];
-  const totals = agents.reduce((accumulator, row) => ({
+  const totals = agents.reduce<ProgressTotals>((accumulator, row) => ({
     generated: accumulator.generated + Number(row.generated ?? 0),
     tested: accumulator.tested + Number(row.tested ?? 0),
     rejected: accumulator.rejected + Number(row.rejected ?? 0),
