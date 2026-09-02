@@ -8,6 +8,8 @@ import {
 import { C } from "@/lib/mock-data";
 import { NAV_GROUPS } from "@/lib/dashboard-nav";
 import { useSeedData } from "@/hooks/use-seed-data";
+import { useAdmin } from "@/hooks/use-admin";
+import { ShieldCheck } from "lucide-react";
 import { useAutoTradeNotifications } from "@/hooks/use-auto-trade-notifications";
 import LanguageSelector, { LanguageProvider } from "./LanguageSelector";
 import ronAvatar from "@/assets/ron-avatar.png";
