@@ -111,8 +111,35 @@ export default function StrategyLabV2Page() {
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem("strategy_lab_v2_run_id");
-    if (saved) refresh(saved).catch(() => localStorage.removeItem("strategy_lab_v2_run_id"));
+    let mounted = true;
+    const restoreRun = async () => {
+      const saved = localStorage.getItem("strategy_lab_v2_run_id");
+      if (saved) {
+        try {
+          await refresh(saved);
+          return;
+        } catch {
+          localStorage.removeItem("strategy_lab_v2_run_id");
+        }
+      }
+
+      // A run may have started on the preview or custom domain, or survived a browser reset.
+      // RLS limits this lookup to the signed-in user's own runs.
+      const { data, error } = await supabase.from("strategy_lab_v2_runs")
+        .select("id")
+        .eq("status", "searching")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (!mounted || !data?.id) return;
+      localStorage.setItem("strategy_lab_v2_run_id", data.id);
+      await refresh(data.id);
+    };
+    restoreRun().catch((error) => {
+      if (mounted) setMessage(error instanceof Error ? error.message : String(error));
+    });
+    return () => { mounted = false; };
   }, []);
 
   /** Merges one chunk response into local state so partial progress is visible immediately. */
@@ -253,6 +280,8 @@ export default function StrategyLabV2Page() {
         {run && !TERMINAL.includes(run.status) && <button onClick={cancel} style={{ ...secondaryButton, color: C.red }}>Cancel</button>}
       </div>
     </section>
+
+    {message && !run && <div style={{ ...panel, marginTop: 16, color: C.red }}>{message}</div>}
 
     {run && <>
       <section style={{ ...panel, marginTop: 16 }}>
