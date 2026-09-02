@@ -422,13 +422,16 @@ function simulate(
   end: number,
   costs: StrategyLabV2Costs,
   entryDelay = 0,
+  precomputed?: GenomeContextV2,
 ): StrategyLabV2Trade[] {
-  const set = indicators(candles, genome);
+  const context = precomputed ?? prepareGenomeContext(candles, genome);
+  const set = context.set;
   const trades: StrategyLabV2Trade[] = [];
   const warmup = Math.max(genome.slow_ema, genome.lookback, genome.bollinger_period, genome.macd_slow + genome.macd_signal, 30);
   for (let signalIndex = Math.max(start, warmup); signalIndex < end - 1 - entryDelay;) {
-    const direction = signalAt(candles, signalIndex, genome, set);
+    const direction = signalAt(candles, signalIndex, genome, context);
     if (!direction) { signalIndex += 1; continue; }
+
     const entryIndex = signalIndex + 1 + entryDelay;
     const entry = candles[entryIndex].open;
     const stopDistance = set.atr[signalIndex] * genome.stop_atr;
