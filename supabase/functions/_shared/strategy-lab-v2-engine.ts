@@ -17,6 +17,8 @@ import {
   type StrategyLabV2Elite,
   type StrategyLabV2Family,
   type StrategyLabV2FoldResult,
+  type StrategyLabV2GenerationOutput,
+
   type StrategyLabV2Metrics,
   type StrategyLabV2Trade,
   type StrategyLabV2Verdict,
