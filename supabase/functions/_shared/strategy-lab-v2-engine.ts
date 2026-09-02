@@ -1,14 +1,24 @@
 import {
   DEFAULT_STRATEGY_LAB_V2_COSTS,
+  STRATEGY_LAB_V2_CHECKPOINT_VERSION,
   STRATEGY_LAB_V2_GATES,
   STRATEGY_LAB_V2_SEARCH_AGENTS,
+  strategyLabV2CheckpointComplete,
+  strategyLabV2ChunkSize,
+  strategyLabV2EliteCount,
+  strategyLabV2PlannedGenerations,
   type StrategyGenomeV2,
+  type StrategyLabV2AgentBest,
+  type StrategyLabV2AgentCheckpoint,
   type StrategyLabV2AgentId,
   type StrategyLabV2Audit,
   type StrategyLabV2CandidateResult,
   type StrategyLabV2Costs,
+  type StrategyLabV2Elite,
   type StrategyLabV2Family,
   type StrategyLabV2FoldResult,
+  type StrategyLabV2GenerationOutput,
+
   type StrategyLabV2Metrics,
   type StrategyLabV2Trade,
   type StrategyLabV2Verdict,
@@ -35,6 +45,18 @@ interface IndicatorsV2 {
   volumeMean: number[];
 }
 
+/**
+ * Everything a genome needs from a candle series, computed exactly once per genome.
+ * Previously each of the five walk-forward folds recomputed the full indicator set and
+ * rescanned `lookback` bars per candle, which is what pushed one agent past the hosted
+ * CPU ceiling. The values produced here are identical to the per-fold computation.
+ */
+interface GenomeContextV2 {
+  set: IndicatorsV2;
+  priorHigh: number[];
+  priorLow: number[];
+}
+
 export interface SearchAgentOutputV2 {
   agent_id: StrategyLabV2AgentId;
   seed: number;
@@ -46,6 +68,15 @@ export interface SearchAgentOutputV2 {
   candidates: StrategyLabV2CandidateResult[];
   best: StrategyLabV2CandidateResult | null;
 }
+
+export interface StrategyLabV2GenerationOutput {
+  agent_id: StrategyLabV2AgentId;
+  generation: number;
+  evaluated: StrategyLabV2CandidateResult[];
+  checkpoint: StrategyLabV2AgentCheckpoint;
+  complete: boolean;
+}
+
 
 export interface FinalStrategyV2 {
   verdict: StrategyLabV2Verdict;
@@ -180,20 +211,41 @@ function indicators(candles: StrategyLabV2Candle[], genome: StrategyGenomeV2): I
   };
 }
 
-function priorExtreme(
-  candles: StrategyLabV2Candle[],
-  index: number,
-  lookback: number,
-  field: "high" | "low",
-): number {
-  let value = field === "high" ? -Infinity : Infinity;
-  for (let i = Math.max(0, index - lookback); i < index; i += 1) {
-    value = field === "high"
-      ? Math.max(value, candles[i].high)
-      : Math.min(value, candles[i].low);
+/**
+ * `output[i]` is the extreme of `values[max(0, i - lookback) .. i - 1]`, i.e. the strictly
+ * prior window, and ±Infinity when that window is empty. A monotonic deque produces the
+ * same values as rescanning the window per bar, in O(n) instead of O(n * lookback).
+ */
+function trailingExtremes(values: number[], lookback: number, mode: "max" | "min"): number[] {
+  const length = values.length;
+  const output = new Array<number>(length);
+  const empty = mode === "max" ? -Infinity : Infinity;
+  if (!length) return output;
+  const window = Math.max(1, Math.floor(lookback));
+  const deque = new Int32Array(length);
+  let head = 0;
+  let tail = 0;
+  for (let i = 0; i < length; i += 1) {
+    while (head < tail && deque[head] < i - window) head += 1;
+    output[i] = head < tail ? values[deque[head]] : empty;
+    const value = values[i];
+    while (head < tail && (mode === "max" ? values[deque[tail - 1]] <= value : values[deque[tail - 1]] >= value)) {
+      tail -= 1;
+    }
+    deque[tail] = i;
+    tail += 1;
   }
-  return value;
+  return output;
 }
+
+function prepareGenomeContext(candles: StrategyLabV2Candle[], genome: StrategyGenomeV2): GenomeContextV2 {
+  return {
+    set: indicators(candles, genome),
+    priorHigh: trailingExtremes(candles.map((bar) => bar.high), genome.lookback, "max"),
+    priorLow: trailingExtremes(candles.map((bar) => bar.low), genome.lookback, "min"),
+  };
+}
+
 
 function directionAllowed(genome: StrategyGenomeV2, direction: "long" | "short") {
   return genome.direction === "both" || genome.direction === direction;
@@ -231,17 +283,19 @@ function signalAt(
   candles: StrategyLabV2Candle[],
   index: number,
   genome: StrategyGenomeV2,
-  set: IndicatorsV2,
+  context: GenomeContextV2,
 ): "long" | "short" | null {
   if (!timeAllowed(genome, candles[index].time)) return null;
+  const set = context.set;
   const candle = candles[index];
   const previous = candles[index - 1];
   const trendUp = set.emaFast[index] > set.emaSlow[index];
   const trendDown = set.emaFast[index] < set.emaSlow[index];
-  const high = priorExtreme(candles, index, genome.lookback, "high");
-  const low = priorExtreme(candles, index, genome.lookback, "low");
+  const high = context.priorHigh[index];
+  const low = context.priorLow[index];
   const range = high - low;
   const atrNow = Math.max(Number.EPSILON, set.atr[index]);
+
   let signal: "long" | "short" | null = null;
 
   switch (genome.family) {
@@ -370,13 +424,16 @@ function simulate(
   end: number,
   costs: StrategyLabV2Costs,
   entryDelay = 0,
+  precomputed?: GenomeContextV2,
 ): StrategyLabV2Trade[] {
-  const set = indicators(candles, genome);
+  const context = precomputed ?? prepareGenomeContext(candles, genome);
+  const set = context.set;
   const trades: StrategyLabV2Trade[] = [];
   const warmup = Math.max(genome.slow_ema, genome.lookback, genome.bollinger_period, genome.macd_slow + genome.macd_signal, 30);
   for (let signalIndex = Math.max(start, warmup); signalIndex < end - 1 - entryDelay;) {
-    const direction = signalAt(candles, signalIndex, genome, set);
+    const direction = signalAt(candles, signalIndex, genome, context);
     if (!direction) { signalIndex += 1; continue; }
+
     const entryIndex = signalIndex + 1 + entryDelay;
     const entry = candles[entryIndex].open;
     const stopDistance = set.atr[signalIndex] * genome.stop_atr;
@@ -582,10 +639,13 @@ function evaluateGenome(
   const foldSize = Math.max(100, Math.floor(candles.length * 0.1));
   const firstFold = Math.max(0, candles.length - foldCount * foldSize);
   const embargo = Math.min(Math.max(genome.lookback, genome.max_bars, genome.slow_ema), Math.floor(foldSize * 0.15));
+  // One context for all five folds: the indicator series and trailing extremes depend on
+  // the genome and the candle series only, never on the fold window.
+  const context = prepareGenomeContext(candles, genome);
   for (let fold = 0; fold < foldCount; fold += 1) {
     const start = firstFold + fold * foldSize + embargo;
     const end = Math.min(candles.length, firstFold + (fold + 1) * foldSize);
-    const trades = start < end ? simulate(candles, genome, start, end, costs, entryDelay) : [];
+    const trades = start < end ? simulate(candles, genome, start, end, costs, entryDelay, context) : [];
     allTrades.push(...trades);
     folds.push({ fold: fold + 1, start_index: start, end_index: end, metrics: metricsFromTrades(trades) });
   }
@@ -608,6 +668,173 @@ function evaluateGenome(
   return { result, trades: allTrades };
 }
 
+function agentFamilies(agentId: StrategyLabV2AgentId): readonly StrategyLabV2Family[] {
+  const definition = STRATEGY_LAB_V2_SEARCH_AGENTS.find((agent) => agent.agent_id === agentId);
+  if (!definition) throw new Error(`unknown_agent:${agentId}`);
+  return definition.families as readonly StrategyLabV2Family[];
+}
+
+/**
+ * Per-generation RNG seed. Deriving it from (agent seed, generation) instead of carrying a
+ * live RNG stream is what makes an interrupted generation replayable: rerunning generation
+ * N with the same persisted elites reproduces exactly the same population.
+ */
+function generationSeed(seed: number, generation: number): number {
+  let x = (Math.abs(Math.trunc(seed)) >>> 0) ^ Math.imul(generation >>> 0, 0x9e3779b1);
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b);
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35);
+  x = (x ^ (x >>> 16)) >>> 0;
+  return x || 0x9e3779b9;
+}
+
+const byScoreThenHash = (a: { score: number; candidate_hash: string }, b: { score: number; candidate_hash: string }) =>
+  b.score - a.score || a.candidate_hash.localeCompare(b.candidate_hash);
+
+export function createStrategyLabV2Checkpoint(options: {
+  agentId: StrategyLabV2AgentId;
+  seed: number;
+  budget: number;
+  generations: number;
+  seen?: string[];
+  elites?: StrategyLabV2Elite[];
+  tested?: number;
+  generated?: number;
+  rejected?: number;
+  completedGenerations?: number;
+  best?: StrategyLabV2AgentBest | null;
+}): StrategyLabV2AgentCheckpoint {
+  agentFamilies(options.agentId);
+  const budget = Math.max(1, Math.floor(options.budget));
+  const chunkSize = strategyLabV2ChunkSize(budget, options.generations);
+  const planned = strategyLabV2PlannedGenerations(budget, options.generations);
+  const seen = [...new Set(options.seen ?? [])];
+  return {
+    checkpoint_version: STRATEGY_LAB_V2_CHECKPOINT_VERSION,
+    agent_id: options.agentId,
+    seed: Math.abs(Math.trunc(options.seed)) >>> 0,
+    budget,
+    planned_generations: planned,
+    chunk_size: chunkSize,
+    completed_generations: Math.max(0, Math.min(planned, Math.floor(options.completedGenerations ?? 0))),
+    generated: options.generated ?? seen.length,
+    tested: options.tested ?? seen.length,
+
+    rejected: options.rejected ?? 0,
+    seen,
+    elites: (options.elites ?? []).slice(0, strategyLabV2EliteCount(chunkSize)),
+    best: options.best ?? null,
+  };
+}
+
+/**
+ * Evaluates exactly one generation — at most `chunk_size` (<= 64) genomes — and returns an
+ * advanced checkpoint. The input checkpoint is never mutated, so a caller that fails to
+ * persist the result simply replays the identical generation on the next invocation.
+ */
+export function runStrategyLabV2Generation(
+  candles: StrategyLabV2Candle[],
+  checkpoint: StrategyLabV2AgentCheckpoint,
+  costs: StrategyLabV2Costs = DEFAULT_STRATEGY_LAB_V2_COSTS,
+): StrategyLabV2GenerationOutput {
+  if (strategyLabV2CheckpointComplete(checkpoint)) {
+    return {
+      agent_id: checkpoint.agent_id,
+      generation: checkpoint.completed_generations,
+      evaluated: [],
+      checkpoint: { ...checkpoint, seen: [...checkpoint.seen], elites: [...checkpoint.elites] },
+      complete: true,
+    };
+  }
+  const families = agentFamilies(checkpoint.agent_id);
+  const generation = checkpoint.completed_generations + 1;
+  const target = Math.min(checkpoint.chunk_size, checkpoint.budget - checkpoint.tested);
+  const rng = new SeededRandom(generationSeed(checkpoint.seed, generation));
+  const seen = new Set(checkpoint.seen);
+  const elites = checkpoint.elites;
+  const population: Array<{ genome: StrategyGenomeV2; parents: string[] }> = [];
+  let generated = 0;
+
+  // Generation 1 (and any generation with no surviving elites) seeds a deterministic random
+  // population. Later generations cross and mutate the persisted elites, falling back to
+  // fresh random genomes only if the elite neighbourhood is exhausted, so the advertised
+  // budget is always reached exactly.
+  const eliteAttempts = elites.length ? target * 60 : 0;
+  for (let attempt = 0; attempt < eliteAttempts && population.length < target; attempt += 1) {
+    const parentA = rng.pick(elites);
+    const parentB = rng.pick(elites);
+    const genome = mutateGenome(crossover(parentA.genome, parentB.genome, rng), families, rng);
+    generated += 1;
+    const hash = hashGenome(genome);
+    if (seen.has(hash)) continue;
+    seen.add(hash);
+    population.push({ genome, parents: [parentA.candidate_hash, parentB.candidate_hash] });
+  }
+  const randomAttempts = target * 400;
+  for (let attempt = 0; attempt < randomAttempts && population.length < target; attempt += 1) {
+    const genome = randomGenome(families, rng);
+    generated += 1;
+    const hash = hashGenome(genome);
+    if (seen.has(hash)) continue;
+    seen.add(hash);
+    population.push({ genome, parents: [] });
+  }
+  if (population.length < target) {
+    throw new Error(`genome_space_exhausted:${checkpoint.agent_id}:generation_${generation}`);
+  }
+
+  const evaluated = population.map((member) =>
+    evaluateGenome(candles, member.genome, costs, generation, member.parents).result
+  );
+
+  const eliteCount = strategyLabV2EliteCount(checkpoint.chunk_size);
+  const nextElites: StrategyLabV2Elite[] = [
+    ...elites,
+    ...evaluated.map((candidate) => ({
+      candidate_hash: candidate.candidate_hash,
+      score: candidate.score,
+      genome: candidate.genome,
+    })),
+  ].sort(byScoreThenHash).slice(0, eliteCount);
+
+  const bestOfGeneration = [...evaluated].sort(byScoreThenHash)[0] ?? null;
+  const best: StrategyLabV2AgentBest | null = bestOfGeneration && (
+      !checkpoint.best ||
+      bestOfGeneration.score > checkpoint.best.score ||
+      (bestOfGeneration.score === checkpoint.best.score &&
+        bestOfGeneration.candidate_hash.localeCompare(checkpoint.best.candidate_hash) < 0)
+    )
+    ? {
+      candidate_hash: bestOfGeneration.candidate_hash,
+      score: bestOfGeneration.score,
+      metrics: bestOfGeneration.metrics,
+    }
+    : checkpoint.best;
+
+  const advanced: StrategyLabV2AgentCheckpoint = {
+    ...checkpoint,
+    completed_generations: generation,
+    generated: checkpoint.generated + generated,
+    tested: checkpoint.tested + evaluated.length,
+    rejected: checkpoint.rejected + evaluated.filter((candidate) => candidate.disqualified).length,
+    seen: [...seen],
+    elites: nextElites,
+    best,
+  };
+
+  return {
+    agent_id: checkpoint.agent_id,
+    generation,
+    evaluated,
+    checkpoint: advanced,
+    complete: strategyLabV2CheckpointComplete(advanced),
+  };
+}
+
+/**
+ * Single-process driver over the same resumable generation runner used by the Edge
+ * endpoint, so a chunked multi-invocation search and an in-process search produce
+ * identical candidates for identical inputs.
+ */
 export function searchStrategyLabV2Agent(
   candles: StrategyLabV2Candle[],
   agentId: StrategyLabV2AgentId,
@@ -616,61 +843,27 @@ export function searchStrategyLabV2Agent(
   seed: number,
   costs: StrategyLabV2Costs = DEFAULT_STRATEGY_LAB_V2_COSTS,
 ): SearchAgentOutputV2 {
-  const definition = STRATEGY_LAB_V2_SEARCH_AGENTS.find((agent) => agent.agent_id === agentId);
-  if (!definition) throw new Error(`unknown_agent:${agentId}`);
-  const families = definition.families as readonly StrategyLabV2Family[];
-  const rng = new SeededRandom(seed);
-  const seen = new Set<string>();
+  let checkpoint = createStrategyLabV2Checkpoint({ agentId, seed, budget, generations });
   const results: StrategyLabV2CandidateResult[] = [];
-  const populationSize = Math.max(12, Math.min(64, Math.floor(budget / Math.max(2, generations))));
-  let population: StrategyGenomeV2[] = [];
-
-  while (population.length < populationSize && seen.size < budget) {
-    const genome = randomGenome(families, rng);
-    const hash = hashGenome(genome);
-    if (!seen.has(hash)) { seen.add(hash); population.push(genome); }
+  while (!strategyLabV2CheckpointComplete(checkpoint)) {
+    const output = runStrategyLabV2Generation(candles, checkpoint, costs);
+    results.push(...output.evaluated);
+    checkpoint = output.checkpoint;
   }
-  let generation = 1;
-  while (results.length < budget && generation <= generations) {
-    const generationResults: StrategyLabV2CandidateResult[] = [];
-    for (const genome of population) {
-      if (results.length >= budget) break;
-      const evaluated = evaluateGenome(candles, genome, costs, generation).result;
-      results.push(evaluated);
-      generationResults.push(evaluated);
-    }
-    const elites = [...generationResults].sort((a, b) => b.score - a.score).slice(0, Math.max(4, Math.floor(populationSize * 0.25)));
-    // Elites remain parents, but must not be re-tested as new candidates. Re-evaluating
-    // them would inflate the advertised search count and duplicate candidate hashes.
-    const next: StrategyGenomeV2[] = [];
-    let attempts = 0;
-    while (next.length < populationSize && results.length + next.length < budget + populationSize && attempts < populationSize * 40) {
-      attempts += 1;
-      const a = rng.pick(elites).genome;
-      const b = rng.pick(elites).genome;
-      const genome = mutateGenome(crossover(a, b, rng), families, rng);
-      const hash = hashGenome(genome);
-      if (!seen.has(hash)) { seen.add(hash); next.push(genome); }
-    }
-    population = next;
-    generation += 1;
-    if (!population.length) break;
-  }
-  while (results.length < budget) {
-    const genome = randomGenome(families, rng);
-    const hash = hashGenome(genome);
-    if (seen.has(hash)) continue;
-    seen.add(hash);
-    results.push(evaluateGenome(candles, genome, costs, generation).result);
-  }
-  results.sort((a, b) => b.score - a.score || a.candidate_hash.localeCompare(b.candidate_hash));
+  results.sort(byScoreThenHash);
   return {
-    agent_id: agentId, seed, budget, generated: seen.size, tested: results.length,
-    rejected: results.filter((candidate) => candidate.disqualified).length,
-    generations: Math.min(generations, generation), candidates: results,
+    agent_id: agentId,
+    seed,
+    budget: checkpoint.budget,
+    generated: checkpoint.generated,
+    tested: checkpoint.tested,
+    rejected: checkpoint.rejected,
+    generations: checkpoint.completed_generations,
+    candidates: results,
     best: results[0] ?? null,
   };
 }
+
 
 function scaledCosts(costs: StrategyLabV2Costs, multiplier: number): StrategyLabV2Costs {
   return {

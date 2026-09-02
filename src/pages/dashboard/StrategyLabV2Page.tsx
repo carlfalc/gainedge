@@ -4,7 +4,11 @@ import { C } from "@/lib/mock-data";
 
 type Agent = {
   agent_id: string; status: string; generated: number; tested: number; rejected: number;
-  generations: number; artifact?: { families?: string[]; best_score?: number; best_metrics?: Metrics };
+  generations: number; budget?: number;
+  artifact?: {
+    families?: string[]; best_score?: number; best_metrics?: Metrics; last_error?: string;
+    checkpoint?: { budget?: number; chunk_size?: number; planned_generations?: number; completed_generations?: number };
+  };
 };
 type Metrics = {
   trades: number; wins: number; losses: number; win_rate: number; win_rate_lower_95: number;
@@ -26,13 +30,28 @@ type FinalResult = {
   exact_rules: string[];
   tested_universe?: { agents: number; unique_candidates: number; walk_forward_folds: number; stress_scenarios: number; bootstrap_runs: number };
 };
+type Progress = {
+  percent?: number; generated?: number; tested?: number; rejected?: number; total_budget?: number;
+  agents_completed?: number; agents_total?: number; phase?: string; current_agent?: string;
+};
 type Run = {
   id: string; status: string; verdict: FinalResult["verdict"] | null; symbol: string; timeframe: string;
   candle_count: number; search_depth: string; random_seed: number; dataset_audit: Record<string, unknown>;
-  progress: { percent?: number; generated?: number; tested?: number; rejected?: number; agents_completed?: number; agents_total?: number; phase?: string; current_agent?: string };
+  progress: Progress;
   candidates_generated: number; candidates_tested: number; candidates_rejected: number;
   final_result: FinalResult | null; execution_allowed: false; error_message?: string | null;
 };
+/** One `run_agent` invocation = one bounded generation. `state` says whether to call again. */
+type ChunkResponse = {
+  agent?: {
+    agent_id: string; state: "partial" | "complete"; generated: number; tested: number;
+    rejected: number; generations: number; planned_generations: number; budget: number; chunk_size: number;
+  };
+  progress?: Progress;
+  next_action?: { action: "run_agent" | "finalise"; agent_id?: string };
+  skipped?: boolean;
+};
+
 
 const AGENT_LABELS: Record<string, string> = {
   trend_structure: "Trend & Structure Search",
@@ -43,12 +62,19 @@ const AGENT_LABELS: Record<string, string> = {
   volume_liquidity: "Volume & Liquidity Search",
   strategy_composer: "Hybrid Strategy Evolution",
 };
+const AGENT_ORDER = Object.keys(AGENT_LABELS);
 const DEPTHS = {
   standard: { candidates: 672, bootstrap: 200, label: "Standard · 672 candidates" },
   deep: { candidates: 1792, bootstrap: 500, label: "Deep · 1,792 candidates" },
   maximum: { candidates: 3584, bootstrap: 1000, label: "Maximum · 3,584 candidates" },
 } as const;
+/**
+ * Safety valve for the drive loop. Every invocation evaluates one bounded generation, so a
+ * healthy agent finishes in `planned_generations` calls; this only stops a pathological loop.
+ */
+const MAX_INVOCATIONS_PER_AGENT = 40;
 const TERMINAL = ["viable_strategy_found", "no_viable_strategy", "inconclusive", "failed", "cancelled"];
+
 const oneYearAgo = () => { const date = new Date(); date.setUTCFullYear(date.getUTCFullYear() - 1); return date.toISOString().slice(0, 10); };
 
 export default function StrategyLabV2Page() {
@@ -86,15 +112,52 @@ export default function StrategyLabV2Page() {
     if (saved) refresh(saved).catch(() => localStorage.removeItem("strategy_lab_v2_run_id"));
   }, []);
 
+  /** Merges one chunk response into local state so partial progress is visible immediately. */
+  const applyChunk = (chunk: ChunkResponse) => {
+    if (chunk.progress) setRun((current) => current ? { ...current, progress: chunk.progress! } : current);
+    const detail = chunk.agent;
+    if (!detail) return;
+    setAgents((current) => current.map((agent) => agent.agent_id === detail.agent_id
+      ? {
+        ...agent,
+        status: detail.state === "complete" ? "complete" : "running",
+        generated: detail.generated, tested: detail.tested, rejected: detail.rejected,
+        generations: detail.generations, budget: detail.budget,
+        artifact: {
+          ...agent.artifact,
+          checkpoint: {
+            ...agent.artifact?.checkpoint,
+            budget: detail.budget, chunk_size: detail.chunk_size,
+            planned_generations: detail.planned_generations, completed_generations: detail.generations,
+          },
+        },
+      }
+      : agent));
+  };
+
+  /**
+   * One invocation evaluates a single bounded generation, so each agent is invoked
+   * repeatedly until the server reports it complete before the next agent starts. All
+   * counters come from the server's persisted state, so a refresh mid-run resumes cleanly.
+   */
   const executeRemaining = async (runId: string, initialAgents?: string[]) => {
     setWorking(true);
     try {
       const status = await refresh(runId);
-      const pending = initialAgents ?? status.agents.filter((agent) => agent.status !== "complete").map((agent) => agent.agent_id);
+      const completed = new Set(status.agents.filter((agent) => agent.status === "complete").map((agent) => agent.agent_id));
+      const ordered = initialAgents ?? (status.agents.length ? AGENT_ORDER.filter((id) => status.agents.some((agent) => agent.agent_id === id)) : AGENT_ORDER);
+      const pending = ordered.filter((agentId) => !completed.has(agentId));
       for (const agentId of pending) {
-        setMessage(`${AGENT_LABELS[agentId] ?? agentId} is evolving and testing candidates…`);
-        const data = await invoke({ action: "run_agent", run_id: runId, agent_id: agentId });
-        if (data.progress) setRun((current) => current ? { ...current, progress: data.progress } : current);
+        const label = AGENT_LABELS[agentId] ?? agentId;
+        for (let invocation = 1; ; invocation += 1) {
+          if (invocation > MAX_INVOCATIONS_PER_AGENT) throw new Error(`agent_did_not_complete:${agentId}`);
+          setMessage(`${label} — evolving generation ${invocation}…`);
+          const chunk = await invoke({ action: "run_agent", run_id: runId, agent_id: agentId }) as ChunkResponse;
+          applyChunk(chunk);
+          if (chunk.skipped || chunk.agent?.state === "complete") break;
+          if (!chunk.agent) throw new Error(`agent_response_missing_state:${agentId}`);
+          setMessage(`${label} — ${chunk.agent.tested}/${chunk.agent.budget} tested · generation ${chunk.agent.generations}/${chunk.agent.planned_generations}`);
+        }
         await refresh(runId);
       }
       setMessage("Stress testing finalists and opening the sealed holdout once…");
@@ -108,6 +171,7 @@ export default function StrategyLabV2Page() {
       setWorking(false);
     }
   };
+
 
   const startRun = async () => {
     setWorking(true); setMessage("Auditing candles and sealing the holdout…"); setRun(null); setAgents([]); setLeaders([]);

@@ -163,6 +163,106 @@ export const STRATEGY_LAB_V2_SEARCH_BUDGETS = {
 
 export type StrategyLabV2SearchDepth = keyof typeof STRATEGY_LAB_V2_SEARCH_BUDGETS;
 
+/**
+ * A single Edge invocation may never evaluate more than this many genomes. The hosted
+ * worker enforces a CPU-time ceiling that an unbounded per-agent search cannot respect,
+ * so the search is executed as resumable one-generation micro-batches instead.
+ */
+export const STRATEGY_LAB_V2_MAX_CHUNK_EVALUATIONS = 64 as const;
+
+export const STRATEGY_LAB_V2_CHECKPOINT_VERSION = 1 as const;
+
+/** Genomes evaluated by one invocation: ceil(per_agent / generations), hard-capped at 64. */
+export function strategyLabV2ChunkSize(perAgent: number, generations: number): number {
+  const budget = Math.max(1, Math.floor(perAgent));
+  const planned = Math.max(1, Math.floor(generations));
+  return Math.max(1, Math.min(STRATEGY_LAB_V2_MAX_CHUNK_EVALUATIONS, Math.ceil(budget / planned)));
+}
+
+/**
+ * Generations actually required to test the whole advertised budget. This equals the
+ * requested generation count for every shipped depth; it only grows if a caller asks for
+ * a budget that the 64-evaluation chunk ceiling could not otherwise deliver.
+ */
+export function strategyLabV2PlannedGenerations(perAgent: number, generations: number): number {
+  const budget = Math.max(1, Math.floor(perAgent));
+  const requested = Math.max(1, Math.floor(generations));
+  return Math.max(requested, Math.ceil(budget / strategyLabV2ChunkSize(budget, requested)));
+}
+
+/** Elites carried between generations. Bounded so the persisted checkpoint stays compact. */
+export function strategyLabV2EliteCount(chunkSize: number): number {
+  return Math.max(4, Math.min(16, Math.floor(chunkSize * 0.25)));
+}
+
+export interface StrategyLabV2Elite {
+  candidate_hash: string;
+  score: number;
+  genome: StrategyGenomeV2;
+}
+
+export interface StrategyLabV2AgentBest {
+  candidate_hash: string;
+  score: number;
+  /** Null only for a best recovered from persisted candidate rows before the next generation. */
+  metrics: StrategyLabV2Metrics | null;
+}
+
+/**
+ * Resumable per-agent search state persisted in `strategy_lab_v2_agent_runs.artifact`.
+ * It only ever advances after a generation has been fully persisted, so replaying an
+ * interrupted invocation reproduces the identical population and cannot double-count.
+ */
+export interface StrategyLabV2AgentCheckpoint {
+  checkpoint_version: typeof STRATEGY_LAB_V2_CHECKPOINT_VERSION;
+  agent_id: StrategyLabV2AgentId;
+  seed: number;
+  budget: number;
+  planned_generations: number;
+  chunk_size: number;
+  completed_generations: number;
+  generated: number;
+  tested: number;
+  rejected: number;
+  seen: string[];
+  elites: StrategyLabV2Elite[];
+  best: StrategyLabV2AgentBest | null;
+}
+
+/** One invocation's worth of work: the evaluated generation plus the advanced checkpoint. */
+export interface StrategyLabV2GenerationOutput {
+  agent_id: StrategyLabV2AgentId;
+  generation: number;
+  evaluated: StrategyLabV2CandidateResult[];
+  checkpoint: StrategyLabV2AgentCheckpoint;
+  complete: boolean;
+}
+
+/**
+ * An agent is finished once its advertised budget of unique candidates has been tested.
+ * The generation ceiling is a secondary guard so a pathological genome space cannot loop.
+ */
+export function strategyLabV2CheckpointComplete(checkpoint: StrategyLabV2AgentCheckpoint): boolean {
+  return checkpoint.tested >= checkpoint.budget ||
+    checkpoint.completed_generations >= checkpoint.planned_generations;
+}
+
+export function isStrategyLabV2Checkpoint(value: unknown): value is StrategyLabV2AgentCheckpoint {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StrategyLabV2AgentCheckpoint>;
+  return candidate.checkpoint_version === STRATEGY_LAB_V2_CHECKPOINT_VERSION &&
+    typeof candidate.agent_id === "string" && isStrategyLabV2Agent(candidate.agent_id) &&
+    Number.isFinite(candidate.seed) && Number.isFinite(candidate.budget) &&
+    Number.isFinite(candidate.chunk_size) && Number.isFinite(candidate.planned_generations) &&
+    Number.isFinite(candidate.completed_generations) && Number.isFinite(candidate.tested) &&
+    Number.isFinite(candidate.generated) && Number.isFinite(candidate.rejected) &&
+    Array.isArray(candidate.seen) && Array.isArray(candidate.elites) &&
+    candidate.seen.every((hash) => typeof hash === "string") &&
+    candidate.elites.every((elite) => Boolean(elite) && typeof elite.candidate_hash === "string" &&
+      Number.isFinite(elite.score) && Boolean(elite.genome));
+}
+
+
 export function isStrategyLabV2Market(value: string): value is StrategyLabV2Market {
   return (STRATEGY_LAB_V2_MARKETS as readonly string[]).includes(value);
 }
@@ -174,3 +274,20 @@ export function isStrategyLabV2Timeframe(value: string): value is StrategyLabV2T
 export function isStrategyLabV2Agent(value: string): value is StrategyLabV2AgentId {
   return STRATEGY_LAB_V2_SEARCH_AGENTS.some((agent) => agent.agent_id === value);
 }
+
+export function isStrategyLabV2Checkpoint(value: unknown): value is StrategyLabV2AgentCheckpoint {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StrategyLabV2AgentCheckpoint>;
+  return candidate.checkpoint_version === STRATEGY_LAB_V2_CHECKPOINT_VERSION &&
+    typeof candidate.agent_id === "string" && isStrategyLabV2Agent(candidate.agent_id) &&
+    Number.isFinite(candidate.seed) && Number.isFinite(candidate.budget) &&
+    Number.isFinite(candidate.planned_generations) && Number.isFinite(candidate.chunk_size) &&
+    Number.isFinite(candidate.completed_generations) && Number.isFinite(candidate.tested) &&
+    Array.isArray(candidate.seen) && Array.isArray(candidate.elites);
+}
+
+export function strategyLabV2CheckpointComplete(checkpoint: StrategyLabV2AgentCheckpoint): boolean {
+  return checkpoint.tested >= checkpoint.budget ||
+    checkpoint.completed_generations >= checkpoint.planned_generations;
+}
+
