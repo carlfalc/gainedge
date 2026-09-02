@@ -41,6 +41,7 @@ export default function DashboardLayout() {
   const chartsActive = location.pathname.startsWith(CHARTS_ROUTE_PATH);
 
   useSeedData(userId);
+  const { isAdmin } = useAdmin();
   useAutoTradeNotifications(userId ?? null);
 
   const sidebarWidth = collapsed && !hovered ? 0 : 240;
