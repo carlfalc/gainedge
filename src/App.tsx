@@ -63,6 +63,7 @@ const App = () => (
             <Route path="ai" element={<GainEdgeAIPage />} />
             <Route path="ron-decision" element={<RonDecisionPage />} />
             <Route path="whisky-cigar-lounge" element={<WhiskyCigarLoungePage />} />
+            <Route path="admin" element={<AdminPage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
