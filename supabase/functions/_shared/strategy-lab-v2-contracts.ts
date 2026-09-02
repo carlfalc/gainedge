@@ -204,7 +204,8 @@ export interface StrategyLabV2Elite {
 export interface StrategyLabV2AgentBest {
   candidate_hash: string;
   score: number;
-  metrics: StrategyLabV2Metrics;
+  /** Null only for a best recovered from persisted candidate rows before the next generation. */
+  metrics: StrategyLabV2Metrics | null;
 }
 
 /**
@@ -227,6 +228,40 @@ export interface StrategyLabV2AgentCheckpoint {
   elites: StrategyLabV2Elite[];
   best: StrategyLabV2AgentBest | null;
 }
+
+/** One invocation's worth of work: the evaluated generation plus the advanced checkpoint. */
+export interface StrategyLabV2GenerationOutput {
+  agent_id: StrategyLabV2AgentId;
+  generation: number;
+  evaluated: StrategyLabV2CandidateResult[];
+  checkpoint: StrategyLabV2AgentCheckpoint;
+  complete: boolean;
+}
+
+/**
+ * An agent is finished once its advertised budget of unique candidates has been tested.
+ * The generation ceiling is a secondary guard so a pathological genome space cannot loop.
+ */
+export function strategyLabV2CheckpointComplete(checkpoint: StrategyLabV2AgentCheckpoint): boolean {
+  return checkpoint.tested >= checkpoint.budget ||
+    checkpoint.completed_generations >= checkpoint.planned_generations;
+}
+
+export function isStrategyLabV2Checkpoint(value: unknown): value is StrategyLabV2AgentCheckpoint {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StrategyLabV2AgentCheckpoint>;
+  return candidate.checkpoint_version === STRATEGY_LAB_V2_CHECKPOINT_VERSION &&
+    typeof candidate.agent_id === "string" && isStrategyLabV2Agent(candidate.agent_id) &&
+    Number.isFinite(candidate.seed) && Number.isFinite(candidate.budget) &&
+    Number.isFinite(candidate.chunk_size) && Number.isFinite(candidate.planned_generations) &&
+    Number.isFinite(candidate.completed_generations) && Number.isFinite(candidate.tested) &&
+    Number.isFinite(candidate.generated) && Number.isFinite(candidate.rejected) &&
+    Array.isArray(candidate.seen) && Array.isArray(candidate.elites) &&
+    candidate.seen.every((hash) => typeof hash === "string") &&
+    candidate.elites.every((elite) => Boolean(elite) && typeof elite.candidate_hash === "string" &&
+      Number.isFinite(elite.score) && Boolean(elite.genome));
+}
+
 
 export function isStrategyLabV2Market(value: string): value is StrategyLabV2Market {
   return (STRATEGY_LAB_V2_MARKETS as readonly string[]).includes(value);
