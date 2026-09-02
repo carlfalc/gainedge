@@ -281,17 +281,19 @@ function signalAt(
   candles: StrategyLabV2Candle[],
   index: number,
   genome: StrategyGenomeV2,
-  set: IndicatorsV2,
+  context: GenomeContextV2,
 ): "long" | "short" | null {
   if (!timeAllowed(genome, candles[index].time)) return null;
+  const set = context.set;
   const candle = candles[index];
   const previous = candles[index - 1];
   const trendUp = set.emaFast[index] > set.emaSlow[index];
   const trendDown = set.emaFast[index] < set.emaSlow[index];
-  const high = priorExtreme(candles, index, genome.lookback, "high");
-  const low = priorExtreme(candles, index, genome.lookback, "low");
+  const high = context.priorHigh[index];
+  const low = context.priorLow[index];
   const range = high - low;
   const atrNow = Math.max(Number.EPSILON, set.atr[index]);
+
   let signal: "long" | "short" | null = null;
 
   switch (genome.family) {
