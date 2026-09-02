@@ -4,7 +4,11 @@ import { C } from "@/lib/mock-data";
 
 type Agent = {
   agent_id: string; status: string; generated: number; tested: number; rejected: number;
-  generations: number; artifact?: { families?: string[]; best_score?: number; best_metrics?: Metrics };
+  generations: number; budget?: number;
+  artifact?: {
+    families?: string[]; best_score?: number; best_metrics?: Metrics; last_error?: string;
+    checkpoint?: { budget?: number; chunk_size?: number; planned_generations?: number; completed_generations?: number };
+  };
 };
 type Metrics = {
   trades: number; wins: number; losses: number; win_rate: number; win_rate_lower_95: number;
@@ -26,13 +30,28 @@ type FinalResult = {
   exact_rules: string[];
   tested_universe?: { agents: number; unique_candidates: number; walk_forward_folds: number; stress_scenarios: number; bootstrap_runs: number };
 };
+type Progress = {
+  percent?: number; generated?: number; tested?: number; rejected?: number; total_budget?: number;
+  agents_completed?: number; agents_total?: number; phase?: string; current_agent?: string;
+};
 type Run = {
   id: string; status: string; verdict: FinalResult["verdict"] | null; symbol: string; timeframe: string;
   candle_count: number; search_depth: string; random_seed: number; dataset_audit: Record<string, unknown>;
-  progress: { percent?: number; generated?: number; tested?: number; rejected?: number; agents_completed?: number; agents_total?: number; phase?: string; current_agent?: string };
+  progress: Progress;
   candidates_generated: number; candidates_tested: number; candidates_rejected: number;
   final_result: FinalResult | null; execution_allowed: false; error_message?: string | null;
 };
+/** One `run_agent` invocation = one bounded generation. `state` says whether to call again. */
+type ChunkResponse = {
+  agent?: {
+    agent_id: string; state: "partial" | "complete"; generated: number; tested: number;
+    rejected: number; generations: number; planned_generations: number; budget: number; chunk_size: number;
+  };
+  progress?: Progress;
+  next_action?: { action: "run_agent" | "finalise"; agent_id?: string };
+  skipped?: boolean;
+};
+
 
 const AGENT_LABELS: Record<string, string> = {
   trend_structure: "Trend & Structure Search",
