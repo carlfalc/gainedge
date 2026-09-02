@@ -93,6 +93,14 @@ const Login = () => {
             {loading ? t("auth.signingIn") : t("auth.login")}
           </button>
 
+          <button type="button" onClick={handleForgotPassword} style={{
+            background: "none", border: "none", color: C.jade, fontSize: 14,
+            fontFamily: "'DM Sans', sans-serif", cursor: "pointer", padding: 0, textAlign: "center",
+          }}>
+            Forgot / set password
+          </button>
+
+
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0" }}>
             <div style={{ flex: 1, height: 1, background: C.border }} />
             <span style={{ fontSize: 14, color: C.muted }}>{t("auth.orContinueWith")}</span>
