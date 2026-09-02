@@ -62,12 +62,19 @@ const AGENT_LABELS: Record<string, string> = {
   volume_liquidity: "Volume & Liquidity Search",
   strategy_composer: "Hybrid Strategy Evolution",
 };
+const AGENT_ORDER = Object.keys(AGENT_LABELS);
 const DEPTHS = {
   standard: { candidates: 672, bootstrap: 200, label: "Standard · 672 candidates" },
   deep: { candidates: 1792, bootstrap: 500, label: "Deep · 1,792 candidates" },
   maximum: { candidates: 3584, bootstrap: 1000, label: "Maximum · 3,584 candidates" },
 } as const;
+/**
+ * Safety valve for the drive loop. Every invocation evaluates one bounded generation, so a
+ * healthy agent finishes in `planned_generations` calls; this only stops a pathological loop.
+ */
+const MAX_INVOCATIONS_PER_AGENT = 40;
 const TERMINAL = ["viable_strategy_found", "no_viable_strategy", "inconclusive", "failed", "cancelled"];
+
 const oneYearAgo = () => { const date = new Date(); date.setUTCFullYear(date.getUTCFullYear() - 1); return date.toISOString().slice(0, 10); };
 
 export default function StrategyLabV2Page() {
