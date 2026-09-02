@@ -28,6 +28,7 @@ import WhiskyCigarLoungePage from "./pages/dashboard/WhiskyCigarLoungePage.tsx";
 import StrategyPage from "./pages/dashboard/StrategyPage.tsx";
 import RonDecisionPage from "./pages/dashboard/RonDecisionPage";
 import GainEdgeAIPage from "./pages/dashboard/GainEdgeAIPage.tsx";
+import AdminPage from "./pages/dashboard/AdminPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ const App = () => (
             <Route path="ai" element={<GainEdgeAIPage />} />
             <Route path="ron-decision" element={<RonDecisionPage />} />
             <Route path="whisky-cigar-lounge" element={<WhiskyCigarLoungePage />} />
+            <Route path="admin" element={<AdminPage />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

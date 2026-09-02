@@ -8,6 +8,8 @@ import {
 import { C } from "@/lib/mock-data";
 import { NAV_GROUPS } from "@/lib/dashboard-nav";
 import { useSeedData } from "@/hooks/use-seed-data";
+import { useAdmin } from "@/hooks/use-admin";
+import { ShieldCheck } from "lucide-react";
 import { useAutoTradeNotifications } from "@/hooks/use-auto-trade-notifications";
 import LanguageSelector, { LanguageProvider } from "./LanguageSelector";
 import ronAvatar from "@/assets/ron-avatar.png";
@@ -41,6 +43,7 @@ export default function DashboardLayout() {
   const chartsActive = location.pathname.startsWith(CHARTS_ROUTE_PATH);
 
   useSeedData(userId);
+  const { isAdmin } = useAdmin();
   useAutoTradeNotifications(userId ?? null);
 
   const sidebarWidth = collapsed && !hovered ? 0 : 240;
@@ -157,7 +160,12 @@ export default function DashboardLayout() {
 
         {/* Nav */}
         <nav style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "12px 8px", display: "flex", flexDirection: "column", gap: 2 }}>
-          {NAV_GROUPS.map((group, gi) => (
+          {[
+            ...NAV_GROUPS,
+            ...(isAdmin
+              ? [{ labelKey: "Admin", items: [{ labelKey: "Admin", icon: ShieldCheck, path: "/dashboard/admin", white: true }] }]
+              : []),
+          ].map((group, gi) => (
             <div key={group.labelKey} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {sidebarWidth > 0 && (
                 <div
