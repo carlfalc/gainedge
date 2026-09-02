@@ -112,15 +112,52 @@ export default function StrategyLabV2Page() {
     if (saved) refresh(saved).catch(() => localStorage.removeItem("strategy_lab_v2_run_id"));
   }, []);
 
+  /** Merges one chunk response into local state so partial progress is visible immediately. */
+  const applyChunk = (chunk: ChunkResponse) => {
+    if (chunk.progress) setRun((current) => current ? { ...current, progress: chunk.progress! } : current);
+    const detail = chunk.agent;
+    if (!detail) return;
+    setAgents((current) => current.map((agent) => agent.agent_id === detail.agent_id
+      ? {
+        ...agent,
+        status: detail.state === "complete" ? "complete" : "running",
+        generated: detail.generated, tested: detail.tested, rejected: detail.rejected,
+        generations: detail.generations, budget: detail.budget,
+        artifact: {
+          ...agent.artifact,
+          checkpoint: {
+            ...agent.artifact?.checkpoint,
+            budget: detail.budget, chunk_size: detail.chunk_size,
+            planned_generations: detail.planned_generations, completed_generations: detail.generations,
+          },
+        },
+      }
+      : agent));
+  };
+
+  /**
+   * One invocation evaluates a single bounded generation, so each agent is invoked
+   * repeatedly until the server reports it complete before the next agent starts. All
+   * counters come from the server's persisted state, so a refresh mid-run resumes cleanly.
+   */
   const executeRemaining = async (runId: string, initialAgents?: string[]) => {
     setWorking(true);
     try {
       const status = await refresh(runId);
-      const pending = initialAgents ?? status.agents.filter((agent) => agent.status !== "complete").map((agent) => agent.agent_id);
+      const completed = new Set(status.agents.filter((agent) => agent.status === "complete").map((agent) => agent.agent_id));
+      const ordered = initialAgents ?? (status.agents.length ? AGENT_ORDER.filter((id) => status.agents.some((agent) => agent.agent_id === id)) : AGENT_ORDER);
+      const pending = ordered.filter((agentId) => !completed.has(agentId));
       for (const agentId of pending) {
-        setMessage(`${AGENT_LABELS[agentId] ?? agentId} is evolving and testing candidates…`);
-        const data = await invoke({ action: "run_agent", run_id: runId, agent_id: agentId });
-        if (data.progress) setRun((current) => current ? { ...current, progress: data.progress } : current);
+        const label = AGENT_LABELS[agentId] ?? agentId;
+        for (let invocation = 1; ; invocation += 1) {
+          if (invocation > MAX_INVOCATIONS_PER_AGENT) throw new Error(`agent_did_not_complete:${agentId}`);
+          setMessage(`${label} — evolving generation ${invocation}…`);
+          const chunk = await invoke({ action: "run_agent", run_id: runId, agent_id: agentId }) as ChunkResponse;
+          applyChunk(chunk);
+          if (chunk.skipped || chunk.agent?.state === "complete") break;
+          if (!chunk.agent) throw new Error(`agent_response_missing_state:${agentId}`);
+          setMessage(`${label} — ${chunk.agent.tested}/${chunk.agent.budget} tested · generation ${chunk.agent.generations}/${chunk.agent.planned_generations}`);
+        }
         await refresh(runId);
       }
       setMessage("Stress testing finalists and opening the sealed holdout once…");
@@ -134,6 +171,7 @@ export default function StrategyLabV2Page() {
       setWorking(false);
     }
   };
+
 
   const startRun = async () => {
     setWorking(true); setMessage("Auditing candles and sealing the holdout…"); setRun(null); setAgents([]); setLeaders([]);
