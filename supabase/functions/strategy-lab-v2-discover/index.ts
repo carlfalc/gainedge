@@ -168,12 +168,10 @@ const agentFamiliesOf = (agentId: StrategyLabV2AgentId) =>
   STRATEGY_LAB_V2_SEARCH_AGENTS.find((agent) => agent.agent_id === agentId)?.families ?? [];
 
 /**
- * Rebuilds a usable checkpoint for an agent. A checkpoint persisted by a previous
- * invocation is authoritative; otherwise the already-persisted candidate rows are
- * replayed into one. That makes recovery idempotent: a row left `running` by a platform
- * kill (which cannot run `finally`) resumes from whatever was durably stored, and an
- * interrupted response never double-counts because counters come from storage, not from
- * the client.
+ * Rebuilds a usable checkpoint for an agent. Candidate rows are the durable source of
+ * truth: if a platform kill happens after the candidate upsert but before the checkpoint
+ * update, the next invocation reconstructs the advanced generation instead of replaying
+ * it or losing progress.
  */
 async function resolveCheckpoint(
   db: DbClient,
@@ -186,22 +184,25 @@ async function resolveCheckpoint(
   const generations = (STRATEGY_LAB_V2_SEARCH_BUDGETS[depth] ?? STRATEGY_LAB_V2_SEARCH_BUDGETS.deep).generations;
   const artifact = (agent.artifact ?? {}) as Record<string, unknown>;
   const stored = artifact.checkpoint;
-  if (
+  const storedMatches =
     isStrategyLabV2Checkpoint(stored) && stored.agent_id === agentId && stored.budget === budget &&
     stored.seed === (Math.abs(Math.trunc(Number(agent.seed))) >>> 0) &&
     stored.chunk_size === strategyLabV2ChunkSize(budget, generations) &&
-    stored.planned_generations === strategyLabV2PlannedGenerations(budget, generations)
-  ) {
-    return { checkpoint: stored, recovered: false, recovered_from_candidates: 0 };
-  }
+    stored.planned_generations === strategyLabV2PlannedGenerations(budget, generations);
 
   const { data, error } = await db.from("strategy_lab_v2_candidates")
-    .select("candidate_hash,score,genome,disqualified")
+    .select("candidate_hash,score,genome,disqualified,generation,development_metrics")
     .eq("run_id", run.id).eq("agent_id", agentId)
     .order("score", { ascending: false }).order("candidate_hash", { ascending: true })
     .limit(budget);
   if (error) throw new Error(`checkpoint_recovery_failed:${error.message}`);
   const rows = data ?? [];
+  if (storedMatches && rows.length === stored.tested) {
+    return { checkpoint: stored, recovered: false, recovered_from_candidates: 0 };
+  }
+  if (storedMatches && rows.length < stored.tested) {
+    throw new Error(`checkpoint_ahead_of_candidates:${stored.tested}/${rows.length}`);
+  }
   const chunkSize = strategyLabV2ChunkSize(budget, generations);
   const elites: StrategyLabV2Elite[] = rows.slice(0, strategyLabV2EliteCount(chunkSize)).map((row) => ({
     candidate_hash: String(row.candidate_hash),
@@ -209,13 +210,23 @@ async function resolveCheckpoint(
     genome: row.genome as StrategyGenomeV2,
   }));
   const tested = rows.length;
+  const completedGenerations = rows.reduce(
+    (maximum, row) => Math.max(maximum, Number(row.generation ?? 0)),
+    0,
+  );
   const checkpoint = createStrategyLabV2Checkpoint({
     agentId, seed: Number(agent.seed), budget, generations,
     seen: rows.map((row) => String(row.candidate_hash)),
     elites, tested, generated: Math.max(tested, Number(agent.generated ?? 0)),
     rejected: rows.filter((row) => Boolean(row.disqualified)).length,
-    completedGenerations: Math.floor(tested / chunkSize),
-    best: elites.length ? { candidate_hash: elites[0].candidate_hash, score: elites[0].score, metrics: null } : null,
+    completedGenerations,
+    best: rows.length
+      ? {
+        candidate_hash: String(rows[0].candidate_hash),
+        score: Number(rows[0].score),
+        metrics: rows[0].development_metrics ?? null,
+      }
+      : null,
   });
   return { checkpoint, recovered: true, recovered_from_candidates: tested };
 }
@@ -384,9 +395,15 @@ Deno.serve(async (request: Request) => {
         const detail = agentError instanceof Error ? agentError.message : String(agentError);
         // Application-level failures are recoverable: park the agent back in `queued` with a
         // diagnostic so Resume can replay the same generation deterministically.
+        const { data: latestAgent } = await db.from("strategy_lab_v2_agent_runs")
+          .select("artifact").eq("id", agent.id).single();
         await db.from("strategy_lab_v2_agent_runs").update({
           status: "queued",
-          artifact: { ...(agent.artifact as object ?? {}), last_error: detail, last_error_at: new Date().toISOString() },
+          artifact: {
+            ...(latestAgent?.artifact as object ?? agent.artifact as object ?? {}),
+            last_error: detail,
+            last_error_at: new Date().toISOString(),
+          },
         }).eq("id", agent.id);
         throw agentError;
       }
@@ -531,6 +548,11 @@ async function completeAgent(
   const { count } = await db.from("strategy_lab_v2_candidates")
     .select("candidate_hash", { count: "exact", head: true })
     .eq("run_id", run.id).eq("agent_id", checkpoint.agent_id);
+  if (count !== checkpoint.budget || checkpoint.tested !== checkpoint.budget) {
+    throw new Error(
+      `candidate_count_mismatch:${checkpoint.agent_id}:persisted_${count ?? "unknown"}:checkpoint_${checkpoint.tested}:budget_${checkpoint.budget}`,
+    );
+  }
   const { error } = await db.from("strategy_lab_v2_agent_runs").update({
     status: "complete", generated: checkpoint.generated, tested: checkpoint.tested,
     rejected: checkpoint.rejected, generations: checkpoint.completed_generations,
