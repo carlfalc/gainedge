@@ -28,6 +28,7 @@ import WhiskyCigarLoungePage from "./pages/dashboard/WhiskyCigarLoungePage.tsx";
 import StrategyPage from "./pages/dashboard/StrategyPage.tsx";
 import RonDecisionPage from "./pages/dashboard/RonDecisionPage";
 import GainEdgeAIPage from "./pages/dashboard/GainEdgeAIPage.tsx";
+import AdminPage from "./pages/dashboard/AdminPage.tsx";
 
 const queryClient = new QueryClient();
 
