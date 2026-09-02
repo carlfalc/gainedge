@@ -238,13 +238,9 @@ export interface StrategyLabV2GenerationOutput {
   complete: boolean;
 }
 
-/**
- * An agent is finished once its advertised budget of unique candidates has been tested.
- * The generation ceiling is a secondary guard so a pathological genome space cannot loop.
- */
+/** An agent is finished only after its advertised budget of unique candidates is persisted. */
 export function strategyLabV2CheckpointComplete(checkpoint: StrategyLabV2AgentCheckpoint): boolean {
-  return checkpoint.tested >= checkpoint.budget ||
-    checkpoint.completed_generations >= checkpoint.planned_generations;
+  return checkpoint.tested >= checkpoint.budget;
 }
 
 export function isStrategyLabV2Checkpoint(value: unknown): value is StrategyLabV2AgentCheckpoint {
@@ -274,20 +270,3 @@ export function isStrategyLabV2Timeframe(value: string): value is StrategyLabV2T
 export function isStrategyLabV2Agent(value: string): value is StrategyLabV2AgentId {
   return STRATEGY_LAB_V2_SEARCH_AGENTS.some((agent) => agent.agent_id === value);
 }
-
-export function isStrategyLabV2Checkpoint(value: unknown): value is StrategyLabV2AgentCheckpoint {
-  if (!value || typeof value !== "object") return false;
-  const candidate = value as Partial<StrategyLabV2AgentCheckpoint>;
-  return candidate.checkpoint_version === STRATEGY_LAB_V2_CHECKPOINT_VERSION &&
-    typeof candidate.agent_id === "string" && isStrategyLabV2Agent(candidate.agent_id) &&
-    Number.isFinite(candidate.seed) && Number.isFinite(candidate.budget) &&
-    Number.isFinite(candidate.planned_generations) && Number.isFinite(candidate.chunk_size) &&
-    Number.isFinite(candidate.completed_generations) && Number.isFinite(candidate.tested) &&
-    Array.isArray(candidate.seen) && Array.isArray(candidate.elites);
-}
-
-export function strategyLabV2CheckpointComplete(checkpoint: StrategyLabV2AgentCheckpoint): boolean {
-  return checkpoint.tested >= checkpoint.budget ||
-    checkpoint.completed_generations >= checkpoint.planned_generations;
-}
-

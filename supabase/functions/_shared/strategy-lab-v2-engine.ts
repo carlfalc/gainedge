@@ -69,15 +69,6 @@ export interface SearchAgentOutputV2 {
   best: StrategyLabV2CandidateResult | null;
 }
 
-export interface StrategyLabV2GenerationOutput {
-  agent_id: StrategyLabV2AgentId;
-  generation: number;
-  evaluated: StrategyLabV2CandidateResult[];
-  checkpoint: StrategyLabV2AgentCheckpoint;
-  complete: boolean;
-}
-
-
 export interface FinalStrategyV2 {
   verdict: StrategyLabV2Verdict;
   reasons: string[];
@@ -744,6 +735,11 @@ export function runStrategyLabV2Generation(
       checkpoint: { ...checkpoint, seen: [...checkpoint.seen], elites: [...checkpoint.elites] },
       complete: true,
     };
+  }
+  if (checkpoint.completed_generations >= checkpoint.planned_generations) {
+    throw new Error(
+      `candidate_budget_not_reached:${checkpoint.agent_id}:${checkpoint.tested}/${checkpoint.budget}`,
+    );
   }
   const families = agentFamilies(checkpoint.agent_id);
   const generation = checkpoint.completed_generations + 1;

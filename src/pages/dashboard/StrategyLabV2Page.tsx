@@ -7,7 +7,10 @@ type Agent = {
   generations: number; budget?: number;
   artifact?: {
     families?: string[]; best_score?: number; best_metrics?: Metrics; last_error?: string;
-    checkpoint?: { budget?: number; chunk_size?: number; planned_generations?: number; completed_generations?: number };
+    checkpoint?: {
+      budget?: number; chunk_size?: number; planned_generations?: number; completed_generations?: number;
+      generated?: number; tested?: number; rejected?: number;
+    };
   };
 };
 type Metrics = {
@@ -129,6 +132,7 @@ export default function StrategyLabV2Page() {
             ...agent.artifact?.checkpoint,
             budget: detail.budget, chunk_size: detail.chunk_size,
             planned_generations: detail.planned_generations, completed_generations: detail.generations,
+            generated: detail.generated, tested: detail.tested, rejected: detail.rejected,
           },
         },
       }
@@ -271,16 +275,31 @@ export default function StrategyLabV2Page() {
 
       <h2 style={heading}>Actual search-agent work</h2>
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(290px,1fr))", gap: 10 }}>
-        {agents.map((agent) => <div key={agent.agent_id} style={panel}>
+        {agents.map((agent) => {
+          const budget = agent.budget ?? agent.artifact?.checkpoint?.budget ?? 0;
+          const tested = agent.tested ?? agent.artifact?.checkpoint?.tested ?? 0;
+          const agentPercent = budget > 0 ? Math.min(100, Math.round((tested / budget) * 100)) : 0;
+          const planned = agent.artifact?.checkpoint?.planned_generations;
+          const statusText = agent.status === "complete"
+            ? `${tested}/${budget || tested} tested · ${agent.rejected} rejected · ${agent.generations}${planned ? `/${planned}` : ""} generations`
+            : tested > 0 || agent.status === "running"
+            ? `${tested}/${budget || "—"} tested · generation ${agent.generations}${planned ? `/${planned}` : ""}`
+            : "Waiting for deterministic search";
+          return <div key={agent.agent_id} style={panel}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
             <strong>{AGENT_LABELS[agent.agent_id] ?? agent.agent_id}</strong>
             <span style={{ color: agent.status === "complete" ? C.jade : "#F59E0B", fontSize: 11, fontWeight: 900 }}>{agent.status.toUpperCase()}</span>
           </div>
           <div style={{ color: C.sec, marginTop: 8, fontSize: 13 }}>
-            {agent.status === "complete" ? `${agent.tested} tested · ${agent.rejected} rejected · ${agent.generations} generations` : "Queued for deterministic search"}
+            {statusText}
+          </div>
+          <div style={{ height: 6, background: C.bg, borderRadius: 8, overflow: "hidden", marginTop: 9 }}>
+            <div style={{ width: `${agentPercent}%`, height: "100%", background: agent.status === "complete" ? C.jade : "#F59E0B", transition: "width .3s" }} />
           </div>
           {agent.artifact?.families && <div style={{ color: C.muted, marginTop: 5, fontSize: 11 }}>{agent.artifact.families.join(" · ").replaceAll("_", " ")}</div>}
-        </div>)}
+          {agent.artifact?.last_error && <div style={{ color: C.red, marginTop: 6, fontSize: 11 }}>Last retry: {agent.artifact.last_error.replaceAll("_", " ")}</div>}
+        </div>;
+        })}
       </section>
     </>}
 
