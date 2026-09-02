@@ -1,12 +1,20 @@
 import {
   DEFAULT_STRATEGY_LAB_V2_COSTS,
+  STRATEGY_LAB_V2_CHECKPOINT_VERSION,
   STRATEGY_LAB_V2_GATES,
   STRATEGY_LAB_V2_SEARCH_AGENTS,
+  strategyLabV2CheckpointComplete,
+  strategyLabV2ChunkSize,
+  strategyLabV2EliteCount,
+  strategyLabV2PlannedGenerations,
   type StrategyGenomeV2,
+  type StrategyLabV2AgentBest,
+  type StrategyLabV2AgentCheckpoint,
   type StrategyLabV2AgentId,
   type StrategyLabV2Audit,
   type StrategyLabV2CandidateResult,
   type StrategyLabV2Costs,
+  type StrategyLabV2Elite,
   type StrategyLabV2Family,
   type StrategyLabV2FoldResult,
   type StrategyLabV2Metrics,
@@ -35,6 +43,18 @@ interface IndicatorsV2 {
   volumeMean: number[];
 }
 
+/**
+ * Everything a genome needs from a candle series, computed exactly once per genome.
+ * Previously each of the five walk-forward folds recomputed the full indicator set and
+ * rescanned `lookback` bars per candle, which is what pushed one agent past the hosted
+ * CPU ceiling. The values produced here are identical to the per-fold computation.
+ */
+interface GenomeContextV2 {
+  set: IndicatorsV2;
+  priorHigh: number[];
+  priorLow: number[];
+}
+
 export interface SearchAgentOutputV2 {
   agent_id: StrategyLabV2AgentId;
   seed: number;
@@ -46,6 +66,15 @@ export interface SearchAgentOutputV2 {
   candidates: StrategyLabV2CandidateResult[];
   best: StrategyLabV2CandidateResult | null;
 }
+
+export interface StrategyLabV2GenerationOutput {
+  agent_id: StrategyLabV2AgentId;
+  generation: number;
+  evaluated: StrategyLabV2CandidateResult[];
+  checkpoint: StrategyLabV2AgentCheckpoint;
+  complete: boolean;
+}
+
 
 export interface FinalStrategyV2 {
   verdict: StrategyLabV2Verdict;
