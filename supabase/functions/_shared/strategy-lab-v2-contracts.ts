@@ -1,3 +1,5 @@
+import { BACKTESTABLE_SYMBOLS, isBacktestable } from "./instrument-registry.ts";
+
 export const STRATEGY_LAB_V2_VERSION = 2 as const;
 export const STRATEGY_LAB_V2_GRAMMAR_VERSION = "2.0.0" as const;
 export const STRATEGY_LAB_V2_EXECUTION_ALLOWED = false as const;
