@@ -239,11 +239,15 @@ export default function StrategyLabV2Page() {
     : { color: C.red, border: C.red, headline: "INCONCLUSIVE — INSUFFICIENT DATA" };
 
   const progress = run?.progress?.percent ?? 0;
-  const availableNote = useMemo(() => timeframe === "15m"
-    ? "Best current coverage across all four markets."
-    : timeframe === "1m" && symbol === "XAUUSD"
-    ? "Large XAUUSD dataset; the engine caps a run at 120,000 candles and reports truncation."
-    : "Coverage may be insufficient. The data audit will refuse to fabricate a result.", [symbol, timeframe]);
+  // Registry-driven honesty gate: a pair with no verified stored coverage is named as
+  // such BEFORE a run is started, instead of being refused later by the server audit.
+  const coverageKnown = isBacktestable(symbol, timeframe);
+  const availableNote = useMemo(() => {
+    const base = backtestCoverageNote(symbol, timeframe);
+    return symbol === "XAUUSD" && timeframe === "1m"
+      ? `${base} The engine caps a run at 120,000 candles and reports truncation.`
+      : base;
+  }, [symbol, timeframe]);
 
   return <div style={{ padding: 24, color: C.text, maxWidth: 1500, margin: "0 auto", fontFamily: "'DM Sans',sans-serif" }}>
     <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
