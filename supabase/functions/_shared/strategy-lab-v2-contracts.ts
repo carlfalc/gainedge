@@ -2,7 +2,13 @@ export const STRATEGY_LAB_V2_VERSION = 2 as const;
 export const STRATEGY_LAB_V2_GRAMMAR_VERSION = "2.0.0" as const;
 export const STRATEGY_LAB_V2_EXECUTION_ALLOWED = false as const;
 
-export const STRATEGY_LAB_V2_MARKETS = ["XAUUSD", "NAS100", "HK50", "GER40"] as const;
+/**
+ * Derived from the canonical instrument registry, filtered on `backtestable`.
+ * NZDUSD and USDCAD enter here because their stored 15m coverage clears
+ * `STRATEGY_LAB_V2_GATES.minimum_candles`; the server-side data audit remains
+ * authoritative for any specific period a user requests.
+ */
+export const STRATEGY_LAB_V2_MARKETS = BACKTESTABLE_SYMBOLS as readonly string[];
 export const STRATEGY_LAB_V2_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"] as const;
 
 export type StrategyLabV2Market = typeof STRATEGY_LAB_V2_MARKETS[number];
