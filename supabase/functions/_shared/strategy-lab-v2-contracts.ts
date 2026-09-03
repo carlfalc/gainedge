@@ -13,7 +13,7 @@ export const STRATEGY_LAB_V2_EXECUTION_ALLOWED = false as const;
 export const STRATEGY_LAB_V2_MARKETS = BACKTESTABLE_SYMBOLS as readonly string[];
 export const STRATEGY_LAB_V2_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"] as const;
 
-export type StrategyLabV2Market = typeof STRATEGY_LAB_V2_MARKETS[number];
+export type StrategyLabV2Market = string;
 export type StrategyLabV2Timeframe = typeof STRATEGY_LAB_V2_TIMEFRAMES[number];
 
 export const STRATEGY_LAB_V2_SEARCH_AGENTS = [
