@@ -271,6 +271,15 @@ export function isStrategyLabV2Market(value: string): value is StrategyLabV2Mark
   return (STRATEGY_LAB_V2_MARKETS as readonly string[]).includes(value);
 }
 
+/**
+ * True only when the registry records verified stored coverage for this exact
+ * market/timeframe pair. The server-side candle audit is still authoritative; this is
+ * the earlier, cheaper honesty gate so a user is never sold a run that cannot complete.
+ */
+export function strategyLabV2CoverageKnown(symbol: string, timeframe: string): boolean {
+  return isBacktestable(symbol, timeframe);
+}
+
 export function isStrategyLabV2Timeframe(value: string): value is StrategyLabV2Timeframe {
   return (STRATEGY_LAB_V2_TIMEFRAMES as readonly string[]).includes(value);
 }
