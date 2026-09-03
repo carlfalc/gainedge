@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
+import {
+  BACKTESTABLE_SYMBOLS, backtestCoverageNote, isBacktestable,
+} from "@/lib/instrument-registry";
 
 type Agent = {
   agent_id: string; status: string; generated: number; tested: number; rejected: number;
