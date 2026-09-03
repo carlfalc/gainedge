@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { C } from "@/lib/mock-data";
+import {
+  BACKTESTABLE_SYMBOLS, backtestCoverageNote, isBacktestable,
+} from "@/lib/instrument-registry";
 
 type Agent = {
   agent_id: string; status: string; generated: number; tested: number; rejected: number;
@@ -236,11 +239,15 @@ export default function StrategyLabV2Page() {
     : { color: C.red, border: C.red, headline: "INCONCLUSIVE — INSUFFICIENT DATA" };
 
   const progress = run?.progress?.percent ?? 0;
-  const availableNote = useMemo(() => timeframe === "15m"
-    ? "Best current coverage across all four markets."
-    : timeframe === "1m" && symbol === "XAUUSD"
-    ? "Large XAUUSD dataset; the engine caps a run at 120,000 candles and reports truncation."
-    : "Coverage may be insufficient. The data audit will refuse to fabricate a result.", [symbol, timeframe]);
+  // Registry-driven honesty gate: a pair with no verified stored coverage is named as
+  // such BEFORE a run is started, instead of being refused later by the server audit.
+  const coverageKnown = isBacktestable(symbol, timeframe);
+  const availableNote = useMemo(() => {
+    const base = backtestCoverageNote(symbol, timeframe);
+    return symbol === "XAUUSD" && timeframe === "1m"
+      ? `${base} The engine caps a run at 120,000 candles and reports truncation.`
+      : base;
+  }, [symbol, timeframe]);
 
   return <div style={{ padding: 24, color: C.text, maxWidth: 1500, margin: "0 auto", fontFamily: "'DM Sans',sans-serif" }}>
     <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -257,7 +264,7 @@ export default function StrategyLabV2Page() {
     <section style={{ ...panel, marginTop: 22 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
         <Field label="Market"><select value={symbol} onChange={(event) => setSymbol(event.target.value)} style={input}>
-          {["XAUUSD", "NAS100", "HK50", "GER40"].map((value) => <option key={value}>{value}</option>)}
+          {BACKTESTABLE_SYMBOLS.map((value) => <option key={value}>{value}</option>)}
         </select></Field>
         <Field label="Timeframe"><select value={timeframe} onChange={(event) => setTimeframe(event.target.value)} style={input}>
           {["1m", "5m", "15m", "1h", "4h"].map((value) => <option key={value}>{value}</option>)}
@@ -271,9 +278,9 @@ export default function StrategyLabV2Page() {
         <Field label="Commission bps"><Num value={commission} set={setCommission} /></Field>
         <Field label="Slippage bps"><Num value={slippage} set={setSlippage} /></Field>
       </div>
-      <div style={{ color: C.sec, fontSize: 12, marginTop: 10 }}>{availableNote}</div>
+      <div style={{ color: coverageKnown ? C.sec : "#F59E0B", fontSize: 12, marginTop: 10 }}>{availableNote}</div>
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-        <button disabled={working} onClick={startRun} style={primaryButton}>
+        <button disabled={working || !coverageKnown} onClick={startRun} style={{ ...primaryButton, opacity: coverageKnown ? 1 : 0.45, cursor: coverageKnown ? "pointer" : "not-allowed" }}>
           {working ? "Discovery running…" : `Start ${DEPTHS[depth].label}`}
         </button>
         {run && !TERMINAL.includes(run.status) && !working && <button onClick={() => executeRemaining(run.id)} style={secondaryButton}>Resume run</button>}

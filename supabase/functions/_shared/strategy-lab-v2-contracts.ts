@@ -1,11 +1,19 @@
+import { BACKTESTABLE_SYMBOLS, isBacktestable } from "./instrument-registry.ts";
+
 export const STRATEGY_LAB_V2_VERSION = 2 as const;
 export const STRATEGY_LAB_V2_GRAMMAR_VERSION = "2.0.0" as const;
 export const STRATEGY_LAB_V2_EXECUTION_ALLOWED = false as const;
 
-export const STRATEGY_LAB_V2_MARKETS = ["XAUUSD", "NAS100", "HK50", "GER40"] as const;
+/**
+ * Derived from the canonical instrument registry, filtered on `backtestable`.
+ * NZDUSD and USDCAD enter here because their stored 15m coverage clears
+ * `STRATEGY_LAB_V2_GATES.minimum_candles`; the server-side data audit remains
+ * authoritative for any specific period a user requests.
+ */
+export const STRATEGY_LAB_V2_MARKETS = BACKTESTABLE_SYMBOLS as readonly string[];
 export const STRATEGY_LAB_V2_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h"] as const;
 
-export type StrategyLabV2Market = typeof STRATEGY_LAB_V2_MARKETS[number];
+export type StrategyLabV2Market = string;
 export type StrategyLabV2Timeframe = typeof STRATEGY_LAB_V2_TIMEFRAMES[number];
 
 export const STRATEGY_LAB_V2_SEARCH_AGENTS = [
@@ -261,6 +269,15 @@ export function isStrategyLabV2Checkpoint(value: unknown): value is StrategyLabV
 
 export function isStrategyLabV2Market(value: string): value is StrategyLabV2Market {
   return (STRATEGY_LAB_V2_MARKETS as readonly string[]).includes(value);
+}
+
+/**
+ * True only when the registry records verified stored coverage for this exact
+ * market/timeframe pair. The server-side candle audit is still authoritative; this is
+ * the earlier, cheaper honesty gate so a user is never sold a run that cannot complete.
+ */
+export function strategyLabV2CoverageKnown(symbol: string, timeframe: string): boolean {
+  return isBacktestable(symbol, timeframe);
 }
 
 export function isStrategyLabV2Timeframe(value: string): value is StrategyLabV2Timeframe {
