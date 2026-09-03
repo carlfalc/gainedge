@@ -278,9 +278,9 @@ export default function StrategyLabV2Page() {
         <Field label="Commission bps"><Num value={commission} set={setCommission} /></Field>
         <Field label="Slippage bps"><Num value={slippage} set={setSlippage} /></Field>
       </div>
-      <div style={{ color: C.sec, fontSize: 12, marginTop: 10 }}>{availableNote}</div>
+      <div style={{ color: coverageKnown ? C.sec : "#F59E0B", fontSize: 12, marginTop: 10 }}>{availableNote}</div>
       <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-        <button disabled={working} onClick={startRun} style={primaryButton}>
+        <button disabled={working || !coverageKnown} onClick={startRun} style={{ ...primaryButton, opacity: coverageKnown ? 1 : 0.45, cursor: coverageKnown ? "pointer" : "not-allowed" }}>
           {working ? "Discovery running…" : `Start ${DEPTHS[depth].label}`}
         </button>
         {run && !TERMINAL.includes(run.status) && !working && <button onClick={() => executeRemaining(run.id)} style={secondaryButton}>Resume run</button>}
