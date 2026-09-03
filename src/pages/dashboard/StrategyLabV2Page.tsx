@@ -264,7 +264,7 @@ export default function StrategyLabV2Page() {
     <section style={{ ...panel, marginTop: 22 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 12 }}>
         <Field label="Market"><select value={symbol} onChange={(event) => setSymbol(event.target.value)} style={input}>
-          {["XAUUSD", "NAS100", "HK50", "GER40"].map((value) => <option key={value}>{value}</option>)}
+          {BACKTESTABLE_SYMBOLS.map((value) => <option key={value}>{value}</option>)}
         </select></Field>
         <Field label="Timeframe"><select value={timeframe} onChange={(event) => setTimeframe(event.target.value)} style={input}>
           {["1m", "5m", "15m", "1h", "4h"].map((value) => <option key={value}>{value}</option>)}
