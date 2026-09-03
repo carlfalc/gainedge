@@ -125,8 +125,8 @@ function Gauge({ value, max = 10, color, size = 36 }: { value: number; max?: num
 function PremiumDash() {
   const rows = [
     { s: "NAS100", d: "BUY", c: 6, col: C.green, pnl: "+$1,240", spark: [20, 22, 21, 25, 28, 27, 30, 32, 35, 34, 38] },
-    { s: "US30", d: "BUY", c: 5, col: C.green, pnl: "+$890", spark: [40, 42, 41, 43, 44, 43, 46, 45, 47, 46, 48] },
-    { s: "AUDUSD", d: "WAIT", c: 3, col: C.amber, pnl: "+$320", spark: [68, 69, 68, 69, 69, 68, 69, 69, 70, 69, 69] },
+    { s: "GER40", d: "BUY", c: 5, col: C.green, pnl: "+$890", spark: [40, 42, 41, 43, 44, 43, 46, 45, 47, 46, 48] },
+    { s: "USDCAD", d: "WAIT", c: 3, col: C.amber, pnl: "+$320", spark: [68, 69, 68, 69, 69, 68, 69, 69, 70, 69, 69] },
     { s: "NZDUSD", d: "WAIT", c: 3, col: C.amber, pnl: "+$180", spark: [56, 57, 56, 57, 57, 56, 57, 57, 57, 57, 57] },
     { s: "XAUUSD", d: "—", c: 2, col: C.red, pnl: "-$45", spark: [46, 47, 46, 45, 46, 47, 46, 45, 46, 47, 46] },
   ];
